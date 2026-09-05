@@ -2033,3 +2033,28 @@ Command to resume: /resume-composer
   architect's decision = the staging-PR form (PR #68 precedent; the
   pull_request triggers are unfiltered) -- reports + decision + two
   follow-ups committed in the toolkit; push agent next.
+- **H1b R0 round 0 FOLDED (`b7ced42`)**: fidelity 0C/2I (the re-pointed
+  predicate was NARROWER than 0.7's -- a 0x03 single under an unknown id or
+  with a wrong X length regressed to "outside the profile"; the wildcard arm
+  failed OPEN on a future payload kind) + tests 0C/4I (RED narrative said
+  "profile arm" where the cause was ADMISSION; a 109-column literal broke fmt;
+  the PreimageLengthMismatch family unnamed; six bare-bump failures not five).
+  Fold: preimage_plate by SHAPE (unshared, 33 bytes, 0x03) + the codec's
+  PreimageLengthMismatch, with a new id_kind_mismatch helper (L24 excluded);
+  positive Entr|Mnem arms + a REFUSING wildcard; RecordError::TagKindMismatch
+  so me seal names the mismatch; doc/message fixes; Task 4 keeps one
+  [Unreleased] and closes F-473 + advances F-454; M-6 (seam prose) filed with
+  H2. Gate re-run in the worktree: 9/9 targeted, both verbs name the 50-char
+  malformed plate, 619/616. r1 sonnet fold verification DISPATCHED.
+- **H2 SPEC R0 ROUND 0 LANDED: fidelity 3C/5I/6M/2N (`3f88280`), journey
+  2C/6I/5M/1N (`a70f950`).** Fidelity Criticals: the spec never forbids a
+  screen-layer normalisation and its tests use a phrase that is a fixed point
+  of seal.NormalisePassphrase (a fold ships green); §2's ms1-shape predicate
+  (codex32.New, checksum) is stricter than the host's shape-only
+  looks_like_ms1 (a grouped/mistyped plate the host refuses is derived from on
+  the device); the sha256 acceptance literal is seven hex chars. Journey
+  Criticals: the phrase is the only key to the path and no screen says to
+  write it and the method down (§8h names "the preimage", which this route
+  cannot produce); nothing relates the derived digest to any preimage the
+  operator holds (device/host method mismatch discovered at spend time).
+  ONE fold of the spec next.
