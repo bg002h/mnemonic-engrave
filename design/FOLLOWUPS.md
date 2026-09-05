@@ -15423,6 +15423,15 @@ is 47 rows (sha 5b3960ca…); the device (fork main 321acb56) matches master, no
 v0.8.0. Low reach: no `md` output ever writes a `+` into an origin; only a
 hand-typed record could. CHANGELOG [Unreleased] already carries the entry.
 
+**ADVANCED 2026-09-04 (H1b, this cycle is the next host change).**
+`crates/me-cli/Cargo.toml` is now `version = "0.8.1"` and the CHANGELOG's single
+`## [Unreleased]` section carries this entry beside H1b's. **Still OPEN**: the
+version bump is not a release. This closes only when the `v0.8.1` tag exists and
+`release.yml`'s assemble + sign has published the binary — the tag is explicitly
+NOT in the H1b plan's scope (the operator's call, or a fable decision, recorded
+when taken). Until then a release-binary operator still admits `+`-signed paths.
+Owning phase is unchanged: before composer S4's journey runs with a release binary.
+
 ### F-455 — `composer-secret-form-words-and-seedqr-are-one-plate`: SPEC §7f offers three secret forms; the device has two plate designs (owning phase: **a later cycle, spec fold at composer S4**) `#seedhammer` `#composer` `#backup`
 
 Filed 2026-09-02 by the S3 plan's author (`IMPLEMENTATION_PLAN_composer_S3_fork_gui.md`,
@@ -15648,7 +15657,7 @@ both sides and now pinned by the corpus row
 payload does not begin `0x03`**, plus shares of foreign ids". The convergence
 question this entry asks is unchanged; only the starting inventory was wrong.
 
-### F-473 — `ms-codec-0.8-bump-needs-a-preimage-refusal-arm`: at the 0.8 bump `validate_record` must gain an explicit `Payload::Preimage` refusal, and `seal::record::preimage_plate` must be re-pointed at it (owning phase: **H1b**) `#hashlock` `#me` `#gating`
+### F-473 — ~~`ms-codec-0.8-bump-needs-a-preimage-refusal-arm`~~ **CLOSED 2026-09-04 by `51f25c9`** (H1b: both halves landed in the same commit as the bump) `#hashlock` `#me` `#gating`
 
 Filed with hashlock H0 (2026-09-04). At the pinned ms-codec `0.7`, `me` refuses
 a kind-`0x03` string at the codec's own prefix gate
@@ -15679,6 +15688,30 @@ Both halves must land in the same commit as the bump. Neither is optional: (1)
 is funds-relevant (a preimage engraved as a seed), (2) is a diagnosis
 regression only.
 
+**CLOSED 2026-09-04 by `51f25c9`** ("me: ms-codec 0.8 -- a decoded
+Payload::Preimage is refused as a preimage plate on both host verbs"), the same
+commit as the `0.7` -> `0.8` bump, as this entry required.
+
+- **(1)** `validate_record`'s `Format::Ms` arm is now a `match` on the decoded
+  payload: `Ok((_, Payload::Preimage(_)))` -> `RecordError::PreimagePlate` on
+  the codec's SUCCESS path; `Ok((_, Entr | Mnem))` -> `RecordKind::Ms`; and
+  because `Payload` is `#[non_exhaustive]`, a wildcard `Ok(_)` that REFUSES, so
+  a payload kind a future minor adds cannot be placed as a seed. The error path
+  still names the kind, so the diagnosis survives either pin.
+- **(2)** `seal::record::preimage_plate` no longer asks for
+  `ReservedPrefixViolation` by name. It is keyed on the device's own SHAPE — an
+  `ms`-HRP, unshared (`0` at index 3, `s`/`S` at index 8), codex32-valid single
+  with a 33-byte payload whose first byte is `0x03`, the same test as the fork's
+  `codex32.IsPreimage` — plus the codec's `PreimageLengthMismatch`, with the
+  L24 id/kind mismatch excluded into its own predicate `id_kind_mismatch`.
+
+RED was seen before GREEN: at the bare bump the whole crate was 617 run, 608
+passed, 9 failed = the 3 box-local `history_purge` + the SIX this entry
+predicts, `a_preimage_plate_is_not_a_seed_record` failing with "validate_record
+admitted a 0x03 preimage plate as Ms". At the fold: 619 run, 616 passed, 3
+failed (`history_purge` x3). Both halves were mutation-checked; see
+`design/agent-reports/hashlock-H1b-implementation-report.md`.
+
 ### F-474 — `unlock-kdf-names-the-refused-record`: `ErrRecordNotPermitted` renders as "Payload unreadable." with no record index or class (owning phase: **H2**) `#seedhammer` `#ux` `#seal`
 
 Filed with hashlock H0 (2026-09-04). `seal.AdmitSection` refuses an encrypted
@@ -15695,3 +15728,33 @@ for the same for `ErrRecordNotPermitted`, naming the record index and its
 class. Owned by H2 because that is when the device learns the preimage kind and
 the copy can say something useful about it rather than only that it was
 refused.
+
+### F-475 — `seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`: the `bip93-plain-33-byte-payload-0x03` row's `source` prose says `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H2**) `#hashlock` `#seam-corpus` `#records`
+
+Filed 2026-09-04 from `hashlock-H1b-plan-R0-r0-fidelity` M-6, and MEASURED
+against ms-codec 0.8.0 before filing (a throwaway crate calling
+`ms_codec::decode` on the four strings in play, not read off the draft):
+
+| string | id | ms-codec 0.8.0 returns |
+| --- | --- | --- |
+| `ms10testsqvrsu9…` (this row) | `test` | `Err` — *unknown tag "test"; not a member of RESERVED_TAG_TABLE* |
+| `ms10entrsqv0qqq…` (`preimage-shape-entr-id`) | `entr` | `Err` — *tag "entr" does not name the kind the prefix byte 0x03 carries* |
+| `ms10hashsqw46h2…` (`preimage-plate-0x03`) | `hash` | `Ok(Payload::Preimage)` |
+
+So the row's parenthetical is wrong about WHICH error: `TagKindMismatch` is the
+`entr`-id row's error, one row over. The id `test` is not in the reserved table
+at all, so the codec never reaches the kind comparison.
+
+**The row's VERDICT is right and nothing is mis-refused.** `host_admits: false`
+holds at 0.8, and for the reason the row argues: `me`'s `preimage_plate` is
+keyed on the SHAPE, not on any codec error, so this string is named a preimage
+plate whatever its id — asserted since H1b (`51f25c9`) by this exact string in
+`sysw::tests::a_preimage_plate_is_named_not_misdiagnosed`. Only the prose
+explaining the 0.8 mechanism is wrong.
+
+**Owned by H2, not H1b**, and deliberately not fixed here: editing
+`testdata/codex32_seam_vectors.json` re-pins `SEAM_VECTORS_SHA256` in BOTH
+repos, and H2 vendors the corpus into the fork anyway. Fold the correction with
+that re-vendoring. Suggested replacement for the parenthetical: *(ms-codec 0.7
+at the prefix gate; 0.8 as an `UnknownTag` — the shape predicate, not the codec
+error, is what names it)*.
