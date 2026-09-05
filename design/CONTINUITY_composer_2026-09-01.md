@@ -1853,3 +1853,17 @@ Command to resume: /resume-composer
   the opus post-impl; run the walk (serve cmd/emu on a FRESH port, drive
   via playwright); fold; merge both branches; push engrave; fork PR/merge;
   flash at the operator's word; then ms-cli 0.18.0 (Task 11).
+- **H0 EMULATOR WALK PASSED (Task 3 Step 2).** emu.wasm built from fork
+  `hashlock-h0` (14afdff), served on a fresh port, driven via playwright
+  with `cmd/emu/walk_h0_preimage.js` (committed on the fork branch as its
+  second commit). Typed M*1 STRING door with the plate -> frame
+  "This record is a hashlock preimage, not a seed. It is not engraved as
+  one." / "Hashlock preimage"; NFC door (`shNFC.present(plate)`) -> "Unknown
+  format" on the start screen; no engrave/confirm frame in either trail;
+  ok:true. (First run's ok:false was the script comparing squashed text to
+  a spaced needle -- fixed; the device's behaviour was identical.) CONTROL
+  in flight: the same walk against an emulator built from unguarded main
+  839fa5aa must reach "Confirm Codex32 Secret". Controller gate re-run at
+  both tips: engrave 613/616 (history_purge x3, box-local), fmt clean,
+  seam sha f1f2fa6b...391c; fork vet + three packages + gui subset ok,
+  vendored corpus identical. Post-impl (opus) IN FLIGHT.
