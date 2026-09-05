@@ -1942,3 +1942,14 @@ Command to resume: /resume-composer
   Proceeding to H1 Task 11 (release) prep: the Step 1 gate evidence, the
   release gate, the publish dry run; the outward steps (release commit
   push, tags, publish) follow.
+- **OPERATOR RULINGS L24-L27 (2026-09-05, asked one by one at the
+  operator's request; ms `a1e0a6f`):** L24 TagKindMismatch refused (kept);
+  L25 `--random` requires `--out FILE` (kept); L26 release order:
+  "Release regardless of the device" -- 0.18.0 does not wait for a measured
+  flash/boot (H0 is merged and pushed in both repos; the controller flashed
+  nothing; a device still on 839fa5aa cuts a preimage plate as a seed until
+  flashed); L27 `--hashlock-phrase -` refused (kept). H1 Task 11 in
+  progress: release gate (build/nextest/clippy/fmt/vendor-freshness/publish
+  dry-run, isolated target) and the `me` H0 evidence build in flight; then
+  CHANGELOG date + corpus sha -> release commit -> staging ritual -> tags
+  `ms-codec-v0.8.0` + `ms-cli-v0.18.0` -> man-release -> acceptance report.
