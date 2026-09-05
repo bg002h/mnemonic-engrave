@@ -2745,3 +2745,14 @@ Command to resume: /resume-composer
   misses phrase records; collision copy dead-ends; PREIMAGE REQUIRED also
   marks mk1 cards; invisible Password refusal; no copy for the new abort
   window. Fidelity lens in flight.
+- H6 spec R0 r0: fidelity lens landed (ddf1cbc9, 4C/7I/7M/3N): the QR raise omits
+  `constantTimeQRModules` (every raised version errors; the constant-time test
+  is a tautology); scale 2 panics `ConstantQRCmd.Engrave` (the whole fit table
+  rests on it); `--pack-preimage` has no place in classification (strict
+  `classify` in decide_sealing: bearer cleartext or an inert flag); the
+  per-plate review sits on read-only `confirmReviewScreen`; `§` and `—` blank
+  the modal (fork's documented class); two headroom numbers do not reproduce.
+  All three lenses persisted (5C/17I total). Fold brief written (e95a1e21)
+  with `<C1_RULING>` pending the operator's answer on the missing ms1 preimage
+  encoder (recommendation: add it Rust-first with vectors). NEXT: ruling ->
+  dispatch the fold author -> r1 verification -> GREEN -> plan.
