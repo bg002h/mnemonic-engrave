@@ -2647,3 +2647,31 @@ Command to resume: /resume-composer
   from 0) in the {public|secret} section: ..." on both per-record loops; the
   public set decode keeps the section-less form. CHANGELOG [Unreleased]; no
   release cut (rides with the next me release). NEXT: push engrave.
+- **H6 BRAINSTORM (preimage plates) -- operator decisions, live walk 2026-09-05:**
+  (1) forms: EITHER the ms1 preimage plate string OR phrase + method as text;
+  QR optional and ALWAYS the phrase + method in plain text (never the ms1
+  string); default plate string / no QR; phrase form only when the phrase is
+  known; QR only with the phrase form. (2) QR text: labelled lines with a
+  version tag, method spelled IN FULL (pbkdf2-hmac-sha256 iterations=100000
+  salt=ms-hashlock-v1 dklen=32 | sha256), phrase last line. (3) entry
+  points: composer at HOLD + the UNSEALED wallet-policy payload (`me sysw
+  pack`) carrying either the ms1 preimage string or a NEW phrase record
+  (Rust first); sealed payload and typed door OUT; host-derived preimage is
+  first-class. (4) architecture C hybrid: composer-native for device-derived
+  (cut at Done in the bundle; header path/digest/csid) + a separate "Hashlock
+  plates" flow under the Wallet Policy door for payload records (header
+  digest / payload hash position / template id if carried); `Which hash?`
+  lists payload preimage/phrase records too. (5) dedicated plate layout for
+  both forms: HASHLOCK PREIMAGE / NOT A SEED + locator + body (+ QR right);
+  100-char phrase fits at the smallest rung. (6) Done review per plate (form,
+  QR); "not on any path, will not be cut" listed. (7) `sysw pack
+  --pack-preimage` (one flag, both kinds) + transit warning + warn on a stray
+  flag / unmatched digest. (8) free text + passphrase programs: WARN then cut
+  as typed; never refuse ("free text means free to engrave anything").
+  (9) RAM retention of preimage/phrase/method until Done accepted (F-483
+  class). Operator: "Ask agent first for all 7 sections and present me
+  remaining unsettled questions." -> design author (opus,
+  BRAINSTORM_hashlock_H6_preimage_plates.md + hashlock-H6-brainstorm-draft-
+  report.md) and journey walker (opus, hashlock-H6-brainstorm-journey-
+  questions.md) DISPATCHED (briefs 07a92e9b). NEXT: merge their question
+  lists -> present to the operator -> spec -> R0.
