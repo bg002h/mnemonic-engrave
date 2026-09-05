@@ -2421,3 +2421,9 @@ Command to resume: /resume-composer
   with the SH2 in BOOTSEL) and the H4 device walk (spec §8), recorded as
   ASSUMED at their word until then. Toolkit push 00980f9b in flight; engrave
   records since e77b097 to push after it.
+- **ALL PUSHES DONE.** Toolkit master 00980f9b pushed via PR #71 (examples,
+  test, clippy green first try; no bypass; report 46b40bbb local). Engrave
+  origin/master a382c14 (one local record 7601281 + this note unpushed). Fork
+  origin/main b9a9a30. ms origin/master e96676c (report 504ff46 local). No
+  agents running. The cycle ends here; the next moves are the operator's
+  (flash + H4) or a new cycle (F-480/484/485/488; F-487 spec walk).
