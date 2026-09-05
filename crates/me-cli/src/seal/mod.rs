@@ -1200,7 +1200,7 @@ mod tests {
     ///   "record 0 is secret material and cannot ride in the public section"
     ///
     /// Mutation this pins: delete the `classify(r) == Format::Ms` guard from
-    /// `check_public` — the assertion then sees `SealError::Record` instead.
+    /// `check_public` — the assertion then sees `SealError::RecordAt` instead.
     #[test]
     fn an_overlong_ms1_in_public_is_reported_as_a_secret_not_as_too_long() {
         // 91 characters: one past §10.2.1a's engraveable limit, and a secret.
