@@ -2566,3 +2566,7 @@ Command to resume: /resume-composer
   off b9a9a30 (worktree .tmp/seedhammer-hashlock-h5); h5-b merged --no-ff at
   6bc777d. A (Tasks 1-3), C (Task 5), D (records) still running. Engrave
   origin/master 583c59f.
+- **H5 implementer D done** (engrave h5-records 4e2cf01f: H2 spec §4.5/§4.7 folds +
+  five FOLLOWUPS closure headers carrying <FORK_MERGE_SHA>; toolkit h5-manual
+  b48af1c1: manual re-quote, make lint OK; report 28d2d3d). Both branches wait
+  for the fork merge SHA. A and C still running.
