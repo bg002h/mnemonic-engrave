@@ -490,3 +490,299 @@ packages.)
 
 Both `hashlock-h0` branches exist only locally, in their own worktrees, with
 clean trees at the tips reported above.
+
+---
+
+# Post-review fold
+
+The post-implementation review (`design/agent-reports/hashlock-H0-post-impl.md`,
+engrave master `87771f6`) returned **NOT GREEN — 1C / 2I / 4M / 1N** against
+engrave `265dc8e` and fork `14afdff`. All eight findings are folded below, one
+commit per finding or tightly related pair, on the same two branches. **Every
+defect was reproduced on the branch tip before it was fixed** — the review's
+suggested fixes were treated as suggestions, and the reproductions are quoted
+per finding.
+
+The fork branch had gained one controller commit, `45f3d4c` (the emulator walk
+`cmd/emu/walk_h0_preimage.js`); this fold builds on top of it and never touches
+that file.
+
+## Finding → commit → proof
+
+| finding | sev | repo | commit | proof it is closed |
+| --- | --- | --- | --- | --- |
+| C-1 Recover reaches Confirm/Engrave | **C** | fork | `52336b0` | new test drives the real Recover screens; mutation (guard back outside the `for`) reaches `Confirm Codex32 Secret` |
+| I-1 / M-2 the `0x03`/33-byte collision | **I/M** | engrave | `8018873` | corpus row + capture 37→38; `host_admits` flip fails `host <= device` |
+| I-1 / M-2 device half + the words | **I/M** | fork | `72506fb` | corpus re-vendored `cmp`-identical; `device_admits` flip fails with the row named |
+| I-2 / N-1 `me seal`'s raw codec error | **I/N** | engrave | `2089282` | `me seal` now names the kind; mutation restores the raw string and kills both tests |
+| M-1 / M-4 doc comments and "48 or 74" | **M** | engrave | `6e84280` | wording only; 77-char case measured and described |
+| M-3 godoc says NFC, is keypad | **M** | fork | `83fbc17` | comment only; the C-1 test drives that branch with `runes()` |
+
+### C-1 — the guard ran once, before a loop that reassigns what it guards
+
+**Reproduced first.** The review's own construction regenerated with the fork's
+`codex32.NewSeed` + `Interpolate` (2-of-N over a 33-byte payload beginning
+`0x03`, id `hash`) produced **the review's exact secret**,
+`ms12hashsqvqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jq9get7tzc6sn5y`
+— an independent confirmation, not a transcription. The new test then failed on
+the shipped tip:
+
+```
+--- FAIL: TestEngraveCodex32RefusesAPreimageRecoveredFromShares (0.00s)
+    codex32_polish_test.go:534: a preimage recovered from shares reached the SECRET confirm screen: "ConfirmCodex32SecretidHASHUnsharedsecret(S)75chars"
+```
+
+byte-identical to the frame the review reported.
+
+**Fix:** the `IsPreimage` test moved to the **top of the `for` body**, so it
+runs on the object a door handed in *and* on every `scan` the `codex32Recover`
+arm manufactures. The comment that carried the false assumption ("Both doors …
+end here") is replaced by one that states why the test must be inside the loop.
+
+**The test drives the real screens** — Confirm Codex32 SHARE → Recover
+(`Button2`) → share 2 on the keypad (`runes`) → OK (`Button3`) — and treats
+reaching **either** `Confirm Codex32 Secret` **or** `Engrave Plate` as fatal,
+rather than merely looking for the refusal afterwards. It also asserts its own
+premise (both shares are *not* preimages, so no upstream door refuses them, and
+their interpolation *is* one), so it cannot pass vacuously.
+
+One deviation, recorded: the shares are driven **UPPERCASE**. The first attempt
+used the lowercase canonical strings and failed with `"mismatchedtypeInvalid
+share"` — `codex32` requires one consistent case across a set, and the keypad
+uppercases what it types, so a lowercase share plus a typed one is a mismatched
+HRP. Uppercase is the form the device actually holds; the comment in the test
+says so.
+
+**Mutation, re-run at the final tip:** with the guard back outside the `for`
+body, `TestEngraveCodex32RefusesAPreimageRecoveredFromShares` fails on the frame
+quoted above **while the older `TestEngraveCodex32RefusesAPreimagePlate` still
+passes** — which is precisely why the defect survived the first round.
+
+### I-1 / M-2 — the collision, and the records that called it impossible
+
+**Reproduced on both sides first.** `ms10testsqvrsu9…` (id `test`, unshared,
+33-byte payload, first byte `0x03`):
+
+```
+ms10testsqvrsu len=75 seedlen=33 seed[0]=0x3 id="test" thr=1 idx=s IsPreimage=true
+ms10testsxy0qq len=75 seedlen=33 seed[0]=0x31 id="test" thr=1 idx=s IsPreimage=false
+```
+
+and the built `me` on the identical string:
+
+```
+me: record 0 (records count from 0) is a hashlock PREIMAGE plate (kind 0x03), not a seed record; …
+```
+
+while the `0x31` string is still "outside the profile". So the host refuses it
+too — **convergence, not a device narrowing**, which is the controller's ruling
+verified rather than assumed.
+
+**Behaviour stands; the words changed.** The doc comment's "A plain BIP-93
+secret whose seed begins 0x03 has a 16..32-byte payload and is untouched" is
+replaced by a paragraph that states the collision plainly, its rate (~1 in 256
+of 33-byte seeds), what is untouched (16/20/24/28/32-byte seeds, every share),
+and why it is accepted (`me` refuses the same string; keying on the id would
+engrave a mistagged **real** preimage as a seed — a refusal costs a re-encode, a
+wrong cut exposes a spend secret). The `mspayload_test.go` mutation comment is
+corrected in the same way, and **F-472's inventory** and the **CHANGELOG**, both
+of which had inherited the falsehood, now say the device had already lost one
+plain-BIP-93 population rather than none.
+
+**The fact became a test.** New seam row `bip93-plain-33-byte-payload-0x03`
+(`host_admits: false`, `device_admits: false`); the `0x31` row keeps
+`device_admits: true`.
+
+```
+codex32_seam_vectors.json  12 -> 13 rows (2 both / 6 device-only / 5 neither)
+record_corpus_pre_s2.json  37 -> 38 records, class Unknown, consult record-refusal
+sha256                     f1f2fa6b…391c -> bb703f608215bb00ccc677de4a282772016e774dd2d1d0f5c828ea38f5eac78b
+```
+
+RED first on both sides: the host showed `37` vs `38` in three `record_corpus`
+tests plus the pin mismatch; the fork showed the vendoring drift named
+verbatim (`hashes to bb703f60…, not the pinned f1f2fa6b…`). Both literals
+re-pinned; `cmp` confirms the two copies byte-identical.
+
+**A correction to the fold brief, measured.** The brief expected the new row
+flipped to `device_admits: true` to "fail the seam test on both sides". It fails
+on the **device side only**, and that is structural rather than a defect: the
+Rust test asserts the HOST verdict and the safe direction `host <= device`
+(`codex32_seam.rs:54`), and a `false`/`true` row satisfies that implication
+trivially — the crate cannot call Go's `sysw.Classify`. So the row is pinned on
+each side by the field that side can measure, and both were re-run:
+
+| flip | side | result |
+| --- | --- | --- |
+| `device_admits` → `true` | fork | `bip93-plain-33-byte-payload-0x03: device admits = false, want true (Classify = 0)` |
+| `device_admits` → `true` | engrave | **passes** — cannot fail, by design (see above) |
+| `host_admits` → `true` | engrave | fails at `codex32_seam.rs:54`, `the HOST admits what the DEVICE refuses` |
+
+### I-2 / N-1 — the second host verb
+
+**Reproduced first**, on the branch tip:
+
+```
+$ printf '%s\n' "$PLATE" | me seal --seal-secret --out a.uf2
+exit 4
+me: invalid record: reserved-prefix byte was 0x03, expected 0x00
+```
+
+**Fix:** a new `RecordError::PreimagePlate`, returned from `validate_record`
+before a decode error is mapped to `RecordError::Invalid`. A separate variant
+for the same reason `MsTooLong` is one: the record is intact and correctly
+checksummed — it is the wrong KIND, not corrupt — and §6.4 renders every other
+record failure as "payload unreadable". After:
+
+```
+me: this record is a hashlock PREIMAGE plate (kind 0x03), not a seed record; this container
+    cannot place one yet. A preimage backs a hashlock spend path, not a wallet — keep it with
+    the policy it unlocks, and do not re-encode it as entropy.
+```
+
+`me sysw pack` is unchanged and keeps its record index — verified by running
+both verbs after the change, not inferred.
+
+**N-1 closed in the same edit:** the pin test's `Err(_) => {}` now asserts
+`Err(RecordError::PreimagePlate)` exactly.
+
+**RED was made behavioural rather than a compile error** — the variant and its
+`Display` were added *unwired* first, so the two tests failed on conduct:
+
+```
+refused as Invalid("reserved-prefix byte was 0x03, expected 0x00"), not as a preimage plate
+stderr does not name the kind
+```
+
+**Mutation after wiring:** dropping the arm reproduces both failures.
+**F-473** now names both verbs and records that, since the diagnosis is shared,
+the 0.8 re-pointing is one arm.
+
+### M-1 / M-4 — wording, no behaviour change
+
+**M-1 reproduced.** Strings built at three payload widths under id `hash`:
+
+| payload | chars | `me sysw pack` says |
+| --- | --- | --- |
+| 32 B | 74 | outside the profile |
+| 33 B | 75 | hashlock PREIMAGE plate |
+| **34 B** | **77** | **hashlock PREIMAGE plate** |
+
+So "id `hash`, 75 characters" and "75 characters is the only shape" were both
+false: the predicate asks `ms_codec` about the PREFIX BYTE. Both comments now
+say kind byte `0x03`, name the well-formed plate as the 75-character `hash`
+case, and state that a malformed `0x03` string (§1's `PreimageLengthMismatch`)
+is named the same way and why that is the wanted direction — which matters
+because F-473 asks a future implementer to re-point this exact predicate using
+these comments.
+
+**M-4:** "Plain BIP-93 secrets **are** 48 or 74 characters" → "**are usually**
+48 or 74 characters". The corpus's own `bip93-plain-33-byte-payload-0x31` row is
+a 75-character plain BIP-93 secret.
+
+### M-3 — the godoc
+
+`recoverCodex32Flow` collects each further share through `inputCodex32Flow`,
+which is `newCodex32Keyboard` — no NFC anywhere on that path. Measured rather
+than read: the C-1 test drives that exact branch with `runes()`. The *reason*
+`unlockEngraveCodex32` does not reuse `engraveCodex32` is unchanged and still
+correct.
+
+## Mutations — all 14, re-run at the fold tips. No survivors.
+
+Every mutation was applied to the branch tree, observed, restored from a byte
+backup and `touch`ed; `git status --porcelain` was empty after each batch.
+
+| # | mutation | fails with |
+| --- | --- | --- |
+| R1 | swap the two arms in `unknown_reason` | `left: Err(Unclassifiable(0, Bip93OutsideTheProfile(75)))`; `stderr does not name the kind` |
+| R2 | `validate_record` admits `ms10hash` | `preimage-plate-0x03: host verdict` (`left: true right: false`) + the pin test |
+| R3 | `preimage_plate` always `false` | the two sysw witnesses **and now** `refused as Invalid("reserved-prefix byte was 0x03, expected 0x00"), not as a preimage plate` — N-1's tightening turned R3 from a 2-witness into a 3-witness mutation |
+| R4 | drop the `preimage_plate` arm from `validate_record` | both I-2 tests (raw codec string returns) |
+| G1 | `IsPreimage`: drop `!f.Unshared` | `IsPreimage(bip93-share-payload-0x03 …) = true, want false` |
+| G2 | `IsPreimage`: `len(d) > 0` | `IsPreimage(bip93-plain-payload-0x03 (16-byte seed …)) = true, want false` |
+| G3 | `IsPreimage`: `d[0] != msPrefixEntr` | `IsPreimage(bip93-plain-33-byte-payload-0x31 …) = true, want false` |
+| G4 | `IsPreimage`: key on the id `hash` | `IsPreimage(preimage-shape-entr-id …) = false, want true` |
+| G5 | `isStrictMs1`: drop the guard | `preimage-plate-0x03` + `preimage-shape-entr-id`: `device admits = true, want false` |
+| G6 | `seal.Classify`: drop the guard | `Classify(…) = codex32 secret, want unknown format` + `AdmitSection` |
+| G7 | `unlockEngraveCodex32`: drop the guard | `never reached "hashlock preimage"; last frame "Insertablankplate… EngravePlate"` |
+| G8 | `engraveCodex32`: drop the in-loop guard | **both** door tests, including the new Recover one |
+| G9 | `gui/scan.go`: drop the guard | `Scan(preimage plate) = codex32.String, <nil>; want errScanUnknownFormat` |
+| **G10** | **new — guard OUTSIDE the `for` body** | `a preimage recovered from shares reached the SECRET confirm screen: "ConfirmCodex32SecretidHASHUnsharedsecret(S)75chars"` |
+| **G11** | **new — the collision row → `device_admits: true`** | `bip93-plain-33-byte-payload-0x03: device admits = false, want true (Classify = 0)` |
+
+## Final gates — verbatim, at the fold tips
+
+### mnemonic-engrave `6e84280` (clean tree)
+
+```
+     Summary [   0.615s] 617 tests run: 614 passed, 3 failed, 2 skipped
+        FAIL [   0.003s] (432/617) mnemonic-engrave::history_purge editing_the_file_alone_is_the_trap_the_message_warns_about
+        FAIL [   0.003s] (438/617) mnemonic-engrave::history_purge the_harness_records_history_at_all
+        FAIL [   0.006s] (444/617) mnemonic-engrave::history_purge the_emitted_zsh_recipe_actually_purges_the_entry
+error: test run failed
+nextest exit=100
+error: manual implementation of `.is_multiple_of()`
+   --> crates/me-cli/src/sysw/composer_records.rs:114:8
+clippy exit=101
+fmt exit=0
+```
+
+**617 run, 614 passed** (was 616/613 — the fold adds one test, `me seal`'s).
+The three failures are the same box-local `history_purge` trio (`/usr/bin/zsh`
+absent). Clippy is red on the same **pre-existing, untouched**
+`composer_records.rs:114` lint the plan names as the local nightly's, green in
+CI at `917d4e3` — unchanged from the pre-fold report's deviation 5, and still
+flagged rather than called green. `fmt --check` clean.
+
+### seedhammer fork `83fbc17` (clean tree)
+
+```
+=== go vet ./codex32/ ./sysw/ ./seal/ ===
+vet exit=0
+=== go test -count=1 ./codex32/ ./sysw/ ./seal/ ===
+ok  	seedhammer.com/codex32	0.004s
+ok  	seedhammer.com/sysw	0.184s
+ok  	seedhammer.com/seal	11.932s
+test exit=0
+=== gui-shard-test.sh ./gui/ 24 ===
+    1205 top-level tests
+    partition verified exhaustive: 1205 == 1205
+RESULT: ok -- all 1205 tests ran across 24 shards
+shard exit=0
+=== gofmt -l (repo) ===
+gui/transaction.go
+gui/transaction_golden_test.go
+gui/transaction_txrecord_test.go
+```
+
+Fully green. **1205** gui tests, up from 1204 — the one new test is C-1's — with
+the partition asserted exhaustive, so nothing was silently dropped. The three
+`gofmt` files are the same pre-existing ones present on untouched `main`; every
+file this fold touched is clean.
+
+## Firmware, re-measured at the fold tip
+
+```
+$ nix develop -c tinygo build -size short -o /dev/null -target pico-plus2 \
+    -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller
+   code    data     bss |   flash     ram
+1551336   31796   31004 | 1583132   62800
+```
+
+| | flash | ram |
+| --- | --- | --- |
+| fork `main` `839fa5aa` | 1,582,628 | 62,800 |
+| pre-fold `14afdff` | 1,583,100 | 62,800 |
+| **fold tip `83fbc17`** | **1,583,132** | **62,800** |
+| delta vs `main` | **+504 B** | **0** |
+| delta vs pre-fold | **+32 B** | **0** |
+
+The fold costs 32 bytes of flash — the C-1 guard moving inside the loop — and no
+RAM. Still inside "a few hundred bytes" of the plan's reference.
+
+## Still not mine, still not done
+
+The emulator walk beyond the controller's `45f3d4c`, the merge to fork `main`,
+the flash, the re-review of this fold, the continuity entry, and any push.
+**Nothing was pushed; no commit was made on `master` or `main`.**
