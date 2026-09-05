@@ -2532,3 +2532,18 @@ Command to resume: /resume-composer
   re-measured). r1 brief pre-written (125efd3). NEXT: fold lands -> checker
   re-run -> commits (plan, spec, report) -> r1 sonnet verification -> GREEN
   -> four implementers (briefs 6f69a13, fill PLAN_GREEN_SHA).
+- **H5 PLAN ROUND 0 FOLDED (plan `a85c9fb`, spec `61a47e4`, report 9a69224)** by
+  an opus fold author: the walk now compares the stored digest to the token
+  PARSED from the confirm frame (the tautology closed); the ok-guard checks
+  every assignment; the two stolen doc comments restored (go doc -u prints
+  them); the operator-agreed copy (write-down second sentence 343/107; plain
+  form 133/397); 'Before you cut plates' (181/339); refusal clause (175/378 --
+  the report's 397 was for the old body); hook share 'no measurable cost'
+  (-16 B, layout noise); Step 12 revert discipline. Controller re-run: checker
+  55/0; five packages ok; whole gui 1239 / 24 shards ok on the second run --
+  the first hit `TestEngraveScreenReleasesResumeStateOnReturn` INCONCLUSIVE
+  (pre-existing load flake, 3/3 alone; filed F-490, 54cac31). **r1 sonnet
+  verification DISPATCHED** (brief a5698d7). NEXT: GREEN -> fill
+  PLAN_GREEN_SHA into the four implementer briefs -> dispatch A/B/C/D in
+  parallel -> merge h5-a..d into `hashlock-h5` -> gates + three walk runs ->
+  post-impl -> merge fork main -> push -> signed image.
