@@ -1969,3 +1969,16 @@ Command to resume: /resume-composer
   the operator's call; H1b (me's bump) needs 0.8.0 published. Acceptance
   (Step 3, spec §12 items 1-6) being run against a local build at cd0a60f;
   re-checked against the released musl binary once the assets exist.
+- **ms-cli 0.18.0 + ms-codec 0.8.0 RELEASED (2026-09-05).** ms master
+  `cd0a60f` pushed via the ritual (four contexts, no bypass); tags
+  `ms-codec-v0.8.0` and `ms-cli-v0.18.0` on that SHA; `man-release` success
+  with 7 assets (two musl tarballs, man tarball, PROVENANCE x2, SHA256SUMS
+  x2); released x86_64 musl binary re-checked: checksum OK, digests and
+  re-derivation identical to the local build. Acceptance report
+  `ms-hashlock-H1-acceptance.md` committed with the release report (ms
+  master, one commit after cd0a60f). NOT DONE: `cargo publish -p ms-codec`
+  (crates.io still 0.7.0) -- the operator's call, asked; H1b (me's 0.8
+  bump, F-473) waits on it. NOT DONE: the flash (operator assumed the boot;
+  ruling L26). The hashlock-phrase cycle's H1 is SHIPPED; H0 merged; H2
+  (device: 0x03 arm + "Type a hashlock phrase" row + method pick) is the
+  next stage, unplanned.
