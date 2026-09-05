@@ -2264,3 +2264,19 @@ Command to resume: /resume-composer
   post-impl (brief hashlock-H2-post-impl-brief.md, fill tips) -> fold ->
   merge fork main --no-ff -> push -> pre-build signed image -> H4 ASSUMED at
   the operator's word; flash at their word only.
+- **H2 IMPLEMENTED (fork `hashlock-h2` e1bf137, 5 commits off c4a64fc; engrave
+  `hashlock-h2` 5a1b825 off 279d731; report on the engrave branch).** Every
+  plan RED reproduced; 32 mutation runs; hashlock+codex32 ok; gui 1220 /
+  24 shards exhaustive ok; checker 26/0 against the implementer's worktree.
+  **Emulator walk PASSED** (49.4 s, ok:true, fresh port, branch build):
+  anchor sha256 + hardened digests, mixed-case row (nothing normalises),
+  negative control differs, HOLD -> reconciliation -> `Path 1: hash only`.
+  Firmware 1,596,276 / 62,856 (+13,144 / +56 vs c4a64fc). Real plan defect
+  fixed minimally: Task 3 used `st.hashByPhrase` before Task 4 added the
+  field (the gate wired all tasks at once, so it could not see ordering).
+  F-481 filed (phrase screen draws no readout; `show` inert) under H3 --
+  post-impl brief item 10 asks the reviewer to grade it. F-474 (owned by H2,
+  unscheduled) -> **Task 7 dispatched to the same implementer** (brief
+  d3a9d86); F-475 re-scheduled to H3 (records in Task 7). 12 deviations
+  recorded. NEXT: Task 7 tips -> controller gate re-run + walk re-run (fresh
+  port) -> opus post-impl (fill tips) -> fold -> merge -> push -> signed image.
