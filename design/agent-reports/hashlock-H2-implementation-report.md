@@ -2,7 +2,7 @@
 
 **Plan:** `design/IMPLEMENTATION_PLAN_hashlock_H2_device.md` (engrave master `1cb05b8`, STATUS R0 GREEN).
 **Spec:** `design/SPEC_hashlock_H2_device.md` (GREEN `55ee7a4`).
-**Branch tips:** seedhammer fork `hashlock-h2` = **`e1bf137`** (5 commits off `main` `c4a64fc`); mnemonic-engrave `hashlock-h2` = **`ae288e7`** (1 commit off `master` `279d731`), plus this report.
+**Branch tips:** seedhammer fork `hashlock-h2` = **`e1bf137`** (5 commits off `main` `c4a64fc`); mnemonic-engrave `hashlock-h2` = **`f67b94b`** (2 commits, branched from `master` at `279d731`). Engrave `master` moved to `047dafc` while this ran, adding only `design/agent-reports/push-engrave-279d731.md`, which this branch does not touch — the merge is clean.
 **Nothing pushed. No `master`/`main` commit. The merge, the flash, the post-implementation review and H4 are NOT mine.**
 
 Every count below is from a run captured once to a file under `/scratch/code/shibboleth/.tmp/h2-impl/` at the tip reported here, and quoted from that file.
