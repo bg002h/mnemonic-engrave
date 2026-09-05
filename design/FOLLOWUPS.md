@@ -15892,7 +15892,7 @@ A per-path array needs the same splicing discipline `composerAddPath` and
 "Remove path" already apply to `Paths` — a change to the composer's state model
 rather than to this route, which is why it is scheduled rather than bolted on.
 
-### F-481 — `hashlock-phrase-screen-draws-no-readout-and-show-does-nothing`: the phrase screen's `show` key is drawn, is tappable, toggles to `hide`, and reveals nothing, because the readout is height-clamped to empty (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
+### F-481 — ~~`hashlock-phrase-screen-draws-no-readout-and-show-does-nothing`~~ **CLOSED 2026-09-05 by fork `26fd1dd`** (post-impl I-2 graded it gating; the 8 px CutBottom removed; TestHashlockPhraseScreenDrawsTheMaskedReadout): the phrase screen's `show` key is drawn, is tappable, toggles to `hide`, and reveals nothing, because the readout is height-clamped to empty (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
 
 Filed 2026-09-05, MEASURED on the emulator during H2's Task 5 walk (fork
 `hashlock-h2`, emu.wasm from that branch, served on a fresh port). On the
@@ -15922,3 +15922,27 @@ merged into it) or drop the reveal key from this keyboard.
 reports the true length, and the confirm modal shows the digest, the method and
 the character count before anything is assigned. It is an affordance defect on a
 new screen, and the post-implementation review is where its severity is ruled.
+
+### F-482 — `hashlock-two-more-spec-4-copy-departures-unrecorded`: §4.1's no-payload lead REPLACES "Which hash?" instead of adding a second lead line, and §4.2's lead is prefixed with "This screen does that hashing for you." — both decided in the plan, neither recorded as a spec departure (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec` `#records`
+
+Filed 2026-09-05 from `hashlock-H2-post-impl` M-1. F-478 and F-479 record two
+§4.5 departures; these two have no record because
+`TestComposerCopyIsVerbatimFromTheSpec` compares the code against a table the
+implementer transcribed, so it cannot see a departure from the spec text.
+
+| spec | spec says | code does (fork `17b3979`) |
+| --- | --- | --- |
+| §4.1 | lead "No hash record in the payload…" as a SECOND lead line when `len(digests) == 0` | `composerHashRows` replaces "Which hash?" outright (`gui/composer_hash.go:169-171`; build-gate fix 9) |
+| §4.2 | lead "Use a phrase you have never used anywhere else." | `composerCopyHashlockPhraseLead` prepends "This screen does that hashing for you." (`gui/composer_copy.go:369`; plan line ~1187) |
+
+Both are defensible (the §4.2 prefix answers the §8i modal just dismissed).
+H3 folds the spec to the shipped copy, or records the departure beside
+F-478/F-479, with the replacement text.
+
+### F-483 — `hashlock-phrase-lives-in-an-unwipeable-go-string`: the typed phrase is `kbd.Fragment` (an immutable Go string) for the life of the phrase screen and across every Back via `initial`; `[]byte(kbd.Fragment)` copies it once more per OK; `seal.isPreimageRecord` stringifies a record a second time on the refusal path (owning phase: **a later follow-up; secret-handling, never gating**) `#hashlock` `#seedhammer` `#secret-handling`
+
+Filed 2026-09-05 from `hashlock-H2-post-impl` M-3, per the operator ruling of
+2026-08-27 (secret-handling defects are logged, never gating) and consistent
+with ruling L15 (no scrub discipline beyond what the composer does by
+construction). Remedy when taken up: a byte-slice fragment in the passphrase
+keyboard with an explicit wipe, and a classify path that does not re-stringify.

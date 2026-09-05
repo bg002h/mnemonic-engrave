@@ -414,3 +414,19 @@ Both the same as before Task 7, and both verified pre-existing at `c4a64fc`. `gi
 ### Not re-run, and why
 
 The emulator walk and the firmware size were **not** re-measured for Task 7. The walk drives the composer's phrase route and never enters the unlock flow, so nothing it asserts is reachable from this diff. The size delta is not claimed for `17b3979`; if the controller wants a number for the merge, it should be re-measured at the merge tip, since this commit adds a struct, a method and two functions to code that is linked either way.
+
+## Post-implementation fold (controller, fork `26fd1dd`)
+
+Opus post-impl review (`hashlock-H2-post-impl.md`): 0C/2I/3M/2N, NOT GREEN.
+Folded inline by the controller on the fork branch, each with a test that fails
+under its mutation (run, not asserted): **I-1** `TestHashlockPhraseRouteSetsTheCorpusDigest`
+asserts `hash <first8>..<last8>` and `chars: <n>` on the confirm frame -- the
+tail-half mutation fails it (`hashb867db87..b867db87`), `len(phrase)+1` fails
+it (`chars:29 ... want "chars: 28"`); **I-2 / F-481** the 8 px `CutBottom` is
+gone, the readout draws (`TestHashlockPhraseScreenDrawsTheMaskedReadout`: 10
+asterisks for 10 typed characters; 0 with the cut restored); **M-2** nil-`Key()`
+fails closed in `DeriveHardened`/`PreimageHardened`; **N-1**
+`TestHashlockRefusalCopyCoversEverySentinel` (deleting the `ErrHex64` arm
+fails it); **N-2** `IsMS1Shaped` folds case ASCII-only. **M-1** filed as F-482,
+**M-3** as F-483. Gates at `26fd1dd`: four packages ok; gui 1224 tests / 24
+shards ok; gofmt and vet unchanged from `c4a64fc` (pre-existing notes only).
