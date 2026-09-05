@@ -1,4 +1,4 @@
-You are the INDEPENDENT fold-verification reviewer (sonnet tier, narrowly scoped) for round 1 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H2_device.md` in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`). Round 0 ran five lenses (`design/agent-reports/hashlock-H2-plan-R0-r0-{fidelity,tests,journey,adversarial,coverage}.md`) and a refute pass (`hashlock-H2-plan-R0-r0-refute.md`, the deduplicated CONFIRMED/PARTIAL list is the fold's contract). The round-0 fold is ONE commit, `<FOLD_SHA>`, over the plan at `02abee6`; its message and the plan's `## R0 round 0 folded here` paragraph map each confirmed finding to its change.
+You are the INDEPENDENT fold-verification reviewer (sonnet tier, narrowly scoped) for round 1 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H2_device.md` in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`). Round 0 ran five lenses (`design/agent-reports/hashlock-H2-plan-R0-r0-{fidelity,tests,journey,adversarial,coverage}.md`) and a refute pass (`hashlock-H2-plan-R0-r0-refute.md`, the deduplicated CONFIRMED/PARTIAL list is the fold's contract). The round-0 fold is ONE commit, `f60c2df`, over the plan at `02abee6`; its message and the plan's `## R0 round 0 folded here` paragraph map each confirmed finding to its change.
 
 ONE QUESTION: does the fold fix every CONFIRMED and PARTIAL finding in the refute list, decline the rest with a stated reason, and introduce no new defect -- with every NEW claim, citation and code block true?
 
@@ -6,10 +6,10 @@ Read-only on every repo (`/scratch/code/shibboleth/mnemonic-engrave`; `/scratch/
 
 ## Already settled -- do not re-derive
 - Round 0's REFUTED findings are closed; do not re-review them. Rulings L5, L7, L12, L15, L16, L22, L24 stand.
-- `scripts/h2-plan-blocks-vs-tree.sh` at `<FOLD_SHA>` reports every block PASS (the controller ran it; output in the fold commit's message) -- the plan's code equals the gated tree; do not report block/tree mismatches unless you find one the script cannot see (a block without a path header).
+- `scripts/h2-plan-blocks-vs-tree.sh` at `f60c2df` reports every block PASS (the controller ran it; output in the fold commit's message) -- the plan's code equals the gated tree; do not report block/tree mismatches unless you find one the script cannot see (a block without a path header).
 
 ## Verify (execute; quote)
-1. For each CONFIRMED/PARTIAL finding in the refute list: the plan's change (`git diff 02abee6..<FOLD_SHA> -- design/IMPLEMENTATION_PLAN_hashlock_H2_device.md`), does it fix the defect as stated (not merely reword it), and is the mapping paragraph honest.
+1. For each CONFIRMED/PARTIAL finding in the refute list: the plan's change (`git diff 02abee6..f60c2df -- design/IMPLEMENTATION_PLAN_hashlock_H2_device.md`), does it fix the defect as stated (not merely reword it), and is the mapping paragraph honest.
 2. Every NEW file:line citation, constant, count, test name and "MUTATION:" claim the fold adds: grep it against the fork at `c4a64fc` and the gated tree (a fold adds citations that were never gated).
 3. Declined findings: is the reason stated and true.
 4. Contradictions the fold introduced within the plan (grep the superseded phrasing: a fold fails by incomplete propagation) and against the spec `design/SPEC_hashlock_H2_device.md` (GREEN `55ee7a4`).
