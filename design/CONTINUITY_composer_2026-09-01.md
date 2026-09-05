@@ -2438,3 +2438,17 @@ Command to resume: /resume-composer
   CYCLE (stage H5, device polish): F-487, F-480, F-484, F-485, F-488. Spine:
   short spec (single author) -> R0 lenses in parallel -> plan + gate -> ONE
   implementer -> post-impl -> merge -> push -> signed image.
+- **H5 (device polish) SPEC DRAFTED (`f6dd437`)**, single author, citations
+  measured at fork main b9a9a30: §1 F-487 reconcile screen shows `hash
+  <first8>..<last8>` + method and asks to write the digest beside the phrase
+  (confirm modal UNCHANGED: fit gate needs 80 headroom, ~107 available -- too
+  little for the extra clause); §2 F-480 `phraseDigests` value set replaces
+  the `hashByPhrase` flag and `composerHashByPhraseSync`; §3 F-484 lead inside
+  `composerPageLines`' band with a geometry gate (no nav ink; readout >= 19
+  px; <= 2 lines, else a prescribed fallback lead); §4 F-485 emulator hook
+  `shComposerPathHashes()`, pre-hold null / post-hold full digest, label
+  pick, no `ok` recomputation, plus a mutated-build control run; §5 F-488
+  next-step sentence with fit. **R0 round 0 DISPATCHED** (briefs 38f1af9):
+  fidelity + design (opus), journey walk (opus), tests + citations (sonnet).
+  NEXT: persist -> fold -> sonnet verification -> plan (+ gate) -> ONE
+  implementer -> post-impl -> merge -> push -> signed image.
