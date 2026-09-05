@@ -2077,3 +2077,10 @@ Command to resume: /resume-composer
   deleted; report committed in the toolkit (`67090e2a`, unpushed record).
   The H1b implementer brief is drafted (`hashlock-H1b-implementer-brief.md`,
   uncommitted, `<PLAN_SHA>` pending r1 GREEN).
+- **H1b PLAN R0 GREEN (`eece8a3`)**: r1 sonnet GREEN (`65043f6`; six Importants
+  reproduce as FIXED from the plan's text; 2M/1N folded as wording). Staleness
+  check vs 0f5ce23: 0 drifted. ONE opus IMPLEMENTER DISPATCHED (brief
+  `cc1f34e`): branch `hashlock-h1b` in `me-worktrees/hashlock-h1b`, own target
+  dir; stops before the me 0.8.1 release. Gate worktree h1b-gate removed.
+  NEXT: implementation -> opus post-impl -> fold -> merge -> push engrave;
+  the me 0.8.1 release is a fable/operator decision. H2 spec r1 in flight.
