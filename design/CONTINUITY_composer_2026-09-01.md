@@ -1932,3 +1932,13 @@ Command to resume: /resume-composer
   still await the operator (TagKindMismatch refusal; --random requires
   --out; H0-before-0.18.0 ordering, now honoured; --hashlock-phrase -
   refused).
+- **OPERATOR: "Let's assume it booted."** (2026-09-05, after the engrave push
+  `364b864` landed; report `bc913d2`.) Recorded as stated: the controller
+  has NOT flashed anything; the H0 firmware is merged and pushed at fork
+  main `c4a64fc` (1,583,132 / 62,800), and the boot is ASSUMED at the
+  operator's direction. The H0-before-0.18.0 ordering is therefore
+  satisfied by the operator's word, not by a measured boot; if the device
+  is later found on `bg839fa5a`, flash before any preimage plate exists.
+  Proceeding to H1 Task 11 (release) prep: the Step 1 gate evidence, the
+  release gate, the publish dry run; the outward steps (release commit
+  push, tags, publish) follow.
