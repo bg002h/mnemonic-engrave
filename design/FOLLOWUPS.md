@@ -15664,8 +15664,16 @@ refusal. Two things break the day `me` bumps to `0.8`:
    BY NAME. At `0.8` that error no longer occurs for `0x03`, so the predicate
    silently answers `false` and `me sysw pack` goes back to misdiagnosing the
    plate as "outside the profile". The unit test
-   `sysw::tests::a_preimage_plate_is_named_not_misdiagnosed` and the binary test
-   `sysw_pack_names_a_preimage_plate_and_never_echoes_it` are the tripwires.
+   `sysw::tests::a_preimage_plate_is_named_not_misdiagnosed` and the binary
+   tests `sysw_pack_names_a_preimage_plate_and_never_echoes_it` and
+   `seal_names_a_preimage_plate_and_never_echoes_it` are the tripwires.
+
+**BOTH host verbs, not just `sysw pack`** (post-implementation review I-2,
+folded 2026-09-04). `me seal` and `me sysw pack` both reach `validate_record`,
+so both lose their refusal at the bump and both must be re-pointed. Since the
+fold, the named diagnosis lives in `RecordError::PreimagePlate` — one arm,
+reached by both verbs — so the re-pointing is one edit; the two binary tests
+above are one witness each.
 
 Both halves must land in the same commit as the bump. Neither is optional: (1)
 is funds-relevant (a preimage engraved as a seed), (2) is a diagnosis

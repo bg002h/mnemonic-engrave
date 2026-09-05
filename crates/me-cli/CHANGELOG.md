@@ -14,7 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   NAMES the kind — "is a hashlock PREIMAGE plate (kind 0x03), not a seed
   record" — instead of misdiagnosing it as "outside the profile" and telling
   the operator to re-encode a spend secret as entropy
-  (`UnknownReason::PreimagePlate`, `seal::record::preimage_plate`). At the
+  (`UnknownReason::PreimagePlate`, `seal::record::preimage_plate`). **`me seal`
+  says the same thing**, via a new `RecordError::PreimagePlate` — before, the
+  second verb stopped at the raw codec string `reserved-prefix byte was 0x03,
+  expected 0x00`, with no kind name and, in a multi-record seal, no way to tell
+  which record. At the
   pinned ms-codec `0.7` the codec's prefix gate already refuses the string;
   `tests/preimage_plate_is_not_a_seed.rs` is the tripwire that goes red at the
   `0.8` bump if the refusing arm is forgotten (follow-up F-473).

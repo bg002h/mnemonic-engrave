@@ -69,6 +69,16 @@ pub enum RecordError {
     /// and too long to cut. Collapsing the two tells an operator with a
     /// perfectly good backup that it has been tampered with.
     MsTooLong(usize),
+    /// A hashlock PREIMAGE plate (SPEC_ms_hashlock §1, kind byte `0x03`).
+    ///
+    /// A SEPARATE variant for the same reason as `MsTooLong`: the record is
+    /// intact and its checksum is good — it is the wrong KIND, not corrupt —
+    /// and `Invalid`'s "invalid record: {codec error}" handed the operator the
+    /// raw `reserved-prefix byte was 0x03, expected 0x00` with no kind name and
+    /// no guidance. `me sysw pack` named the kind from H0's first commit; this
+    /// is the same diagnosis for `me seal`, the other verb that reaches
+    /// `validate_record` (post-implementation review I-2).
+    PreimagePlate,
 }
 
 impl std::fmt::Display for RecordError {
@@ -106,6 +116,13 @@ impl std::fmt::Display for RecordError {
                  {MAX_ENGRAVEABLE_MS1_LEN} (§10.2.1a). The record is INTACT — it is too long \
                  to cut, not unreadable. `me seal` refuses it here so the device does not \
                  refuse it after a ~31 s key derivation."
+            ),
+            RecordError::PreimagePlate => write!(
+                f,
+                "this record is a hashlock PREIMAGE plate (kind 0x03), not a seed record; \
+                 this container cannot place one yet. A preimage backs a hashlock spend \
+                 path, not a wallet — keep it with the policy it unlocks, and do not \
+                 re-encode it as entropy."
             ),
         }
     }
@@ -173,9 +190,17 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
             }
             // ms_codec::decode, NOT decode_with_correction — a seed that needed
             // repair must be fixed at source, not engraved.
-            ms_codec::decode(s)
-                .map(|_| RecordKind::Ms)
-                .map_err(|e| RecordError::Invalid(e.to_string()))
+            ms_codec::decode(s).map(|_| RecordKind::Ms).map_err(|e| {
+                // H0 (SPEC_ms_hashlock §9), post-impl review I-2: name the KIND
+                // before falling back to the codec's own words. `me seal` and
+                // `me sysw pack` both land here, so the diagnosis has to live
+                // at the shared refusal rather than in one verb's Display.
+                if preimage_plate(s) {
+                    RecordError::PreimagePlate
+                } else {
+                    RecordError::Invalid(e.to_string())
+                }
+            })
         }
     }
 }
