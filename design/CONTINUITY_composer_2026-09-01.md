@@ -1813,3 +1813,14 @@ Command to resume: /resume-composer
   walk, merge and flash are the controller's/operator's. NEXT: H1 r1 ->
   merge hashlock-h1 -> push ms; H0 impl -> post-impl (opus) -> emulator walk
   -> fork PR/merge -> flash at the operator's word -> then ms-cli 0.18.0.
+- **H1 MERGED to ms master (`7d12102`, --no-ff; plan record `1e3d6df`).**
+  r1 sonnet fold verification GREEN (ms `576fae9`: 5/5 C+I fixed, every
+  added test fails on its defect, no argv_guard regression). Controller
+  gated the MERGED tip in an isolated target dir: nextest 559/559, clippy 0,
+  fmt 0 on both toolchains. NOT RELEASED: ms-codec 0.8.0 / ms-cli 0.18.0 stay
+  unpublished until H0 is merged and flashed (spec §9 default). The H1 plan
+  carries an IMPLEMENTATION RECORD (D2 encode-order and D5 schema-pin plan
+  defects). ms push of 27 commits DISPATCHED (hand ritual, four contexts;
+  master frozen). Engrave pushed `423b276` (run 33932528219, no bypass;
+  report `92f2ec1`). Worktree `ms-worktrees/hashlock-h1` removed; branch
+  kept. H0 implementer still running.
