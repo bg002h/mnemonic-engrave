@@ -2509,3 +2509,13 @@ Command to resume: /resume-composer
   fold (spec departures -> spec fold or record) -> verification -> parallel
   implementers by disjoint files -> merge -> gates + three walk runs ->
   post-impl -> merge fork main -> push -> image.
+- **OPERATOR: "I'm away from device."** Flash + H4 deferred until they are back;
+  nothing waits on them (rebuild the signed image at the H5 merge tip so ONE
+  flash covers H0+H2+H5). Two copy calls stated to the operator, no
+  objection: (a) the write-down line's second sentence becomes "The phrase
+  and method are not on this device. Without both, this path can never be
+  spent." (journey I-1, measured 343/107); (b) §8h's PLAIN form becomes "Back
+  up every preimage separately." (journey I-2, 133/397), folded into H5. H5
+  plan lenses: tests 0C/0I/1M (50e1425), journey 0C/2I/5M/2N (55e3356);
+  fidelity in flight. NEXT: fold plan + spec once -> sonnet verification ->
+  four implementers.
