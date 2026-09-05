@@ -2467,3 +2467,11 @@ Command to resume: /resume-composer
   per §; build gate per TASK boundary this time -- memory
   `a-gate-that-wires-all-tasks-at-once-cannot-see-order`) -> R0 lenses ->
   ONE implementer -> three walk runs -> post-impl -> merge -> push -> image.
+- **OPERATOR (mid-cycle): "You may use multiple agents for parallel recon or
+  implementation, if needed."** Applied to H5 when the plan lands: split the
+  six tasks by DISJOINT file groups (the plan's git add lists decide; Tasks
+  1-3 share composer_copy.go / composer_hashlock.go -> one agent; Task 4
+  unlock_kdf.go, Task 5 hook + cmd/emu + walk, Task 6 records are disjoint ->
+  own agents), each in its own fork worktree/branch (h5-a..h5-d), controller
+  merges into `hashlock-h5`, then whole gates + the three walk runs at the
+  merged tip. Memory `implementation-tight-one-agent` amended.
