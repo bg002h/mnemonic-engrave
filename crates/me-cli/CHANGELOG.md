@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-04
+
 ### Added
 
 - **Hashlock H0** (`SPEC_ms_hashlock` §9): a kind-`0x03` hashlock PREIMAGE
