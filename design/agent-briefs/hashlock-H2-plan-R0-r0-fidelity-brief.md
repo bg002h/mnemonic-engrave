@@ -1,0 +1,25 @@
+You are the INDEPENDENT fidelity + design reviewer (opus tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H2_device.md` in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`, plan committed at `<PLAN_SHA>`). The spec it implements is `design/SPEC_hashlock_H2_device.md` (R0 GREEN at `55ee7a4`; three review rounds); the fork under change is `/scratch/code/shibboleth/seedhammer` at main `c4a64fc` (read-only); the corpus is ms `crates/ms-codec/tests/vectors/hashlock-v0.8.json` at `cd0a60f`.
+
+ONE QUESTION: if an implementer follows this plan literally, does the device derive the SAME digest the host derives for the same typed bytes and method, with every screen, Back edge and copy line the spec requires — and does the plan claim nothing false about the fork code and APIs it cites?
+
+Read-only; commit nothing; no sub-agents; read no `.jsonl`; do not create scratch copies (a tests reviewer runs the plan concurrently in its own; the controller's gate scratch is at `/scratch/code/shibboleth/.tmp/h2-gate` — you may READ it to see the wired tree, never modify it).
+
+## Already settled — do not re-derive
+- The build gate ran (a gate agent hand-wired every block into a scratch copy; its report `design/agent-reports/hashlock-H2-plan-build-gate.md` lists every fix it needed and the whole-package results). Do not report compile findings; DO report a plan block whose gated fix changed its meaning.
+- The spec's rulings (L5, L7, L12, L15, L16, L22, L24) and its three rounds' findings are settled; review the PLAN against the SPEC and the fork, not the spec.
+- Secret-handling never gates.
+
+## Verify (construct counterexamples; an assessment without one is Minor at most)
+1. **Spec §2 ↔ Task 1's `ValidatePhrase`/`IsMS1Shaped`.** Clause by clause against ms-cli `argv_guard.rs:148-164` and `format.rs:12-14` (`is_display_separator`: whitespace, `-`, `,`): does the Go shape test strip the SAME characters (the plan strips space/tab/newline/CR/`-`/`,` — Rust's `char::is_whitespace` is wider: does any printable-ASCII input differ? `0x20..=0x7E` contains only the space); is the 64-hex rule applied AFTER the shape test and the cap as on the host (order matters for a 64-hex string that is also… can a 64-hex string be ms1-shaped? no `ms1` prefix — state it); does `ValidatePhrase` accept exactly the corpus's `refusals` rows the host accepts?
+2. **Spec §3 ↔ Task 1's `DeriveHardened`.** `seal.NewDeriver`'s PBKDF2 (`seal/pbkdf2.go:85-150`): one HMAC-SHA256 block, iterations counted how (does `d.done = 1` after construction mean `Step(Iterations)` performs `Iterations` total, or `Iterations-1`?) — confirm against the corpus row values by reading the gate report's Task 1 result; is `Key()` 32 bytes; does `Wipe()` run on every path (the progress-false path included)?
+3. **Spec §4.6 ↔ Task 4's loop.** Trace `hashlockPhraseRoute` and `composerHashEdit` for every Back edge in §4.6 and for `composerAddPath`'s creation semantics (`composer_shape.go:262-272`): is there any path where `composerHashEdit` returns `false` other than Back at `Which hash?`; where the phrase is dropped when the spec says intact; where `Hash` is assigned before HOLD? Does `Type 64 hex`'s Back now return to `Which hash?` (a behaviour change the plan notes) and is that consistent with the spec?
+4. **Spec §4.5/§4.7 ↔ the copy.** Every string in Task 4 Step 1 against the spec's text; the relation line's index base (`matches hash 1` for the first record — `composerHashRow(i+1, d)` is 1-based); the drop order; `composerCopyHashEveryPathFor` gated on `hashByPhrase` — is that the spec's condition ("every path is hashed and at least one hash was set by phrase") and is `hashByPhrase` ever reset (edit a phrase-set hash back to a payload row or `No hash lock`)?
+5. **Spec §5 ↔ Task 3.** The label-keyed switch, the `default` panic, the §8i predicate; the test's coverage claim (0/1/2 digests); `composerPickScreenMaxRows` (24) versus the longest row set.
+6. **Spec §6 ↔ Task 2** and **§7.5 ↔ Task 5**: the decoder's error mapping; the walk's assertions (`b867db87..edbc96cb`, `chars: 28`) against the corpus.
+7. **Records.** Task 6's H3 pointers; anything the plan changes that a shipped comment or test description then contradicts (grep the fork for "never derives", "index-keyed", "Type 64 hex").
+
+## Severity
+Critical: a host/device digest divergence path; a Back edge that deletes a path or assigns a hash contrary to §4.6; a false claim about the fork API. Important: a missing screen/state, an unsound assumption, copy that differs from the spec, a test that cannot fail on what it names. Minor/Nit: wording, records.
+
+## Report (your final action)
+Write `/scratch/code/shibboleth/mnemonic-engrave/design/agent-reports/hashlock-H2-plan-R0-r0-fidelity.md` (create; must not exist): findings `### C-n / I-n / M-n / N-n — title` with the plan section, the counterexample or trace, and a SUGGESTION; the Back-edge table (edge, spec says, plan does); closing counts. Return a two-line summary plus the path.
