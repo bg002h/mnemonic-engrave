@@ -1,10 +1,12 @@
 # SPEC — Hashlock H2: the device leg (SeedHammer II fork)
 
-**STATUS: DRAFT 2026-09-05 — R0 round 0 FOLDED (fidelity opus 3C/5I/6M/2N
-`hashlock-H2-spec-R0-r0-fidelity.md`; journey opus 2C/6I/5M/1N
-`hashlock-H2-spec-R0-r0-journey.md`); round 1 (sonnet fold verification) pending.
-Citations measured at fork main `c4a64fc`, ms `cd0a60f`, engrave `1d54dc6`.**
-Previous STATUS: DRAFT, citations machine-checked, R0 dispatched (`bfd042e`).
+**STATUS: DRAFT 2026-09-05 — R0 round 1 FOLDED (sonnet fold verification
+`hashlock-H2-spec-R0-r1-fold-verification.md`: 5/5 C and 10/11 I fixed, I-5
+partial, TWO new Importants the round-0 fold introduced — a false mutation
+claim and a wrong fit-gate citation — all folded here); round 2 (sonnet, scoped
+to §2/§4/§7.1/§10 and I-5) pending. Citations measured at fork main `c4a64fc`,
+ms `cd0a60f`.**
+Previous STATUS: R0 round 0 folded (`60a86f6`); before that DRAFT (`bfd042e`).
 
 This is stage H2 of the hashlock-phrase cycle (`design/BRAINSTORM_hashlock_phrase.md`
 §4.1; SPEC_ms_hashlock §9's sequence). H0 (reader guards) is merged in both repos;
@@ -22,11 +24,14 @@ engraves a preimage this cycle; L12 both warnings warn, never refuse; L15 no scr
 discipline beyond what the composer does by construction; L16 §4.4 agreed; L22
 `0x03` inert, no new class (shipped in H0); L24 `TagKindMismatch` refused.
 
-**One sentence this stage makes false, and folds:** the composer spec's §14 and
+**One sentence this stage makes false, in two places:** the composer spec's §14
+(and its §6c line, `SPEC_wallet_policy_composer.md:386`) and the fork's
 `gui/composer_hash.go:27-28` say the composer "never derives, stores or engraves a
 preimage this cycle". From H2 the composer DERIVES one, in RAM, for the length of
-one screen; it still never stores, shows or engraves it. Both records are folded to
-say exactly that (fidelity I-5).
+one screen; it still never stores, shows or engraves it. The fork comment is
+rewritten by THIS stage's implementation commit (§1 item 5); the composer spec's
+two sentences are H3's (the records stage) and stay as they are until then —
+they are named here so H3 cannot miss them (fidelity I-5; r1 NF-C).
 
 ---
 
@@ -44,7 +49,10 @@ In:
 4. `codex32.DecodeMS1Preimage` (§6): the `0x03` arm as its OWN function with its
    own length rule; `DecodeMS1` unchanged (r2 C-2). No screen calls it this cycle;
    it exists so the kind has one decoder and one test, Rust-first.
-5. The two records above; a phrase-route form of §8h at Done (§4.7).
+5. The fork record above — `gui/composer_hash.go:27-28` becomes *"THE COMPOSER
+   DERIVES A PREIMAGE IN RAM FOR ONE SCREEN (H2) AND NEVER STORES, SHOWS OR
+   ENGRAVES IT. It puts a digest in a script."* — and a phrase-route form of §8h
+   at Done (§4.7). The composer spec's §6c/§14 sentences are folded by H3, not here.
 
 Out (§9): storing, displaying or engraving a preimage; reading a preimage plate
 into any flow; a scrub discipline; `ms split` of preimages; salt/iteration
@@ -89,9 +97,14 @@ normalisation on the phrase, is forbidden on this path.** Rule 3 folds a COPY
 only to detect a plate; the phrase itself is never changed. `Correct Horse` and
 `correct horse` are different phrases. Because the anchor phrase is a fixed
 point of every one of those folds, §7.1 and §7.2 MUST drive the corpus rows
-that are not: `Correct Horse Battery Staple` (case), `  a  b ` (leading,
-trailing and doubled spaces), `correct-horse,battery staple` (the separators a
-plate would strip). A screen-layer fold ships green against the anchor alone.
+that are not. `seal.NormalisePassphrase` is `ToLower(Join(Fields(s), " "))`
+(`seal/open.go:76-78`), so it changes exactly two corpus rows: `Correct Horse
+Battery Staple` (case) and `  a  b ` (leading, trailing and doubled spaces) —
+those two are the witnesses against it. The third row, `correct-horse,battery
+staple`, is a fixed point of that normaliser (r1 NF-A) and witnesses a DIFFERENT
+fold: a screen that stripped display separators from the phrase the way rule 3
+strips them from a COPY to detect a plate. A screen-layer fold of either kind
+ships green against the anchor alone.
 
 The limit is a named constant, `hashlock.PhraseMaxChars = 100`, the ONLY source
 of the counter's denominator and the rule's bound; a test asserts both read it.
@@ -141,10 +154,17 @@ is what the composer stores (`st.list.Paths[idx].Hash`, a `*[32]byte` —
 
 ## §4. Screens and copy
 
-All copy ASCII, inside the modal-fits gate the composer's copy tests enforce
-(`gui/composer_copy_test.go`: normalised capacity 588 with an 80-character
-margin). The confirm modal (§4.5) is the largest body this stage adds; §4.5
-states its drop order.
+All copy ASCII. The fit gate is `gui/modal_fits_test.go`'s `assertModalBodyFits`
+(r1 NF-B): it RENDERS each specific body (`firstModalFrame`) and measures the
+headroom for that exact text by appending filler (`modalHeadroom`), requiring at
+least `modalBodyMargin = 80` normalised characters (`modal_fits_test.go:51`);
+there is NO capacity constant — the file's own comment says capacity depends on
+how the words wrap, which is why it measures each body instead of budgeting them
+(the "588" in its comment is one historical measurement of unrelated filler, not
+a budget). Every new or changed body in this stage — the phrase screen's lead
+and refusals, both method modals, the confirm modal in its longest variant, the
+`Which hash?` no-payload lead, the phrase-route §8h — is ADDED to that test's
+table and measured; §4.5 states what to drop if its measurement fails.
 
 ### §4.1 `Which hash?`
 
@@ -200,15 +220,19 @@ survive. The method is a permanent property of the policy; the confirm modal
 
 Hardened: the countdown screen, title `Deriving`, zero-state lead *"Deriving.
 This takes about 10 seconds."*, then `About N seconds left.` from the measured
-rate. Back during the derivation abandons it and nothing is assigned (r2 Q3),
+rate, driven by `hashlock.DeriveHardened` — never `unlockDerive` and never a
+`seal.Header` (§3). Back during the derivation abandons it and nothing is assigned (r2 Q3),
 returning to the method pick with the phrase intact. A power loss ends the
 composition, as it does at any other point in this flow — `composerState` is RAM
 (journey M-4).
 
 ### §4.5 The confirm modal
 
-Title `Hash lock`. Lines, in order (drop order for the fit gate, journey M-2:
-none — this is the whole body; §8i and §8h are NOT here, see §4.7 and §5):
+The surface is the composer's own confirm screen, `composerConfirmScreen(ctx, th,
+title, body)` (`gui/composer_shape.go:77`), whose body ends with
+`composerConfirmBody`'s "Hold button to confirm." (`gui/composer_copy.go:32-33`):
+the operator HOLDS to confirm and presses Back to decline (fidelity M-4). Title
+`Hash lock`. Lines, in order (§8i and §8h are NOT here, see §4.7 and §5):
 
 ```
 hash  <first8>..<last8>
@@ -238,9 +262,16 @@ matches.
   route says so. The reuse lines are the brainstorm's §3.7 copy in full
   (fidelity M-5). The reconciliation line converts a divergence discovered at
   spend time into a five-minute check.
-- **CONTINUE** sets `st.list.Paths[idx].Hash` to the digest and returns to the
-  path; **Back** returns to the method pick with the phrase intact, nothing
-  assigned (§4.6).
+- **HOLD** (the confirm gesture) sets `st.list.Paths[idx].Hash` to the digest
+  and returns to the path; **Back** returns to the method pick with the phrase
+  intact, nothing assigned (§4.6).
+- **Drop order if `assertModalBodyFits` fails on the longest variant** (journey
+  M-2; r1 measured the normalised body at about 484 characters, headroom
+  uncertain because the 18-character digest token does not wrap): first shorten
+  the reuse block to the brainstorm's two sentences ("One phrase per policy.
+  Never use this phrase as a passphrase or a password anywhere else."), then
+  move the reconciliation line into the phrase-route §8h at Done (§4.7). The
+  backup line and the relation line are never dropped.
 
 The 64 visible bits (`first8..last8`) are a transcription check, adequate ONLY
 because the full-width lockstep vector runs in CI (§7.1); the H4 walk records
@@ -345,8 +376,10 @@ where it says so (fidelity I-4). Tests:
   Go code recomputed (mutations: zero-pad the salt to 16 bytes → every hardened
   row fails; 99,999 iterations → every hardened row fails; **fold the phrase
   through `seal.NormalisePassphrase` before deriving → the `Correct Horse
-  Battery Staple`, `  a  b ` and `correct-horse,battery staple` rows fail** —
-  fidelity C-1; the anchor row alone would not);
+  Battery Staple` and `  a  b ` rows fail** (the anchor row alone would not,
+  and `correct-horse,battery staple` is a fixed point of that normaliser — r1
+  NF-A); **strip display separators from the phrase before deriving → the
+  `correct-horse,battery staple` row fails** — fidelity C-1);
 - every `refusals` row (15) through the §2 rule: empty, TAB/DEL/0xFF, ` ~`
   accepted, 64-hex both cases refused naming `Type 64 hex`, `beef` accepted,
   the plate lowercase / UPPERCASE / grouped by 5 / with leading and trailing
@@ -370,9 +403,10 @@ for the phrase typed ONCE. The §2 refusals driven through the screen with the
 counter at `101/100`, with a 64-hex phrase, with an ms1-shaped phrase (grouped
 and ungrouped). The two method modals appear when their condition holds and not
 otherwise (19 vs 20 characters; SHA-256 always). The confirm modal's relation
-line with 0, 1 and 2 payload records (matching and not). Geometry: the confirm
-modal fits with the relation line present and `chars: 100` (the longest
-variant), and the no-payload lead fits.
+line with 0, 1 and 2 payload records (matching and not). Geometry: every body §4 adds
+or changes is in `modal_fits_test.go`'s table — the confirm modal in its longest
+variant (relation line present, `chars: 100`), the no-payload lead, both method
+modals, the phrase-route §8h — and `assertModalBodyFits` passes for each.
 
 ### §7.3 The switch
 
@@ -450,11 +484,13 @@ the corpus and re-pins both sha literals.
 | the three keyboards | `gui/passphrase_keyboard.go:76` (`NewPassphraseKeyboard`), `:92` (`NewTextKeyboard`), `:112` (`NewLineKeyboard`) |
 | `passphraseEntryFlow` hard-codes its title and messages | `gui/passphrase_flow.go:74` |
 | the countdown copy, its zero-state lead and step size; `unlockDerive(ctx, th, h seal.Header, pass []byte)` | `gui/unlock_kdf.go:26` (`kdfStepIterations = 500`), `:219-221` (`unlockKDFLead`, "about 30 seconds"), `:236`, `:242` |
-| the normalising template that is forbidden here | `sysw/open.go:55` (`seal.NormalisePassphrase`), `seal/open.go:231` |
+| the normalising template that is forbidden here | `sysw/open.go:55` (`seal.NormalisePassphrase`), `seal/open.go:231`; the composer spec sentence H3 folds: `SPEC_wallet_policy_composer.md:386` |
 | PBKDF2 and SHA-256 already linked | `seal/pbkdf2.go`, `seal/crypto.go`, `gui/unlock_kdf.go` |
 | `DecodeMS1` and its five callers | `codex32/mspayload.go:35`; `gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`, `gui/singlesig_verify.go:185`, `gui/multisig_verify.go:1237`, `bundle/verify.go:138` |
 | `IsPreimage` (H0) | `codex32/mspayload.go:94` (unshared, 33-byte payload, `0x03`) |
-| the modal-fits gate | `gui/composer_copy_test.go` (normalised capacity 588, margin 80) |
+| the fit gate: per-body render + headroom, `modalBodyMargin = 80`, no capacity constant | `gui/modal_fits_test.go:51` (`assertModalBodyFits`, `modalHeadroom`, `normalizeDrawn` :60-71; the comment at :32 records one historical 588-character filler measurement) |
+| the confirm surface and its hold gesture | `gui/composer_shape.go:77` (`composerConfirmScreen`), `gui/composer_copy.go:32-33` (`composerConfirmBody`: "Hold button to confirm.") |
+| what `seal.NormalisePassphrase` does | `seal/open.go:76-78`: `ToLower(Join(Fields(s), " "))` |
 | vendored-corpus convention | `sysw/testdata/record_class_vectors.provenance.json`, `sysw/codex32_seam_test.go` (sha pinned as a literal) |
 | the corpus, its sha, its `lockstep` and `refusals` arrays | ms `crates/ms-codec/tests/vectors/hashlock-v0.8.json` at `cd0a60f`, `a46c197a…1d30` (CHANGELOG ms-codec 0.8.0) |
 | the derivation constants; the phrase cap | ms `crates/ms-codec/src/hashlock.rs:27,30,32`; ms-cli `crates/ms-cli/src/hashlock_phrase.rs:24` |
@@ -465,6 +501,16 @@ the corpus and re-pins both sha literals.
 | ruling L22 and H0's guards | `codex32.IsPreimage`, `sysw.isStrictMs1`, `seal.Classify`, `gui/scan.go`, `engraveCodex32`, `unlockEngraveCodex32` at `c4a64fc` |
 
 ---
+
+## R0 round 1 folded here
+
+r1 NF-A → §2 and §7.1 credit the normaliser mutation to the two rows it actually
+changes and give the separators row its own mutation; NF-B → §4, §4.5, §7.2 and
+§10 cite the real gate (`assertModalBodyFits`, per-body, margin 80, no capacity
+constant) and require every new body in its table, with a drop order; NF-C /
+fidelity I-5 → the fork comment is this stage's, the composer spec's two
+sentences are H3's, said in the opening paragraph, §1 and §10; fidelity M-4 →
+`composerConfirmScreen` + HOLD; fidelity M-2 → §4.4 repeats the forbid.
 
 ## R0 round 0 folded here
 
