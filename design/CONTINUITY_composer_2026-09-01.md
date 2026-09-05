@@ -2639,3 +2639,6 @@ Command to resume: /resume-composer
   DISPATCHED** (report f489-seal-record-index-review.md): asks for the
   public-section path's test too. NEXT: fold if needed -> merge --no-ff ->
   push. No release owed (message-only; rides with the next me release).
+- F-489: branch tip now 768fb12f -- the PUBLIC section's locator gets its own CLI
+  test (corrupted md1 at public index 1; mutation fails it, run). Reviewer
+  messaged to include the commit. NEXT: review GREEN -> merge --no-ff -> push.
