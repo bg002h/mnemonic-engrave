@@ -1953,3 +1953,19 @@ Command to resume: /resume-composer
   dry-run, isolated target) and the `me` H0 evidence build in flight; then
   CHANGELOG date + corpus sha -> release commit -> staging ritual -> tags
   `ms-codec-v0.8.0` + `ms-cli-v0.18.0` -> man-release -> acceptance report.
+- **H1 RELEASE COMMIT ms `cd0a60f`** ("release: ms-codec 0.8.0 + ms-cli
+  0.18.0 -- corpus SHA pinned; H0 merged; released regardless of the device
+  (ruling L26)"): both CHANGELOG entries dated 2026-09-05, corpus sha
+  a46c197a...1d30 pinned, Step 1 evidence in the message (fork c4a64fc; me
+  6d8ef65 refuses the plate by name at exit 4 on `sysw pack` AND `seal`;
+  the plan's Step 1 wording superseded by H0's actual diagnosis -- recorded,
+  not re-planned), Step 2 gate at a1e0a6f (559/559, clippy, fmt x2, vendor
+  OK, publish dry-run OK). ONE sonnet agent DISPATCHED to: staging ritual
+  (five contexts incl. vendor-freshness) -> push master -> tags
+  ms-codec-v0.8.0 + ms-cli-v0.18.0 on the pushed SHA (by name, never
+  --tags) -> watch man-release -> list assets -> report
+  `push-ms-cd0a60f-release.md`. NOT dispatched: `cargo publish -p
+  ms-codec` to crates.io (0.7.0 is there; ms-cli last published 0.14.0) --
+  the operator's call; H1b (me's bump) needs 0.8.0 published. Acceptance
+  (Step 3, spec §12 items 1-6) being run against a local build at cd0a60f;
+  re-checked against the released musl binary once the assets exist.
