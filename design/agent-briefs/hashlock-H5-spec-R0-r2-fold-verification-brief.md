@@ -1,0 +1,11 @@
+You are the INDEPENDENT fold-verification reviewer (sonnet tier, narrowly scoped) for round 2 of the R0 gate on `design/SPEC_hashlock_H5_device_polish.md` in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`). Round 1's report `design/agent-reports/hashlock-H5-spec-R0-r1-fold-verification.md` (persisted `77621fb`) found the round-0 fold correct in substance but carrying four Importants of its own (R1-I-1 headroom 205/320 -> actually 186/339; R1-I-2 "shorter" -> 165 drawn, headroom 378; R1-I-3 §1.4 sent the reconcile clause to H2 §4.7, contradicting §2.5; R1-I-4 `composer_hashlock_test.go:916` asserts `st.hashByPhrase` and was not listed). The r2 fold is ONE commit, `44b1690`, over `d36ede5`; its `## R0 round 1 folded here` paragraph maps each.
+
+ONE QUESTION: does `44b1690` fix R1-I-1..R1-I-4 exactly (re-measure the two numbers yourself for the folded text; confirm §1.4/§2.5/H2 §4.7 are now consistent; confirm the :916 site and its rewrite are listed in §2.3 and §6), and does it introduce no new contradiction or false number?
+
+Read-only on every repo; for measurement use your own detached fork worktree `git -C /scratch/code/shibboleth/seedhammer worktree add --detach /scratch/code/shibboleth/.tmp/h5-r2 b9a9a30` (Go `/scratch/code/shibboleth/.toolchain/go/bin/go`; remove it when done); commit nothing; no sub-agents; never read any `.jsonl`. Scope is the r1 items and the diff `git diff d36ede5..44b1690 -- design/SPEC_hashlock_H5_device_polish.md` -- do not re-review round 0. The r1 report's §3 Minors (citation looseness) are being folded separately by the controller; note whether each is still present at `44b1690` but do not grade them above Minor.
+
+## Severity
+An R1 Important not fixed, a new false number or citation, a new contradiction = Important. Wording = Minor/Nit. A clean round closes R0 for this spec.
+
+## Report (your final action)
+Write `/scratch/code/shibboleth/mnemonic-engrave/design/agent-reports/hashlock-H5-spec-R0-r2-fold-verification.md` (create; must not exist): a table (R1 item, fold change, verdict), the two measurements quoted, the §4.7 consistency check, closing counts, a plain GREEN / NOT GREEN. Return a two-line summary plus the path.
