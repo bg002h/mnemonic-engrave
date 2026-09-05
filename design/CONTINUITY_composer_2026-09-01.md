@@ -2058,3 +2058,14 @@ Command to resume: /resume-composer
   cannot produce); nothing relates the derived digest to any preimage the
   operator holds (device/host method mismatch discovered at spend time).
   ONE fold of the spec next.
+- **H2 SPEC R0 ROUND 0 FOLDED (`60a86f6`)**: §2 forbids the screen-layer fold
+  by mechanism (seal.NormalisePassphrase named) and the lockstep drives the
+  three non-fixed-point corpus rows; rule 3 is the host's shape-only
+  looks_like_ms1; the sha256 literal corrected (b867db87..edbc96cb); §4.5 gets
+  the backup line, the payload relation line and the host-reconciliation line;
+  §4.6 states the Back contract once (a loop; false only at Which hash?;
+  tests through composerAddPath); §4.7 keeps §8h at Done with a phrase-route
+  form; the method modals get a verb and honest numbers; the composer's "never
+  derives a preimage" records are named for folding. r1 sonnet fold
+  verification DISPATCHED. Also in flight: H1b r1 verification; the toolkit
+  staging-PR push.
