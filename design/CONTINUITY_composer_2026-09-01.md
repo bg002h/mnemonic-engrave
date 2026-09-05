@@ -2210,3 +2210,11 @@ Command to resume: /resume-composer
   comprehension (sonnet).** NEXT: persist five reports -> refute pass (sonnet)
   -> persist -> ONE fold -> checker + sonnet fold verification -> GREEN ->
   ONE opus implementer (brief hashlock-H2-implementer-brief.md, fill PLAN_SHA).
+- **Rate limit hit (session limit, reset 23:40 Phoenix):** all five round-0
+  lens agents were terminated mid-work; two had already written their reports
+  (coverage 0C/1I/3M/1N persisted d4d5861; journey 0C/5I/3M/2N persisted
+  636c671, counts from headers -- no closing block). The other three
+  (fidelity, tests, adversarial) were RESUMED from their transcripts at
+  04:55 on 2026-09-05 after the operator's "Proceed"; reports pending. Engrave
+  origin/master = 1e61916 (pushed, no bypass). Pre-written: r1 fold-verification
+  brief (cda41ac, FOLD_SHA pending).
