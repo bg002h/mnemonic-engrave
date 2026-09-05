@@ -132,7 +132,8 @@ pub enum UnknownReason {
     /// a plain reading.** It says "not an md1/mk1/ms1/mt1 string", and this
     /// string *is* an `ms1` string — just not a constellation one. `ms1` is a
     /// two-gate profile over codex32 (a length in the profile's own sets, then
-    /// the 4-character id `entr`), so plain BIP-93 secrets at 48 and 74
+    /// the 4-character id `entr` for a seed or `hash` for a hashlock preimage
+    /// plate), so plain BIP-93 secrets at 48 and 74
     /// characters, and every BIP-93 *share*, land here. Pointing that operator
     /// at the classifier costs them the hour it takes to work out that the
     /// classifier was never the cause.
@@ -156,6 +157,10 @@ pub enum UnknownReason {
     /// the codec about the KIND, not about a length or an id
     /// (post-implementation review M-1).
     PreimagePlate,
+    /// An ms1 string whose 4-character id and kind byte disagree (SPEC_ms_hashlock
+    /// §1 rule 2, `TagKindMismatch`, ruling L24 — refused, never read by either
+    /// field). Damaged or forged: re-encode from the source rather than editing.
+    TagKindMismatch,
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the address gap belongs to — and, since S2,
     /// the case a descriptor `me` REFUSES lands in: the descriptor arm places
@@ -195,6 +200,12 @@ fn unknown_reason(record: &str) -> UnknownReason {
     // reserved prefix).
     // Before the profile arm: a preimage plate is INSIDE the profile's lengths
     // and would otherwise be reported as outside them (H0, SPEC_ms_hashlock §9).
+    // Before the preimage and profile arms: a mismatch is inside the profile's
+    // lengths and is neither a plate nor outside the profile (H1b, ruling L24).
+    // The HRP gate lives in the helper, as in its two siblings (fidelity N-1).
+    if crate::seal::record::id_kind_mismatch(record) {
+        return UnknownReason::TagKindMismatch;
+    }
     if crate::seal::record::preimage_plate(record) {
         return UnknownReason::PreimagePlate;
     }
@@ -850,7 +861,10 @@ mod tests {
     /// H0 (SPEC_ms_hashlock §9): a preimage plate is refused for its KIND,
     /// named as such, and NOT as "outside the profile" — it is 75 characters,
     /// inside the profile, and the profile arm would claim it if it ran first.
-    /// MUTATION: swap the two arms in `unknown_reason` -> `Bip93OutsideTheProfile(75)`.
+    /// MUTATION (measured at ms-codec 0.7): swap the two arms in `unknown_reason`
+    /// -> `Bip93OutsideTheProfile(75)`. At 0.8 the plate DECODES, so
+    /// `bip93_outside_the_profile` is false for it and the swap yields
+    /// `Unrecognised` instead; the test still fails either way.
     #[test]
     fn a_preimage_plate_is_named_not_misdiagnosed() {
         const PLATE: &str =
@@ -860,11 +874,80 @@ mod tests {
             pack(vec![PLATE.into()], None, ITER),
             Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
         );
+        // R0 r0 fidelity I-1: the shape names a 0x03 single whatever its id,
+        // exactly as the device does -- the seam corpus's `test`-id 33-byte row
+        // is a plate here; its 48-char sibling (a 16-byte payload) is not.
+        assert_eq!(
+            pack(
+                vec![
+                    "ms10testsqvrsu9guyv4rzwplgex4gkmzd9c8wl593jfe4gdg47mtm3xt6tv7qh3pm4xrfdlvvp"
+                        .into()
+                ],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
+        assert!(!matches!(
+            pack(
+                vec!["ms10testsqv0qqqqqqqqqqqqqqqqqqqqqqq8mzk8tjfdnjn5".into()],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate))
+        ));
+        // R0 r0 tests I-3: a kind-0x03 single whose X is not 32 bytes (id hash,
+        // 16-byte X, 50 characters) is refused by the codec as
+        // PreimageLengthMismatch and is named a preimage plate here too.
+        assert_eq!(
+            pack(
+                vec!["ms10hashsqw46h2at4w46h2at4w46h2at4w4ssrnvvaudn2k4d".into()],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
+        // Post-impl M-3: the `unshared` conjunct and the case-insensitive share
+        // index are load-bearing. A 2-of-N SHARE whose SSS point begins 0x03
+        // (seam corpus `bip93-share-payload-0x03`) is NOT a plate --
+        // MUTATION: drop `unshared` -> PreimagePlate. The UPPERCASE plate (the
+        // QR-alphanumeric form) IS one -- MUTATION: make the share-index test
+        // case-sensitive -> Unrecognised.
+        assert!(!matches!(
+            pack(
+                vec![
+                    "ms12testaqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqdq7pl8qdc5tsp"
+                        .into()
+                ],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate))
+        ));
+        assert_eq!(
+            pack(vec![PLATE.to_ascii_uppercase()], None, ITER),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
         // The control: an entr string of the same length is still a seed.
         assert!(matches!(
             classify("ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqcwugpdxtfme2w"),
             record::Class::Codex32Secret
         ));
+    }
+
+    /// H1b: an id/kind MISMATCH (SPEC_ms_hashlock §1 rule 2, ruling L24) is named
+    /// as such, not as "outside the profile". The string is the seam corpus's
+    /// `preimage-shape-entr-id` row: kind byte 0x03 under the id `entr`.
+    /// MUTATION: remove the TagKindMismatch arm -> `Bip93OutsideTheProfile(75)`.
+    #[test]
+    fn an_id_kind_mismatch_is_named_not_misdiagnosed() {
+        const MISMATCH: &str =
+            "ms10entrsqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5gz69g08wwtz9";
+        assert_eq!(MISMATCH.chars().count(), 75);
+        assert_eq!(
+            pack(vec![MISMATCH.into()], None, ITER),
+            Err(SyswError::Unclassifiable(0, UnknownReason::TagKindMismatch)),
+        );
     }
 
     /// **THE CONTROL, in both directions.** Without it, a predicate that

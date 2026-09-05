@@ -1,6 +1,6 @@
 [package]
 name = "mnemonic-engrave"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 description = "Prepare wallet backups and signed transactions for a SeedHammer II: `me sysw pack` builds the payload it engraves, from mt1 strings or a tx: record; bare `me` converts one md1/mk1/mt1 string to an NFC NDEF payload. Refuses secret ms1."
 license = "MIT OR Unlicense"
@@ -50,7 +50,7 @@ sha2 = "0.10"
 # this crate puts around the same words. Found by the Phase 2 Rust-side review.
 bip39 = { version = "2.2", features = ["zeroize"] }
 rand = "0.9"
-ms-codec = "0.7"
+ms-codec = "0.8"
 # The mt1 wire format -- the PRIMARY for everything sysw::mt converges on.
 # A path dependency because mt-codec lives in a private sibling repo
 # (mnemonic-transaction) and is unpublished; the layout is the constellation's

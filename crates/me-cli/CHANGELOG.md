@@ -18,10 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   says the same thing**, via a new `RecordError::PreimagePlate` — before, the
   second verb stopped at the raw codec string `reserved-prefix byte was 0x03,
   expected 0x00`, with no kind name and, in a multi-record seal, no way to tell
-  which record. At the
-  pinned ms-codec `0.7` the codec's prefix gate already refuses the string;
-  `tests/preimage_plate_is_not_a_seed.rs` is the tripwire that goes red at the
-  `0.8` bump if the refusing arm is forgotten (follow-up F-473).
+  which record. H0 shipped
+  against ms-codec 0.7, where the codec's prefix gate refused the string; H1b
+  moved the refusal onto the codec's success path and the tripwire test
+  `tests/preimage_plate_is_not_a_seed.rs` now asserts the named variant.
 - Five rows in the shared seam corpus `testdata/codex32_seam_vectors.json`
   (now 13 rows: 2 both / 6 device-only / 5 neither), vendored byte-identical
   into the SeedHammer fork and pinned by sha256 in both suites:
@@ -35,6 +35,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   convergence). 16-, 20-, 24-, 28- and 32-byte seeds and every share are
   untouched. The S2 pre-capture `testdata/record_corpus_pre_s2.json` grows
   33 → 38 with the same records, all `Unknown`.
+- **Hashlock H1b** (`SPEC_ms_hashlock` §9, follow-up F-473): the `ms-codec`
+  pin moves `0.7` → `0.8`, so `me` reads the RELEASED hashlock wire. At `0.8`
+  the codec DECODES a kind-`0x03` string as `Payload::Preimage`, so the refusal
+  H0 shipped is now on the codec's **success** path rather than an accident of
+  the old pin: `validate_record` answers `RecordError::PreimagePlate` for a
+  decoded preimage and never `RecordKind::Ms`. `Payload` is `#[non_exhaustive]`,
+  and the wildcard arm **refuses** — a payload kind a future `ms-codec` minor
+  adds cannot be placed as a seed until `me` has decided what it is, and the
+  compiler cannot warn about it. `seal::record::preimage_plate` is now
+  pin-independent and keyed on the device's own SHAPE (an `ms`-HRP, unshared,
+  codex32-valid single with a 33-byte payload whose first byte is `0x03`, the
+  same test as the fork's `codex32.IsPreimage`), so a `0x03` single under any
+  id — or with a wrong X length the codec can name (`PreimageLengthMismatch`,
+  which it reaches only when the string length sits in the profile's length
+  sets, i.e. X ∈ {16, 17, 20, 21, 24, 25, 28, 29, 32, 33}) — is named a preimage
+  plate on both host verbs rather than falling through to "outside the
+  profile". Any other X (18, 19, 22, …) is outside the profile's length sets and
+  is refused as exactly that (post-impl M-1).
+- An **id/kind mismatch** (`SPEC_ms_hashlock` §1 rule 2, ruling L24) — an `ms1`
+  single whose 4-character id and kind byte disagree — is diagnosed as what it
+  is on both verbs (`UnknownReason::TagKindMismatch`,
+  `RecordError::TagKindMismatch`, `seal::record::id_kind_mismatch`) instead of
+  as "outside the profile". It is refused and never read by either field: a
+  damaged or forged plate is re-encoded from the source, not edited.
 
 ### Changed
 

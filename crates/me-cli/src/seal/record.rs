@@ -79,6 +79,10 @@ pub enum RecordError {
     /// is the same diagnosis for `me seal`, the other verb that reaches
     /// `validate_record` (post-implementation review I-2).
     PreimagePlate,
+    /// An ms1 single whose 4-character id and kind byte disagree
+    /// (SPEC_ms_hashlock §1 rule 2, ruling L24): refused, never read by either
+    /// field. `me seal` and `me sysw pack` both name it (R0 r0 fidelity M-3).
+    TagKindMismatch,
 }
 
 impl std::fmt::Display for RecordError {
@@ -116,6 +120,12 @@ impl std::fmt::Display for RecordError {
                  {MAX_ENGRAVEABLE_MS1_LEN} (§10.2.1a). The record is INTACT — it is too long \
                  to cut, not unreadable. `me seal` refuses it here so the device does not \
                  refuse it after a ~31 s key derivation."
+            ),
+            RecordError::TagKindMismatch => write!(
+                f,
+                "this ms1 string's 4-character id and kind byte disagree; it is refused rather \
+                 than read by either field (SPEC_ms_hashlock §1 rule 2). A damaged or forged \
+                 plate — re-encode it from the source rather than editing the string."
             ),
             RecordError::PreimagePlate => write!(
                 f,
@@ -190,17 +200,35 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
             }
             // ms_codec::decode, NOT decode_with_correction — a seed that needed
             // repair must be fixed at source, not engraved.
-            ms_codec::decode(s).map(|_| RecordKind::Ms).map_err(|e| {
-                // H0 (SPEC_ms_hashlock §9), post-impl review I-2: name the KIND
-                // before falling back to the codec's own words. `me seal` and
-                // `me sysw pack` both land here, so the diagnosis has to live
-                // at the shared refusal rather than in one verb's Display.
-                if preimage_plate(s) {
-                    RecordError::PreimagePlate
-                } else {
-                    RecordError::Invalid(e.to_string())
+            //
+            // H1b (SPEC_ms_hashlock §9, F-473): at ms-codec 0.8 the codec DECODES a
+            // kind-0x03 string as `Payload::Preimage`. It is not a seed record and
+            // `RecordKind::Ms` is never answered for it — the arm is on the SUCCESS
+            // path. The error path keeps naming the kind for a codec that still
+            // refuses the prefix (0.7 behaviour), so the diagnosis survives either
+            // pin; `me seal` and `me sysw pack` both land here.
+            match ms_codec::decode(s) {
+                Ok((_, ms_codec::Payload::Preimage(_))) => Err(RecordError::PreimagePlate),
+                Ok((_, ms_codec::Payload::Entr(_) | ms_codec::Payload::Mnem { .. })) => {
+                    Ok(RecordKind::Ms)
                 }
-            })
+                // `Payload` is #[non_exhaustive]: a kind a future ms-codec minor
+                // adds arrives HERE, silently, and must not be placed as a seed
+                // until `me` has decided what it is. Refuse; the compiler cannot
+                // warn (R0 r0 fidelity I-2).
+                Ok(_) => Err(RecordError::Invalid(
+                    "an ms1 payload kind this me does not know; refusing to place it as a seed"
+                        .to_string(),
+                )),
+                Err(ms_codec::Error::TagKindMismatch { .. }) => Err(RecordError::TagKindMismatch),
+                Err(e) => {
+                    if preimage_plate(s) {
+                        Err(RecordError::PreimagePlate)
+                    } else {
+                        Err(RecordError::Invalid(e.to_string()))
+                    }
+                }
+            }
         }
     }
 }
@@ -213,7 +241,8 @@ pub fn validate_record(s: &str) -> Result<RecordKind, RecordError> {
 /// refused. Constellation `ms1` is a two-gate profile *over* codex32 — the
 /// string length must be in [`ms_codec::consts::VALID_STR_LENGTHS`] ∪
 /// [`ms_codec::consts::VALID_MNEM_STR_LENGTHS`], and then the 4-character id
-/// must be `entr` — so plain BIP-93 secrets (48 and 74 characters) and BIP-93
+/// must be `entr` (a seed) or, since ms-codec 0.8, `hash` (a hashlock preimage
+/// plate) — so plain BIP-93 secrets (48 and 74 characters) and BIP-93
 /// *shares* are perfectly valid codex32 and still not records this tool can
 /// place. Telling that operator "not an md1/mk1/ms1/mt1 string" is false on a
 /// plain reading, and points at the classifier when the cause is the profile.
@@ -233,32 +262,62 @@ pub fn bip93_outside_the_profile(s: &str) -> bool {
         && ms_codec::decode(s).is_err()
 }
 
-/// Is `s` a string of the hashlock PREIMAGE KIND (SPEC_ms_hashlock §1: kind
-/// byte `0x03`) — the one `ms1` shape that is inside the profile's lengths and
-/// is still not a seed?
-///
-/// **Keyed on the codec's kind refusal, not on a length or an id.** A
-/// well-formed plate is 75 characters with the id `hash`, but this asks only
-/// whether `ms_codec` refuses the string for its PREFIX BYTE, so a malformed
-/// `0x03` string — a 77-character one carrying a 34-byte payload, say, which
-/// §1 calls a `PreimageLengthMismatch` — is named the same way. That is the
-/// intended direction: the refusal is correct and the advice is right for
-/// both, and a predicate that checked the length would let the malformed one
-/// fall through to "outside the profile" (post-implementation review M-1).
-///
-/// H0 (SPEC_ms_hashlock §9). At ms-codec 0.7 the codec refuses the kind with
-/// `ReservedPrefixViolation { got: 3 }`, and this asks for exactly that, so
-/// the diagnosis names the kind instead of the profile. At the 0.8 bump the
-/// codec DECODES the kind and this arm must be re-pointed at the refusing
-/// arm `validate_record` gains then; `preimage_plate_is_not_a_seed.rs` is
-/// what goes red if either half is forgotten.
-pub fn preimage_plate(s: &str) -> bool {
+/// Is `s` an `ms`-HRP single whose 4-character id and kind byte disagree
+/// (SPEC_ms_hashlock §1 rule 2, ruling L24)? Refused, never read by either
+/// field; diagnosed by name on both host verbs (H1b). The HRP gate comes
+/// first, as in its two siblings, so a non-`ms` string never reaches the codec.
+pub fn id_kind_mismatch(s: &str) -> bool {
     let s = s.trim();
     matches!(classify(s), Ok(Format::Ms))
         && matches!(
             ms_codec::decode(s),
-            Err(ms_codec::Error::ReservedPrefixViolation { got: 0x03 })
+            Err(ms_codec::Error::TagKindMismatch { .. })
         )
+}
+
+/// Is `s` a hashlock PREIMAGE plate — an `ms`-HRP, codex32-valid, UNSHARED
+/// single whose kind byte is `0x03` (SPEC_ms_hashlock §1)? A well-formed plate
+/// is 75 characters with id `hash`; a `0x03` single under any other id, or with
+/// a wrong X length the codec can name (`PreimageLengthMismatch`, reached only
+/// when the string length sits in the profile's length sets), is named the same
+/// way, because the KIND is the prefix byte (the device's `codex32.IsPreimage`
+/// tests the same shape); any other length is outside the profile. Pin-independent
+/// (H1b, F-473): 0.7 refused the kind with `ReservedPrefixViolation { got: 3 }`,
+/// 0.8 decodes it or names its length; both answer `true` here.
+pub fn preimage_plate(s: &str) -> bool {
+    let s = s.trim();
+    if !matches!(classify(s), Ok(Format::Ms)) {
+        return false;
+    }
+    // An id/kind MISMATCH is diagnosed separately (ruling L24), never as a plate.
+    if id_kind_mismatch(s) {
+        return false;
+    }
+    // A kind-0x03 single whose X is not 32 bytes: the codec names the kind
+    // itself (`PreimageLengthMismatch`), and so does this (tests I-3).
+    if matches!(
+        ms_codec::decode(s),
+        Err(ms_codec::Error::PreimageLengthMismatch { .. })
+    ) {
+        return true;
+    }
+    // The KIND is the prefix byte on an UNSHARED single with a 33-byte payload —
+    // the same shape the device's `codex32.IsPreimage` tests (H0) — so a
+    // malformed or mistagged 0x03 single is named the same way on both sides,
+    // and a share or a plain 16..32-byte BIP-93 secret whose first byte happens
+    // to be 0x03 is not. BIP-93 layout: `ms1` + threshold char + 4-char id +
+    // share index; `0` and `s` mean unshared.
+    let b = s.as_bytes();
+    let unshared = b.get(3).is_some_and(|c| *c == b'0')
+        && b.get(8).is_some_and(|c| c.eq_ignore_ascii_case(&b's'));
+    unshared
+        && match ms_codec::codex32::Codex32String::from_string(s.to_string()) {
+            Ok(c) => {
+                let d = c.parts().data();
+                d.len() == 33 && d[0] == 0x03
+            }
+            Err(_) => false,
+        }
 }
 
 /// §6.3: every public record must belong to a card set that REASSEMBLES AND

@@ -2796,6 +2796,12 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 // not the classifier, and the message says so. The length and
                 // the two length sets are shape, never content — the record
                 // itself is a seed and is never echoed.
+                U::TagKindMismatch => format!(
+                    "record {i} (records count from 0) is an ms1 string whose 4-character \
+                     id and kind byte disagree; it is refused rather than read by either \
+                     field (SPEC_ms_hashlock §1 rule 2). A damaged or forged plate — \
+                     re-encode it from the source rather than editing the string."
+                ),
                 U::PreimagePlate => format!(
                     "record {i} (records count from 0) is a hashlock PREIMAGE plate (kind \
                      0x03), not a seed record; this container cannot place one yet. A \
@@ -2808,7 +2814,8 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      container cannot place it.\n      \
                      `ms1` is a two-gate PROFILE over BIP-93: the whole string must be \
                      {:?} characters (entropy) or {:?} (mnemonic), and the 4-character id must \
-                     be `entr`. This one is {len} characters.\n      \
+                     be `entr` (a seed) or `hash` (a hashlock preimage plate, which is refused \
+                     for its kind). This one is {len} characters.\n      \
                      Plain BIP-93 secrets are usually 48 or 74 characters and BIP-93 SHARES carry \
                      their own id, so neither is a constellation record — re-encode the \
                      entropy as `ms1` rather than editing the string.",
