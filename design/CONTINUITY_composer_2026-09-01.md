@@ -2196,3 +2196,17 @@ Command to resume: /resume-composer
   checker script `scripts/h2-plan-blocks-vs-tree.sh` (plan blocks == gated
   tree) as the re-gate. NEXT: fold commit -> fill PLAN_SHA in six briefs ->
   five lenses + refute -> fold -> ONE implementer.
+- **H2 PLAN GATE FOLDED (`02abee6`)** by an opus fold agent: 12 gate fixes + a
+  13th the gate applied but never logged (`hashHex` -> `hashlockHashHex`: gui
+  already declares `hashHex` at seal_fixture_test.go:172, so round 0's block
+  was a redeclaration) + 3 prose corrections + 5 import lines. Re-gate is
+  `scripts/h2-plan-blocks-vs-tree.sh` (38e21db): 25 blocks (5 whole files by
+  diff, 20 fragments verbatim), 0 FAIL, controller re-run in the fold commit.
+  Un-gated residue named: Task 5 Step 1's walk is prose, never executed (the
+  implementer writes and runs it; the controller re-runs). Fold report
+  persisted 23974d3. **R0 ROUND 0 DISPATCHED (five lenses in parallel, briefs
+  5685258): fidelity (opus), tests/mutation (sonnet, own scratch .tmp/h2-tests),
+  journey walk (opus), adversarial failure states (opus), coverage +
+  comprehension (sonnet).** NEXT: persist five reports -> refute pass (sonnet)
+  -> persist -> ONE fold -> checker + sonnet fold verification -> GREEN ->
+  ONE opus implementer (brief hashlock-H2-implementer-brief.md, fill PLAN_SHA).
