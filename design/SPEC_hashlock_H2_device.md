@@ -261,17 +261,27 @@ method: hardened   chars: <n>        (or: method: sha256   chars: <n>)
 <relation line, only when the payload holds hash: records>
 <other-path line, only when another path of this policy already carries a different
 hash: "another path has a different hash: back up every phrase">
-Write down this phrase and the method now. They are
-not on this device and not on your plates. Without
-both, this path can never be spent.
+Write down this phrase, the method and this digest
+now. The phrase and method are not on this device.
+Without both, this path can never be spent.
 One phrase per policy. Spending any path of a wsh
 wallet publishes this digest. Never use this phrase
 as a passphrase or a password anywhere else -- a
 spend publishes the preimage, and anyone can then
 test guesses at the phrase itself.
-Before you fund this wallet, run ms hashlock with this
+```
+
+The reconciliation lines are drawn on their own post-HOLD `showError` screen,
+shown immediately after HOLD assigns the digest and reachable for every policy
+that has a phrase-set hash (the drop order below names this same destination):
+
+```
+hash  <first8>..<last8>
+method: <m>   chars: <n>
+Before you cut plates, run ms hashlock with this
 phrase and method on the host and check the digest
-matches.
+matches. If they differ, do not fund this wallet:
+build it again.
 ```
 
 - `chars: <n>` is the phrase's byte count — the one signal that shows a stray
@@ -337,11 +347,12 @@ is hashed and at least one hash was set by phrase, the text reads
 > HASH ON EVERY PATH
 > Every way to spend this wallet needs a hashlock
 > preimage. It is not on this device and not on these
-> plates. Back up the phrase and its method, or the
+> plates. Back up every phrase and its method, and every
 > preimage plate, separately.
 
-(the shipped text names only "the preimage", an artifact this route cannot
-produce; `composerCopyHashEveryPath` at `gui/composer_copy.go:169-173`). The
+(the shipped text now ends *"Back up every preimage separately."*, still
+naming only "the preimage" -- an artifact this route cannot produce;
+`composerCopyHashEveryPath` at `gui/composer_copy.go:169-173` at `b9a9a30`). The
 §8i rule modal fires at the pick (§5) as today, once; it is not repeated in the
 confirm modal (journey N-1, fidelity M-4).
 
