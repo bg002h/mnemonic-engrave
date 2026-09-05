@@ -2485,3 +2485,13 @@ Command to resume: /resume-composer
   flight since 460e97c) messaged with the four changes. Memory
   `verify-folds-by-recomputation` gains: re-measure composed text; a quoted
   number is only as good as the body it measured.
+- **H5 SPEC R0 GREEN (`e03d8e7`).** r2 sonnet verification GREEN (3b16a2b): both
+  numbers re-measured, §4.7 consistent, :916 listed; its one Minor (a
+  forward reference to "Task 1" before any plan exists) grounded. Lens
+  closure: fidelity, tests/citations, journey, fold-verification x2. Plan R0
+  briefs carry SPEC_SHA e03d8e7 (cc790e6); PLAN_SHA pending the plan author
+  (opus, in flight, notified twice). NEXT: plan lands -> persist author report
+  -> commit plan + checker -> three plan lenses -> refute if needed -> fold ->
+  verification -> split implementers by disjoint files (h5-a: Tasks 1-3;
+  h5-b: Task 4; h5-c: Task 5; h5-d: Task 6 records) -> merge -> whole gates +
+  three walk runs -> post-impl -> merge fork main -> push -> signed image.
