@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hashlock H0** (`SPEC_ms_hashlock` §9): a kind-`0x03` hashlock PREIMAGE
+  plate is pinned as *never a seed record* on the host. `me sysw pack` now
+  NAMES the kind — "is a hashlock PREIMAGE plate (kind 0x03), not a seed
+  record" — instead of misdiagnosing it as "outside the profile" and telling
+  the operator to re-encode a spend secret as entropy
+  (`UnknownReason::PreimagePlate`, `seal::record::preimage_plate`). At the
+  pinned ms-codec `0.7` the codec's prefix gate already refuses the string;
+  `tests/preimage_plate_is_not_a_seed.rs` is the tripwire that goes red at the
+  `0.8` bump if the refusing arm is forgotten (follow-up F-473).
+- Four rows in the shared seam corpus `testdata/codex32_seam_vectors.json`
+  (now 12 rows: 2 both / 6 device-only / 4 neither), vendored byte-identical
+  into the SeedHammer fork and pinned by sha256 in both suites:
+  `preimage-plate-0x03`, `preimage-shape-entr-id` (the shape under the wrong
+  id — the kind is the prefix byte, not the id), and two `device_admits: true`
+  controls whose payloads begin `0x03`, `bip93-plain-payload-0x03` and
+  `bip93-share-payload-0x03`, which the device guard must NOT touch. The S2
+  pre-capture `testdata/record_corpus_pre_s2.json` grows 33 → 37 with the same
+  records, all `Unknown`.
+
 ### Changed
 
 - `me sysw pack`: a `key:` record whose origin path has a `+`-signed component
