@@ -2756,3 +2756,7 @@ Command to resume: /resume-composer
   with `<C1_RULING>` pending the operator's answer on the missing ms1 preimage
   encoder (recommendation: add it Rust-first with vectors). NEXT: ruling ->
   dispatch the fold author -> r1 verification -> GREEN -> plan.
+- **OPERATOR C-1 RULING: (1) add `EncodeMS1Preimage` Rust-first** (ms-codec/me
+  with corpus rows: id hash, kind 0x03, 75 chars, round trip; never emits
+  `entr`), then the Go port under a provenance pin with lockstep. Fold author
+  DISPATCHED (brief e95a1e21 + ruling).
