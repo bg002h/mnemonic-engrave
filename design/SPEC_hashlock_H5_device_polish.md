@@ -55,7 +55,7 @@ the phrase route and retyping (about 10 s hardened); neither is where the check 
 3. Both bodies get their rows: the reconcile body in the error-body fit table
    (`assertModalBodyFits`, longest content = `hardened`, `chars: 100`) and in the copy table
    (`TestComposerCopyTableCoversEveryBody`); the confirm body's existing rows carry the new
-   sentence (`composer_copy_test.go:130-137`, `modal_fits_test.go:388`).
+   sentence (`composer_copy_test.go:130-135`, `modal_fits_test.go:388`).
 4. H2 spec fold, part of this leg (the copy-verbatim test `TestComposerCopyIsVerbatimFromTheSpec`
    diffs the code against `SPEC_hashlock_H2_device.md`): §4.5's write-down sentence takes
    item 2's text and §4.5's post-HOLD reconcile clause quotes item 1's body (the reconcile
@@ -102,17 +102,17 @@ Done still names a phrase the composition no longer has.
    `No hash lock` row test that names `composerHashByPhraseSync` in its MUTATION comment)
    are all listed in §6; `composer_copy_test.go:144`'s row keeps its section and drives
    `composerAnyPathByPhrase` through a state built for it.
+4. Index identity is not used anywhere in this design (C16's lesson: "Remove path" splices
+   the slice). Two paths sharing one phrase digest are both by-phrase; a path whose phrase
+   digest is later replaced by the SAME digest typed as 64 hex is still by-phrase (the
+   digest was derived here once; the backup burden is unchanged) -- state this in the code.
+
 5. §8h's phrase form (`composerCopyHashEveryPathPhrase`, `composer_copy.go:461-466`) ends
    *"Back up every phrase and its method, and every preimage plate, separately."* -- "every"
    and "and", not "the" and "or": on a mixed wallet (one phrase path, one payload-row path)
    both backups are needed, one per path, and the old sentence offered a choice (journey I-3,
    constructed and quoted). Fit: 165 drawn (was 160), headroom unchanged at 378 (r1 verification).
    Copy-table row updated; H2 §4.7 folded to it.
-4. Index identity is not used anywhere in this design (C16's lesson: "Remove path" splices
-   the slice). Two paths sharing one phrase digest are both by-phrase; a path whose phrase
-   digest is later replaced by the SAME digest typed as 64 hex is still by-phrase (the
-   digest was derived here once; the backup burden is unchanged) -- state this in the code.
-
 ## §3. F-484 -- the phrase screen's lead wraps inside the page band
 
 **Today** (`gui/composer_hashlock.go:169-172`): the lead wraps at `dims.X-2*8` and is centred
@@ -184,7 +184,7 @@ the host and seal the payload again."* The index is 0-based (`seal/record.go:69`
 device said so nowhere while `me` says it thirteen times; once the number is an instruction
 to delete, a 1-based reading deletes the record ABOVE the plate -- in the package's own
 fixture, a seed (journey I-4). The body is shared by every `unlockRecordNoun` arm
-(`gui/unlock_kdf.go:391-393`), so the change applies to all of them; fit re-measured in the
+(`gui/unlock_kdf.go:390-393`), so the change applies to all of them; fit re-measured in the
 error-body fit table at the longest noun and a two-digit index (measured 397 headroom with
 this sentence); the copy-table row updated; `gui/unlock_preimage_test.go`'s frame assertion
 gains the new sentence. Documentation only (journey M-5): the re-sealed payload has a new
@@ -231,9 +231,9 @@ review; merge to fork main `--no-ff`; a signed image built (`sh2-flash -b`); the
 `gui/composer_copy.go:409-423` (confirm body), `:441-446` (reconcile + its stale comment),
 `:458-473` (§8h forms); `gui/composer_state.go:35-38`; `gui/composer_hash.go:177-199`;
 `gui/composer_shape.go:356` (Remove arm sync); `gui/composer_paged.go:62-90` (band);
-`gui/unlock_kdf.go:388-393` (the shared body), `:395-425` (noun arms);
+`gui/unlock_kdf.go:390-393` (the shared body), `:395-425` (noun arms);
 `gui/modal_fits_test.go:52` (`modalBodyMargin = 80`), `:33-35` (headroom is a line budget),
-confirm rows at `:342` and `:388`; `gui/composer_flow.go:33-34` (state construction);
+the reconcile body's row in the error-screen-body table at `:342` and the confirm-modal row at `:388`; `gui/composer_flow.go:33-34` (state construction);
 `gui/frame_hook.go` / `gui/frame_hook_tinygo.go` (the seam model); `gui/screen.go:95-98`
 (`frameTargets` drops the tag); `seal/record.go:69` (0-based index); `cmd/emu/walk_hashlock_phrase.js:74-76, 232,
 286-329`.
