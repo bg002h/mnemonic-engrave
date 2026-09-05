@@ -120,3 +120,22 @@ fn seal_names_a_preimage_plate_and_never_echoes_it() {
         "the record was echoed:\n{err}"
     );
 }
+
+/// H1b (F-473): the codec now DECODES the plate — prove the refusal is on the
+/// success path, not an accident of the pin. MUTATION: replace the
+/// `Ok((_, Payload::Preimage(_)))` arm with `Ok(_) => Ok(RecordKind::Ms)` (i.e.
+/// delete the arm) -> this fails on its SECOND assertion (`decoded` still
+/// succeeds — the codec is unchanged; measured), and
+/// `a_preimage_plate_is_not_a_seed_record` fails with "admitted ... as Ms".
+#[test]
+fn the_codec_decodes_the_plate_and_me_still_refuses_it() {
+    let decoded = ms_codec::decode(PREIMAGE_PLATE);
+    assert!(
+        matches!(decoded, Ok((_, ms_codec::Payload::Preimage(_)))),
+        "ms-codec did not decode the plate as Payload::Preimage: {decoded:?}"
+    );
+    assert!(matches!(
+        validate_record(PREIMAGE_PLATE),
+        Err(RecordError::PreimagePlate)
+    ));
+}

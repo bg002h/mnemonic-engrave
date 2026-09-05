@@ -132,7 +132,8 @@ pub enum UnknownReason {
     /// a plain reading.** It says "not an md1/mk1/ms1/mt1 string", and this
     /// string *is* an `ms1` string — just not a constellation one. `ms1` is a
     /// two-gate profile over codex32 (a length in the profile's own sets, then
-    /// the 4-character id `entr`), so plain BIP-93 secrets at 48 and 74
+    /// the 4-character id `entr` for a seed or `hash` for a hashlock preimage
+    /// plate), so plain BIP-93 secrets at 48 and 74
     /// characters, and every BIP-93 *share*, land here. Pointing that operator
     /// at the classifier costs them the hour it takes to work out that the
     /// classifier was never the cause.
@@ -850,7 +851,10 @@ mod tests {
     /// H0 (SPEC_ms_hashlock §9): a preimage plate is refused for its KIND,
     /// named as such, and NOT as "outside the profile" — it is 75 characters,
     /// inside the profile, and the profile arm would claim it if it ran first.
-    /// MUTATION: swap the two arms in `unknown_reason` -> `Bip93OutsideTheProfile(75)`.
+    /// MUTATION (measured at ms-codec 0.7): swap the two arms in `unknown_reason`
+    /// -> `Bip93OutsideTheProfile(75)`. At 0.8 the plate DECODES, so
+    /// `bip93_outside_the_profile` is false for it and the swap yields
+    /// `Unrecognised` instead; the test still fails either way.
     #[test]
     fn a_preimage_plate_is_named_not_misdiagnosed() {
         const PLATE: &str =
@@ -858,6 +862,39 @@ mod tests {
         assert_eq!(PLATE.chars().count(), 75);
         assert_eq!(
             pack(vec![PLATE.into()], None, ITER),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
+        // R0 r0 fidelity I-1: the shape names a 0x03 single whatever its id,
+        // exactly as the device does -- the seam corpus's `test`-id 33-byte row
+        // is a plate here; its 48-char sibling (a 16-byte payload) is not.
+        assert_eq!(
+            pack(
+                vec![
+                    "ms10testsqvrsu9guyv4rzwplgex4gkmzd9c8wl593jfe4gdg47mtm3xt6tv7qh3pm4xrfdlvvp"
+                        .into()
+                ],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
+        assert!(!matches!(
+            pack(
+                vec!["ms10testsqv0qqqqqqqqqqqqqqqqqqqqqqq8mzk8tjfdnjn5".into()],
+                None,
+                ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate))
+        ));
+        // R0 r0 tests I-3: a kind-0x03 single whose X is not 32 bytes (id hash,
+        // 16-byte X, 50 characters) is refused by the codec as
+        // PreimageLengthMismatch and is named a preimage plate here too.
+        assert_eq!(
+            pack(
+                vec!["ms10hashsqw46h2at4w46h2at4w46h2at4w4ssrnvvaudn2k4d".into()],
+                None,
+                ITER
+            ),
             Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
         );
         // The control: an entr string of the same length is still a seed.
