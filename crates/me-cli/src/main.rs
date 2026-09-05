@@ -2796,6 +2796,12 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 // not the classifier, and the message says so. The length and
                 // the two length sets are shape, never content — the record
                 // itself is a seed and is never echoed.
+                U::PreimagePlate => format!(
+                    "record {i} (records count from 0) is a hashlock PREIMAGE plate (kind \
+                     0x03), not a seed record; this container cannot place one yet. A \
+                     preimage backs a hashlock spend path, not a wallet — keep it with the \
+                     policy it unlocks, and do not re-encode it as entropy."
+                ),
                 U::Bip93OutsideTheProfile(len) => format!(
                     "record {i} (records count from 0) is a VALID BIP-93 codex32 string — the \
                      checksum is good — but not a constellation `ms1` record, so this \

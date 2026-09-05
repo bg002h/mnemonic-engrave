@@ -143,6 +143,12 @@ pub enum UnknownReason {
     ///
     /// [`Unrecognised`]: UnknownReason::Unrecognised
     Bip93OutsideTheProfile(usize),
+    /// A hashlock PREIMAGE plate (SPEC_ms_hashlock §1, kind `0x03`, id
+    /// `hash`): inside the profile's lengths, refused for its KIND. Named so
+    /// the operator is not told to "re-encode the entropy as `ms1`" — the
+    /// string is a constellation record, just not one this container places
+    /// yet (H0, §9). Carries no number: 75 characters is the only shape.
+    PreimagePlate,
     /// No reserved prefix, not a BIP-39 mnemonic, and not a constellation
     /// string. This is the case the address gap belongs to — and, since S2,
     /// the case a descriptor `me` REFUSES lands in: the descriptor arm places
@@ -180,6 +186,11 @@ fn unknown_reason(record: &str) -> UnknownReason {
     // question asked here and the only one that re-parses; every arm above is a
     // prefix test on a record this one cannot match (an `ms1` string carries no
     // reserved prefix).
+    // Before the profile arm: a preimage plate is INSIDE the profile's lengths
+    // and would otherwise be reported as outside them (H0, SPEC_ms_hashlock §9).
+    if crate::seal::record::preimage_plate(record) {
+        return UnknownReason::PreimagePlate;
+    }
     if crate::seal::record::bip93_outside_the_profile(record) {
         return UnknownReason::Bip93OutsideTheProfile(record.trim().chars().count());
     }
@@ -827,6 +838,26 @@ mod tests {
                 "{s}"
             );
         }
+    }
+
+    /// H0 (SPEC_ms_hashlock §9): a preimage plate is refused for its KIND,
+    /// named as such, and NOT as "outside the profile" — it is 75 characters,
+    /// inside the profile, and the profile arm would claim it if it ran first.
+    /// MUTATION: swap the two arms in `unknown_reason` -> `Bip93OutsideTheProfile(75)`.
+    #[test]
+    fn a_preimage_plate_is_named_not_misdiagnosed() {
+        const PLATE: &str =
+            "ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c";
+        assert_eq!(PLATE.chars().count(), 75);
+        assert_eq!(
+            pack(vec![PLATE.into()], None, ITER),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
+        // The control: an entr string of the same length is still a seed.
+        assert!(matches!(
+            classify("ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqcwugpdxtfme2w"),
+            record::Class::Codex32Secret
+        ));
     }
 
     /// **THE CONTROL, in both directions.** Without it, a predicate that

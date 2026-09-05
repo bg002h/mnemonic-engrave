@@ -208,6 +208,25 @@ pub fn bip93_outside_the_profile(s: &str) -> bool {
         && ms_codec::decode(s).is_err()
 }
 
+/// Is `s` a hashlock PREIMAGE plate (SPEC_ms_hashlock §1: kind byte `0x03`,
+/// id `hash`, 75 characters) — the one `ms1` string that is inside the
+/// profile's lengths and is still not a seed?
+///
+/// H0 (SPEC_ms_hashlock §9). At ms-codec 0.7 the codec refuses the kind with
+/// `ReservedPrefixViolation { got: 3 }`, and this asks for exactly that, so
+/// the diagnosis names the kind instead of the profile. At the 0.8 bump the
+/// codec DECODES the kind and this arm must be re-pointed at the refusing
+/// arm `validate_record` gains then; `preimage_plate_is_not_a_seed.rs` is
+/// what goes red if either half is forgotten.
+pub fn preimage_plate(s: &str) -> bool {
+    let s = s.trim();
+    matches!(classify(s), Ok(Format::Ms))
+        && matches!(
+            ms_codec::decode(s),
+            Err(ms_codec::Error::ReservedPrefixViolation { got: 0x03 })
+        )
+}
+
 /// §6.3: every public record must belong to a card set that REASSEMBLES AND
 /// DECODES. Records are chunks, so this is necessarily a whole-set operation —
 /// a per-record decode rejects every legitimate payload.
