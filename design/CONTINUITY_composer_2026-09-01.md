@@ -2629,3 +2629,13 @@ Command to resume: /resume-composer
   engrave 1fb24566 (+ two local record commits), toolkit 13f78a26, ms
   e96676c. No agents running. Cycle closed; the flash and H4 are the
   operator's.
+- **F-489 IN PROGRESS (operator: "Do 489").** Branch `f489-seal-record-index`:
+  code 2abc4a1a (`SealError::RecordAt { section, index, source }`, attached in
+  both per-record loops, rendered "record N (records count from 0) in the
+  {public|secret} section: ..."; CLI test with the plate at secret index 1,
+  RED seen, mutation (wrapping dropped) fails it; whole crate 620/617 + the
+  box-local trio; fmt clean; clippy pre-existing only), records 379fd528
+  (CHANGELOG [Unreleased] Changed; F-489 CLOSED by 2abc4a1a). **Sonnet review
+  DISPATCHED** (report f489-seal-record-index-review.md): asks for the
+  public-section path's test too. NEXT: fold if needed -> merge --no-ff ->
+  push. No release owed (message-only; rides with the next me release).
