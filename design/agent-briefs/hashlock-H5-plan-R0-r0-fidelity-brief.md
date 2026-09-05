@@ -1,4 +1,4 @@
-You are the INDEPENDENT fidelity + design reviewer (opus tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md` (engrave master `<PLAN_SHA>`), the plan for spec `design/SPEC_hashlock_H5_device_polish.md` (R0 GREEN `e03d8e7`).
+You are the INDEPENDENT fidelity + design reviewer (opus tier) for round 0 of the R0 gate on `design/IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md` (engrave master `0c2b13e`), the plan for spec `design/SPEC_hashlock_H5_device_polish.md` (R0 GREEN `e03d8e7`).
 
 ONE QUESTION: if an implementer follows this plan literally, task by task in order, does the device do exactly what the spec's §1-§5 say -- reconcile screen with digest, method and chars and the mismatch sentence; the write-down line; per-digest provenance with a nil-safe helper and the "every ... and every" banner; the lead inside the band with the geometry gate; the "(records count from 0)" sentence; the !tinygo hook, the emulator glue and the three-run walk -- and is every claim the plan makes about the fork true?
 
