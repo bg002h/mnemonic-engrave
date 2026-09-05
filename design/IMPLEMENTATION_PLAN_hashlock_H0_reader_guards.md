@@ -1,6 +1,7 @@
 # Hashlock H0 — Reader Guards Implementation Plan
 
-**STATUS: DRAFT 2026-09-04 — R0 round 0 FOLDED (fidelity opus 2C/5I/2M/0N `hashlock-H0-plan-R0-r0-fidelity.md`; tests sonnet 0C/1I/3M `hashlock-H0-plan-R0-r0-tests.md`); build gate RE-RUN GREEN after the fold (controller hand-wire, both repos; output in the fold commit's message); round 1 (sonnet fold verification) pending.**
+**STATUS: DRAFT 2026-09-04 — R0 round 1 FOLDED (sonnet fold verification `hashlock-H0-plan-R0-r1-fold-verification.md`: 8/8 C+I fixed, 1 new Important — the round-0 fold's whole-crate claim did not reproduce because the corpus edit breaks `tests/record_corpus.rs`'s pre-S2 capture, never mentioned; fixed below in Task 1 Step 1b, whole crate re-run with `--no-fail-fast` in a worktree with its own target dir, output in the r1 fold commit's message); round 2 (sonnet, scoped to the capture step and the gate claim) pending.**
+Previous STATUS: R0 round 0 folded (fidelity opus 2C/5I/2M/0N; tests sonnet 0C/1I/3M), gate re-run green.
 Previous STATUS: DRAFT — build gate green at `b0af794`.
 H0 is the prerequisite `SPEC_ms_hashlock.md` §9 places BEFORE ms-cli 0.18.0
 (a controller default awaiting the operator: H0 precedes the release rather
@@ -93,6 +94,14 @@ H1 plan whose gate produced the vector string).
 - **Cite the anchor TEXT, not only the line.** Three of this plan's original
   line citations were off (fidelity I-1); every `Modify` below now quotes the
   text to anchor on, and the line is a hint.
+- **Whole-crate numbers are measured with `--no-fail-fast`, in a worktree with
+  its OWN `CARGO_TARGET_DIR`.** Without `--no-fail-fast` nextest stops after
+  the first failing binary, and the round-0 fold quoted "615/616" for a tree
+  that was 610/616 (r1). A target dir shared between worktrees hands a
+  whole-crate run unit-test binaries compiled from ANOTHER tree (their
+  `testdata/` paths are baked in at compile time), which fails seven vector
+  tests for a reason that is not the plan's. And `touch` a file restored from
+  a backup, or cargo reuses the mutated build.
 
 ---
 
@@ -102,6 +111,7 @@ H1 plan whose gate produced the vector string).
 | --- | --- | --- |
 | engrave `crates/me-cli/testdata/codex32_seam_vectors.json` | Modify (append rows 9-12) | the shared corpus: `preimage-plate-0x03`, `bip93-plain-payload-0x03`, `bip93-share-payload-0x03`, `preimage-shape-entr-id` |
 | engrave `crates/me-cli/tests/codex32_seam.rs:25-26` | Modify (fragment) | re-pin `SEAM_VECTORS_SHA256` |
+| engrave `crates/me-cli/testdata/record_corpus_pre_s2.json` | Modify (append 4 entries) | S2's invariant-2 capture enumerates the seam corpus, so it grows 33 → 37 with the same rows; class `Unknown`, consult `record-refusal` |
 | engrave `crates/me-cli/tests/preimage_plate_is_not_a_seed.rs` | Create | host pin: `validate_record` is `Err`, `sysw::classify` is not `Codex32Secret`; `me sysw pack` names the kind |
 | engrave `crates/me-cli/src/seal/record.rs` (after `bip93_outside_the_profile`) | Modify (append fn) | `preimage_plate(&str) -> bool` |
 | engrave `crates/me-cli/src/sysw/mod.rs` (`UnknownReason`, `unknown_reason`, tests) | Modify (fragments) | `UnknownReason::PreimagePlate`; the arm BEFORE the profile arm; unit test |
@@ -150,6 +160,7 @@ site that turns a codex32 string into a seed, a display of one, or an engrave:
 **Files:**
 - Modify: `crates/me-cli/testdata/codex32_seam_vectors.json` (append after row 8, `bip93-bad-checksum`)
 - Modify: `crates/me-cli/tests/codex32_seam.rs:25-26` (anchor: `const SEAM_VECTORS_SHA256: &str =`)
+- Modify: `crates/me-cli/testdata/record_corpus_pre_s2.json` (append four entries after the `codex32_seam/bip93-bad-checksum` entry)
 - Create: `crates/me-cli/tests/preimage_plate_is_not_a_seed.rs`
 - Modify: `crates/me-cli/src/seal/record.rs` (append after `pub fn bip93_outside_the_profile`)
 - Modify: `crates/me-cli/src/sysw/mod.rs` (anchors: `    Bip93OutsideTheProfile(usize),`; the profile arm in `fn unknown_reason`; the `/// **THE CONTROL, in both directions.**` test)
@@ -196,6 +207,38 @@ site that turns a codex32 string into a seed, a display of one, or an engrave:
       "source": "codex32.NewSeed(\"ms\", 0, \"entr\", 's', 33 bytes with byte 0 = 0x03): the preimage SHAPE (unshared, 33-byte payload, prefix 0x03) under the id `entr`. The kind is the prefix byte, not the id (SPEC_ms_hashlock section 1): ms-codec 0.7 refuses the prefix, 0.8 refuses the id/prefix mismatch (TagKindMismatch), and the device treats it as inert -- never a seed either way. Measured on the fork at 839fa5aa."
     }
 ```
+
+- [ ] **Step 1b: Extend the pre-S2 record capture — and argue for it.** `tests/record_corpus.rs` is S2's invariant 2 as a gate: it ENUMERATES the corpus (`sysw_vectors.json`, then every `codex32_seam_vectors.json` row in file order, then its literals) and asserts the committed capture `testdata/record_corpus_pre_s2.json` is exactly that enumeration, that every record's class is unchanged, and that the descriptor gate stays shut on each. Four new seam rows therefore red three tests (`the_capture_is_the_whole_corpus`: "is not the enumerated corpus"; the class and gate counts 33 vs 37) until the capture carries them. The file says "a diff to this file IS a change to invariant 2 and has to be argued for": the argument is that these four records are ADDED, not moved — every one classifies `Unknown` on the host today (`host_admits: false` in the seam corpus: ms-codec 0.7 refuses the kind, and the two BIP-93 rows are outside the profile), the descriptor gate refuses each as a record (`record-refusal`), and no record that was placeable changes class. Insert, directly after the entry whose origin is `codex32_seam/bip93-bad-checksum` (keep its trailing `},`), in the file's style:
+
+```json
+    {
+      "origin": "codex32_seam/preimage-plate-0x03",
+      "record": "ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-plain-payload-0x03",
+      "record": "ms10testsqv0qqqqqqqqqqqqqqqqqqqqqqq8mzk8tjfdnjn5",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/bip93-share-payload-0x03",
+      "record": "ms12testaqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqdq7pl8qdc5tsp",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
+      "origin": "codex32_seam/preimage-shape-entr-id",
+      "record": "ms10entrsqv0qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5gz69g08wwtz9",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+```
+
+Run: `cargo nextest run --locked -p mnemonic-engrave --test record_corpus`
+Expected: 6/6 PASS (measured), 37 records. (At the 0.8 bump the plate's host class stays `Unknown` only if H1b's refusing arm lands — the same tripwire as Step 5, now with a third witness.)
 
 - [ ] **Step 2: See the seam test fail on the hash.**
 
@@ -377,11 +420,11 @@ Expected: 5 PASS (measured: the two integration tests, the two existing profile 
 
 - [ ] **Step 9: Whole crate, then commit.**
 
-Run: `cargo nextest run --locked -p mnemonic-engrave && cargo clippy --locked -p mnemonic-engrave --all-targets -- -D warnings && cargo fmt -p mnemonic-engrave -- --check`
-Expected: green under CI's toolchain. Measured at the gate on the local nightly: 615/616 with `history_purge::the_harness_records_history_at_all` failing — it fails identically on untouched `master` (a shell-history harness that depends on this box), so it is not this task's; and clippy's one `manual implementation of .is_multiple_of()` in `sysw/composer_records.rs:114` is the local nightly's, green in CI at `917d4e3`.
+Run: `cargo nextest run --locked -p mnemonic-engrave --no-fail-fast && cargo clippy --locked -p mnemonic-engrave --all-targets -- -D warnings && cargo fmt -p mnemonic-engrave -- --check`
+Expected: green under CI's toolchain. Measured at the r1 gate in a worktree with its own target dir: 616 tests, every failure a `history_purge` test (`the_harness_records_history_at_all`, `the_emitted_zsh_recipe_actually_purges_the_entry`, `editing_the_file_alone_is_the_trap_the_message_warns_about`) — the three fail identically on untouched `master` (no `/usr/bin/zsh` on this box), so they are not this task's — see the r1 fold commit for the exact summary line; clippy's one `manual implementation of .is_multiple_of()` in `sysw/composer_records.rs:114` is the local nightly's, green in CI at `917d4e3`.
 
 ```bash
-git add crates/me-cli/testdata/codex32_seam_vectors.json crates/me-cli/tests/codex32_seam.rs crates/me-cli/tests/preimage_plate_is_not_a_seed.rs crates/me-cli/src/seal/record.rs crates/me-cli/src/sysw/mod.rs crates/me-cli/src/main.rs
+git add crates/me-cli/testdata/codex32_seam_vectors.json crates/me-cli/testdata/record_corpus_pre_s2.json crates/me-cli/tests/codex32_seam.rs crates/me-cli/tests/preimage_plate_is_not_a_seed.rs crates/me-cli/src/seal/record.rs crates/me-cli/src/sysw/mod.rs crates/me-cli/src/main.rs
 git commit -m "seam corpus: preimage-plate rows (the plate, two 0x03-leading populations the guard must not touch, the shape under the wrong id) + host pin + preimage-plate diagnosis (hashlock H0)"
 ```
 
@@ -758,5 +801,7 @@ Expected: flash within a few hundred bytes of `1,582,628` (main `839fa5aa`); RAM
 1. **Spec coverage.** §9 H0 (a): `isStrictMs1` / `seal.Classify` gain the test — Task 2 Steps 4-5 — and §12 item 7 ("no engrave path offers it") is met by guarding what the site enumeration found: the sealed path (Step 7), the NFC mirror (Step 8a) and the choke point both direct doors reach (Step 8b). "With the record-class vector row" — Task 1's rows, read by both suites. "Merged and flashed" — Task 3, now with an acceptance before the flash. §9 H0 (b): `me`'s `validate_record` treats `0x03` as inert "in the same release window as the 0.8 bump" — Task 1's pin test is green at 0.7 and is the tripwire; the refusing arm belongs to the bump (an H1b-owned follow-up, Task 4), because at 0.7 there is no `Payload::Preimage` to match; and the host now NAMES the kind instead of misdiagnosing the profile (Step 7).
 2. **Placeholders.** None: the fixture question and the gui harness were settled at the first gate; the door tests and the diagnosis are written out.
 3. **Type consistency.** `IsPreimage(s String) bool` is defined once (Task 2 Step 2) and called with a `codex32.String` at five sites (`isStrictMs1`, `seal.Classify`, `Scan`, `engraveCodex32`, `unlockEngraveCodex32`); `ParsePrefix(frag string) (Fields, error)` with `Fields.Unshared bool` (`codex32/polish.go:82,71`); `Seed()` is `func (s String) Seed() []byte` (`codex32/codex32.go:386`); `AdmitSection(records [][]byte, section Section) ([]AdmittedRecord, error)` (`seal/record.go:244`); `validate_record(s: &str) -> Result<RecordKind, RecordError>` (`record.rs:117`); `preimage_plate(s: &str) -> bool` beside `bip93_outside_the_profile` (`record.rs:204`); `pack(vec![...], None, ITER)` returns `Result<_, SyswError>` as the neighbouring test uses it.
+
+**R0 round 1 folded here.** The new Important: the round-0 fold's "whole crate 615/616" was false — nextest without `--no-fail-fast` stopped after the first failing binary, hiding `record_corpus.rs`'s three failures (33 vs 37) that Task 1 Step 1's rows cause. Step 1b now extends the capture with the argument invariant 2 demands; the File Structure table and Step 9's `git add` carry the file; Step 9 and a Global Constraint fix the measurement method (`--no-fail-fast`, own target dir, `touch` after a restore).
 
 **R0 round 0 folded here.** Fidelity: C-1 (two unguarded doors) → Task 2 Step 8 (Scan mirror + choke point + two tests) and the site table; C-2 (any-byte predicate) → the singles-only, shape-exact predicate, two `device_admits: true` corpus rows whose payload begins `0x03`, the six-population test; I-1 (three anchors) → re-cited with anchor text (`codex32_seam.rs:25-26`, `codex32_seam_test.go:30`, `seal/record.go:212-214`) and a Global Constraint; I-2 (the IsPreimage test could not catch its own mutation) → the table, with every mutation measured against one row (and a 33-byte `0x31` row added when the `!= msPrefixEntr` mutation survived the first table); I-3 (`me` misdiagnoses the plate) → `preimage_plate` + `UnknownReason::PreimagePlate` + the Display text + a unit test and a binary test; I-4 (cheaper acceptance) → Task 3 Step 2; I-5 ("Payload unreadable." unrecorded) → Global Constraints and a Task 4 follow-up owned by H2; M-1 (`:177`) → `:176`; M-2 (the two containers diverge) → Global Constraints. Tests lens: I-1 (prefix vs id indistinguishable) → the `preimage-shape-entr-id` row in the corpus and the table, with the id-keyed mutation measured; M-1 (stale citations) → fixed with I-1; M-2/M-3 recorded.
