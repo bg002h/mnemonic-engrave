@@ -2008,3 +2008,14 @@ Command to resume: /resume-composer
   local master had diverged from origin (two F-324 ci commits from
   2026-09-02 absent locally); the push agent STOPPED correctly (report
   committed); rebased, lint OK, re-dispatched.
+- **H1b PLAN COMMITTED, GATE GREEN (`e672194`)**: RED at the bare bump =
+  five failures (the three H0 tripwires, the sysw unit test, the seam row);
+  Tasks 2-3 green; mutations a/b and the mismatch-arm removal each fail
+  their tests; 619/616 whole crate. R0 round 0 DISPATCHED (opus fidelity +
+  sonnet tests, briefs committed). Toolkit docs push: the SHA cannot earn
+  its required contexts (all three workflows are path-filtered to crates/
+  etc.; docs-only commits trigger none), the only job that ran
+  (sibling-pin-check, non-required) fails on a PRE-EXISTING deliberate pin
+  exception (cross-tool-differential.yml:80, commented); the push agent
+  stopped correctly twice. Decision (bypass per the repo's own docs-only
+  comments / widen paths / gated touch) routed to the fable architect.
