@@ -2019,3 +2019,17 @@ Command to resume: /resume-composer
   exception (cross-tool-differential.yml:80, commented); the push agent
   stopped correctly twice. Decision (bypass per the repo's own docs-only
   comments / widen paths / gated touch) routed to the fable architect.
+- **H2 SPEC DRAFTED (`design/SPEC_hashlock_H2_device.md`, engrave `bfd042e`):**
+  the device leg -- `Type a hashlock phrase` row (label-keyed switch, r2
+  C-4), the phrase screen (NewPassphraseKeyboard, a NEW flow, counter n/100
+  unclamped), the method pick with both modals (L12), the derivation on the
+  countdown screen through a NEW 14-byte-salt driver (r2 M-5), the confirm
+  modal (§8i + the reuse lines), a `hashlock` Go package porting
+  ms_codec::hashlock with the 0.8.0 corpus vendored + pinned, and
+  `DecodeMS1Preimage` with `DecodeMS1` unchanged (r2 C-2). Citations
+  re-grepped at fork c4a64fc / ms cd0a60f (one fixed: the phrase cap is
+  ms-cli's HASHLOCK_PHRASE_MAX_CHARS). R0 round 0 DISPATCHED: fidelity +
+  journey lenses (opus; briefs `a3798e4`). Toolkit docs push: the fable
+  architect's decision = the staging-PR form (PR #68 precedent; the
+  pull_request triggers are unfiltered) -- reports + decision + two
+  follow-ups committed in the toolkit; push agent next.
