@@ -2304,3 +2304,21 @@ Command to resume: /resume-composer
   PID from `ss -ltnp`). NEXT: opus post-impl (brief tips filled) -> fold ->
   merge fork main --no-ff + engrave master -> push both -> signed image -> H4
   ASSUMED.
+- **ULTRACODE WORKFLOW LAUNCHED (operator: "Can we use ultracode to make this
+  go faster?")** -- run wf_7b02c125-9b9, script
+  workflows/scripts/h2-postimpl-breadth-and-h3-drafts-wf_7b02c125-9b9.js in
+  the session dir. Two things in parallel with the opus post-impl (which
+  stays the gate): (a) five DISJOINT post-impl lenses over 17b3979 --
+  interruption/state (opus), geometry on the 240x240 panel (opus), walk
+  control = can the walk FAIL under a mutated emulator (opus), host-device
+  e2e for the tr/wsh fixture wallets + F-474 (opus), records claims
+  re-measured (sonnet) -- each C/I finding refuted by two sonnet skeptics
+  (survives if either does not refute); reports
+  design/agent-reports/hashlock-H2-post-impl-lens-<key>.md and
+  -refute-<key>-<id>-<v>.md; (b) three H3 drafters (opus) on their own
+  branches -- h3-composer-spec (engrave), h3-seam-corpus (engrave + fork,
+  F-475), h3-hashlock-device-manual (toolkit) -- each verified by a sonnet
+  agent; reports h3-<key>-draft.md / h3-<key>-verify.md. NEXT: persist every
+  workflow report; fold surviving lens findings together with the opus
+  post-impl's; merge H2; then merge the verified H3 branches (rebase onto the
+  merged tips first) and push.
