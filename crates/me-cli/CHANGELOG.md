@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `me seal` names the record it refuses by position and section — `record N
+  (records count from 0) in the secret section: …` — the way `me sysw pack`
+  already does (F-489). Behaviour unchanged: the same records are refused for the
+  same reasons; only the sentence gained a locator.
+
 ## [0.8.1] - 2026-09-04
 
 ### Added

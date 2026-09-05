@@ -16062,7 +16062,7 @@ operator pulls it forward.
 Filed 2026-09-05 from the host-device e2e lens M-3. One more sentence in the arm's copy,
 re-measured for fit.
 
-### F-489 — `me-seal-does-not-name-the-record-index-where-sysw-pack-does`: `me seal --seal-secret` refuses a preimage plate by kind but without the record index that `me sysw pack` prints (owning phase: **the next me code cycle**) `#me-cli` `#ux` `#hashlock`
+### F-489 — ~~`me-seal-does-not-name-the-record-index-where-sysw-pack-does`~~ **CLOSED 2026-09-05 by `2abc4a1a`** (SealError::RecordAt; `seal_names_the_refused_record_index_like_sysw_pack`): `me seal --seal-secret` refuses a preimage plate by kind but without the record index that `me sysw pack` prints (owning phase: **the next me code cycle**) `#me-cli` `#ux` `#hashlock`
 
 Filed 2026-09-05 from the host-device e2e lens N-1. Same message shape on both verbs.
 
