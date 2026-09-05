@@ -2343,3 +2343,20 @@ Command to resume: /resume-composer
   Ultracode workflow wf_7b02c125-9b9 still running (lenses + H3 drafts). NEXT:
   r1 GREEN -> merge fork main --no-ff + engrave master -> pushes -> signed
   image; fold any surviving workflow-lens findings the same way.
+- **ULTRACODE LENSES LANDED (49b03eb):** interruption 0C/1I/3M/1N; geometry
+  1C/1I/1M/1N; walk-control 0C/0I/3M/2N (the walk FAILS under a mutated digest
+  display and a mutated hardened derivation -- measured on two mutated
+  emulators); host-device e2e 0C/1I/3M/1N; records-claims 0C/0I/0M/1N. The
+  Critical and two Importants are F-481 (fixed at 26fd1dd; MaxHeight now 209 =
+  the keyboard block). NEW: e2e I-1 "two phrases to back up" hard-coded, wrong
+  on the three-hashlock wallet -> count-free line + n=3 row + no-digit
+  assertion; interruption M-1 Remove path never re-synced hashByPhrase ->
+  sync call + flow test. **Folded at fork `a1fd139`** (both RED under
+  mutation, run; gui 1225 / 24 shards ok); engrave branch records e879123
+  (F-484..F-489, F-483 note, report addendum). r1 fold verification of
+  26fd1dd: GREEN (d7057cd). Refute votes + H3 drafts still running in
+  wf_7b02c125-9b9. (A continuity commit landed on the engrave branch by a cwd
+  slip and was reset off it -- `git -C`, always.) NEXT: workflow done ->
+  persist refutes + H3 reports -> ONE sonnet verification of a1fd139 (+ refute
+  reconciliation) -> merge fork main --no-ff + engrave master -> push -> signed
+  image -> merge verified H3 branches.
