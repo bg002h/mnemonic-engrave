@@ -1,6 +1,7 @@
 # Hashlock H1b — `me` bumps to ms-codec 0.8 Implementation Plan
 
-**STATUS: DRAFT 2026-09-05 — R0 round 0 FOLDED (fidelity opus 0C/2I/6M/2N `hashlock-H1b-plan-R0-r0-fidelity.md`; tests sonnet 0C/4I/2M `hashlock-H1b-plan-R0-r0-tests.md`); build gate RE-RUN GREEN after the fold (controller hand-wire in `me-worktrees/h1b-gate`, own target dir; output in the fold commit's message); round 1 (sonnet fold verification) pending.**
+**STATUS: R0 GREEN 2026-09-05 (0 Critical / 0 Important open).** Round 0: fidelity (opus, `hashlock-H1b-plan-R0-r0-fidelity.md`, 0C/2I/6M/2N) + tests/mutation (sonnet, `hashlock-H1b-plan-R0-r0-tests.md`, 0C/4I/2M), one fold (`b7ced42`, gate re-run green). Round 1: fold verification (sonnet, `hashlock-H1b-plan-R0-r1-fold-verification.md`): GREEN — all six Importants reproduce as FIXED from the plan's text (five build/test stages, four mutations, both host verbs); 2 Minors + 1 Nit (an anchor quote, an unstated comment text, a blank line) folded here as wording. Lens-closure: fidelity, tests/mutation, fold-verification. Baseline for staleness: engrave `0f5ce23`.
+Previous STATUS: R0 round 0 folded (`b7ced42`), r1 pending.
 Previous STATUS: build gate green at `e672194`, R0 dispatched.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -170,7 +171,7 @@ red tree is not a commit; Task 2 lands with it.
             }
 ```
 
-- [ ] **Step 2: Re-point the predicate — by SHAPE, plus the codec's own kind errors.** Replace the whole of `pub fn preimage_plate` (from its doc comment's first line `/// Is `s` a hashlock PREIMAGE plate` to its closing brace) with the two functions below. The device's `codex32.IsPreimage` (H0) is shape-exact — unshared, 33-byte payload, first byte `0x03` — and the host must NAME the same population whatever the id says (fidelity I-1: at 0.8 a `0x03` single under an unknown id decodes to `UnknownTag`, and one with a wrong X length to `PreimageLengthMismatch`; neither is `Ok(Preimage)`, so a predicate keyed on the decode result alone regresses to "outside the profile"). The L24 mismatch is the one deliberate exception and gets its own predicate:
+- [ ] **Step 2: Re-point the predicate — by SHAPE, plus the codec's own kind errors.** Replace the whole of `pub fn preimage_plate` (from its doc comment's first line, which at `0f5ce23` reads `/// Is `s` a string of the hashlock PREIMAGE KIND (SPEC_ms_hashlock §1: kind`, to the function's closing brace; the function name is the anchor — r1 N-1) with the two functions below. The device's `codex32.IsPreimage` (H0) is shape-exact — unshared, 33-byte payload, first byte `0x03` — and the host must NAME the same population whatever the id says (fidelity I-1: at 0.8 a `0x03` single under an unknown id decodes to `UnknownTag`, and one with a wrong X length to `PreimageLengthMismatch`; neither is `Ok(Preimage)`, so a predicate keyed on the decode result alone regresses to "outside the profile"). The L24 mismatch is the one deliberate exception and gets its own predicate:
 
 ```rust
 /// Is `s` an `ms`-HRP single whose 4-character id and kind byte disagree
@@ -288,9 +289,18 @@ Run: `cargo nextest run --locked -p mnemonic-engrave -E 'test(/preimage/) | test
 Expected: 6 PASS (the four `preimage` tests, the seam test, the new witness) —
 measured. Then add three shape assertions to the sysw unit test
 `a_preimage_plate_is_named_not_misdiagnosed` (fidelity I-1, tests I-3), before
-its control line, and fix that test's recorded mutation comment (fidelity M-5:
-at 0.8 the swap yields `Unrecognised`, not `Bip93OutsideTheProfile(75)`, because
-the plate now decodes — the test still fails either way):
+its control line, and replace that test's recorded mutation comment (fidelity
+M-5: at 0.8 the swap yields `Unrecognised`, not `Bip93OutsideTheProfile(75)`,
+because the plate now decodes — the test still fails either way) with:
+
+```rust
+    /// MUTATION (measured at ms-codec 0.7): swap the two arms in `unknown_reason`
+    /// -> `Bip93OutsideTheProfile(75)`. At 0.8 the plate DECODES, so
+    /// `bip93_outside_the_profile` is false for it and the swap yields
+    /// `Unrecognised` instead; the test still fails either way.
+```
+
+then the assertions:
 
 ```rust
         // R0 r0 fidelity I-1: the shape names a 0x03 single whatever its id,
@@ -443,6 +453,7 @@ git commit -m "me sysw pack: name an id/kind mismatch (TagKindMismatch) instead 
 
 1. **Spec coverage.** §9 H0 (b) "treats kind 0x03 as inert in the same release window as the 0.8 bump" → Task 2 Step 1 (the success-path arm) and Step 2 (the predicate), guarded by H0's tripwires (Task 1 Step 3 RED → Task 2 Step 4 GREEN) and the new witness. §1 rule 2 / L24 → Task 3. §3's `#[non_exhaustive]` `Payload` → the wildcard `Ok(_)` arm. F-473 both halves → Tasks 2 and 4.
 2. **Placeholders.** None; Step 3's aside about the test crate's access to `ms_codec` is settled at the gate (integration tests of a bin crate see its `[dependencies]`).
+
 **R0 round 0 folded here.** Fidelity: I-1 → the shape-exact `preimage_plate` (+ the codec's `PreimageLengthMismatch`; the L24 mismatch excluded via `id_kind_mismatch`), with the two corpus rows asserted in the sysw unit test; I-2 → positive `Entr | Mnem` arms and a REFUSING wildcard; M-1 → Step 1's Expected (no new crates); M-2 → Task 4 (one `[Unreleased]`, the H0 sentence in the past tense, F-454 due); M-3 → `RecordError::TagKindMismatch` on both verbs; M-4 → the witness message; M-5 → the mutation comment, both doc comments, the operator text; M-6 → filed with H2; N-1 → the HRP gate inside `id_kind_mismatch`; N-2 → the heading style. Tests: I-1 → the RED paragraph states the real mechanism (admission, six failures); I-2 → the wrapped literal and a fmt step; I-3 → the `PreimageLengthMismatch` clause and its assertion; I-4 → `record_corpus` named among the RED failures; M-1/M-2 recorded.
 
 3. **Type consistency.** `ms_codec::decode(&str) -> Result<(Tag, Payload)>` (ms `crates/ms-codec/src/decode.rs:46` at `cd0a60f`); `Payload::Preimage(Zeroizing<[u8; 32]>)` (`payload.rs:46`); `Error::TagKindMismatch { tag: [u8; 4], prefix: u8 }` (`error.rs:67`); `Error::ReservedPrefixViolation { got: u8 }` (`error.rs:76`); `RecordError::PreimagePlate` (`record.rs:81`); `UnknownReason::PreimagePlate` (`sysw/mod.rs:158`); `pack(vec![...], None, ITER) -> Result<_, SyswError>` as the neighbouring test uses it.
