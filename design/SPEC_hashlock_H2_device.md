@@ -1,11 +1,18 @@
 # SPEC — Hashlock H2: the device leg (SeedHammer II fork)
 
-**STATUS: DRAFT 2026-09-05 — R0 round 1 FOLDED (sonnet fold verification
-`hashlock-H2-spec-R0-r1-fold-verification.md`: 5/5 C and 10/11 I fixed, I-5
-partial, TWO new Importants the round-0 fold introduced — a false mutation
-claim and a wrong fit-gate citation — all folded here); round 2 (sonnet, scoped
-to §2/§4/§7.1/§10 and I-5) pending. Citations measured at fork main `c4a64fc`,
-ms `cd0a60f`.**
+**STATUS: R0 GREEN 2026-09-05 (0 Critical / 0 Important open).** Round 0:
+fidelity (opus, `hashlock-H2-spec-R0-r0-fidelity.md`, 3C/5I/6M/2N) + journey
+(opus, `hashlock-H2-spec-R0-r0-journey.md`, 2C/6I/5M/1N), one fold (`60a86f6`).
+Round 1: fold verification (sonnet, `hashlock-H2-spec-R0-r1-fold-verification.md`):
+5/5 C and 10/11 I fixed, I-5 partial, two new Importants the fold introduced
+(a false mutation claim; a fictitious fit-gate constant), folded (`c06a760`).
+Round 2: fold verification (sonnet, `hashlock-H2-spec-R0-r2-fold-verification.md`):
+NF-A, NF-B, I-5 fixed; one new Important — §3 still named the old confirm
+gesture where §4.5 had become HOLD — folded here as one word, closed by the
+machine check that the old upper-case gesture word no longer occurs in this
+file (the method modals' own "Continue?" question is copy, not the gesture). Lens-closure: fidelity/design,
+journey/adversarial, fold-verification ×2. Citations measured at fork main
+`c4a64fc`, ms `cd0a60f`.
 Previous STATUS: R0 round 0 folded (`60a86f6`); before that DRAFT (`bfd042e`).
 
 This is stage H2 of the hashlock-phrase cycle (`design/BRAINSTORM_hashlock_phrase.md`
@@ -146,7 +153,8 @@ iterations/s (brainstorm §3.4), so hardened takes about 10 s — the method row
 says so. SHA-256 is instant and shows no countdown.
 
 **The preimage lives on the stack for the derivation and the confirm modal and
-is dropped after CONTINUE or Back** (L7; L15: no scrub beyond that). The digest
+is dropped after HOLD (the confirm gesture, §4.5) or Back** (L7; L15: no scrub
+beyond that). The digest
 is what the composer stores (`st.list.Paths[idx].Hash`, a `*[32]byte` —
 `md/compose.go:167`, fidelity M-1), exactly as `Type 64 hex` stores one today.
 
