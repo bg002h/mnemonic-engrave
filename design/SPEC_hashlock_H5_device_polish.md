@@ -1,6 +1,6 @@
 # SPEC — Hashlock H5: device polish (F-487, F-480, F-484, F-485, F-488)
 
-**STATUS: DRAFT 2026-09-05 -- R0 round 0 folded (three lenses: fidelity 1C/5I, tests 0C/3I, journey 0C/7I); r1 fold verification pending.** Base: seedhammer fork main `b9a9a30`
+**STATUS: DRAFT 2026-09-05 -- R0 round 0 folded; r1 fold verification NOT GREEN (0C/4I/4M, all introduced by the fold) folded here; r2 verification pending.** Base: seedhammer fork main `b9a9a30`
 (H2 merged at c284484; H3 seam corpus at b9a9a30). Parent spec: `SPEC_hashlock_H2_device.md`
 (GREEN 55ee7a4, H3-folded at 657f40f/8d5139d). Every citation below was measured at
 `b9a9a30`; re-grep at plan time.
@@ -40,8 +40,9 @@ the phrase route and retyping (about 10 s hardened); neither is where the check 
    reconciliation. The first sentence keeps the substring *"run ms hashlock with this phrase"*
    verbatim: `TestHashlockReconcileScreenIsReachableOnAMixedPolicy`
    (`gui/composer_hashlock_test.go:909`) and the walk (`walk_hashlock_phrase.js:318`) use it as
-   their needle. Measured on `errorScreenBody` at `sh2DisplaySize` (journey I-1/I-2): 205
-   characters drawn in full, headroom 320 against the 80 margin. Drawn where it is drawn
+   their needle. Measured on `errorScreenBody` at `sh2DisplaySize` for exactly this body (`hardened`,
+   `chars: 100`; r1 verification): 186 characters drawn in full, headroom 339 against the 80
+   margin. Drawn where it is drawn
    today: its own `showError` screen right after HOLD, for every phrase-set hash.
 2. The confirm modal's write-down sentence becomes *"Write down this phrase, the method and
    this digest now."* -- the operator's second ruled remedy, as ruled. Its second and third
@@ -57,7 +58,8 @@ the phrase route and retyping (about 10 s hardened); neither is where the check 
    sentence (`composer_copy_test.go:130-137`, `modal_fits_test.go:388`).
 4. H2 spec fold, part of this leg (the copy-verbatim test `TestComposerCopyIsVerbatimFromTheSpec`
    diffs the code against `SPEC_hashlock_H2_device.md`): §4.5's write-down sentence takes
-   item 2's text; §4.5's post-HOLD reconcile clause and §4.7 quote item 1's body. The
+   item 2's text and §4.5's post-HOLD reconcile clause quotes item 1's body (the reconcile
+   text lives only in §4.5; §4.7 changes only through §2.5's phrase-form sentence). The
    toolkit manual's "On the SeedHammer II" section (`docs/manual/src/40-cli-reference/43-ms.md`)
    quotes the old reconcile sentence and is re-quoted in the same cycle (a toolkit docs
    commit, `make lint`), not left to a later stage (journey M-2).
@@ -91,9 +93,11 @@ Done still names a phrase the composition no longer has.
    came from a phrase -- H2 §4.7's condition, now per digest.
 3. `composerHashByPhraseSync` and both its call sites are deleted. Remove path, the
    `No hash lock` row, `Type 64 hex` and payload rows need no bookkeeping: they change
-   `p.Hash`, and the predicate reads `p.Hash`. The five sites that reference the removed
+   `p.Hash`, and the predicate reads `p.Hash`. The six sites that reference the removed
    field today (`composer_state.go:35-38`, `composer_hashlock.go:70`, `composer_copy.go:469`,
-   `composer_hash.go:177-199` incl. the `No hash lock` call, `composer_shape.go:356`) and the
+   `composer_hash.go:177-199` incl. the `No hash lock` call, `composer_shape.go:356`, and
+   `composer_hashlock_test.go:916` where `TestHashlockReconcileScreenIsReachableOnAMixedPolicy`
+   asserts `st.hashByPhrase` -- it becomes `composerAnyPathByPhrase(st)`) and the
    two tests that mutate the deleted function (`TestRemovePathReSyncsHashByPhrase`; the
    `No hash lock` row test that names `composerHashByPhraseSync` in its MUTATION comment)
    are all listed in §6; `composer_copy_test.go:144`'s row keeps its section and drives
@@ -102,7 +106,7 @@ Done still names a phrase the composition no longer has.
    *"Back up every phrase and its method, and every preimage plate, separately."* -- "every"
    and "and", not "the" and "or": on a mixed wallet (one phrase path, one payload-row path)
    both backups are needed, one per path, and the old sentence offered a choice (journey I-3,
-   constructed and quoted). Fit: 160 drawn today, headroom 378; the new sentence is shorter.
+   constructed and quoted). Fit: 165 drawn (was 160), headroom unchanged at 378 (r1 verification).
    Copy-table row updated; H2 §4.7 folded to it.
 4. Index identity is not used anywhere in this design (C16's lesson: "Remove path" splices
    the slice). Two paths sharing one phrase digest are both by-phrase; a path whose phrase
@@ -193,8 +197,9 @@ passphrase; the manual's unlock section says so.
   `method: hardened   chars: 28` and "If they differ" -- MUTATION: return the old
   one-sentence body -> fails on the token; MUTATION: drop the mismatch sentence -> fails.
   The confirm-modal test gains "and this digest" -- MUTATION: old write-down line -> fails.
-  `TestHashlockReconcileScreenIsReachableOnAMixedPolicy` (:909) and the walk's :318 needle
-  stay green by construction (the substring is kept) -- run them.
+  `TestHashlockReconcileScreenIsReachableOnAMixedPolicy` keeps its :909 needle by construction
+  (the substring is kept) and has its :916 assertion rewritten to `composerAnyPathByPhrase(st)`
+  in Task 1 (it does not compile otherwise); the walk's :318 needle stays -- run both.
 - §2: a zero-value-state HOLD test (`composerState{}` as `composerFlow` builds it; one phrase
   route to HOLD; no panic; the digest is in the set) -- MUTATION: assign into the map without
   the nil check -> panics. `TestRemovePathReSyncsHashByPhrase` becomes the value-set test
@@ -257,3 +262,15 @@ Declined: journey M-4 (saying on the reconcile screen that the consent screen re
 token -- the token is on the screen itself now); journey N-2 (wording). Verified true and
 kept: §3 exactly as written (152 px under Back, 0 with the band; the lead is 2 lines at 464
 and at 411 px so §3.3's fallback never fires; readout budget unchanged at 209).
+
+## R0 round 1 folded here
+
+The r1 sonnet verification (`hashlock-H5-spec-R0-r1-fold-verification.md`) found the round-0
+fold had composed two numbers from measurements of DIFFERENT bodies instead of re-measuring
+the text it wrote: §1.1's body is 186 drawn / 339 headroom (not 205/320, which was the journey
+lens's body before `chars:` and the new sentence); §2.5's sentence is 165 drawn (was 160),
+headroom unchanged at 378 (not "shorter"). §1.4 no longer sends the reconcile clause to H2
+§4.7 (only §2.5's phrase form changes §4.7). §2.3/§6 list the sixth `hashByPhrase` site,
+`composer_hashlock_test.go:916`, whose assertion becomes the predicate (the test does not
+compile otherwise). Lesson recorded: a fold that composes two remedies re-measures the
+composed text; a number quoted from a report is only as good as the body it measured.
