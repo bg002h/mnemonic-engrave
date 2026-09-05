@@ -15778,3 +15778,119 @@ exactly what keeps a preimage out of `Class::is_argv_forbidden`'s five classes.
 Remedy when taken up: a `Class` for the kind (H0 rejected one) or a shape test
 in the guard that does not route through `Class` (`seal::record::preimage_plate`
 is that test). Severity capped at Minor by the operator ruling of 2026-08-27.
+
+### F-477 — `composer-spec-still-says-the-device-never-derives-a-preimage`: H2's phrase route falsifies `SPEC_wallet_policy_composer.md` §6c line 386 and its §14 out-of-scope row (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock` `#records`
+
+Filed 2026-09-05 during the H2 device implementation
+(`IMPLEMENTATION_PLAN_hashlock_H2_device.md` Task 6). Two sentences in the
+composer spec were true of the S-series cycle and are false as of H2, which
+derives a preimage in RAM for one screen:
+
+- **§6c, line 386:** *"The composer never derives, stores or engraves a preimage
+  this cycle (§14)."* Replacement: *"The composer DERIVES a preimage in RAM for
+  one screen (H2, `SPEC_hashlock_H2_device` §4) and never stores, shows or
+  engraves it; what reaches a script is the digest."*
+- **§14's out-of-scope table row:** `| on-device preimage derivation, storage or
+  engraving | C25; §6c |`. Replacement: split it — derivation is now IN scope
+  (H2), while *storage, display and engraving* of a preimage stay out, for the
+  same C25 reason.
+
+The code comment that said the same thing is already corrected in the fork
+(`gui/composer_hash.go`, H2 Task 3: *"THE COMPOSER DERIVES A PREIMAGE IN RAM FOR
+ONE SCREEN (H2) AND NEVER STORES, SHOWS OR ENGRAVES IT."*), so the fork and this
+spec now disagree until this is folded. Deliberately not fixed in H2: editing
+the composer spec is a separate artifact from the one H2 was reviewed against.
+
+### F-478 — `h2-spec-4.5-drop-order-names-an-unreachable-destination`: §4.5 step 2 sends the reconciliation line to the phrase-route §8h at Done, which `composerEveryPathHashed` guards (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
+
+Filed 2026-09-05. `SPEC_hashlock_H2_device` §4.5's drop order ends *"then move
+the reconciliation line into the phrase-route §8h at Done (§4.7)"*. The build
+gate did exactly that and three R0 lenses traced the loss (r0 adversarial I-1 =
+fidelity I-2 = journey I-3): §8h is guarded by `composerEveryPathHashed`
+(`gui/composer_state.go`), false the moment ONE path is keyed, so on the ordinary
+mixed wallet the line was then drawn NOWHERE. The plan departs from the spec and
+gives the line its own `showError` immediately after HOLD in
+`hashlockPhraseRoute`; that is what shipped, and
+`TestHashlockReconcileScreenIsReachableOnAMixedPolicy` gates it.
+
+Replacement sentence for that clause, for whoever folds the spec:
+
+> then move the reconciliation line out of the confirm modal and onto its own
+> dismissible screen shown immediately after HOLD, where it is reachable for
+> every policy that has a phrase-set hash — NOT into the phrase-route §8h at
+> Done, whose `composerEveryPathHashed` guard is false for any policy with one
+> un-hashed path.
+
+### F-479 — `h2-spec-4.5-line-list-has-no-other-path-line`: the confirm modal draws a cross-path warning §4.5 does not enumerate (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
+
+Filed 2026-09-05. §4.5 enumerates the confirm modal's lines "in order" and has
+no clause for r0 journey I-1's cross-path warning, which the plan added and which
+shipped as `composerCopyHashlockOtherPath` / `hashlockOtherPathLine`. Text to add
+to that list, after the relation line:
+
+> `<other-path line, only when another path of this policy already carries a
+> different hash: "another path has a different hash: two phrases to back up">`
+
+and to §4.5's bullet list, after the relation-line bullet:
+
+> - The other-path line (journey I-1): when any OTHER path of the same policy
+>   already carries a `Hash` that differs from this digest, the modal says so,
+>   because `md.ValidatePathList` has no clause about two paths' `Hash` values
+>   and "One phrase per policy" is advice — a second phrase is legal, and a
+>   second backup burden the operator must choose knowingly. Omitted when no
+>   other path carries a hash, or when the hashes are equal.
+
+Measured with it present: the longest §4.5 variant draws 337 characters with 107
+of headroom, above `assertModalBodyFits`'s margin of 80.
+
+### F-480 — `hash-provenance-is-composition-wide-not-per-path`: `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock`
+
+Filed 2026-09-05 from H2's R0 round 0 (adversarial I-2, tests I-4), where the
+per-path variant was the reviewers' preferred remedy and was **declined for H2
+with its reason**. `composerHashByPhraseSync` drops the flag on the one event
+after which no phrase-set hash can still be in the composition — no path carries
+a hash at all — and deliberately NOT when THIS path's hash is replaced by a
+payload row or a hex digest, because another path may still be phrase-set and
+clearing on that narrower event would drop §8h's phrase form while a phrase-set
+hash is live (the C16 shape: a composition-wide fact edited as though it were
+per-path).
+
+The residual staleness runs the SAFE way: `composerCopyHashEveryPathPhrase` names
+"the phrase and its method, **or** the preimage plate", so an over-sticky flag
+tells the operator to back up one artifact too many, never one too few. Severity
+resolved MINOR on that reasoning.
+
+A per-path array needs the same splicing discipline `composerAddPath` and
+"Remove path" already apply to `Paths` — a change to the composer's state model
+rather than to this route, which is why it is scheduled rather than bolted on.
+
+### F-481 — `hashlock-phrase-screen-draws-no-readout-and-show-does-nothing`: the phrase screen's `show` key is drawn, is tappable, toggles to `hide`, and reveals nothing, because the readout is height-clamped to empty (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
+
+Filed 2026-09-05, MEASURED on the emulator during H2's Task 5 walk (fork
+`hashlock-h2`, emu.wasm from that branch, served on a fresh port). On the
+`Hashlock phrase` screen:
+
+- with 20 characters typed and reveal OFF, the frame carries **no `*` at all**;
+- tapping `show` flips the label to `hide` and the frame still carries **no
+  characters** — the whole probe had to fall back to the `n/100` counter as its
+  only oracle, and the walk's key-grid mapping had to be proved by the DIGEST
+  instead.
+
+Mechanism: `hashlockPhraseFlow` cuts a lead band and a counter band out of the
+content rectangle and passes what is left as `kbd.MaxHeight`, and
+`PassphraseKeyboard.Layout` then binary-searches leading runes off the readout
+until it fits `MaxHeight - grid - 8`. On this screen that budget is smaller than
+one line, so every rune is dropped and `shown` is "".
+
+Why it is worth fixing rather than documenting: the fork's own
+`passphrase_keyboard.go` argues the case against exactly this shape when it
+explains why the gear key was REMOVED rather than left inert — *"a live-looking
+control that swallows the press, on the machine where the next thing the
+operator approves is cut into steel"*. `show` is now that control on this screen.
+Either give the readout its line (the lead could be shortened or the counter
+merged into it) or drop the reveal key from this keyboard.
+
+**Not gating H2 and not argued as such:** nothing is mis-derived, the counter
+reports the true length, and the confirm modal shows the digest, the method and
+the character count before anything is assigned. It is an affordance defect on a
+new screen, and the post-implementation review is where its severity is ruled.
