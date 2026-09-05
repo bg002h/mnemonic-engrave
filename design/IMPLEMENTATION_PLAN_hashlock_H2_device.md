@@ -1,6 +1,6 @@
 # Hashlock H2 — Device Leg Implementation Plan (SeedHammer fork)
 
-**STATUS: DRAFT 2026-09-05 — build gate not yet run; R0 not yet dispatched.**
+**STATUS: DRAFT -- build gate GREEN WITH FIXES folded; R0 round 0 pending.**
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -73,7 +73,9 @@ mnemonic-secret `cd0a60f`; mnemonic-engrave `e1c23e9`.
 | `gui/composer_copy.go` | Modify (append) | `composerCopyHashlock*` strings; `composerCopyHashEveryPathPhrase` |
 | `gui/composer_shape.go` | Modify (one line) | Done's §8h picks the phrase-route form when a hash was set by phrase |
 | `gui/composer_state.go` | Modify | `composerState.hashByPhrase bool` (set by the phrase route) |
-| `gui/composer_copy_test.go`, `gui/modal_fits_test.go` | Modify (rows) | the two copy gates |
+| `gui/composer_copy_test.go` | Modify (rows + count) | the AST-scan copy gate: ten new `composerCopyTable` rows and the `declared` literal 41 → 42 → 51 (build gate fixes 1, 2) |
+| `gui/modal_fits_test.go` | Modify (rows) | five new `TestModalsThisBlockTouchesAreDrawnInFull` rows |
+| `gui/composer_gates_test.go` | Modify (one row) | Task 3's no-payload lead moves an EXISTING test's pump target (build gate fix 12) |
 | `gui/composer_hash_test.go` | Modify (append) | §7.3 switch tests |
 | `gui/composer_hashlock_test.go` | Create | §7.2 harness tests |
 | `cmd/emu/walk_hashlock_phrase.js` | Create | §7.5 |
@@ -86,6 +88,20 @@ the controller hand-wires the whole plan into a scratch copy of the fork and run
 'TestComposer|TestHashlock' ./gui/` before review, then the gui shard script; output in
 the plan commit. Whole-package gui runs use `scripts/gui-shard-test.sh` (engrave).
 
+**Block headers — the convention every code block below carries.** A fenced block that
+holds file content opens with the file it belongs to and how much of that file it is:
+
+    ```go file=gui/composer_hash.go mode=fragment
+    ```go file=gui/composer_hashlock.go mode=whole
+
+`mode=whole` means the block IS the file; `mode=fragment` means the block must appear
+VERBATIM inside it, indentation included. Markdown takes only the FIRST word of an info
+string as the language, so highlighting is unaffected.
+`scripts/h2-plan-blocks-vs-tree.sh` parses those headers and checks every block against
+the GATED SCRATCH TREE the build gate left at `/scratch/code/shibboleth/.tmp/h2-gate`
+— whole blocks by `diff`, fragments by exact substring — and prints its own blind spots
+(headerless ```bash blocks, and every prose claim). A block with NO header is a command
+or an illustration, not file content, and nothing checks it.
 ---
 
 ### Task 1: The `hashlock` package and its lockstep gate
@@ -108,7 +124,7 @@ sha256sum hashlock/testdata/hashlock-v0.8.json   # a46c197a3640fe8af4ca4370b46a9
 
 Create `hashlock/testdata/hashlock-v0.8.provenance.json` in the shape of `sysw/testdata/record_class_vectors.provenance.json`:
 
-```json
+```json file=hashlock/testdata/hashlock-v0.8.provenance.json mode=whole
 {
   "_comment": [
     "PROVENANCE PIN for the vendored copy of ms-codec 0.8.0's hashlock corpus (SPEC_hashlock_H2_device §7.1).",
@@ -131,7 +147,7 @@ Create `hashlock/testdata/hashlock-v0.8.provenance.json` in the shape of `sysw/t
 
 - [ ] **Step 2: The failing tests.** Create `hashlock/hashlock_test.go`:
 
-```go
+```go file=hashlock/hashlock_test.go mode=whole
 package hashlock
 
 import (
@@ -354,7 +370,7 @@ Expected: does not compile (`PreimageHardened` … undefined).
 
 - [ ] **Step 4: The package.** Create `hashlock/hashlock.go`:
 
-```go
+```go file=hashlock/hashlock.go mode=whole
 // Package hashlock is the SeedHammer port of ms_codec::hashlock (ms-codec 0.8.0,
 // mnemonic-secret cd0a60f): a memorable phrase becomes a 32-byte hashlock
 // PREIMAGE X, and the digest H = SHA-256(X) is what a spend path's script holds.
@@ -503,7 +519,21 @@ func isHex(b []byte) bool {
 - [ ] **Step 5: Run to green, then the mutations.**
 
 Run: `go vet ./hashlock/ && go test -count=1 ./hashlock/`
-Expected: PASS (6 tests). Mutations, each reverted: `Salt = append(Salt, 0, 0)` → 11 hardened X/H failures; `Iterations = 99999` → 11 failures; `phrase = []byte(seal.NormalisePassphrase(string(phrase)))` at the top of `PreimageHardened` → exactly the `Correct Horse Battery Staple` and `  a  b ` rows fail; stripping `-`/`,` from the phrase first → exactly the `correct-horse,battery staple` row fails; `IsMS1Shaped` using `codex32.New` → the grouped-by-5, leading/trailing-spaces and grouped-by-2 refusals rows fail (a checksum parse rejects grouped input); the cap literal 99 → `TestPhraseMaxCharsIsTheCap` and the 100-character refusals row fail.
+Expected: PASS (6 tests). Then the mutations, each reverted. What follows is the build
+gate's MEASURED outcome (`design/agent-reports/hashlock-H2-plan-build-gate.md`, Task 1
+Step 5 table), which corrected two of this plan's own round-0 predictions:
+
+| Mutation | Measured outcome |
+| --- | --- |
+| `Salt = append(Salt, 0, 0)` | 22 failures — 11 rows × (hardened X + hardened H) |
+| `Iterations = 99999` | 22 failures, the same 11 rows × X and H |
+| `phrase = []byte(seal.NormalisePassphrase(string(phrase)))` at the top of `PreimageHardened` | exactly the `Correct Horse Battery Staple` and `  a  b ` rows, 4 failures (X+H each) |
+| strip `-`/`,` from the phrase first | **FOUR rows fail, not one.** Gate, verbatim: *"4 rows fail, not 1: `correct-horse,battery staple`, `a-b,c`, and BOTH 64-char rows … because those two rows also contain `-` and `,` … Plan's own claim is wrong; the mutation itself still works as a gate (it does fail), just on 4 rows, not 1."* Re-measured against the vendored corpus for this fold: 4 of the 11 derivation phrases carry `-` or `,` — `correct-horse,battery staple` (28), `a-b,c` (5), `hashlock phrase row: sixty-four printable characters, no hex!!xx` (64) and its `!`-suffixed sibling (65). |
+| `IsMS1Shaped` using `codex32.New` | exactly refusals rows 11, 12 and 13 (grouped-by-5, leading/trailing spaces, grouped-by-2) — a checksum parse rejects grouped input |
+| the cap literal 99 | **ONLY `TestPhraseMaxCharsIsTheCap` fails.** Gate, verbatim: *"The corpus has no 100-character refusals row — its one `too-long` row is 101 characters (verified: `len(...)==101`), which is refused whether the cap is 99 or 100, so `TestRefusalRowsMatchTheHost` stays green under this mutation. Plan's second clause does not hold for this corpus."* Re-measured for this fold: the sole `too-long` refusals row is 101 characters. |
+
+Every mutation still fails the test it is aimed at — nothing silently passed. Only two of
+the plan's own descriptions of SCOPE were wrong, and both are corrected above.
 
 - [ ] **Step 6: Commit.**
 
@@ -522,7 +552,7 @@ git commit -s -m "hashlock: port ms_codec::hashlock (0.8.0) -- both derivations,
 
 - [ ] **Step 1: The test.** Append to `codex32/mspayload_test.go`:
 
-```go
+```go file=codex32/mspayload_test.go mode=fragment
 // H2 (SPEC_hashlock_H2_device §6): the 0x03 kind has ONE decoder of its own;
 // DecodeMS1 keeps refusing it (H0), and the two never share a code path.
 func TestDecodeMS1PreimageIsShapeExact(t *testing.T) {
@@ -571,7 +601,7 @@ func TestDecodeMS1PreimageIsShapeExact(t *testing.T) {
 
 - [ ] **Step 3: The decoder.** Append to `codex32/mspayload.go`:
 
-```go
+```go file=codex32/mspayload.go mode=fragment
 // DecodeMS1Preimage decodes the m-format HASHLOCK PREIMAGE kind (SPEC_ms_hashlock
 // §1: payload = [0x03][32 bytes]) from a New-valid string: ONLY an unshared
 // single whose data is exactly 33 bytes beginning 0x03 -- the shape IsPreimage
@@ -613,17 +643,19 @@ git commit -s -m "codex32: DecodeMS1Preimage -- the 0x03 kind's own decoder, sha
 ### Task 3: `Which hash?` — label-keyed rows and the phrase row
 
 **Files:**
-- Modify: `gui/composer_hash.go` — the header comment at :27-28; `composerHashEdit` (:140-172) replaced
-- Modify: `gui/composer_hash_test.go` (append)
+- Modify: `gui/composer_hash.go` — the header comment at :27-28; `composerHashEdit` (:139-176, its doc comment included) replaced
+- Modify: `gui/composer_hash_test.go` (append; `"fmt"` joins the import block)
 - Modify: `gui/composer_copy.go` (append `composerCopyHashlockNoPayloadLead`)
+- Modify: `gui/composer_copy_test.go` — the new body's `composerCopyTable` row and the AST scan's `declared` literal (**build gate fix 1**: the plan had no step for either, and `TestComposerCopyTableCoversEveryBody` fails BY NAME on any `composerCopy*` function that has no row)
+- Modify: `gui/composer_gates_test.go` — one EXISTING test's pump target (**build gate fix 12**, a direct consequence of this task's no-payload lead swap; see Step 4)
 
 **Interfaces:**
-- Consumes: `composerPickScreen(ctx, th, title, lead string, rows []string) (int, bool)`, `composerPayloadDigests(*syswSession) [][32]byte`, `composerHashRow`, `composerHexEntry`, `composerCopyHashRule`, `showError`; Task 4's `hashlockPhraseRoute(ctx, th, st, idx) hashlockOutcome`.
-- Produces: `composerHashRows` struct; the phrase row label constant `composerHashRowPhrase = "Type a hashlock phrase"`.
+- Consumes: `composerPickScreen(ctx, th, title, lead string, rows []string) (int, bool)`, `composerPayloadDigests(*syswSession) [][32]byte`, `composerHashRow`, `composerHexEntry`, `composerCopyHashRule`, `showError`; Task 4's `hashlockPhraseRoute(ctx, th, st, idx int, payload [][32]byte) hashlockOutcome`.
+- Produces: the `composerHashRowSet` struct and its constructor `composerHashRows(s *syswSession) composerHashRowSet` — Go forbids a type and a func sharing one name in a package, and the tests call the CONSTRUCTOR `composerHashRows`, so the TYPE takes the `…RowSet` name; the phrase row label constant `composerHashRowPhrase = "Type a hashlock phrase"`.
 
 - [ ] **Step 1: The tests (RED).** Append to `gui/composer_hash_test.go`:
 
-```go
+```go file=gui/composer_hash_test.go mode=fragment
 // H2: the row switch is keyed by LABEL (spec §5; r2 review C-4). With 0, 1 and 2
 // payload digests, every row does what its label says, and `Type 64 hex` never
 // clears the lock. MUTATION: restore the index arithmetic with the new row
@@ -660,24 +692,39 @@ func TestWhichHashRowsAreLabelKeyed(t *testing.T) {
 }
 ```
 
+and add `"fmt"` to that file's imports, which the new test needs:
+
+```go file=gui/composer_hash_test.go mode=fragment
+import (
+	"encoding/hex"
+	"fmt"
+	"strings"
+	"testing"
+)
+```
+
 Run: `go test -count=1 -run TestWhichHashRowsAreLabelKeyed ./gui/` — Expected: does not compile (`composerHashRows` undefined).
 
 - [ ] **Step 2: The rows struct and the switch.** In `gui/composer_hash.go`, replace lines 27-28 of the header comment with:
 
-```go
+```go file=gui/composer_hash.go mode=fragment
 // THE COMPOSER DERIVES A PREIMAGE IN RAM FOR ONE SCREEN (H2) AND NEVER STORES,
 // SHOWS OR ENGRAVES IT. It puts a digest in a script.
 ```
 
 and replace `composerHashEdit` (the whole function at :140-172) with:
 
-```go
+```go file=gui/composer_hash.go mode=fragment
 const composerHashRowPhrase = "Type a hashlock phrase"
 
-// composerHashRows builds `Which hash?` ONCE and records where each named row
+// composerHashRowSet builds `Which hash?` ONCE and records where each named row
 // sits, so the dispatch below is by label, never by index arithmetic (spec §5;
 // r2 review C-4: the shipped default arm cleared the lock when a row moved).
-type composerHashRows struct {
+//
+// (Named composerHashRowSet rather than composerHashRows: the constructor below
+// is composerHashRows, and Go does not allow a type and a func to share a name
+// in the same package -- the plan's own tests call the constructor composerHashRows.)
+type composerHashRowSet struct {
 	labels    []string
 	lead      string
 	digests   [][32]byte
@@ -686,13 +733,13 @@ type composerHashRows struct {
 	noneRow   int
 }
 
-func composerHashRowsFor(s *syswSession) composerHashRows {
+func composerHashRows(s *syswSession) composerHashRowSet {
 	digests := composerPayloadDigests(s)
 	labels := make([]string, 0, len(digests)+3)
 	for i, d := range digests {
 		labels = append(labels, composerHashRow(i+1, d))
 	}
-	r := composerHashRows{digests: digests, lead: "Which hash?"}
+	r := composerHashRowSet{digests: digests, lead: "Which hash?"}
 	r.phraseRow = len(labels)
 	labels = append(labels, composerHashRowPhrase)
 	r.hexRow = len(labels)
@@ -706,10 +753,11 @@ func composerHashRowsFor(s *syswSession) composerHashRows {
 	return r
 }
 
+// composerHashEdit sets or clears one path's hashlock.
 func composerHashEdit(ctx *Context, th *Colors, st *composerState, idx int) bool {
 	title := fmt.Sprintf("Path %d hash", idx+1)
 	for {
-		rows := composerHashRowsFor(ctx.sysw)
+		rows := composerHashRows(ctx.sysw)
 		sel, ok := composerPickScreen(ctx, th, title, rows.lead, rows.labels)
 		if !ok {
 			return false // Back at `Which hash?` -- the ONLY false this function returns (spec §4.6)
@@ -749,13 +797,16 @@ func composerHashEdit(ctx *Context, th *Colors, st *composerState, idx int) bool
 }
 ```
 
-(`composerHashRows` in the test is the struct's constructor name used by the test — to keep the test as written, add `func composerHashRows(s *syswSession) composerHashRows { return composerHashRowsFor(s) }` is NOT allowed (name clash with the type). Rename the constructor: the test calls `composerHashRows(s)`; make the TYPE `composerHashRowSet` and the FUNCTION `composerHashRows`. Apply that renaming consistently in this step.)
+(The TYPE is `composerHashRowSet` and the CONSTRUCTOR is `composerHashRows` because Go
+does not allow a type and a func to share one name in a package, and the Step 1 test
+calls `composerHashRows(s)`. The block above already carries that naming and the comment
+recording it; nothing further needs renaming.)
 
 Note the behaviour change for `Type 64 hex`'s Back: today `composerHexEntry`'s `false` propagates out of `composerHashEdit` and, at creation, deletes the path (`composer_shape.go:269`); under §4.6 it returns to `Which hash?`. The test in Step 1 does not cover it; Task 4's harness tests do (Back from hex entry at creation keeps the path).
 
 Append to `gui/composer_copy.go`:
 
-```go
+```go file=gui/composer_copy.go mode=fragment
 // ─── H2: hashlock phrase route (SPEC_hashlock_H2_device §4) ──────────────────
 
 func composerCopyHashlockNoPayloadLead() string {
@@ -764,12 +815,43 @@ func composerCopyHashlockNoPayloadLead() string {
 }
 ```
 
-- [ ] **Step 3: GREEN.** Task 4 supplies `hashlockPhraseRoute`; until then add a one-line stub in `gui/composer_hashlock.go` returning `hashlockBackToWhichHash` so this task compiles, and replace it in Task 4. Run: `go test -count=1 -run 'TestWhichHashRowsAreLabelKeyed|TestComposerHash' ./gui/` — Expected: PASS.
+- [ ] **Step 3: The copy gate's row and its count (build gate fix 1).** `TestComposerCopyTableCoversEveryBody` (`gui/composer_copy_test.go`) AST-scans `composer_copy.go` for every `composerCopy*` function and requires BOTH a `composerCopyTable` row and an exact declared-count literal. This task adds one such function, so both move. Add the row:
 
-- [ ] **Step 4: Commit.**
+```go file=gui/composer_copy_test.go mode=fragment
+		{"composerCopyHashlockNoPayloadLead", "H2-3", composerCopyHashlockNoPayloadLead(),
+			"No hash record in the payload. Type a phrase below, or make one with ms hashlock on the host."},
+```
+
+and bump the count literal from `41` to `42`, recording why above it:
+
+```go file=gui/composer_copy_test.go mode=fragment
+	// 42 SINCE H2 TASK 3 added composerCopyHashlockNoPayloadLead (the
+	// no-payload lead on `Which hash?`, SPEC_hashlock_H2_device §4.1).
+```
+
+(Task 4 adds nine more bodies and bumps the same literal to `51`; the file's FINAL text — the comment block and the `if declared != 51` it guards — is the block in Task 4 Step 1, which is what the gated tree holds. Both bumps are recorded in that one comment.)
+
+- [ ] **Step 4: The pre-existing test this task's lead swap moves (build gate fix 12).** `TestComposerLockAndHashEditsAreNotGuardedByTheDiscardConfirm` in `gui/composer_gates_test.go` drives `composerPathEdit` with `ctx.sysw == nil`, so `composerHashRows` reports 0 payload digests and this task's design swaps the LEAD to `composerCopyHashlockNoPayloadLead()` — exactly as intended on a device with no hash record loaded. That test pumped to the literal `"Which hash?"`, which no longer appears on that frame. The TITLE is what is invariant across both leads, so the pump target moves to it:
+
+```go file=gui/composer_gates_test.go mode=fragment
+		{"time lock", 1, "What kind of time lock?"},
+		// H2 (SPEC_hashlock_H2_device §4.1): with no ctx.sysw session loaded
+		// (this test's own state), composerHashRows reports 0 payload digests,
+		// so the screen's LEAD becomes composerCopyHashlockNoPayloadLead
+		// rather than the literal "Which hash?" -- the TITLE ("Path 1 hash")
+		// is what stays invariant across both cases, so the pump target moves
+		// to it rather than to wording this test does not otherwise assert on.
+		{"hash lock", 2, "Path 1 hash"},
+```
+
+This is a genuine regression in an unrelated existing test, and the narrow `-run` selections in this task never touch that file: the build gate found it only on the full `gui` shard set (shard 11 failed). Run `scripts/gui-shard-test.sh ./gui/ 24` — or at least `go test -run TestComposerLockAndHashEdits ./gui/` — before calling this task green.
+
+- [ ] **Step 5: GREEN.** Task 4 supplies `hashlockPhraseRoute`; until then add a one-line stub in `gui/composer_hashlock.go` returning `hashlockBackToWhichHash` so this task compiles, and replace it in Task 4. Run: `go test -count=1 -run 'TestWhichHashRowsAreLabelKeyed|TestComposerHash|TestComposerCopy|TestComposerLockAndHashEdits' ./gui/` — Expected: PASS.
+
+- [ ] **Step 6: Commit.**
 
 ```bash
-git add gui/composer_hash.go gui/composer_hash_test.go gui/composer_copy.go gui/composer_hashlock.go
+git add gui/composer_hash.go gui/composer_hash_test.go gui/composer_copy.go gui/composer_copy_test.go gui/composer_gates_test.go gui/composer_hashlock.go
 git commit -s -m "composer: Which hash? rows are label-keyed; the phrase row; the no-payload lead names both routes (hashlock H2)"
 ```
 
@@ -779,16 +861,26 @@ git commit -s -m "composer: Which hash? rows are label-keyed; the phrase row; th
 
 **Files:**
 - Create: `gui/composer_hashlock.go` (replacing Task 3's stub), `gui/composer_hashlock_test.go`
-- Modify: `gui/composer_copy.go` (append), `gui/composer_copy_test.go` (rows), `gui/modal_fits_test.go` (rows)
+- Modify: `gui/composer_copy.go` (append; `seedhammer.com/hashlock` joins its imports), `gui/composer_copy_test.go` (nine rows + the `declared` literal 42 → 51, and the `hashlock` import — **build gate fix 2**), `gui/modal_fits_test.go` (five rows + the `hashlock` import)
 - Modify: `gui/composer_state.go` (`hashByPhrase bool` on `composerState`), `gui/composer_shape.go:443` (§8h form)
 
 **Interfaces:**
 - Consumes: `NewPassphraseKeyboard(ctx)` (`gui/passphrase_keyboard.go:76`; `kbd.Update`, `kbd.Fragment`, `kbd.Layout`, `kbd.MaxHeight`), `composerPickScreen`, `composerConfirmScreen(ctx, th, title, body) bool` (`gui/composer_shape.go:77`), `composerConfirmBody` (`gui/composer_copy.go:32`), `showError`, `layoutTitle`, `layoutNavigation`, `widget.Labelf`/`Labelw`, `hashlock.*`.
 - Produces: `hashlockPhraseRoute(ctx, th, st, idx, payloadDigests [][32]byte) hashlockOutcome` with `hashlockAssigned | hashlockBackToWhichHash`.
 
-- [ ] **Step 1: The copy, and its two gates (RED).** Append to `gui/composer_copy.go`:
+- [ ] **Step 1: The copy, and its two gates (RED).** `gui/composer_copy.go` now references `hashlock`'s sentinel errors, so its import turns into a block:
 
-```go
+```go file=gui/composer_copy.go mode=fragment
+import (
+	"fmt"
+
+	"seedhammer.com/hashlock"
+)
+```
+
+Append the bodies (this is the text the build gate proved fits — see the §4.5 note after the gate rows below; the reuse block is the brainstorm's two sentences, and the reconciliation line lives in `composerCopyHashEveryPathPhrase`):
+
+```go file=gui/composer_copy.go mode=fragment
 func composerCopyHashlockPhraseLead() string {
 	return "Use a phrase you have never used anywhere else."
 }
@@ -838,12 +930,8 @@ func composerCopyHashlockConfirm(first8last8, method string, chars int, relation
 	return b +
 		"Write down this phrase and the method now. They are not on this device and " +
 		"not on your plates. Without both, this path can never be spent.\n" +
-		"One phrase per policy. Spending any path of a wsh wallet publishes this " +
-		"digest. Never use this phrase as a passphrase or a password anywhere else " +
-		"-- a spend publishes the preimage, and anyone can then test guesses at the " +
-		"phrase itself.\n" +
-		"Before you fund this wallet, run ms hashlock with this phrase and method on " +
-		"the host and check the digest matches."
+		"One phrase per policy. Never use this phrase as a passphrase or a password " +
+		"anywhere else."
 }
 
 func composerCopyHashlockRelation(i int) string {
@@ -854,17 +942,101 @@ func composerCopyHashlockRelation(i int) string {
 }
 
 // §8h, the phrase-route form (SPEC_hashlock_H2_device §4.7).
+//
+// Carries the confirm modal's reconciliation line (moved here by §4.5's own
+// drop order, step 2: the modal's normalised body measured only 64 characters
+// of headroom against the required 80, so the line that converts a spend-time
+// divergence into a five-minute check moves to Done instead of being cut).
 func composerCopyHashEveryPathPhrase() string {
 	return "HASH ON EVERY PATH\n" +
 		"Every way to spend this wallet needs a hashlock preimage. It is not on " +
 		"this device and not on these plates. Back up the phrase and its method, " +
-		"or the preimage plate, separately."
+		"or the preimage plate, separately.\n" +
+		"Before you fund this wallet, run ms hashlock with this phrase and method " +
+		"on the host and check the digest matches."
 }
 ```
 
-Add rows to `composerCopyTable()` in `gui/composer_copy_test.go` for each new function (section "H2-4.2", "H2-4.3a", "H2-4.3b", "H2-4.4", "H2-4.5", "H2-4.7", with their expected normalised text — copy the row shape of the existing entries), and rows to `TestModalsThisBlockTouchesAreDrawnInFull` in `gui/modal_fits_test.go`:
+Now BOTH copy gates. `TestComposerCopyTableCoversEveryBody` AST-scans `composer_copy.go`
+and fails BY NAME on any `composerCopy*` function without a `composerCopyTable` row, so
+every one of this task's NINE new bodies needs one. Round 0 of this plan named six §8
+SECTIONS (H2-4.2/4.3a/4.3b/4.4/4.5/4.7) rather than functions, and three of those sections
+carry two bodies each — so `composerCopyHashlockRefusal`, `composerCopyHashlockRelation`
+and `composerCopyHashEveryPathFor` had no row at all (**build gate fix 2**; gate, verbatim:
+*"the plan's own row list under-counted its own new functions by 4"* — that 4 is against
+all TEN H2 rows, Task 3's `composerCopyHashlockNoPayloadLead` included). `composerCopyTable`
+needs the `hashlock` import for the refusal row:
 
-```go
+```go file=gui/composer_copy_test.go mode=fragment
+import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"strings"
+	"testing"
+
+	"seedhammer.com/hashlock"
+)
+```
+
+```go file=gui/composer_copy_test.go mode=fragment
+		{"composerCopyHashlockPhraseLead", "H2-4.2", composerCopyHashlockPhraseLead(),
+			"Use a phrase you have never used anywhere else."},
+		{"composerCopyHashlockRefusal", "H2-4.2", composerCopyHashlockRefusal(hashlock.ErrMS1Shaped),
+			"That is a preimage plate, not a phrase. On the host, run ms hashlock with it and load the hash: record it prints."},
+		{"composerCopyHashlockHardenedWarning", "H2-4.3a", composerCopyHashlockHardenedWarning(),
+			"Even a 20-character phrase falls in about 72 days on one GPU, and shorter ones fall sooner. Choose it from a generator. If you have used this phrase anywhere else, press Back and choose another. Continue?"},
+		{"composerCopyHashlockSHA256Warning", "H2-4.3b", composerCopyHashlockSHA256Warning(),
+			"This is the brainwallet construction: anyone holding the digest tests 10^10 phrases per second. A phrase a person chose is not safe here; use six diceware words. If you have used this phrase anywhere else, press Back and choose another. Continue?"},
+		{"composerCopyHashlockDerivingLead", "H2-4.4", composerCopyHashlockDerivingLead(),
+			"Deriving. This takes about 10 seconds."},
+		{"composerCopyHashlockConfirm", "H2-4.5", composerCopyHashlockConfirm("b867db87..edbc96cb", "hardened", 100,
+			composerCopyHashlockRelation(-1)),
+			"hash  b867db87..edbc96cb method: hardened   chars: 100 no hash: record in the payload has this digest " +
+				"Write down this phrase and the method now. They are not on this device and not on your plates. Without both, this path can never be spent. " +
+				"One phrase per policy. Never use this phrase as a passphrase or a password anywhere else."},
+		{"composerCopyHashlockRelation", "H2-4.5", composerCopyHashlockRelation(0),
+			"matches hash 1 in the payload"},
+		{"composerCopyHashEveryPathPhrase", "H2-4.7", composerCopyHashEveryPathPhrase(),
+			"HASH ON EVERY PATH Every way to spend this wallet needs a hashlock preimage. It is not on this device and not on these plates. Back up the phrase and its method, or the preimage plate, separately. " +
+				"Before you fund this wallet, run ms hashlock with this phrase and method on the host and check the digest matches."},
+		{"composerCopyHashEveryPathFor", "H2-4.7", composerCopyHashEveryPathFor(&composerState{hashByPhrase: true}),
+			"HASH ON EVERY PATH Every way to spend this wallet needs a hashlock preimage. It is not on this device and not on these plates. Back up the phrase and its method, or the preimage plate, separately. " +
+				"Before you fund this wallet, run ms hashlock with this phrase and method on the host and check the digest matches."},
+```
+
+and the scan's declared-count literal goes 42 → 51, carrying the reason (this is the
+file's final text, both bumps recorded):
+
+```go file=gui/composer_copy_test.go mode=fragment
+	// 51 SINCE H2 TASK 4 added the phrase route's nine bodies: the phrase
+	// lead, the phrase-rule refusal, both method warnings, the deriving
+	// lead, the confirm body and its relation line, and the two §8h forms
+	// (SPEC_hashlock_H2_device §4.2-§4.7).
+	if declared != 51 {
+		t.Errorf("composer_copy.go declares %d bodies, the plan and the table know 51 -- "+
+			"if that is deliberate, update both", declared)
+	}
+```
+
+(`composerCopyHashEveryPathFor` is created in Step 3 with the §8h wiring; its row and the
+51 land here so the count gate is bumped once. Step 1 is RED by construction, as below.)
+
+Then `TestModalsThisBlockTouchesAreDrawnInFull` in `gui/modal_fits_test.go`, which also
+needs the `hashlock` import:
+
+```go file=gui/modal_fits_test.go mode=fragment
+import (
+	"strings"
+	"testing"
+
+	"seedhammer.com/gui/assets"
+	"seedhammer.com/gui/op"
+	"seedhammer.com/hashlock"
+)
+```
+
+```go file=gui/modal_fits_test.go mode=fragment
 		{
 			"the hashlock hardened warning (H2 §4.3)",
 			composerCopyHashlockHardenedWarning(),
@@ -888,17 +1060,45 @@ Add rows to `composerCopyTable()` in `gui/composer_copy_test.go` for each new fu
 		},
 ```
 
-Run: `go test -count=1 -run 'TestModalsThisBlockTouchesAreDrawnInFull|TestComposerCopy' ./gui/` — Expected: does not compile until the functions exist; then, if the §4.5 longest body does NOT fit, apply the spec's drop order (§4.5) — first the reuse block to two sentences, then move the reconciliation line to `composerCopyHashEveryPathPhrase` — and record which step was needed. The measured headroom goes in the commit message.
+Run: `go test -count=1 -run 'TestModalsThisBlockTouchesAreDrawnInFull|TestComposerCopy' ./gui/` — Expected: does not compile until Step 3's functions exist; then GREEN.
 
-- [ ] **Step 2: The harness tests (RED).** Create `gui/composer_hashlock_test.go`:
+**§4.5's drop order was needed, and BOTH of its steps (build gate fixes 3 and 4).**
+`assertModalBodyFits` measures each body per-body with an 80-character margin. Measured
+by the build gate:
 
-```go
+- Step 0, the unshortened §4.5 body: **484 of 504 characters drawn — CUT** after
+  "…check the digest matches.", before "Hold button to confirm.".
+- Step 1, shorten the reuse block to the brainstorm's two sentences ("One phrase per
+  policy. Never use this phrase as a passphrase or a password anywhere else."): it fits,
+  384/384 drawn, **headroom 64 — still BELOW the 80-character margin**, so the test still
+  fails ("fits today with only 64 characters to spare… Shorten this body rather than
+  lowering the margin.").
+- Step 2, move the reconciliation line ("Before you fund this wallet, run ms hashlock…")
+  out of the confirm modal and into `composerCopyHashEveryPathPhrase`, which is the spec's
+  own next step: confirm modal **290 drawn, headroom 186**; the §8h phrase form **254
+  drawn, headroom 262**.
+
+The blocks above already carry both steps, so an implementer following this plan does not
+rediscover them. Do NOT re-lengthen the confirm body: 64 characters of headroom is a
+failing gate, not a near miss. (The spec is unchanged — §4.5 names this drop order itself.)
+
+- [ ] **Step 2: The harness tests, and every helper they need (RED).** Create `gui/composer_hashlock_test.go`. This is the whole file as the build gate wrote and ran it — the seven helpers round 0 only NAMED (`composerStateForTest`, `runComposerAddPath`, `tapRow`, `holdConfirm`, `tapPassphraseKey`, `waitDone`, `groupBy`, `loadHashlockCorpusForGUI`) are written out, and each carries the mechanism it depends on in its own comment:
+
+```go file=gui/composer_hashlock_test.go mode=whole
 package gui
 
 import (
 	"encoding/hex"
+	"encoding/json"
+	"image"
+	"os"
 	"strings"
 	"testing"
+	"time"
+
+	"seedhammer.com/gui/assets"
+	"seedhammer.com/gui/op"
+	"seedhammer.com/md"
 )
 
 // The anchor phrase and the corpus digests (hashlock/testdata/hashlock-v0.8.json,
@@ -910,26 +1110,200 @@ const (
 	hashlockMixedPhrase  = "Correct Horse Battery Staple"
 )
 
+// composerStateForTest is an empty policy shape with one path being added --
+// the minimal state runComposerAddPath's callers need before a path exists.
+//
+// Wrapper is wsh: a key-less path is wsh-only (composer_shape.go:250, spec
+// §4b/C16) and md.ComposeWrapper's zero value is ComposeTr, which REFUSES a
+// key-less path outright ("This build will not put a key-less path in
+// taproot") -- the very screen these tests drive through never appears under
+// the zero-value state.
+func composerStateForTest(t *testing.T) *composerState {
+	t.Helper()
+	return &composerState{list: md.PathList{Wrapper: md.ComposeWsh}}
+}
+
+// hashlockKbdFor captures the *PassphraseKeyboard hashlockPhraseFlow registers
+// via hookPPWidget, keyed by the harness that is driving it.
+//
+// sessionHarness (gui/unlock_session_test.go) carries no widgets map of its
+// own, and this file does not modify that struct -- so the capture lives here,
+// alongside tapPassphraseKey, the only place that reads it.
+var hashlockKbdFor = map[*sessionHarness]*PassphraseKeyboard{}
+
 // runComposerAddPath drives composerAddPath (the CREATION entry point, where a
 // false from composerHashEdit deletes the path -- spec §4.6) on the touch harness.
+//
+// p.display is set to sh2DisplaySize: the default 240x240 test display is
+// narrower than the passphrase keyboard (340 px), which pushes q/p/a/l off the
+// canvas -- reachable by a hit test, unreachable by a finger (the rule
+// passphrase_flow_test.go states for exactly this reason).
 func runComposerAddPath(t *testing.T, st *composerState, s *syswSession) *sessionHarness {
 	t.Helper()
-	ctx := NewContext(newPlatform())
+	p := newPlatform()
+	p.display = sh2DisplaySize
+	ctx := NewContext(p)
 	ctx.sysw = s
 	returned := false
+	h := &sessionHarness{t: t, ctx: ctx, done: &returned}
+	passphraseWidgetHook = func(name string, w any) {
+		if name != "kbd" {
+			return
+		}
+		if k, ok := w.(*PassphraseKeyboard); ok {
+			hashlockKbdFor[h] = k
+		}
+	}
 	frame, drawer, quit := runUITouch(ctx, func() {
 		composerAddPath(ctx, &descriptorTheme, st)
 		returned = true
 	})
-	h := &sessionHarness{t: t, ctx: ctx, done: &returned}
 	h.frame, h.drawer = frame, drawer
-	t.Cleanup(quit)
+	t.Cleanup(func() {
+		quit()
+		passphraseWidgetHook = nil
+		delete(hashlockKbdFor, h)
+	})
 	return h
 }
 
+// tapRow selects row i of an n-row composerPickScreen page by touch (the
+// zero-Button Clickables plateHitPoints already knows how to find,
+// unlock_platelist_test.go) and takes it -- the same "tap selects, Button3
+// takes" contract composer_pick_touch_test.go exercises directly. A row
+// count that does not match what is actually drawn fails loudly rather than
+// silently tapping the wrong target.
+func (h *sessionHarness) tapRow(i, n int) {
+	h.t.Helper()
+	pts := plateHitPoints(h.ctx, h.drawer())
+	if len(pts) != n {
+		h.t.Fatalf("tapRow(%d, %d): the screen drew %d touch targets, not %d", i, n, len(pts), n)
+	}
+	tap(&h.ctx.Router, h.drawer(), pts[i])
+	h.next("after selecting the row")
+	h.tapNav(Button3)
+}
+
+// holdConfirm holds Button3 (the ConfirmWarningScreen hold gesture) past
+// confirmDelay, then RELEASES.
+//
+// It cannot reuse wipe_guard_test.go's sessionHarness.hold verbatim: that
+// helper never sends a release, which is fine for its own callers (one hold
+// per test). This route holds SEVERAL ConfirmWarningScreens in sequence (the
+// key-less consent, a method warning, the final Hash lock confirm), and
+// EventRouter.Events (gui/event.go) tracks exactly ONE pointer contact
+// GLOBALLY: while `pointer.pressed` is true it reuses the STALE
+// `pointer.pressedTag` instead of hit-testing the current frame. Measured:
+// two sequential holds with no release in between "succeeded" (a frame kept
+// coming back) but the second one never left 0% progress, because its press
+// event was routed to the FIRST screen's now-defunct Clickable, which nobody
+// still polls. The release resets `pointer.pressed`, so the NEXT hold's press
+// gets a fresh hit test against the CURRENT screen.
+//
+// Tolerant of the flow ending here (mirrors unlock_session_test.go's
+// holdDiscardConfirm): the LAST hold in several of these tests is the one
+// that assigns the digest and lets composerAddPath return, so no further
+// frame legitimately follows it.
+func (h *sessionHarness) holdConfirm() {
+	h.t.Helper()
+	dims := h.ctx.Platform.DisplaySize()
+	sz := assets.NavBtnPrimary.Bounds().Size()
+	ys := [3]int{leadingSize, (dims.Y - sz.Y) / 2, dims.Y - leadingSize - sz.Y}
+	pos := image.Pt(dims.X-sz.X/2, ys[int(Button3-Button1)]+sz.Y/2)
+	d := h.drawer()
+	tag, _, hit := d.Hit(pos)
+	if !hit {
+		h.t.Fatalf("holdConfirm: no touch target at %v", pos)
+	}
+	if c, ok := tag.(*Clickable); !ok || (c.Button != Button3 && c.AltButton != Button3) {
+		h.t.Fatalf("holdConfirm: the target at %v is %v", pos, tag)
+	}
+	h.ctx.Router.Events(d, PointerEvent{Pressed: true, Entered: true, Pos: pos}.Event())
+	h.next("hold press")
+	time.Sleep(confirmDelay)
+	if c, ok := h.frame(); ok {
+		h.content = c
+	}
+	h.ctx.Router.Events(d, PointerEvent{Pressed: false, Entered: true, Pos: pos}.Event())
+	if c, ok := h.frame(); ok {
+		h.content = c
+	}
+}
+
+// waitDone pumps frames until composerAddPath has returned (the *done flag
+// runComposerAddPath set is flipped synchronously, before the underlying
+// goroutine exits, so the pump's final ok==false confirms it rather than
+// racing it).
+func (h *sessionHarness) waitDone() {
+	h.t.Helper()
+	for i := 0; i < 256; i++ {
+		if _, ok := h.frame(); !ok {
+			if !*h.done {
+				h.t.Fatalf("the session ended without composerAddPath returning")
+			}
+			return
+		}
+		if *h.done {
+			return
+		}
+	}
+	h.t.Fatalf("composerAddPath never returned after 256 frames")
+}
+
+// tapPassphraseKey types one character on the harness's registered
+// PassphraseKeyboard, cycling pages by touch until the character's page is up
+// -- modelled on ppHarness.typeRune (passphrase_flow_test.go), adapted to
+// sessionHarness because that is the type runComposerAddPath returns.
+func (h *sessionHarness) tapPassphraseKey(r rune) {
+	h.t.Helper()
+	kbd, ok := hashlockKbdFor[h]
+	if !ok {
+		h.t.Fatal("no *PassphraseKeyboard was registered for this harness")
+	}
+	for range len(ppPages) + 1 {
+		if tag := ppTagFor(kbd, func(k ppKey) bool { return k.action == ppRune && k.r == r }); tag != nil {
+			h.tapAt(h.point(tag, "key "+string(r)))
+			h.next("after typing a character")
+			return
+		}
+		cyc := ppTagFor(kbd, func(k ppKey) bool { return k.action == ppPageCycle })
+		if cyc == nil {
+			h.t.Fatalf("no page-cycle key on keyboard page %d", kbd.page)
+		}
+		h.tapAt(h.point(cyc, "page-cycle key"))
+		h.next("after cycling the keyboard page")
+	}
+	h.t.Fatalf("%q is not typeable on any keyboard page", string(r))
+}
+
+// tapAt and point mirror ppHarness's (passphrase_flow_test.go), adapted to
+// sessionHarness: a tap aimed at the centre of a hit area actually drawn,
+// failing loudly if that area is undrawn, off-panel, or covered.
+func (h *sessionHarness) tapAt(pos image.Point) {
+	h.t.Helper()
+	tap(&h.ctx.Router, h.drawer(), pos)
+}
+
+func (h *sessionHarness) point(tag op.Tag, what string) image.Point {
+	h.t.Helper()
+	d := h.drawer()
+	b, ok := d.TagBounds(tag)
+	if !ok {
+		h.t.Fatalf("%s: no hit area was drawn -- unreachable by touch", what)
+	}
+	c := b.Min.Add(b.Max).Div(2)
+	screen := image.Rectangle{Max: h.ctx.Platform.DisplaySize()}
+	if !c.In(screen) {
+		h.t.Fatalf("%s: hit area %v lies off the %v panel -- unreachable by a finger", what, b, screen)
+	}
+	if hit, _, ok := d.Hit(c); !ok || hit != tag {
+		h.t.Fatalf("%s: hit area %v is covered by another target (%v)", what, b, hit)
+	}
+	return c
+}
+
 // typeOnPassphraseKeyboard taps each character of s on the four-page printable
-// keyboard (hookPPWidget exposes it as "kbd"; see passphrase_flow_test.go for the
-// page-turn idiom this reuses).
+// keyboard.
 func typeOnPassphraseKeyboard(t *testing.T, h *sessionHarness, s string) {
 	t.Helper()
 	for _, r := range s {
@@ -937,7 +1311,62 @@ func typeOnPassphraseKeyboard(t *testing.T, h *sessionHarness, s string) {
 	}
 }
 
-func hashHex(h *[32]byte) string { return hex.EncodeToString(h[:]) }
+func hashlockHashHex(h *[32]byte) string { return hex.EncodeToString(h[:]) }
+
+// groupBy inserts a space every n runes -- the corpus's own "grouped" refusal
+// shape (hashlock.IsMS1Shaped strips it right back out).
+func groupBy(s string, n int) string {
+	var b strings.Builder
+	for i, r := range s {
+		if i > 0 && i%n == 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// hashlockCorpusRow is the one field these GUI tests read back from the
+// vendored corpus: the derivation row for a given (untouched) phrase.
+type hashlockCorpusForGUI struct {
+	rows map[string]struct{ SHA256H string }
+}
+
+func (c hashlockCorpusForGUI) row(t *testing.T, phrase string) struct{ SHA256H string } {
+	t.Helper()
+	r, ok := c.rows[phrase]
+	if !ok {
+		t.Fatalf("the corpus has no derivation row for %q", phrase)
+	}
+	return r
+}
+
+// loadHashlockCorpusForGUI reads hashlock/testdata via a path RELATIVE TO THIS
+// PACKAGE (`go test` runs with gui/ as its working directory, and hashlock/ is
+// a sibling of it), not a duplicate copy: the hashlock package already owns
+// the vendored corpus and its provenance pin (Task 1), and this file reads the
+// SAME bytes rather than re-vendoring them.
+func loadHashlockCorpusForGUI(t *testing.T) hashlockCorpusForGUI {
+	t.Helper()
+	raw, err := os.ReadFile("../hashlock/testdata/hashlock-v0.8.json")
+	if err != nil {
+		t.Fatalf("reading the vendored hashlock corpus: %v", err)
+	}
+	var doc struct {
+		Derivation []struct {
+			Phrase  string `json:"phrase"`
+			SHA256H string `json:"sha256_h"`
+		} `json:"derivation"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parsing the vendored hashlock corpus: %v", err)
+	}
+	c := hashlockCorpusForGUI{rows: map[string]struct{ SHA256H string }{}}
+	for _, r := range doc.Derivation {
+		c.rows[r.Phrase] = struct{ SHA256H string }{r.SHA256H}
+	}
+	return c
+}
 
 // Both methods, from the creation entry point, land the corpus digest on the path.
 func TestHashlockPhraseRouteSetsTheCorpusDigest(t *testing.T) {
@@ -951,18 +1380,19 @@ func TestHashlockPhraseRouteSetsTheCorpusDigest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st := composerStateForTest(t) // an empty policy shape with one path being added
 			h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+			h.mustReach("What can spend on this path?")
+			h.choose(1) // A hash, no keys
 			h.mustReach("EXPERIMENTAL")
 			h.holdConfirm() // key-less path consent (§8a)
-			h.mustReach("Which hash?")
-			h.tapRow(0, 3) // Type a hashlock phrase (no payload digests)
-			h.mustReach("Hash lock") // §8i rule modal
+			h.mustReach("Type a hashlock phrase")
+			h.tapRow(0, 3)               // Type a hashlock phrase (no payload digests)
+			h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 			h.tapNav(Button3)
 			h.mustReach("Hashlock phrase")
 			typeOnPassphraseKeyboard(t, h, tc.phrase)
 			h.tapNav(Button3) // OK
 			h.mustReach("Which method?")
 			h.tapRow(tc.methodRow, 2)
-			h.tapNav(Button3)
 			if tc.method == "sha256" {
 				h.mustReach("brainwallet")
 				h.holdConfirm()
@@ -972,7 +1402,7 @@ func TestHashlockPhraseRouteSetsTheCorpusDigest(t *testing.T) {
 			}
 			h.mustReach("Write down this phrase")
 			h.holdConfirm()
-			if got := st.list.Paths[len(st.list.Paths)-1].Hash; got == nil || hashHex(got) != tc.want {
+			if got := st.list.Paths[len(st.list.Paths)-1].Hash; got == nil || hashlockHashHex(got) != tc.want {
 				t.Fatalf("path hash = %v, want %s", got, tc.want)
 			}
 		})
@@ -987,23 +1417,24 @@ func TestHashlockPhraseRouteDoesNotNormalise(t *testing.T) {
 		row := c.row(t, phrase)
 		st := composerStateForTest(t)
 		h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+		h.mustReach("What can spend on this path?")
+		h.choose(1) // A hash, no keys
 		h.mustReach("EXPERIMENTAL")
 		h.holdConfirm()
-		h.mustReach("Which hash?")
+		h.mustReach("Type a hashlock phrase")
 		h.tapRow(0, 3)
-		h.mustReach("Hash lock")
+		h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 		h.tapNav(Button3)
 		h.mustReach("Hashlock phrase")
 		typeOnPassphraseKeyboard(t, h, phrase)
 		h.tapNav(Button3)
 		h.mustReach("Which method?")
 		h.tapRow(1, 2) // sha256: instant
-		h.tapNav(Button3)
 		h.mustReach("brainwallet")
 		h.holdConfirm()
 		h.mustReach("Write down this phrase")
 		h.holdConfirm()
-		if got := st.list.Paths[len(st.list.Paths)-1].Hash; got == nil || hashHex(got) != row.SHA256H {
+		if got := st.list.Paths[len(st.list.Paths)-1].Hash; got == nil || hashlockHashHex(got) != row.SHA256H {
 			t.Fatalf("%q: path hash = %v, want %s", phrase, got, row.SHA256H)
 		}
 	}
@@ -1014,11 +1445,13 @@ func TestHashlockPhraseRouteDoesNotNormalise(t *testing.T) {
 func TestHashlockBackContractKeepsThePath(t *testing.T) {
 	st := composerStateForTest(t)
 	h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+	h.mustReach("What can spend on this path?")
+	h.choose(1) // A hash, no keys
 	h.mustReach("EXPERIMENTAL")
 	h.holdConfirm()
-	h.mustReach("Which hash?")
+	h.mustReach("Type a hashlock phrase")
 	h.tapRow(0, 3)
-	h.mustReach("Hash lock")
+	h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 	h.tapNav(Button3)
 	h.mustReach("Hashlock phrase")
 	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
@@ -1030,17 +1463,14 @@ func TestHashlockBackContractKeepsThePath(t *testing.T) {
 	h.tapNav(Button3)
 	h.mustReach("Which method?")
 	h.tapRow(1, 2)
-	h.tapNav(Button3)
 	h.mustReach("brainwallet")
 	h.tapNav(Button1) // decline -> method pick, phrase intact
 	h.mustReach("Which method?")
 	h.tapRow(0, 2)
-	h.tapNav(Button3)
 	h.mustReach("Deriving")
 	h.tapNav(Button1) // Back during derivation -> method pick
 	h.mustReach("Which method?")
 	h.tapRow(1, 2)
-	h.tapNav(Button3)
 	h.mustReach("brainwallet")
 	h.holdConfirm()
 	h.mustReach("Write down this phrase")
@@ -1055,7 +1485,7 @@ func TestHashlockBackContractKeepsThePath(t *testing.T) {
 	h.tapNav(Button1) // Back at method pick -> phrase screen
 	h.mustReach("Hashlock phrase")
 	h.tapNav(Button1) // Back at phrase screen -> Which hash?, phrase dropped
-	h.mustReach("Which hash?")
+	h.mustReach("Type a hashlock phrase")
 	if n := len(st.list.Paths); n != 1 {
 		t.Fatalf("path deleted by Back to Which hash?: %d paths", n)
 	}
@@ -1070,27 +1500,27 @@ func TestHashlockBackContractKeepsThePath(t *testing.T) {
 func TestHashlockDeclineThenHardenedTypesOnce(t *testing.T) {
 	st := composerStateForTest(t)
 	h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+	h.mustReach("What can spend on this path?")
+	h.choose(1) // A hash, no keys
 	h.mustReach("EXPERIMENTAL")
 	h.holdConfirm()
-	h.mustReach("Which hash?")
+	h.mustReach("Type a hashlock phrase")
 	h.tapRow(0, 3)
-	h.mustReach("Hash lock")
+	h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 	h.tapNav(Button3)
 	h.mustReach("Hashlock phrase")
 	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
 	h.tapNav(Button3)
 	h.mustReach("Which method?")
 	h.tapRow(1, 2)
-	h.tapNav(Button3)
 	h.mustReach("brainwallet")
 	h.tapNav(Button1)
 	h.mustReach("Which method?")
 	h.tapRow(0, 2)
-	h.tapNav(Button3)
 	h.mustReach("Deriving")
 	h.mustReach("Write down this phrase")
 	h.holdConfirm()
-	if got := st.list.Paths[0].Hash; got == nil || hashHex(got) != hashlockAnchorHardH {
+	if got := st.list.Paths[0].Hash; got == nil || hashlockHashHex(got) != hashlockAnchorHardH {
 		t.Fatalf("hash = %v, want hardened anchor", got)
 	}
 }
@@ -1108,11 +1538,13 @@ func TestHashlockPhraseRefusalsOnScreen(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st := composerStateForTest(t)
 			h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+			h.mustReach("What can spend on this path?")
+			h.choose(1) // A hash, no keys
 			h.mustReach("EXPERIMENTAL")
 			h.holdConfirm()
-			h.mustReach("Which hash?")
+			h.mustReach("Type a hashlock phrase")
 			h.tapRow(0, 3)
-			h.mustReach("Hash lock")
+			h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 			h.tapNav(Button3)
 			h.mustReach("Hashlock phrase")
 			typeOnPassphraseKeyboard(t, h, tc.typed)
@@ -1133,24 +1565,25 @@ func TestHashlockMethodModalsFireOnCondition(t *testing.T) {
 		method int
 		warns  bool
 	}{
-		{"nineteen-characters", 0, true},  // 19 chars, hardened -> 72-days modal
+		{"nineteen-characters", 0, true},   // 19 chars, hardened -> 72-days modal
 		{"twenty--characters!!", 0, false}, // 20 chars, hardened -> no modal
 		{"twenty--characters!!", 1, true},  // sha256 -> always
 	} {
 		st := composerStateForTest(t)
 		h := runComposerAddPath(t, st, composerSessionWith(nil, nil))
+		h.mustReach("What can spend on this path?")
+		h.choose(1) // A hash, no keys
 		h.mustReach("EXPERIMENTAL")
 		h.holdConfirm()
-		h.mustReach("Which hash?")
+		h.mustReach("Type a hashlock phrase")
 		h.tapRow(0, 3)
-		h.mustReach("Hash lock")
+		h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 		h.tapNav(Button3)
 		h.mustReach("Hashlock phrase")
 		typeOnPassphraseKeyboard(t, h, tc.phrase)
 		h.tapNav(Button3)
 		h.mustReach("Which method?")
 		h.tapRow(tc.method, 2)
-		h.tapNav(Button3)
 		if tc.warns {
 			h.mustReach("Continue?")
 		} else {
@@ -1166,36 +1599,89 @@ func TestHashlockConfirmRelationLine(t *testing.T) {
 	s := composerSessionWith([]string{"hash:" + hashlockAnchorSHA_H, "hash:" + strings.Repeat("ab", 32)}, nil)
 	st := composerStateForTest(t)
 	h := runComposerAddPath(t, st, s)
+	h.mustReach("What can spend on this path?")
+	h.choose(1) // A hash, no keys
 	h.mustReach("EXPERIMENTAL")
 	h.holdConfirm()
 	h.mustReach("Which hash?")
-	h.tapRow(2, 5) // the phrase row sits after the two payload rows
-	h.mustReach("Hash lock")
+	h.tapRow(2, 5)               // the phrase row sits after the two payload rows
+	h.mustReach("32-byte value") // the §8i rule modal (composerCopyHashRule)
 	h.tapNav(Button3)
 	h.mustReach("Hashlock phrase")
 	typeOnPassphraseKeyboard(t, h, hashlockAnchorPhrase)
 	h.tapNav(Button3)
 	h.mustReach("Which method?")
 	h.tapRow(1, 2)
-	h.tapNav(Button3)
 	h.mustReach("brainwallet")
 	h.holdConfirm()
 	h.mustReach("matches hash 1 in the payload")
 }
 ```
 
-(`composerStateForTest`, `h.tapRow(i, n)`, `h.holdConfirm()`, `h.tapPassphraseKey(r)`, `h.waitDone()`, `groupBy`, `loadHashlockCorpusForGUI` are small test helpers; write them in this file modelled on `composer_backleg_test.go`'s harness use and `passphrase_flow_test.go`'s keyboard driving. `tapRow` uses `rowY(i, n)` from `composer_paged.go`'s pick-screen geometry as the walks do; `holdConfirm` is the `ConfirmWarningScreen` hold gesture the existing composer tests use.)
+The helpers are no longer a placeholder, and six of the build gate's twelve fixes live in
+this file. Each one is a mechanism an implementer would otherwise have to rediscover:
+
+- **Fix 5 — the display size.** `runComposerAddPath` sets `p.display = sh2DisplaySize`.
+  The default 240×240 test display is narrower than the 340 px passphrase keyboard, which
+  pushes `q`/`p`/`a`/`l` off the canvas — reachable by a hit test, unreachable by a
+  finger. That is the rule `gui/passphrase_flow_test.go:28-31` states for exactly this
+  reason; without it, keys the anchor phrase needs are never drawn.
+- **Fix 6 — the state is wsh.** `composerStateForTest` returns
+  `&composerState{list: md.PathList{Wrapper: md.ComposeWsh}}`. `md.ComposeWrapper`'s zero
+  value is `ComposeTr` (`md/compose.go:32`, iota 0), and a key-less path is refused
+  outright under `tr` (`gui/composer_shape.go:250`, "This build will not put a key-less
+  path in taproot") — so a zero-value state never reaches the screen these tests exist to
+  drive.
+- **Fix 7 — the spend-kind choice comes first.** Every flow opens with
+  `h.mustReach("What can spend on this path?"); h.choose(1) // A hash, no keys`.
+  `composerAddPath` shows that `ChoiceScreen` before anything else; "EXPERIMENTAL" appears
+  only after the key-less arm is chosen. Round 0's tests started at "EXPERIMENTAL" and
+  could never get there.
+- **Fix 8 — the §8i rule modal's needle is `32-byte value`.** That modal is
+  `showError(ctx, th, title, composerCopyHashRule())` with `title = "Path N hash"`. "Hash
+  lock" is the CONFIRM screen's title, not this one; round 0's test text and its own
+  `composer_hash.go` disagreed on the point. The needle is now a substring of the rule
+  body itself.
+- **Fix 9 — the no-payload frame's needle is `Type a hashlock phrase`.** With
+  `composerSessionWith(nil, nil)` there are 0 payload digests, so Task 3's design replaces
+  the lead with `composerCopyHashlockNoPayloadLead()` and the literal "Which hash?" is not
+  on that frame at all. The phrase row's LABEL is present under either lead. (Same
+  mechanism as fix 12, in this plan's own tests rather than a pre-existing one.)
+- **Fix 10 — no stray `Button3` after `tapRow`.** `tapRow` already implements the plan's
+  own "tap selects, Button3 takes" contract, so round 0's extra `h.tapNav(Button3)` after
+  the method pick queued a SECOND click that landed on the next screen and misfired its
+  confirm state. Every test that reached that line hung at the following screen until it
+  was removed.
+- **A thirteenth change the gate's fix table does NOT list: `hashHex` is
+  `hashlockHashHex`.** Round 0 declared `func hashHex(h *[32]byte) string` in this file,
+  and `gui` already has a `hashHex` — `gui/seal_fixture_test.go:172`, `func hashHex(h
+  [16]byte) string`. Same package, so the plan as written was a redeclaration and would not
+  compile. The gate renamed this file's helper (verified for this fold by grepping the fork
+  at `c4a64fc`). Nothing else in the file changed name.
+- **Fix 11 — `holdConfirm` must RELEASE.** It cannot reuse `wipe_guard_test.go`'s
+  `sessionHarness.hold`, which never sends a release. `EventRouter.Events`
+  (`gui/event.go:14-15`) tracks exactly ONE pointer contact GLOBALLY: while
+  `pointer.pressed` is true it reuses the STALE `pointer.pressedTag` instead of hit-testing
+  the current frame. This route holds several `ConfirmWarningScreen`s in sequence (key-less
+  consent → a method warning → the final Hash lock confirm), so without an explicit release
+  the second and later holds route to the FIRST screen's now-defunct `Clickable` and never
+  leave 0% — no crash, no wrong-screen frame, just a stuck confirm. Measured directly with
+  an isolated debug test before the cause was traced to `event.go`'s single global pointer
+  struct. **MUTATION: delete the release `PointerEvent{Pressed: false, …}` from
+  `holdConfirm` → every test with two or more holds hangs at its second one.** The comment
+  in the file records the mechanism so a future reader does not "simplify" it away.
 
 Run: `go test -count=1 -run TestHashlock ./gui/` — Expected: does not compile.
 
-- [ ] **Step 3: The route.** Replace Task 3's stub `gui/composer_hashlock.go` with:
+- [ ] **Step 3: The route.** Replace Task 3's stub `gui/composer_hashlock.go` with this file, as built:
 
-```go
+```go file=gui/composer_hashlock.go mode=whole
 package gui
 
 import (
 	"encoding/hex"
 	"fmt"
+	"image"
 	"time"
 
 	"seedhammer.com/gui/assets"
@@ -1405,17 +1891,29 @@ func hashlockDeriveFlow(ctx *Context, th *Colors, phrase []byte, m hashlockMetho
 }
 ```
 
-(Layout calls mirror `unlockDerive` at `gui/unlock_kdf.go:242-290`; the implementer aligns imports (`image`) and helper names against that function and `passphraseEntryFlow`, and the gate compiles them. The frame must be drawn INSIDE the progress callback, as the countdown needs a frame per step.)
+(Layout calls mirror `unlockDerive` at `gui/unlock_kdf.go:242-290`; the frame is drawn
+INSIDE the progress callback, as the countdown needs a frame per step. `image` is in the
+import block above — round 0 used `image.Pt` without importing it, and the build gate
+added the import.)
 
-Add `hashByPhrase bool` to `composerState` (`gui/composer_state.go`), and at `gui/composer_shape.go:443` replace `composerCopyHashEveryPath()` with:
+Add the `hashByPhrase` field to `composerState` in `gui/composer_state.go`, next to `bound`:
 
-```go
-				composerCopyHashEveryPathFor(st)
+```go file=gui/composer_state.go mode=fragment
+	// hashByPhrase records that AT LEAST ONE path's hash was set through the
+	// phrase route (H2), so Done's §8h form names the phrase/method as the
+	// backup rather than a bare preimage (composerCopyHashEveryPathFor).
+	hashByPhrase bool
 ```
 
-with, in `gui/composer_copy.go`:
+and at `gui/composer_shape.go:443` swap the §8h call, so the line reads:
 
-```go
+```go file=gui/composer_shape.go mode=fragment
+				showError(ctx, th, "Spend paths", composerCopyHashEveryPathFor(st))
+```
+
+with, appended to `gui/composer_copy.go`:
+
+```go file=gui/composer_copy.go mode=fragment
 func composerCopyHashEveryPathFor(st *composerState) string {
 	if st.hashByPhrase {
 		return composerCopyHashEveryPathPhrase()
@@ -1427,12 +1925,32 @@ func composerCopyHashEveryPathFor(st *composerState) string {
 - [ ] **Step 4: GREEN, then the mutations.**
 
 Run: `go vet ./gui/ && go test -count=1 -run 'TestHashlock|TestWhichHash|TestComposerHash|TestComposerCopy|TestModalsThisBlockTouchesAreDrawnInFull' ./gui/`
-Expected: PASS. Mutations, each reverted: fold `phrase` through `seal.NormalisePassphrase` in `hashlockPhraseFlow` before `ValidatePhrase` → `TestHashlockPhraseRouteDoesNotNormalise` fails on the mixed-case and spaces rows; make the confirm's Back return `hashlockBackToWhichHash` → `TestHashlockBackContractKeepsThePath` fails at "Which method?"; make `composerHashEdit` return `false` from the phrase route's Back → the same test fails on the path count; remove the relation line → `TestHashlockConfirmRelationLine` fails; drop `!f.Unshared` in Task 2 → its test fails.
+Expected: PASS. Mutations, each reverted, with the build gate's MEASURED failure in place
+of round 0's prediction where the two differ:
+
+| Mutation | Measured failure |
+| --- | --- |
+| fold `phrase` through `seal.NormalisePassphrase` in `hashlockPhraseFlow` before `ValidatePhrase` | `TestHashlockPhraseRouteDoesNotNormalise`: `"Correct Horse Battery Staple": path hash = …, want 95d4447…` |
+| the confirm's Back returns `hashlockBackToWhichHash` | `TestHashlockBackContractKeepsThePath`: `never reached "Which method?"` |
+| `composerHashEdit` returns `false` from the phrase route's Back | `TestHashlockBackContractKeepsThePath` — but it fails EARLIER than round 0 claimed: at `never reached "Type a hashlock phrase"` (the very next inner Back), **not** at the path-count assertion. The mutation is still caught by this test; only the plan's description of *where* was imprecise (gate, Task 4 mutation table). |
+| remove the relation line | `TestHashlockConfirmRelationLine`: `never reached "matches hash 1 in the payload"` |
+| delete the release event from `holdConfirm` (fix 11's mechanism) | every test with two or more holds hangs at its second one — see Step 2 |
+| drop `!f.Unshared` in Task 2 | its own test fails, as in Task 2 |
+
+`go vet ./gui/` reports two PRE-EXISTING complaints that are not this plan's:
+`gui/freetext_sizeproof_golden_test.go:111` and `gui/transaction_golden_test.go:104`
+(`testing.ArtifactDir requires go1.26 or later (file is go1.25)`). Anything else is new.
 
 - [ ] **Step 5: The whole gui package.**
 
 Run: `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24`
-Expected: all green, partition exhaustive (the count grows by this task's tests; quote it).
+Expected: green, partition exhaustive. Measured by the build gate at the wired tree:
+**1213 top-level tests, `partition verified exhaustive: 1213 == 1213`, all 24 shards ok,
+34 s wall.** That is the `c4a64fc` suite plus the 8 new top-level tests this plan adds to
+`gui` and `codex32` (`TestWhichHashRowsAreLabelKeyed`, the seven `TestHashlock*`, and
+`TestDecodeMS1PreimageIsShapeExact`); `hashlock`'s own 6 tests are a separate package and
+are not in the 1213. The FIRST run of this shard set is what caught fix 12 (shard 11
+failed); a narrow `-run` selection cannot.
 
 - [ ] **Step 6: Commit.**
 
@@ -1450,7 +1968,25 @@ git commit -s -m "composer: the hashlock phrase route -- phrase screen, method p
 
 - [ ] **Step 1: The walk.** Modelled on `cmd/emu/walk_h0_preimage.js` (helpers inlined) and `shots_composer.js`'s route to `Which hash?` (`goTo("Wallet Policy")` → `Build a new policy` → the shape → a path → `chooseRow(…, "Which hash?", …)`): tap `Type a hashlock phrase`, dismiss the §8i modal, type `correct horse battery staple` on the passphrase keyboard (map the key coordinates by probing `shScreen` for the keyboard's page, as `walk_verify.js` did for the ms1 keypad), OK, pick `SHA-256`, hold through the brainwallet modal, read the confirm modal and assert it contains `b867db87..edbc96cb`, `method: sha256`, `chars: 28`, `Write down this phrase`; Back out. Negative control: type `correct horse battery stapl` and assert the digest line does NOT contain `b867db87`. Second positive: `Correct Horse Battery Staple` shows the corpus's mixed-case sha256 digest (read it from the corpus, `derivation` row for that phrase). Hardened once: assert `3cf5d421..b70a4c12` after the countdown (allow 30 s). Export `run()` returning `{typed, control, mixed, hardened, ok}`; every assertion throws.
 
-- [ ] **Step 2: Firmware size.** `export PATH=/nix/var/nix/profiles/default/bin:$PATH; nix develop -c tinygo build -size short -o /dev/null -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller` — record flash and RAM against `c4a64fc`'s 1,583,132 / 62,800.
+- [ ] **Step 2: Firmware size.** `export PATH=/nix/var/nix/profiles/default/bin:$PATH; nix develop -c tinygo build -size short -o /dev/null -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller`
+
+Expected, measured by the build gate at the fully wired tree:
+
+```
+   code    data     bss |   flash     ram
+1563384   31852   31004 | 1595236   62856
+```
+
+**Flash 1,595,236 B / RAM 62,856 B** against `c4a64fc`'s 1,583,132 / 62,800 —
+**+12,104 B flash (+0.76%) and +56 B RAM (+0.09%)** for the whole port: the new `hashlock`
+package, `DecodeMS1Preimage`, the label-keyed switch, the phrase route, its screens and
+its copy. The rule this applies is spec §7.6's own: PBKDF2 and SHA-256 are already linked
+(`seal/pbkdf2.go`, `seal/crypto.go`) and the keyboard already exists, so the stage expects
+**a small delta over `c4a64fc`'s 1,583,132 / 62,800** — 0.76% is that. No numeric flash
+ceiling is asserted here, because neither the spec nor this plan sets one; the acceptance
+is the delta against the named baseline. A materially larger delta means something was
+linked that should not have been — measure again before the merge, since the emulator walk
+(Step 1) is not in this number.
 
 - [ ] **Step 3: Commit.**
 
@@ -1471,8 +2007,146 @@ The controller RUNS the walk on an emulator built from the branch (fresh port, p
 
 ---
 
+## Build gate folded here
+
+The build gate hand-wired every code block of Tasks 1-4 into a scratch copy of the fork
+at `/scratch/code/shibboleth/.tmp/h2-gate` (fork main `c4a64fc` + this plan), ran them,
+and reached **GATE GREEN WITH FIXES (12)** plus two prose corrections. Its verbatim report
+is `design/agent-reports/hashlock-H2-plan-build-gate.md`. Every fix is folded above, at the
+task it belongs to, and the plan's blocks are now the gated tree's own bytes.
+
+**The twelve fixes.**
+
+1. **`gui/composer_copy_test.go` — a row and a count Task 3 had no step for.** Task 3 adds
+   `composerCopyHashlockNoPayloadLead`, and `TestComposerCopyTableCoversEveryBody` fails by
+   name on any `composerCopy*` function without a `composerCopyTable` row and an exact
+   declared count. → Task 3 **Step 3** (new): the row, and 41 → 42.
+2. **The same gate, nine more times in Task 4.** Round 0 listed six §8 sections, not nine
+   functions; `composerCopyHashlockRefusal`, `composerCopyHashlockRelation` and
+   `composerCopyHashEveryPathFor` had no row. → Task 4 Step 1 now carries all nine rows,
+   the `hashlock` import both test files need, and the literal 42 → 51.
+3. **The §4.5 confirm body did not fit.** Unshortened it drew 484 of 504 characters and was
+   CUT. Spec §4.5's drop-order step 1 (reuse block → the brainstorm's two sentences) left
+   **64 characters of headroom against a required margin of 80** — still failing. → the
+   shortened text is in Task 4 Step 1's block, with the measurement beside it.
+4. **The reconciliation line moved out of the confirm modal.** §4.5's drop-order step 2 was
+   needed too: "Before you fund this wallet, run ms hashlock…" now lives in
+   `composerCopyHashEveryPathPhrase` (Done's §8h form). Measured after both steps: confirm
+   **290 drawn, headroom 186**; §8h form **254 drawn, headroom 262**. → Task 4 Step 1, and
+   the §4.5 note under it. The spec is unchanged; it names this drop order itself.
+5. **`p.display = sh2DisplaySize` in `runComposerAddPath`.** The 240×240 default is
+   narrower than the 340 px keyboard and pushes `q`/`p`/`a`/`l` off canvas. → Task 4 Step 2.
+6. **`composerStateForTest` returns `md.PathList{Wrapper: md.ComposeWsh}`.**
+   `md.ComposeWrapper`'s zero value is `ComposeTr` (`md/compose.go:32`), under which a
+   key-less path is refused outright (`gui/composer_shape.go:250`). → Task 4 Step 2.
+7. **The flow opens at `What can spend on this path?` and chooses `A hash, no keys`.**
+   "EXPERIMENTAL" is only reachable through that `ChoiceScreen`. Seven call sites. → Task 4
+   Step 2.
+8. **The §8i rule modal's needle is `32-byte value`, not `Hash lock`.** Its title is
+   `Path N hash`; "Hash lock" belongs to the later confirm screen. Seven call sites. →
+   Task 4 Step 2.
+9. **The no-payload frame's needle is `Type a hashlock phrase`, not `Which hash?`.** With
+   zero payload digests, Task 3's design swaps the lead, so that literal is not drawn.
+   Seven call sites. → Task 4 Step 2.
+10. **The stray `h.tapNav(Button3)` after each `tapRow` is gone.** `tapRow` already takes
+    the row; the second click landed on the NEXT screen and misfired its confirm state.
+    Nine call sites. → Task 4 Step 2.
+11. **`holdConfirm` holds, waits, and RELEASES.** `EventRouter.Events` (`gui/event.go:14-15`)
+    tracks ONE pointer contact globally: while `pointer.pressed` is true it reuses the stale
+    `pointer.pressedTag` instead of hit-testing the current frame, so a second hold with no
+    release routes to the first screen's defunct `Clickable` and never leaves 0%. → Task 4
+    Step 2, with the mechanism in the file's own comment and a MUTATION recorded in Step 4
+    (delete the release → every test with two or more holds hangs at its second).
+12. **`gui/composer_gates_test.go`'s pump target moves to `Path 1 hash`.** A genuine
+    regression in a pre-existing, unrelated test, caused by Task 3's no-payload lead swap
+    (`ctx.sysw == nil` → 0 digests → the lead changes; the TITLE is what is invariant).
+    Found only by the full 24-shard `gui` run — shard 11 failed. → Task 3 **Step 4** (new),
+    because Task 3 is the change that causes it.
+
+**A thirteenth change the gate made but did not list.** `hashHex` in
+`gui/composer_hashlock_test.go` is `hashlockHashHex` in the gated tree: `gui` already
+declares `func hashHex(h [16]byte) string` at `gui/seal_fixture_test.go:172`, so round 0's
+`func hashHex(h *[32]byte) string` was a redeclaration in the same package and would not
+have compiled. Re-verified against the fork at `c4a64fc` for this fold. It is folded with
+the rest, because the block is now the tree's own bytes — but it is named here so the count
+in this section and the count in the gate report can be reconciled.
+
+**The two prose corrections** (Task 1 Step 5's mutation table, now a measured table):
+
+- **Separator-strip scope.** The plan claimed one row fails; **four do** —
+  `correct-horse,battery staple`, `a-b,c`, and the two long rows that also carry `-` and
+  `,`. Re-measured for this fold against the vendored corpus: 4 of 11 derivation phrases
+  contain a `-` or a `,`.
+- **The cap literal.** The plan claimed the 100-character refusals row fails too; there is
+  no such row — the corpus's one `too-long` row is **101** characters, refused under either
+  cap, so only `TestPhraseMaxCharsIsTheCap` fails. Re-measured for this fold: 101.
+
+A third, smaller correction from the gate's Task 4 mutation table is folded at Task 4
+Step 4: making `composerHashEdit` return `false` from the phrase route's Back does fail
+`TestHashlockBackContractKeepsThePath`, but at `never reached "Type a hashlock phrase"`,
+not at the path-count assertion the plan named.
+
+**Whole-suite and size, measured at the wired tree.** `codex32`/`sysw`/`seal`/`hashlock`
+green; `gui` 1213 top-level tests, partition verified exhaustive, all 24 shards ok;
+firmware **1,595,236 B flash / 62,856 B RAM** (+12,104 / +56 against `c4a64fc`'s
+1,583,132 / 62,800). NOT run by the gate, and still owed: the emulator walk
+(`cmd/emu/walk_hashlock_phrase.js`, Task 5 Step 1) and the flash.
+
+**The block check.** `scripts/h2-plan-blocks-vs-tree.sh` re-derives the claim this section
+makes. Output:
+
+    plan: /scratch/code/shibboleth/mnemonic-engrave/design/IMPLEMENTATION_PLAN_hashlock_H2_device.md
+    tree: /scratch/code/shibboleth/.tmp/h2-gate
+
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:127  whole          hashlock/testdata/hashlock-v0.8.provenance.json  (18 lines, identical)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:150  whole          hashlock/hashlock_test.go                     (213 lines, identical)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:373  whole          hashlock/hashlock.go                          (143 lines, identical)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:555  fragment       codex32/mspayload_test.go                     (42 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:604  fragment       codex32/mspayload.go                          (25 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:658  fragment       gui/composer_hash_test.go                     (34 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:697  fragment       gui/composer_hash_test.go                     (6 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:710  fragment       gui/composer_hash.go                          (2 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:717  fragment       gui/composer_hash.go                          (80 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:809  fragment       gui/composer_copy.go                          (6 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:820  fragment       gui/composer_copy_test.go                     (2 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:827  fragment       gui/composer_copy_test.go                     (2 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:836  fragment       gui/composer_gates_test.go                    (8 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:873  fragment       gui/composer_copy.go                          (5 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:883  fragment       gui/composer_copy.go                          (74 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:970  fragment       gui/composer_copy_test.go                     (9 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:982  fragment       gui/composer_copy_test.go                     (23 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1011  fragment       gui/composer_copy_test.go                     (8 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1028  fragment       gui/modal_fits_test.go                        (8 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1039  fragment       gui/modal_fits_test.go                        (21 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1087  whole          gui/composer_hashlock_test.go                 (531 lines, identical)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1678  whole          gui/composer_hashlock.go                      (213 lines, identical)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1901  fragment       gui/composer_state.go                         (4 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1910  fragment       gui/composer_shape.go                         (1 lines, verbatim substring)
+    PASS IMPLEMENTATION_PLAN_hashlock_H2_device.md:1916  fragment       gui/composer_copy.go                          (6 lines, verbatim substring)
+
+    25 blocks checked, 0 FAIL
+
+    NOT COVERED by this script:
+      * 7 fenced blocks carry no file= header (bash recipes, illustrative
+        snippets); nothing here runs or checks them:
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:119  ```bash
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:540  ```bash
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:636  ```bash
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:853  ```bash
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:1957  ```bash
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:1975  ``` (no info string)
+          IMPLEMENTATION_PLAN_hashlock_H2_device.md:1993  ```bash
+      * every PROSE claim: expected test names, mutation outcomes, headroom and
+        firmware numbers, spec references, file:line citations.
+      * whether the tree is GREEN -- this compares TEXT only; `go test` and the
+        gate report are what say the text works.
+      * files the plan modifies without carrying a block for them.
+
+---
+
+
 ## Self-review
 
 1. **Spec coverage.** §2 → Task 1 (`ValidatePhrase`, `IsMS1Shaped`, the refusals rows) and Task 4 (through the screen); §3 → Task 1 (`DeriveHardened` on `seal.NewDeriver` with the slice salt; the constants; the lockstep mutations); §4.1 → Task 3; §4.2-§4.5 → Task 4 (the flow, the copy, both gates); §4.6 → Task 4's loop and the Back test through `composerAddPath`; §4.7 → `composerCopyHashEveryPathFor`; §5 → Task 3; §6 → Task 2; §7.1 → Task 1's tests; §7.2/§7.3 → Tasks 4/3; §7.4 → Task 2; §7.5 → Task 5; §7.6 → Task 5 Step 2; §8 → Task 6 (H4); §9 → nothing to build.
-2. **Placeholders.** The harness helpers in Task 4 Step 2 are named and modelled on existing files; the implementer writes them (small) — recorded, not TBD. The walk's keyboard mapping is probed on the live emulator as `walk_verify.js` did; the plan says so.
+2. **Placeholders.** None left in the Go. The Task 4 Step 2 harness helpers round 0 only NAMED are written out in full, as the build gate wrote and ran them, and `scripts/h2-plan-blocks-vs-tree.sh` proves every block is the gated tree's own bytes. The one thing still written as prose rather than code is Task 5 Step 1's emulator walk: the gate did not run it (out of scope), and its keyboard mapping is probed on the live emulator as `walk_verify.js` did — so it is the plan's one un-gated executable artifact, and the controller runs it before the post-implementation review.
 3. **Type consistency.** `seal.NewDeriver(passphrase, salt []byte, iterations int) *Deriver`, `Step(n int) bool`, `Done()/Total() int`, `Key() []byte`, `Wipe()` (`seal/pbkdf2.go:85-182`); `composerPickScreen(ctx, th, title, lead string, rows []string) (int, bool)` (`composer_paged.go:259`); `composerConfirmScreen(ctx, th, title, body string) bool` (`composer_shape.go:77`); `composerConfirmBody(body string) string` (`composer_copy.go:32`); `Hash *[32]byte` (`md/compose.go:167`); `composerSessionWith(public, secret []string) *syswSession` (`composer_door_test.go:15`); `ParsePrefix(frag string) (Fields, error)`, `Fields.Unshared` (`codex32/polish.go:82,71`); `NewSeed(hrp string, threshold int, id string, shareIdx rune, data []byte) (String, error)` (`codex32/codex32.go:279`); `composerPickScreenMaxRows = 24` (`composer_paged.go:224`).
