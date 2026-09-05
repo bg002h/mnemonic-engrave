@@ -352,7 +352,7 @@ is hashed and at least one hash was set by phrase, the text reads
 
 (the shipped text now ends *"Back up every preimage separately."*, still
 naming only "the preimage" -- an artifact this route cannot produce;
-`composerCopyHashEveryPath` at `gui/composer_copy.go:169-173`). The
+`composerCopyHashEveryPath` at `gui/composer_copy.go:169-173` at `b9a9a30`). The
 §8i rule modal fires at the pick (§5) as today, once; it is not repeated in the
 confirm modal (journey N-1, fidelity M-4).
 
