@@ -2475,3 +2475,13 @@ Command to resume: /resume-composer
   own agents), each in its own fork worktree/branch (h5-a..h5-d), controller
   merges into `hashlock-h5`, then whole gates + the three walk runs at the
   merged tip. Memory `implementation-tight-one-agent` amended.
+- **H5 SPEC r1 NOT GREEN (77621fb: 0C/4I/4M, all introduced by my round-0
+  fold):** two numbers composed from measurements of DIFFERENT bodies (205/320
+  -> 186/339; "shorter" -> 165 drawn, 378 headroom), a §4.7 contradiction, and
+  the :916 `hashByPhrase` assertion unlisted (would not compile). Folded at
+  `44b1690` (the four Importants; numbers = the verifier's measurements of the
+  folded text) and `d206a2e` (the four citation Minors). **r2 sonnet
+  verification DISPATCHED** (brief 9cc588b, at 44b1690). Plan author (opus, in
+  flight since 460e97c) messaged with the four changes. Memory
+  `verify-folds-by-recomputation` gains: re-measure composed text; a quoted
+  number is only as good as the body it measured.
