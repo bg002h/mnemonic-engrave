@@ -2322,3 +2322,24 @@ Command to resume: /resume-composer
   workflow report; fold surviving lens findings together with the opus
   post-impl's; merge H2; then merge the verified H3 branches (rebase onto the
   merged tips first) and push.
+- **H2 POST-IMPL (opus, cbecf57): NOT GREEN 0C/2I/3M/2N.** No digest divergence
+  (20 screen derivations, host column recomputed); firmware at 17b3979
+  measured 1,597,276 / 62,856 (Task 7 = +1,000 B). I-1: `first8..last8` and
+  `chars: n` survived mutation of the whole gui suite (no test asserted them;
+  the walk covers the digest token only and is not in CI). I-2: F-481 graded
+  GATING (dead `show` control = the shape the fork removed the gear key for;
+  8 px deficit). **FOLDED INLINE by the controller, fork `26fd1dd`**: two
+  assertions (both mutations RED -- run: `hashb867db87..b867db87`; `chars:29`),
+  CutBottom(8) removed + TestHashlockPhraseScreenDrawsTheMaskedReadout (0
+  asterisks with the cut restored), M-2 nil-Key fails closed, N-1 sentinel
+  coverage test (RED with the ErrHex64 arm deleted), N-2 ASCII-only fold.
+  Gates: four packages ok; gui 1224 / 24 shards ok. Engrave branch `67f9fe9`:
+  F-481 CLOSED, F-482 (two unrecorded §4 copy departures, H3), F-483 (phrase
+  in an unwipeable string; secret-handling) filed; report addendum. **r1
+  sonnet fold verification DISPATCHED** (brief f6de0a0; executes the
+  mutations; F-481 by geometry). Lesson re-learned: a mutation script that
+  does not match its target silently leaves the code unmutated and the test
+  green -- always print the match count before trusting a RED/GREEN.
+  Ultracode workflow wf_7b02c125-9b9 still running (lenses + H3 drafts). NEXT:
+  r1 GREEN -> merge fork main --no-ff + engrave master -> pushes -> signed
+  image; fold any surviving workflow-lens findings the same way.
