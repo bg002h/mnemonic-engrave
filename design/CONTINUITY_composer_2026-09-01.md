@@ -1913,3 +1913,9 @@ Command to resume: /resume-composer
   corpus flip that bites the RUST seam test is `host_admits`, not
   `device_admits` (the Rust test cannot call Go). Sonnet fold verification
   brief committed; dispatch next; controller gate re-run in flight.
+- Controller gate re-run at the folded tips (isolated target dir): engrave
+  95cd48a 617 run / 614 passed (history_purge trio), fmt clean, seam sha
+  bb703f608215bb00ccc677de4a282772016e774dd2d1d0f5c828ea38f5eac78b pinned
+  in BOTH repos, 13 rows, capture 38; fork 83fbc17 vet ok, three packages
+  ok, gui subset ok, gofmt clean, corpus byte-identical. Sonnet fold
+  verification in flight.
