@@ -188,3 +188,45 @@ fn seal_names_the_refused_record_index_like_sysw_pack() {
         "the record was echoed:\n{err}"
     );
 }
+
+/// F-489, the PUBLIC section: the same locator on `check_public`'s per-record
+/// loop. A valid md1 at 0 and the same string with one character changed at 1
+/// (its checksum no longer holds) -- the index must be 1 and the section
+/// "public". MUTATION: return `SealError::Record(e)` from `check_public`'s
+/// per-record arm again -> the first assertion fails.
+#[test]
+fn seal_names_the_refused_public_record_index_too() {
+    use std::process::Command;
+    const MD1: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
+    let mut corrupted = MD1.to_string();
+    // Flip the last character to another bech32 character so the checksum fails.
+    let last = corrupted.pop().unwrap();
+    corrupted.push(if last == 'q' { 'p' } else { 'q' });
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    let o = Command::new(assert_cmd::cargo::cargo_bin("me"))
+        .args([
+            "seal",
+            "--plaintext",
+            MD1,
+            "--plaintext",
+            &corrupted,
+            "--out",
+            out.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(
+        !o.status.success(),
+        "me seal accepted a corrupted public record: {err}"
+    );
+    assert!(
+        err.contains("record 1 (records count from 0) in the public section"),
+        "stderr does not name the refused PUBLIC record's index:\n{err}"
+    );
+    assert!(
+        !err.contains("record 0 (records count from 0)"),
+        "the wrong record was named:\n{err}"
+    );
+}
