@@ -15722,7 +15722,7 @@ admitted a 0x03 preimage plate as Ms". At the fold: 619 run, 616 passed, 3
 failed (`history_purge` x3). Both halves were mutation-checked; see
 `design/agent-reports/hashlock-H1b-implementation-report.md`.
 
-### F-474 — `unlock-kdf-names-the-refused-record`: `ErrRecordNotPermitted` renders as "Payload unreadable." with no record index or class (owning phase: **H2**) `#seedhammer` `#ux` `#seal`
+### F-474 — ~~`unlock-kdf-names-the-refused-record`~~ **CLOSED 2026-09-05 by fork `17b3979`** (H2 Task 7: the refusal carries the record index and kind, and the unlock screen names them) `#seedhammer` `#ux` `#seal`
 
 Filed with hashlock H0 (2026-09-04). `seal.AdmitSection` refuses an encrypted
 section WHOLE when any record is not on the allow-list, and
@@ -15739,7 +15739,30 @@ class. Owned by H2 because that is when the device learns the preimage kind and
 the copy can say something useful about it rather than only that it was
 refused.
 
-### F-475 — `seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`: the `bip93-plain-33-byte-payload-0x03` row's `source` prose says `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H2**) `#hashlock` `#seam-corpus` `#records`
+**CLOSED in-phase, fork `17b3979`.** `seal.RecordNotPermittedError` now carries
+`Index` (0-based, as `me` counts records), `Class`, `Section` and `Preimage`,
+and `Unwrap`s to `ErrRecordNotPermitted` so every existing `errors.Is` caller is
+untouched — the message alone was never enough, because `gui/unlock_kdf.go`
+matches with `errors.Is` and cannot take a message apart. `gui/unlock_kdf.go`
+gained the named arm: *"Record 1 is a hashlock preimage, not a seed. This
+payload cannot be unlocked here. Nothing was opened."*
+
+It carries **no record bytes**: index, class and section are authenticated
+plaintext and naming them leaks nothing (§6.4's own argument for the record
+count), and the record itself is what must not travel. `Preimage` is a FIELD
+rather than a `Classification`, because H0 rejected a class for the kind — a
+preimage plate stays `ClassUnknown` and inert on every classifier, and the flag
+only lets the screen say *which* unknown it was.
+
+Gated by `seal/record_not_permitted_test.go` (a plate at record 1 of the
+encrypted section, and a codex32 share at record 2 of the public section — two
+indices and two kinds, so neither field can be a constant) and
+`gui/unlock_preimage_test.go` (the whole flow to the drawn frame, plus the body
+as a pure function over four rows, each measured with `assertModalBodyFits`).
+The RED was reproduced first: `never reached "hashlock preimage"; last frame
+"Payloadunreadable.SealedPayload"`. Six mutations run and reverted.
+
+### F-475 — `seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`: the `bip93-plain-33-byte-payload-0x03` row's `source` prose says `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H3** — re-scheduled from H2, see below) `#hashlock` `#seam-corpus` `#records`
 
 Filed 2026-09-04 from `hashlock-H1b-plan-R0-r0-fidelity` M-6, and MEASURED
 against ms-codec 0.8.0 before filing (a throwaway crate calling
@@ -15762,6 +15785,11 @@ plate whatever its id — asserted since H1b (`51f25c9`) by this exact string in
 `sysw::tests::a_preimage_plate_is_named_not_misdiagnosed`. Only the prose
 explaining the 0.8 mechanism is wrong.
 
+**RE-SCHEDULED H2 → H3 on 2026-09-05**, at the H2 plan's own direction and
+confirmed against what H2 actually did: H2 vendors `hashlock-v0.8.json`, a
+DIFFERENT file, and never touches `codex32_seam_vectors.json`, so the
+re-vendoring this correction was meant to ride along with did not happen in H2.
+(Original scheduling, and still the reason to fold it with a re-vendoring:)
 **Owned by H2, not H1b**, and deliberately not fixed here: editing
 `testdata/codex32_seam_vectors.json` re-pins `SEAM_VECTORS_SHA256` in BOTH
 repos, and H2 vendors the corpus into the fork anyway. Fold the correction with
