@@ -2099,3 +2099,12 @@ Command to resume: /resume-composer
   pushed `d723cac` (report `79a05a6`). Lesson: two of my own folds now put a
   number or a claim into a spec that a grep would have falsified -- re-grep
   every NEW citation a fold adds, not only the ones the draft carried.
+- **H2 SPEC R0 GREEN (`55ee7a4`)**: r2 sonnet found one leftover word (§3
+  named the old confirm gesture; §4.5 is HOLD) -- folded as one word with a
+  grep as the check (and the STATUS reworded once so its own grep claim held).
+  Lens-closure: fidelity/design, journey/adversarial, fold-verification x2.
+  NEXT: the H2 implementation plan (fork `hashlock` package + corpus vendoring
+  + Which hash? row + phrase/method/derive/confirm screens + DecodeMS1Preimage
+  + walk), its build gate (Go, hand-wired), R0, ONE implementer, post-impl,
+  emulator walk, fork merge, flash at the operator's word (H4). H1b
+  implementer still running.
