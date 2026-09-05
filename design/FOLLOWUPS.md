@@ -16071,3 +16071,11 @@ the refused record's index as `me sysw pack` does ("record N (records count from
 hashlock PREIMAGE plate ..."), with a test that fails without it. Low priority; bundle with
 the next host change, not a cycle of its own. Same rule as the fork's Task 7 unlock
 refusal: name what was refused and where.
+
+### F-490 — `fork-engrave-resume-state-test-is-load-flaky`: `TestEngraveScreenReleasesResumeStateOnReturn` (`gui/residency_wiring_test.go:112`) fails INCONCLUSIVE ("the job never completed (state 1)") when a heavy neighbour shares the shard, and passes 3/3 alone (owning phase: **fork test hygiene, next fork code cycle**) `#seedhammer` `#tests` `#flaky`
+
+Filed 2026-09-05 from the controller's whole-gui run on the H5 gated tree (shard 23, beside a
+2,000,000-iteration KDF test): a timing-dependent completion check that reports INCONCLUSIVE
+under load. H5 does not touch the file. Same class as the toolkit's wall-clock ceiling test:
+make the job completion deterministic (inject the clock or wait on the state transition), or
+move the KDF-heavy tests to their own shard.
