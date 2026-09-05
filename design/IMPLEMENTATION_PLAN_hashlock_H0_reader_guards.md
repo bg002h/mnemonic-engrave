@@ -1,6 +1,7 @@
 # Hashlock H0 — Reader Guards Implementation Plan
 
-**STATUS: DRAFT 2026-09-04 — R0 round 1 FOLDED (sonnet fold verification `hashlock-H0-plan-R0-r1-fold-verification.md`: 8/8 C+I fixed, 1 new Important — the round-0 fold's whole-crate claim did not reproduce because the corpus edit breaks `tests/record_corpus.rs`'s pre-S2 capture, never mentioned; fixed below in Task 1 Step 1b, whole crate re-run with `--no-fail-fast` in a worktree with its own target dir, output in the r1 fold commit's message); round 2 (sonnet, scoped to the capture step and the gate claim) pending.**
+**STATUS: R0 GREEN 2026-09-04 (0 Critical / 0 Important open).** Round 0: fidelity (opus, `hashlock-H0-plan-R0-r0-fidelity.md`, 2C/5I/2M/0N) + tests/mutation (sonnet, `hashlock-H0-plan-R0-r0-tests.md`, 0C/1I/3M), one fold (`fdfb040`). Round 1: fold verification (sonnet, `hashlock-H0-plan-R0-r1-fold-verification.md`): 8/8 fixed, 1 new Important (the fold's whole-crate claim; the record-corpus capture), folded (`64a6e0d`). Round 2: fold verification (sonnet, `hashlock-H0-plan-R0-r2-fold-verification.md`): GREEN, one wording observation — the `PreimagePlate` message asserted `id \`hash\`` for a shape whose id may be `entr`; the message now names the kind only (wording; the binary test's assertion is unchanged and was re-run). Lens-closure: fidelity, tests/mutation, fold-verification ×2.
+Previous STATUS: DRAFT 2026-09-04 — R0 round 1 FOLDED (sonnet fold verification `hashlock-H0-plan-R0-r1-fold-verification.md`: 8/8 C+I fixed, 1 new Important — the round-0 fold's whole-crate claim did not reproduce because the corpus edit breaks `tests/record_corpus.rs`'s pre-S2 capture, never mentioned; fixed below in Task 1 Step 1b, whole crate re-run with `--no-fail-fast` in a worktree with its own target dir, output in the r1 fold commit's message); round 2 (sonnet, scoped to the capture step and the gate claim) pending.**
 Previous STATUS: R0 round 0 folded (fidelity opus 2C/5I/2M/0N; tests sonnet 0C/1I/3M), gate re-run green.
 Previous STATUS: DRAFT — build gate green at `b0af794`.
 H0 is the prerequisite `SPEC_ms_hashlock.md` §9 places BEFORE ms-cli 0.18.0
@@ -383,9 +384,9 @@ In `crates/me-cli/src/main.rs`, immediately before the arm `U::Bip93OutsideThePr
 ```rust
                 U::PreimagePlate => format!(
                     "record {i} (records count from 0) is a hashlock PREIMAGE plate (kind \
-                     0x03, id `hash`), not a seed record; this container cannot place one \
-                     yet. A preimage backs a hashlock spend path, not a wallet — keep it \
-                     with the policy it unlocks, and do not re-encode it as entropy."
+                     0x03), not a seed record; this container cannot place one yet. A \
+                     preimage backs a hashlock spend path, not a wallet — keep it with the \
+                     policy it unlocks, and do not re-encode it as entropy."
                 ),
 ```
 
