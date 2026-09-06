@@ -3136,3 +3136,32 @@ Command to resume: /resume-composer
   0.9.0 release brief (H1b/0.8.1 ritual: `push-me-v0.8.1-release-brief.md`
   precedent) -> then the next follow-up. Gate worktrees are detached and
   disposable once the implementer's branches exist.
+- **F-500 CLOSED and F-503 + F-506 IMPLEMENTED (2026-09-06, opus session).**
+  zsh: the operator installed `/usr/bin/zsh` 5.9.2, so the history_purge trio
+  passes and the me suite is FULLY GREEN on this box for the first time (633
+  on master, 634 at the F-503 tip). Nix zsh was measured (same version, drives
+  the harness correctly) and rejected on fit -- a store path is not the
+  `/usr/bin/zsh` the test hardcodes and CI apt-installs, and using it would
+  have meant changing a gate's own lookup mechanism to suit one machine
+  (engrave ce359fae). **A failing history_purge test is now a real finding.**
+  F-503: the implementer ran the three tasks (report b5cd1779, updated
+  e3e1f780; four named mutations killed as predicted; both seam pins equal).
+  It also found and filed F-506 -- a comment the CONTROLLER wrote in the plan
+  claimed the UPPERCASE spelling "never reaches a seed class", and measurement
+  said `MS10HASHSQV...` -> Classify = 2, a SEED class. **Operator ruled
+  case-insensitive**; controller folded inline: fork d5d331d0
+  (`strings.EqualFold`, the false comment rewritten with the measurement, the
+  reasoning being that IsPreimagePlate decides ADMISSION where strictness
+  yields a refusal while this decides INERTNESS where it yields the opposite),
+  me 10faf109 (a fifth seam row `hash-kind03-16-byte-x-uppercase`, capture
+  entry, CHANGELOG, corpus re-pinned a669e10f) and 44ae864f (F-506 closed).
+  Gates at the tips: me 634/634/2, fmt 0, clippy pre-existing only; fork
+  codex32+sysw ok, 54 non-gui packages ok, gui 1289/24, gofmt clean; mutation
+  EqualFold -> == reds exactly the new row. **Post-impl check DISPATCHED**
+  (sonnet, brief e3b873c5; tips me 44ae864f, fork d5d331d0, ms 81d67b85).
+  NEXT: check GREEN -> merge three repos + push (engrave staging, fork plain
+  + `sh2-flash -b`, ms staging) -> me 0.9.0 release (brief committed; its
+  CHANGELOG section must be WRITTEN -- H6's host half recorded nothing) ->
+  F-504 (the host still says the uppercase id "is not `hash`", which the
+  device now reads in either case; sharpened by F-506) -> the docs cluster
+  F-498/F-499/F-502/F-505 -> F-490 -> F-495/496/497 need operator decisions.
