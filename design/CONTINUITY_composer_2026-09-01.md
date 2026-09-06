@@ -2917,3 +2917,16 @@ Command to resume: /resume-composer
   + ms -> signed image -> physical QR-scan gate. The macOS-aarch64 build job
   on engrave run 34015170572 failed on a GitHub artifact-upload timeout
   (non-required; infrastructure, no action).
+- **H6 IMPLEMENTER A LANDED (ms `h6-a` tip ca715165; report 45ecf62c).** Three
+  commits (corpus ffdb77d4 = plan's sha 4f1819cd...; ms-cli delegates; the
+  0.9.0 bump). Controller re-ran at the tip: nextest 562/562 (11 skipped), fmt
+  0, clippy 0 under the honoured 1.85.0 pin (rustc 1.85.0 in the worktree --
+  the plan's "clippy unprovable here" note is wrong for ms, right for me),
+  publish dry-run ok, Cargo.lock moves only ms-codec, ms-cli's exact pin
+  bumped. Two Step 6 items A's brief did not carry (MIGRATION.md; cross-repo
+  FOLLOWUPS) go to the release agent (addendum 1903a3c0). **Pre-publish opus
+  review of the A diff DISPATCHED** (brief 1903a3c0) -- the publish is the
+  stage's one irreversible action. C messaged the corpus sha; continuing 5b/6.
+  NEXT: review GREEN -> merge `h6-a` to ms master (ff) -> release agent
+  (MIGRATION + FOLLOWUPS commit, vendor-freshness, ci/staging, tag
+  ms-codec-v0.9.0, publish) -> B.
