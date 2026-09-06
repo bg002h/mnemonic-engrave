@@ -2930,3 +2930,17 @@ Command to resume: /resume-composer
   NEXT: review GREEN -> merge `h6-a` to ms master (ff) -> release agent
   (MIGRATION + FOLLOWUPS commit, vendor-freshness, ci/staging, tag
   ms-codec-v0.9.0, publish) -> B.
+- **H6 IMPLEMENTER C LANDED (fork `h6-c` tip 872ba06; report 0105c671) and
+  MERGED ff into the new fork integration branch `hashlock-h6` (worktree
+  `/scratch/code/shibboleth/.tmp/seedhammer-hashlock-h6`, tip 872ba06c).**
+  Controller re-ran there: engrave/codex32/hashlock/backup ok (35+1 fuzz /
+  61+1 fuzz / 10 / 141 -- C's 36/62 counted the Fuzz funcs); gui 1239/24
+  shards ok; gofmt clean on the 22 changed files; checker 97 blocks, 65 PASS,
+  the 32 FAIL all in Tasks 7-11's gui/sysw files (not yet implemented), none
+  in C's files. `go vet ./...` is red at fb0dd04 ALREADY (bspline unkeyed
+  literals; testing.ArtifactDir vs the go.mod language version) -- pre-existing,
+  candidate follow-up, not C's. Firmware per C: 1,599,680 / 63,232 (+472 B;
+  the plate layout is not yet linked in until the gui tasks reference it).
+  **D DISPATCHED** (Task 7, `h6-d` off 872ba06c). Pre-publish review of A
+  still running. NEXT: review GREEN -> merge h6-a -> release -> B; D report ->
+  merge -> E -> F.
