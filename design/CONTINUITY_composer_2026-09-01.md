@@ -2996,3 +2996,21 @@ Command to resume: /resume-composer
   -> F (fill `<FORK_MERGE_SHA>`; also re-record D's provisional sysw
   provenance pin to B's Task 2 commit 4d00fbbf) -> gates + walk x3 ->
   post-impl review (brief aec48835: FORK_TIP, ME_TIP=8cf2a7f9, ME_BASE=f82b8c11).
+- **H6 IMPLEMENTER E LANDED and MERGED (fork `h6-e` -> `hashlock-h6` tip
+  bdb66963; report bd5276b5).** Four commits (8a+8b, 9, 10, 11). Controller
+  re-ran on h6-e: gofmt clean on 27 changed files; every non-gui package ok;
+  gui 1287/24 shards; checker 97 blocks / 0 FAIL against (h6-e, ms h6-a, me
+  h6-b) -- every plan block is now verbatim in the three trees. E's report:
+  firmware 1,643,580 / 63,272 = the plan's wired-tree figure to the byte; D's
+  M8 premise corrected (no syswOffer/take site -- the flows filter on
+  r.class, so E extended the oracle's MATCHER; M8 now reds at six sites; 22
+  sites reconcile); one AST test added for §8.8's call site (1286 -> 1287);
+  gofmt baseline is five files not three; Task 9's bundleCard mutation reds at
+  a different test than the plan names. **F DISPATCHED** (Tasks 12-13; fork
+  `h6-f` off bdb66963, engrave `h6-records` off master, toolkit `h6-manual`;
+  brief c30b58da carries the provisional-pin re-record to B's 4d00fbbf, the
+  five-file baseline, F-493/494). NEXT: F report -> merge h6-f -> controller
+  gates at the merged tip (walk x3 with mutation discipline, QR goldens,
+  firmware size) -> post-impl review (FORK_TIP, ME_TIP 8cf2a7f9, ME_BASE
+  f82b8c11) -> fold -> ship (fork main, engrave master = h6-b + h6-records,
+  toolkit, ms report commit) -> signed image -> physical QR-scan gate.
