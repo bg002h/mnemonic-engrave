@@ -3104,3 +3104,9 @@ Command to resume: /resume-composer
   (exp/tx-plan-driven, exp/tx-brief-driven) and seedhammer-corpus-sync
   (mdcli-corpus-sync). The `.tmp/h6-*` gated scratch trees and target dirs
   are not worktrees and were left alone.
+- `.tmp/h6-*` and `.tmp/h6f-cargo-target` deleted (about 55 GB of gated
+  scratch trees, review copies and Cargo target dirs); `.tmp` is ~3.8 GB,
+  mostly `h1b-target` and small scratch from shipped cycles (h5-gate, s4*,
+  w3*/w4*). The H6 plan checker's default tree args no longer exist; point
+  it at real checkouts (ms master, engrave master, fork main) if it is ever
+  re-run.
