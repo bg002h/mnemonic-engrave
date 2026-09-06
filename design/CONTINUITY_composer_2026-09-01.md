@@ -2944,3 +2944,28 @@ Command to resume: /resume-composer
   **D DISPATCHED** (Task 7, `h6-d` off 872ba06c). Pre-publish review of A
   still running. NEXT: review GREEN -> merge h6-a -> release -> B; D report ->
   merge -> E -> F.
+- **H6: A PUBLISH-READY, D MERGED, E + RELEASE DISPATCHED (2026-09-06 early).**
+  Pre-publish opus review of A: GREEN 0C/0I/2M/2N (differential fuzz 1,200,045
+  inputs, 0 disagreements; A/B 108/108 identical; report 1b469f3d). Both
+  Minors folded on `h6-a` by A (1a4f4aa8: dated CHANGELOG heading; `qr_text`
+  -> `Zeroizing<String>`, buffer Zeroizing from the first byte, exact
+  capacity); plan blocks folded to match (e095ea90; checker 97/0 against the
+  h6-a tree, which is now the checker's ms tree of record); delta review GREEN
+  (e2eecada; Nit N-3 = no shipped guard on the no-realloc property -> filed
+  in ms FOLLOWUPS by the release agent). **ms master ff'd to 1a4f4aa8.**
+  **RELEASE AGENT (sonnet) DISPATCHED** for ms-codec 0.9.0 (records commit:
+  MIGRATION.md + cross-repo FOLLOWUPS + N-3; vendor-freshness; ci/staging;
+  tag ms-codec-v0.9.0; publish). ms master is FROZEN until it reports.
+  D landed (fork `h6-d` aeb1a070, Task 7; report 122b3ba1; controller: sysw
+  42 ok, gui 1239/24, gofmt clean, checker 25 FAIL all in Tasks 8-11 files)
+  and MERGED ff into `hashlock-h6` (tip aeb1a070). D's deviations: the sysw
+  provenance pin is PROVISIONAL (names engrave 17ba56c1; re-record once B's
+  Task 2 lands -- controller/F at records time); one test added (ClassPreimage
+  / IsSecret had no fork-side gate). D's M8: the admission row has no gate
+  until E's flows consume the classes -> E's brief addendum (6beae115) makes
+  E register the sites + class names in gui/sysw_admit_oracle_test.go and
+  prove the gate. **E DISPATCHED** (Tasks 8a-11 sequential, `h6-e` off
+  aeb1a070). Rate limit killed D and the reviewer mid-run (reset 12:40am);
+  both resumed from transcript via SendMessage -- D's report was already
+  complete on disk. NEXT: release report -> B (needs 0.9.0 on crates.io) ->
+  E report -> merge -> F -> controller gates + walk x3 -> post-impl review.
