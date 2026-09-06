@@ -3223,3 +3223,36 @@ Command to resume: /resume-composer
   F-495/496/497 need operator decisions; F-483 is secret-handling, last.
   Operator-owned and unchanged: flash bgfcd1546, the H4 walk, ACCEPTANCE
   item 8 (one worst-case QR plate, ~43 min).
+- **BURNDOWN, second batch (2026-09-06): F-498/499/502/505 + F-495 closed;
+  F-496 and F-497 ruled.** Docs cluster (sonnet, brief 906a6ecf, report
+  9ad39a44): fork comments now cite `composerFlow` BY NAME rather than
+  `composer_flow.go:34` (the literal had moved to :51 -- a line number is what
+  decayed, so the fix names the function); the five-file gofmt baseline is
+  recorded in engrave CLAUDE.md where the NEXT cycle reads it, rather than
+  rewriting two closed plans; both §8h blockquotes carry all four
+  `composerCopyHashEveryPathFor` arms; the H6 spec's emu.wasm figure is marked
+  an observation with the walk file's sha256 as the reproducible alternative.
+  Controller verified independently: zero `:34` citations left, four
+  blockquotes per spec, the CLAUDE.md paragraph, fork build clean. Merged:
+  engrave af277173, fork main **1115af6b PUSHED**.
+  **F-495 closed by measurement first.** The operator asked "does me already
+  handle this? check first" -- and the preimage route WAS already complete
+  (`ms hashlock` prints the ms1 plate string, `me sysw pack --pack-preimage`
+  takes it). Only the PHRASE form lacked a verb. `ms hashlock --emit-record`
+  (ms `c48f4bd5`, merged to ms master) composes the record from the phrase ms
+  has already read on stdin; the phrase is retained only under the flag and
+  only in Zeroizing; the record prints on the stderr card, never on stdout;
+  a source with no phrase is a usage error. Its test pins the bytes against
+  ENGRAVE's corpus rows, since the wire form belongs to me -- neither side can
+  drift silently. ms 567/567, fmt 0, clippy 0. The GUI schema's flag count
+  moved 67 -> 68, which is that assertion working. One incidental finding: the
+  first refusal test used `--hex` on argv, which the argv guard refuses before
+  parsing, so it tested the guard rather than the flag.
+  **F-496 ruled**: reconcile only when the payload carries no matching `hash:`
+  record (the locator already proves the match when it does). **F-497 ruled**:
+  accept, and make the census copy say it reports THIS run. Both owned by the
+  hashlock stage after H6, not implemented.
+  NEXT: push engrave master; push ms master (two commits: c48f4bd5 + the local
+  report commit f21f8b8); then F-490 (the load-flaky fork test) and F-483
+  (secret handling, last). Operator-owned: flash `bg1115af6` once rebuilt, the
+  H4 walk, ACCEPTANCE item 8.
