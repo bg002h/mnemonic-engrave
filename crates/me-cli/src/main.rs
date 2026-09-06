@@ -199,6 +199,14 @@ enum SyswCmd {
     /// appended for you when a `key:`/`hash:` record is present — see
     /// `--now`/`--no-now`).
     ///
+    /// `phrase:<hex of "<method>,<phrase>">` is a hashlock PHRASE and the method
+    /// that derives its preimage — `hardened` or `sha256` — cut on the FIRST
+    /// comma, so a space after the comma is part of the phrase and derives a
+    /// different preimage. It is SECRET and BEARER: it is admitted only with
+    /// `--pack-preimage`, and only through `--in` or stdin, because the argv
+    /// guard refuses it on the command line. No verb emits one, so this help is
+    /// the producer.
+    ///
     /// mt1 strings (from `mt encode`) feed its transaction TEXT plates; pack
     /// the COMPLETE set of FULL strings — never `--elide-prefix` output, whose
     /// shortened lines are not self-verifying and are refused here — or the
@@ -260,6 +268,21 @@ enum SyswCmd {
         /// confirmation the DEVICE recomputes for itself.
         #[arg(long)]
         allow_unsigned_inputs: bool,
+        /// Admit a hashlock PREIMAGE into this payload: an ms1 kind-0x03 plate
+        /// string, or a `phrase:` record carrying a hashlock phrase and its
+        /// method.
+        ///
+        /// Both are BEARER material -- whoever holds the preimage can spend any
+        /// key-less hashlock path it unlocks -- so admission is explicit,
+        /// exactly as `--seal-secret` makes encrypting seed material explicit.
+        /// It is NOT `--seal-secret` and the two do not substitute.
+        ///
+        /// It gates ADMISSION, never CLASSIFICATION: `me` calls a preimage a
+        /// preimage either way, which is why the payload still SEALS by default
+        /// and why the device's vendored class corpus carries one answer per
+        /// row.
+        #[arg(long)]
+        pack_preimage: bool,
         /// Append the pack time as a trailing `now:` record to THIS payload even
         /// though it holds no `key:`/`hash:` record. By default `pack` appends
         /// `now:<hex of unix seconds>` as the LAST record only when the records
@@ -563,11 +586,21 @@ fn argv_secret_guard(argv: &[String]) -> Option<String> {
             // exists to name. The POSITION is named instead: it is derived
             // from the argv we were handed and tells the operator which
             // argument to stop passing.
-            let what = if class.is_bearer() {
-                "BEARER material -- a signed transaction, or the mt1 set carrying one. \
-                 Anyone who can read it can broadcast it"
-            } else {
-                "SECRET key material. It can spend everything derived from it, forever"
+            // H6: the two hashlock carriers are BOTH secret AND bearer, so they
+            // reach this guard and the transaction wording would be FALSE for
+            // them -- a refusal that names the wrong material is a defect in
+            // what the tool claims to have found, not a nicety.
+            use mnemonic_engrave::sysw::record::Class as GC;
+            let what = match class {
+                GC::Preimage | GC::Phrase => {
+                    "a HASHLOCK PREIMAGE -- the plate string, or the phrase a `phrase:` \
+                     record carries. For a key-less hashlock path it alone spends the coins"
+                }
+                _ if class.is_bearer() => {
+                    "BEARER material -- a signed transaction, or the mt1 set carrying one. \
+                     Anyone who can read it can broadcast it"
+                }
+                _ => "SECRET key material. It can spend everything derived from it, forever",
             };
             let purge = mnemonic_engrave::io::remedy::history_purge_block(&argv_surface(argv));
             return Some(format!(
@@ -1420,6 +1453,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             iterations,
             region,
             r#as,
+            pack_preimage,
         } => {
             if *allow_weak {
                 eprintln!(
@@ -1477,9 +1511,20 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // about work already done.
             let admission = mnemonic_engrave::sysw::Admission {
                 allow_unsigned_inputs: *allow_unsigned_inputs,
+                pack_preimage: *pack_preimage,
             };
             if *allow_unsigned_inputs {
                 report_unsigned_overrides(&recs);
+            }
+            // H6 §3.3 warnings 1-3, HERE and not in `admit_check`: all three are
+            // payload-wide, so none belongs in a per-record admission rule, and
+            // all three print BEFORE the passphrase ceremony for F-246's reason
+            // -- "a warning the operator reads after writing a passphrase down
+            // is a warning about work already done". Warning 4 is inside
+            // `decide_sealing`'s caller, AFTER the sealing line, because its own
+            // wording refers to it.
+            if *pack_preimage {
+                report_preimage_admission(&recs);
             }
 
             // §6g — `--expect`, and it runs HERE for F-246's reason: before the
@@ -1694,6 +1739,14 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             }
 
             let sealing = decide_sealing(&recs, *no_passphrase, *passphrase_ask, *passphrase_words);
+            // H6 §8.2.4 — AFTER the sealing line, because its own wording refers
+            // to it. `decide_sealing` itself is BYTE-UNCHANGED: classification
+            // is unconditional, so the strict classifier it calls already sees
+            // both new classes, `is_secret()` is true for each, and the payload
+            // seals by default with no second call site to keep in step.
+            if sealing {
+                report_sealed_preimage(&recs);
+            }
 
             // Exactly one passphrase mode. clap enforces mutual exclusion; this
             // is the "none given" case, and the DEFAULT is to generate rather
@@ -2417,6 +2470,204 @@ fn decide_sealing(
     true
 }
 
+/// Is this record SHAPED like a hashlock carrier, whether or not it classifies
+/// as one (H6 §4.3)?
+///
+/// It answers the question §8.2.2 needs and `classify` cannot: `classify` is the
+/// ADMISSION-relevant answer, and every shape §4.3 narrows out is `Unknown` to
+/// it. This is the diagnostic side -- `seal::record::preimage_plate` is
+/// deliberately kept WIDE for exactly this purpose (a mistagged plate is still
+/// NAMED a preimage plate when it is refused), plus the `phrase:` prefix, plus
+/// the id/kind mismatch that ruling L24 diagnoses as neither and whose own
+/// refusal still names the record.
+fn hashlock_carrier_shaped(record: &str) -> bool {
+    let t = record.trim();
+    if t.starts_with(mnemonic_engrave::sysw::composer_records::PHRASE_PREFIX) {
+        return true;
+    }
+    if mnemonic_engrave::seal::record::preimage_plate(t) {
+        return true;
+    }
+    matches!(
+        ms_codec::decode(t),
+        Err(ms_codec::Error::TagKindMismatch { .. })
+    )
+}
+
+/// H6 §3.3 / §8.2 — the payload-wide warnings `--pack-preimage` prints, on
+/// stderr, BEFORE the passphrase ceremony (warnings 1-3).
+///
+/// Warning 4, the sealed-transit note, is printed by [`report_sealed_preimage`]
+/// AFTER the sealing line, because "SEALED and holds a hashlock preimage" is a
+/// follow-on from the sealing determination rather than a non-sequitur. It names
+/// no direction: it used to say "the passphrase above" and the passphrase is
+/// printed BELOW it, with `--passphrase-ask` not even prompted for yet (R0 round
+/// 0, fidelity I-6 = journey M-1).
+///
+/// Host lines are stderr, carry no panel budget, and are exempt from the
+/// device's ASCII rule; the shipped refusals already carry em dashes.
+fn report_preimage_admission(records: &[String]) {
+    use mnemonic_engrave::sysw::classify;
+    use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
+    use mnemonic_engrave::sysw::record::Class as C;
+
+    let carriers: Vec<(usize, C)> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(i, r)| match classify(r) {
+            c @ (C::Preimage | C::Phrase) => Some((i, c)),
+            _ => None,
+        })
+        .collect();
+
+    // §8.2.2 — the flag with nothing to admit. A WARNING, never a refusal: the
+    // flag loosens admission, and loosening it over nothing costs nothing.
+    //
+    // AND IT IS SILENT WHEN A CARRIER-SHAPED RECORD IS PRESENT (R0 round 0,
+    // journey I-3 = fidelity M-4). Every shape §4.3 narrows OUT -- the wrong-id
+    // plate, the malformed X, the UPPERCASE spelling, the id/kind mismatch, and
+    // every malformed `phrase:` record -- classifies `Unknown`, so `carriers`
+    // is empty and this line fired directly above a refusal naming the same
+    // record. MEASURED: *"holds no preimage plate and no `phrase:` record"*
+    // immediately above *"record 0 … is a kind-0x03 preimage payload whose
+    // 4-character id is not `hash`"*. This line is printed FIRST, so it is what
+    // the operator reads first, and its plain meaning -- drop the flag, it did
+    // nothing -- is the wrong next move. The refusal that follows says
+    // everything they need; §12 item 5's own standard is "one refusal and not
+    // three".
+    if carriers.is_empty() {
+        if !records.iter().any(|r| hashlock_carrier_shaped(r)) {
+            eprintln!(
+                "me: --pack-preimage was passed and this payload holds no preimage plate and no \
+                 `phrase:` record. Nothing was admitted that would otherwise have been refused."
+            );
+        }
+        return;
+    }
+
+    // §8.2.1 — transit, always, when a preimage or `phrase:` record is admitted.
+    eprintln!(
+        "me: WARNING — this payload carries a hashlock PREIMAGE. Anyone who holds the tag \
+         can read it, and for a key-less hashlock path the preimage alone spends the coins. \
+         Treat this payload as bearer material until it is on the machine and erased."
+    );
+
+    // §8.2.3 — the orphan check, over BOTH carriers.
+    //
+    // The `phrase:` half is the one that matters: a preimage record is produced
+    // by `ms hashlock --out` and is correct by construction, while a `phrase:`
+    // record has no CLI producer at all, so the operator hand-builds it as hex.
+    // Two hand-build errors pass every rule the parser applies and are caught by
+    // nothing else -- a SPACE AFTER THE COMMA (printable ASCII, so
+    // `hardened, my phrase` is admitted and derives a different preimage from
+    // `my phrase`), and the WRONG METHOD SELECTOR. Both are one PBKDF2 run away
+    // here -- milliseconds on the host against ~10 s on the device, after a
+    // pick, at a screen with no copy for a digest that matches nothing.
+    let hashes: Vec<[u8; 32]> = records
+        .iter()
+        .filter_map(|r| match parse(r) {
+            Some(Ok(ComposerRecord::Hash(h))) => Some(h),
+            _ => None,
+        })
+        .collect();
+    // INCOMPLETE versus CONTRADICTORY, and only the second is a WARNING.
+    // `ms hashlock --out X.txt` writes only the ms1 string and prints `hash:` to
+    // stdout, so the minimal correct journey packs a payload with no `hash:`
+    // record at all -- and a WARNING on every single run is how a warning stops
+    // being read.
+    //
+    // ONCE PER PAYLOAD, ABOVE THE LOOP (R0 round 0, fidelity M-2). §3.3 makes
+    // all four warnings payload-wide and this sentence's own subject is "this
+    // payload"; inside the loop it printed once per carrier -- MEASURED, two
+    // byte-identical copies for a payload holding a plate and a `phrase:`
+    // record -- which works against the very reason it is a note and not a
+    // warning. With no `hash:` record there is also nothing for a carrier to be
+    // orphaned FROM, so the per-carrier check has nothing left to say.
+    if hashes.is_empty() {
+        eprintln!(
+            "me: note — this payload holds no `hash:` record, so nothing here says which \
+             policy the preimage unlocks. The Hashlock plates flow will print the digest \
+             alone."
+        );
+        return;
+    }
+    for (i, class) in carriers {
+        let Some(digest) = preimage_digest_of(&records[i], class) else {
+            continue;
+        };
+        if hashes.contains(&digest) {
+            continue;
+        }
+        let hx = hex(&digest);
+        let (first8, last8) = (&hx[..8], &hx[56..]);
+        match class {
+            C::Phrase => eprintln!(
+                "me: WARNING — record {i} (records count from 0) is a hashlock phrase whose \
+                 digest {first8}..{last8} matches no `hash:` record in this payload. Check \
+                 the method selector and the text after the first comma — a space after the \
+                 comma is part of the phrase and derives a different preimage."
+            ),
+            _ => eprintln!(
+                "me: WARNING — record {i} (records count from 0) is a preimage whose digest \
+                 {first8}..{last8} matches no `hash:` record in this payload. Nothing here \
+                 tells the device which policy it unlocks, and the Hashlock plates flow will \
+                 print the digest alone."
+            ),
+        }
+    }
+}
+
+/// H = sha256(X) for an admitted carrier: decoded for a plate, DERIVED for a
+/// `phrase:` record.
+///
+/// Deriving is what makes §8.2.3's phrase half possible at all, and it is the
+/// reason the check lives on the host: PBKDF2 at 100,000 iterations is
+/// milliseconds here and about ten seconds on the SH2.
+fn preimage_digest_of(
+    record: &str,
+    class: mnemonic_engrave::sysw::record::Class,
+) -> Option<[u8; 32]> {
+    use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
+    use mnemonic_engrave::sysw::record::Class as C;
+    match class {
+        C::Phrase => match parse(record) {
+            Some(Ok(ComposerRecord::Phrase(p))) => {
+                let x = p.method.preimage(p.phrase.as_bytes());
+                Some(ms_codec::hashlock::digest(&x))
+            }
+            _ => None,
+        },
+        C::Preimage => match ms_codec::decode(record.trim()) {
+            Ok((_, ms_codec::Payload::Preimage(x))) => Some(ms_codec::hashlock::digest(&x)),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// H6 §8.2.4 — the sealed-transit note, printed AFTER the sealing line.
+///
+/// Each clause is true of the container it names. `me seal` — the frozen Sealed
+/// Payload container — refuses a preimage plate outright, at pack time on the
+/// host and in `AdmitSection` on the device. THIS container does not: `sysw.Open`
+/// runs no admission and the session appends both sections, so a sealed `sysw`
+/// payload's preimage IS reachable after unlocking.
+fn report_sealed_preimage(records: &[String]) {
+    use mnemonic_engrave::sysw::classify;
+    use mnemonic_engrave::sysw::record::Class as C;
+    if !records
+        .iter()
+        .any(|r| matches!(classify(r), C::Preimage | C::Phrase))
+    {
+        return;
+    }
+    eprintln!(
+        "me: this payload is SEALED and holds a hashlock preimage, so the device needs this \
+         payload's passphrase before it can reach it. `me seal` — the Sealed Payload \
+         container — refuses a preimage plate outright; this one does not."
+    );
+}
+
 /// A record CLASS, for an operator. Names the class, never the record.
 fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
     use mnemonic_engrave::sysw::record::Class as C;
@@ -2770,6 +3021,30 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
         // your body", the other is "this tool cannot place that at all". The
         // first version of this said only the second, so the operator whose
         // `pass:` body was plain text was told about descriptors and addresses.
+        // H6 §8.1.1. A well-formed preimage plate (id `hash`) or a `phrase:`
+        // record in a payload that did not ask for one.
+        //
+        // THE FINAL SENTENCE IS EMITTED ONLY FOR THE PLATE-SHAPED CARRIERS THIS
+        // FLAG ACTUALLY ADMITS. For any other id the advice would be
+        // affirmatively false -- `--pack-preimage` refuses a wrong-id record on
+        // the next run (§4.3), and the operator is then sent to `ms hashlock`,
+        // which refuses it a third time in a message written for a different
+        // audience. Three refusals, none of them saying the one thing that is
+        // true and actionable; a wrong-id record gets §8.1.2 straight away,
+        // from the no-flag path too, and sees ONE refusal.
+        E::PreimageNotAdmitted(i, class) => {
+            use mnemonic_engrave::sysw::record::Class as C;
+            let what = match class {
+                C::Phrase => "a hashlock PHRASE record (phrase:)",
+                _ => "a hashlock PREIMAGE plate (kind 0x03)",
+            };
+            format!(
+                "record {i} (records count from 0) is {what}, not a seed record; this \
+                 payload did not ask for one. A preimage backs a hashlock spend path, not \
+                 a wallet — keep it with the policy it unlocks, and do not re-encode it as \
+                 entropy. Re-run with --pack-preimage if that is what you intend."
+            )
+        }
         // Neither branch prints the record — a `pass:` body is a passphrase.
         E::Unclassifiable(i, why) => {
             use mnemonic_engrave::sysw::UnknownReason as U;
@@ -2811,11 +3086,24 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      field (SPEC_ms_hashlock §1 rule 2). A damaged or forged plate — \
                      re-encode it from the source rather than editing the string."
                 ),
+                // H6 §8.1.2 -- THE EXISTING BODY REWRITTEN, not a second arm.
+                // Measured: `entr` never reaches here (id_kind_mismatch is
+                // diagnosed first, above), and a kind-0x03 single under the id
+                // `hash` is now a CLASS and reaches PreimageNotAdmitted
+                // instead. So the only case this arm actually covers is an id
+                // outside {entr, hash}, and the body now says so.
+                //
+                // THE LAST SENTENCE IS THE POINT: §4.3 exists for exactly one
+                // case, and the operator most likely to hit this refusal is the
+                // one holding a 33-byte seed backup that happens to begin 0x03.
                 U::PreimagePlate => format!(
-                    "record {i} (records count from 0) is a hashlock PREIMAGE plate (kind \
-                     0x03), not a seed record; this container cannot place one yet. A \
-                     preimage backs a hashlock spend path, not a wallet — keep it with the \
-                     policy it unlocks, and do not re-encode it as entropy."
+                    "record {i} (records count from 0) is a kind-0x03 preimage payload \
+                     whose 4-character id is not `hash`. A preimage plate is kind 0x03 \
+                     under the id `hash` (SPEC_ms_hashlock rule 2), and --pack-preimage \
+                     admits only that. Re-encode it with `ms hashlock` rather than editing \
+                     the string. If this string is a 33-byte seed backup that happens to \
+                     begin 0x03, it is not a preimage: roughly 1 in 256 of them look like \
+                     this."
                 ),
                 U::Bip93OutsideTheProfile(len) => format!(
                     "record {i} (records count from 0) is a VALID BIP-93 codex32 string — the \
@@ -2834,17 +3122,25 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 U::Unrecognised => format!(
                     "record {i} (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
-                     a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:` record. Addresses are not \
+                     a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:`/`phrase:` record. Addresses are not \
                      classifiable here, \
                      and neither is a wallet descriptor `me` refuses — see sysw::classify"
                 ),
+                // H6 adds a FIFTH reserved prefix, and this arm is where a
+                // `phrase:` record's own failure lands (R0 round 0, journey
+                // I-1): it called one "a `key:`/`hash:`/`now:` record" and then
+                // offered build recipes for those three and not for the one the
+                // operator is holding. With no verb emitting a `phrase:` record
+                // (§13), this text and `pack`'s help ARE the producer.
                 U::Composer(e) => format!(
-                    "record {i} (records count from 0) is a `key:`/`hash:`/`now:` record whose \
-                     body fails its rule ({}).\n      {}\n      Build the record with `me sysw \
-                     pack`'s helpers: a key record is `key:` + the hex of `[fingerprint/path]xpub` \
-                     exactly as `md decompose` prints it; a hash record is `hash:` + the 32-byte \
-                     digest as 64 lowercase hex; a now record is `now:` + the hex of \
-                     `<seconds>[,<height>]`.",
+                    "record {i} (records count from 0) is a `key:`/`hash:`/`now:`/`phrase:` \
+                     record whose body fails its rule ({}).\n      {}\n      Build the record \
+                     with `me sysw pack`'s helpers: a key record is `key:` + the hex of \
+                     `[fingerprint/path]xpub` exactly as `md decompose` prints it; a hash record \
+                     is `hash:` + the 32-byte digest as 64 lowercase hex; a now record is `now:` \
+                     + the hex of `<seconds>[,<height>]`; a phrase record is `phrase:` + the hex \
+                     of `<method>,<phrase>` with method `hardened` or `sha256`, cut on the FIRST \
+                     comma — so a space after it is part of the phrase.",
                     e.detail(),
                     e.line(*i)
                 ),
