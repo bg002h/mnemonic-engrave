@@ -27,12 +27,17 @@
 # tail of the output, not this header. In summary: whole blocks are diffed
 # against <tree>/<path>, fragments must appear as an exact byte substring, and
 # NOTHING here runs a command, checks a prose claim, or says whether any tree is
-# green. H6 adds one blind spot of its own, named here because a gate that hides
-# it is worse than no gate: **the fork tree's gui/ work for Tasks 8b-12 was
-# SPECIFIED and not wired** by the plan author (see the plan's `## Build gate`
-# and the author report), so those tasks' blocks deliberately carry NO file=
-# header and this script does not check them. Every block it does check is one
-# that was built and run.
+# green.
+#
+# THE H6-SPECIFIC BLIND SPOT IS CLOSED. This header used to name one: the fork
+# tree's gui/ work for Tasks 8b-12 was SPECIFIED and not wired by the plan
+# author, so those tasks' blocks carried no file= header and this script did not
+# check them. The build-gate agent wired, built, tested and mutated all five
+# tasks in the same fork tree (see the plan's `## Build gate` and
+# design/agent-reports/hashlock-H6-plan-gate-8b-12.md), and every block in them
+# now carries a header. Every block this script reports on is one that was built
+# and run; the only fenced blocks left unheaded are bash recipes and one
+# captured `go test` failure tail, which the run's own "NOT COVERED" list names.
 #
 # USAGE
 #   scripts/h6-plan-blocks-vs-tree.sh [plan.md] [fork-tree] [ms-tree] [me-tree]

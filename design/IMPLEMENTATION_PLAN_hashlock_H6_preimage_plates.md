@@ -3,11 +3,13 @@
 **STATUS: DRAFT, awaiting R0 round 0.** Written by the plan author (opus) from
 `design/SPEC_hashlock_H6_preimage_plates.md` (R0 GREEN at engrave `a67a3924`).
 The build gate below was run BY THE AUTHOR at every task boundary in three
-scratch trees; `## Build gate` records what was wired and, explicitly, **what
-was specified and NOT wired** — Tasks 8b through 12 are the fork's `gui`
-surface, and their blocks deliberately carry no `file=` header so the checker
-cannot report a coverage it does not have. Author report:
-`design/agent-reports/hashlock-H6-plan-author-report.md`.
+scratch trees; `## Build gate` records what was wired and how it was gated.
+**Every task is now wired**: Tasks 1-8a by the plan author, and Tasks 8b-12 —
+the fork's `gui` surface — by the build-gate agent, in the same trees. Every
+code block carries a `file=` header and `scripts/h6-plan-blocks-vs-tree.sh`
+checks all 86 of them. Reports:
+`design/agent-reports/hashlock-H6-plan-author-report.md` and
+`design/agent-reports/hashlock-H6-plan-gate-8b-12.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
@@ -2499,17 +2501,20 @@ is called by Task 8b's `hashlockPayloadRoute` and by Task 8b's HOLD, so:
 
 ### Task 8b: `Which hash?` gains two bands, and the derive-only path (spec §5.1)
 
-**Repo:** the fork. **Group E, after 8a.** **SPECIFIED, NOT WIRED** by the plan
-author — the blocks below carry no `file=` header and the checker does not check
-them; see `## Build gate`.
+**Repo:** the fork. **Group E, after 8a.** **WIRED, BUILT, TESTED AND MUTATED**
+by the build-gate agent — every block below carries a `file=` header and is
+byte-for-byte the text that was compiled; every number is measured on this tree.
 
 **Files:**
 - Modify: `gui/composer_hash.go`, `gui/composer_hashlock.go`
 - Modify (tests): `gui/composer_hash_test.go`, `gui/composer_hashlock_test.go`
 
 **Interfaces:**
-- Produces: `composerHashPreimageRow(i int, d [32]byte) string`, `composerHashPhraseRow(i int, d *[32]byte) string`, `composerHashInPayloadRow(i int, d [32]byte) string`, `hashlockPayloadRoute(ctx, th, st, idx int, rec sysw.Record) hashlockOutcome`.
+- Produces: `composerHashPreimageRow(i int, d [32]byte) string`, `composerHashPhraseRow(i int, d *[32]byte) string`, `composerHashInPayloadRow(i int, d [32]byte) string`, `hashlockPayloadRoute(ctx, th, st, idx int, rec sysw.PhraseRecord, payload [][32]byte) hashlockOutcome`, `hashlockPreimageRecordRoute(...)`, `composerPayloadPreimages`, `composerPayloadPhrases`, `hashlockMethodOf`, `hashlockDerivedDigest`, `composerCopyHashlockPreimageConfirm`.
+  *(This line read `rec sysw.Record` — there is no such exported type; the block below already said `sysw.PhraseRecord`, and the wired signature also carries the payload digests, which the confirm modal's relation line needs.)*
 - Consumes: `composerHashRows` (`gui/composer_hash.go:157-175`), `composerHashEdit`'s label-keyed switch (`:184-224`), `hashlockDeriveFlow`, `composerCopyHashlockConfirm`, `hashlockRelationLine`, `hashlockOtherPathLine`, `composerHoldHashlockMaterial`.
+- **`composerHashRows` GAINS A SECOND PARAMETER**, `st *composerState` (nil-safe): band 3's row form depends on what THIS composition has already derived, and there is nowhere else to read that from. `hashlockDerivedDigest` answers it out of Task 8a's `hashlockHeld` rather than out of a second, index-keyed map.
+- **`hashlockPhraseRoute` GAINS THE HOLD.** Task 8a's note is right that `composerHoldHashlockMaterial` has no production caller until 8b; the caller is BOTH payload routes *and* the typed route's own HOLD, which is what §2.2 requires and what closes the fork's join guard (see `## Build gate`).
 - **`hashlockPhraseRoute` is UNCHANGED** and a payload phrase never enters it.
 
 - [ ] **Step 1: the six bands, in order.** `composerHashRows` builds the row set
@@ -2522,9 +2527,29 @@ on those NAMES and its `default` PANICS rather than assigns (H2 §5, r2 C-4).
    before derivation, `phrase <i>  <first8>..<last8>` after
 4. `Type a hashlock phrase`  5. `Type 64 hex`  6. `No hash lock`
 
-MEASURED at `sh2DisplaySize`: every row draws on ONE line in
-`composerPageLines`' 411 px band (23 px per row), `preimage 10  b867db87..edbc96cb`
-and `phrase record 10 (derive to see the digest)` included.
+MEASURED at `sh2DisplaySize` by `TestWhichHashRowsDrawOnOneLine`, in
+`composerPageLines`' own 411 px band — every row draws on ONE line:
+
+| row | chars | px |
+| --- | --- | --- |
+| `hash 10  b867db87..edbc96cb` | 27 | 236 |
+| `hash 10  b867db87..edbc96cb  (in payload)` | 41 | 343 |
+| `preimage 10  b867db87..edbc96cb` | 31 | 276 |
+| `phrase record 10 (derive to see the digest)` | 43 | 336 |
+| `phrase 10  b867db87..edbc96cb` | 29 | 253 |
+| `Type a hashlock phrase` | 22 | 189 |
+| `Type 64 hex` | 11 | 95 |
+| `No hash lock` | 12 | 100 |
+
+**BUT THE PAGE HOLDS FIVE ROWS, NOT SIX, AND THE PLAN CARRIED NO NUMBER FOR
+THAT.** 23 px is the LABEL height; the row PITCH is 29 px (`sz.Y + 6`,
+`gui/composer_paged.go`), the content box is 224 px, and the lead and its spacer
+take two pitches before any row is drawn — so a payload holding a `hash:`
+record, a preimage record and a `phrase:` record draws SIX rows and `No hash
+lock`, the row an operator reaches for to UNDO a lock, is on page 2.
+`composerPickScreen` pages on Button2 and draws the pager icon only when a
+second page exists, so it is reachable; `TestWhichHashPageHoldsFiveRows` pins
+both the count and the reachability.
 `composerPickScreenMaxRows` (`gui/composer_paged.go:243`) is checked against the
 longest row set.
 
@@ -2537,7 +2562,15 @@ plate is offered at Done; band 2 cuts a plate. Band 1's row becomes
 
 MEASURED at `sh2DisplaySize`, longest two-digit form: **41 characters, 343 px,
 ONE line.** The alternative wording `(preimage in payload)` is 50 characters and
-**348 px over two lines**, which a picker band cannot spend.
+**348 px over two lines**, which a picker band cannot spend. Both numbers are
+the spec's own, confirmed on this tree.
+
+**AN UNDERIVED `phrase:` RECORD CANNOT BE COUNTED HERE**, and that is a property
+of §5.1 rather than an omission this step can close: its digest is not knowable
+without running the KDF, which Step 3 forbids at row-build time. The annotation
+is exact for a preimage record, and a `phrase:` record's own `hash:` row gains it
+the moment the record is derived — `composerHashEdit` rebuilds the row set on
+every pass of its loop.
 
 - [ ] **Step 3: DERIVATION IS LAZY, and the payload path is a DIFFERENT
 FUNCTION.** A `phrase:` row derives on PICK, behind the existing `Deriving`
@@ -2551,19 +2584,74 @@ pick — so J4-1's mistake cannot occur — and the reconcile screen's instructi
 ("run `ms hashlock` with this phrase") is a no-op for a phrase the host already
 has. So the payload path is a DERIVE-ONLY sibling:
 
-```
-func hashlockPayloadRoute(ctx *Context, th *Colors, st *composerState, idx int, rec sysw.PhraseRecord) hashlockOutcome {
-        // no phrase screen, no method pick, no reconcile screen
-        x, ok := hashlockDeriveFlow(ctx, th, rec.Phrase, rec.Method)   // the countdown
-        if !ok { return hashlockBackToWhichHash }
-        h := hashlock.Digest(&x)
-        if !composerCopyHashlockConfirm(ctx, th, st, idx, h, ...) { return hashlockBackToWhichHash }
-        st.list.Paths[idx].Hash = &h
-        composerHoldHashlockMaterial(st, h, hashlockMaterial{
-                phrase: []byte(rec.Phrase), method: rec.Method,
-                preimage: x, provenance: hashlockFromPayload,
-        })
-        return hashlockAssigned
+```go file=fork/gui/composer_hashlock.go mode=fragment
+// hashlockPayloadRoute is §5.1's DERIVE-ONLY sibling of hashlockPhraseRoute,
+// for a phrase: record the payload delivered.
+//
+// A DIFFERENT FUNCTION, not a flag on the phrase route, because
+// hashlockPhraseRoute does BOTH of the things a payload phrase must not do: it
+// calls hashlockMethodPick (the method is the RECORD's, so offering a pick is
+// J4-1's mistake -- a phrase derived under a method its record does not name
+// produces a digest nothing else in the payload agrees with), and it ends on
+// composerCopyHashlockReconcile, whose instruction ("run ms hashlock with this
+// phrase") is a no-op for a phrase the host already has.
+//
+// AND THAT SPLIT IS WHAT MAKES §10.2 TRUE BY CONSTRUCTION.
+// composerCopyHashlockReconcile has exactly ONE call site in the whole tree,
+// inside hashlockPhraseRoute, so a payload phrase can never reach it. There is
+// no runtime guard and no test for one, because the guard would be dead code.
+//
+// THERE IS NO PHRASE SCREEN AND NO METHOD PICK, so the only Back before the
+// confirm is the derivation countdown's, which returns to `Which hash?` with
+// nothing assigned -- the same contract the phrase route's own phrase screen
+// has (§4.6).
+func hashlockPayloadRoute(ctx *Context, th *Colors, st *composerState, idx int, rec sysw.PhraseRecord, payload [][32]byte) hashlockOutcome {
+	phrase := []byte(rec.Phrase)
+	m := hashlockMethodOf(rec.Method)
+	x, ok := hashlockDeriveFlow(ctx, th, phrase, m)
+	if !ok {
+		return hashlockBackToWhichHash
+	}
+	h := hashlock.Digest(&x)
+	body := composerCopyHashlockConfirm(hashlockFirst8Last8(h), m.String(), len(phrase),
+		hashlockRelationLine(payload, h), hashlockOtherPathLine(st, idx, h))
+	if !composerConfirmScreen(ctx, th, "Hash lock", composerConfirmBody(body)) {
+		return hashlockBackToWhichHash
+	}
+	d := h
+	st.list.Paths[idx].Hash = &d
+	// H6 §2.2: the material is HELD, so §5.3 can offer a plate for it at Done.
+	// composerNotePhraseDigest is deliberately NOT called: that map is H5's
+	// record of a phrase TYPED HERE, which drives the §8h banner that says the
+	// preimage "is not on this device" -- false for a payload phrase, whose
+	// provenance is recorded in the material instead.
+	composerHoldHashlockMaterial(st, h, hashlockMaterial{
+		phrase: phrase, method: m, preimage: x, provenance: hashlockFromPayload,
+	})
+	return hashlockAssigned
+}
+
+// hashlockPreimageRecordRoute is the same shape WITHOUT the KDF: a preimage
+// plate record carries X directly, so there is no countdown, no phrase and no
+// method.
+//
+// IT DOES NOT REUSE composerCopyHashlockConfirm. That body is phrase-shaped --
+// it prints `method: <m>   chars: <n>` and tells the operator to write down the
+// phrase and the method -- and for a preimage record every one of those is
+// false: there is no phrase, no method, and `chars: 0` would be a measurement
+// of nothing on the screen that gates funds.
+func hashlockPreimageRecordRoute(ctx *Context, th *Colors, st *composerState, idx int, p hashlockPayloadPreimage, payload [][32]byte) hashlockOutcome {
+	body := composerCopyHashlockPreimageConfirm(hashlockFirst8Last8(p.digest),
+		hashlockRelationLine(payload, p.digest), hashlockOtherPathLine(st, idx, p.digest))
+	if !composerConfirmScreen(ctx, th, "Hash lock", composerConfirmBody(body)) {
+		return hashlockBackToWhichHash
+	}
+	d := p.digest
+	st.list.Paths[idx].Hash = &d
+	composerHoldHashlockMaterial(st, p.digest, hashlockMaterial{
+		preimage: p.preimage, provenance: hashlockFromPayload,
+	})
+	return hashlockAssigned
 }
 ```
 
@@ -2593,20 +2681,40 @@ two adjacent rows with identical digest text and different consequences.
 PICK appears for a record that names its own method, and the reconcile
 screen — whose instruction is a no-op here — is drawn.
 
-**Boundary gate:** `scripts/gui-shard-test.sh ./gui/ 24`.
+**A PREIMAGE RECORD NEEDS ITS OWN CONFIRM BODY.** The Interfaces above name
+`composerCopyHashlockConfirm` for both payload carriers, and that body is
+phrase-shaped: it prints `method: <m>   chars: <n>` and tells the operator to
+write down the phrase and the method. A preimage record carries X and has none
+of the three, so reusing it draws `method: hardened   chars: 0` on the screen
+that gates funds. `composerCopyHashlockPreimageConfirm` is what the preimage
+route draws instead — **MEASURED through `confirmWarningBody` wrapped in
+`composerConfirmBody`, longest variant (both relation lines): 274 drawn /
+headroom 186.**
+
+**MUTATIONS, all six executed (tails in `## Build gate`):** the band order
+swapped; derivation at row-build time; the `(in payload)` annotation dropped; a
+payload phrase routed through `hashlockPhraseRoute`; the shipped three-arm
+`taking` predicate restored; and the HOLD removed from both payload routes.
+
+**Boundary gate (RUN):** `scripts/gui-shard-test.sh ./gui/ 24` — **1250
+top-level tests, partition verified exhaustive, all 24 shards ok.** This is also
+where Task 8a's shard-18 red closes: `composerHoldHashlockMaterial` now has two
+production callers.
 
 ---
 
 ### Task 9: the Done review — a PICK step, the census, cut order and both abort arms (spec §5.3, §5.4, §8.3, §8.4, §10.1, §10.3)
 
-**Repo:** the fork. **Group E, after 8b.** **SPECIFIED, NOT WIRED.**
+**Repo:** the fork. **Group E, after 8b.** **WIRED, BUILT, TESTED AND MUTATED.**
 
 **Files:**
-- Modify: `gui/composer_flow.go` (`composerEngraveStep`, `:335-394`), `gui/composer_census.go`, `gui/composer_copy.go`, `gui/composer_copy_test.go`, `gui/modal_fits_test.go`
+- Modify: `gui/composer_flow.go` (`composerEngraveStep`, `:335-394`), `gui/composer_census.go`, `gui/composer_copy.go`, `gui/composer_copy_test.go`, `gui/modal_fits_test.go`, `gui/composer_census_test.go` (the signature), `gui/composer_paged_geometry_test.go` (the census joins the W-3 gate)
 - Create: `gui/composer_preimage_plate.go`, `gui/composer_preimage_plate_test.go`
 
 **Interfaces:**
-- Produces: `composerPreimagePlatePick(ctx, th, st, h) hashlockPlateChoice`, `composerPreimagePlates(st) []hashlockPlate`, `composerAbortNoPreimage`, `composerAbortPreimageCut`, `composerCopyHashEveryPathHeld`, `composerCopyHashEveryPathHeldPhrase`, `composerBuildHashlockPlate(st, h, choice) backup.Hashlock`.
+- Produces: `composerPreimagePlatePick(ctx, th, st, h) hashlockPlateChoice`, `composerPreimagePlates(st) []hashlockPlate`, `composerPreimagePlateStep`, `composerAcceptedPreimagePlates`, `composerAbortNoPreimage(ctx, th) bool`, `composerAbortPreimageCut(ctx, th) bool`, `composerCopyHashEveryPathHeld`, `composerCopyHashEveryPathHeldPhrase`, `composerBuildHashlockPlate(p hashlockPlate, locator []string) (backup.Hashlock, error)`, `composerHashlockPlateFor`, `hashlockPlateLocator`, `composerHashlockLocator`, `composerPreimageMarkTitle`, `composerPlateCutHook`.
+  *(Two signatures moved. The abort arms take no `st`: `composerFlow` keeps the state and neither arm reads it. `composerBuildHashlockPlate` takes the DECIDED plate and its pre-formatted locator and returns an error, because `backup` takes no dependency on `md` or `hashlock` and the locator is the caller's to build — exactly as `Passphrase` works.)*
+- **AND IT NEEDS `hashlock.MethodLine` AND `hashlock.QRText`, WHICH NO TASK WIRED.** §8.6's method line and `ms_codec::hashlock::qr_text`'s Go twin existed only as constants inside `backup/hashlock_test.go`; a plate built from production had nothing to fill `Method` and `QRText` with. Both are ported into `hashlock/` from this package's own constants (so a change to `Iterations`, `Salt` or `PreimageLen` cannot drift the plate) and pinned against the Rust primary's literal: the hardened line is **73 characters**, which is §6.5's own pin.
 - **`composerCensusLines`'s SIGNATURE CHANGES** (§5.3 item 2 / r0 fidelity N-3): today `composerCensusLines(params engrave.Params, cards []bundleCard)`, which can see neither step (A)'s decisions nor `hashlockHeld`. It gains the ACCEPTED-PLATE LIST as a third parameter — a VALUE computed by step (A) — rather than reading state, so the census reports a decision instead of recomputing one.
 - **`bundleAbortWarningText` is UNCHANGED** (`gui/bundle_flow.go:780-792`), and that is normative: it is reachable only from `bundleAbortWarning` at `:625` and `:640`, both INSIDE `bundleEngrave`, and §5.4 cuts every accepted preimage plate BEFORE calling it — so a clause added there could never fire. It also could not be plumbed: the shipped comment at `:610-616` prohibits the variadic tail by name.
 - **`buildPlateCensusLines`' count and its "a set is only a backup when all of it exists" claim (`gui/multisig_build_census.go:63-73`) stay BYTE-UNCHANGED**, because a preimage plate is not a `bundleCard` and does not enter `plan` — S6b's passphrase-plate precedent (`:88-93`: entering `plan` *"would tell a reader it travels WITH the set"*).
@@ -2632,6 +2740,16 @@ areas. Rows, MEASURED at `sh2DisplaySize` in the 411 px band, each ONE line:
 | `phrase + method` | 15 | 138 |
 | `phrase + method + QR` | 20 | 180 |
 | `do not cut this preimage` | 24 | 196 |
+
+All four confirmed on this tree (`TestComposerPreimagePlateRowsDrawOnOneLine`).
+**THE LEAD COSTS ROWS, AND THAT IS THE NUMBER THE PLAN DID NOT CARRY.**
+`composerPickScreen` draws the lead as a per-page header THROUGH
+`composerPageLines`, so every line the lead spends is a row lost from page 1: a
+four-line lead (the digest, the path, the character count and the method each on
+their own line) leaves THREE of these four rows, with `do not cut this preimage`
+— the row an operator reaches for to UNDO — on page 2. The masked lead is
+therefore TWO lines, and `TestComposerPreimagePlatePickDrawsAllFourRows` pins
+all four onto page 1.
 
 The QR rows are offered ONLY when the device holds the phrase
 (`len(m.phrase) > 0`, decision 1), and taking one fires §8.5's warning.
@@ -2659,30 +2777,84 @@ choices already made and staying read-only. `composerCensusLines`
 plate, and the apart-storage line.
 
 **Drawn through `composerPageLines`' 411 px band, NOT `confirmReviewScreen`'s
-own wrap.** MEASURED at `sh2DisplaySize`: `confirmReviewScreen` wraps at
-`dims.X - 2*8 = 464` px and centres on the whole panel, while the navigation
-column starts at 427 px, so any row wider than **374 px** has its right edge
-under a button. Every new row is over it — 405, 423, 441, 447, 448 px — and so
-is the SHIPPED completeness line at **459 px**, which is why this is a
-PRE-EXISTING property rather than something H6 invents. H6 still may not add five
-more rows to it: that is the W-3 class the composer's paged screens were rebuilt
-to remove.
+own wrap** — so `composerEngraveStep` calls `composerReadScreen`, which has
+`confirmReviewScreen`'s exact contract (Button1 back, Button2 pages, Button3
+continues) inside the band that keeps ink off the buttons.
 
-§8.3's rows, verbatim:
+MEASURED at `sh2DisplaySize` and all four geometry numbers confirmed:
+`confirmReviewScreen` wraps at `dims.X - 2*8 = 464` px and centres on the whole
+panel, the navigation column starts at **427 px**, so any row wider than
+**374 px** has its right edge under a button, and the SHIPPED completeness line
+is **459 px** — which is why this is a PRE-EXISTING property rather than
+something H6 invents. H6 still may not add five more rows to it: that is the W-3
+class the composer's paged screens were rebuilt to remove.
 
-```
-Plus {n} preimage plate(s), cut first and NOT part of this backup:
-path {n}  {first8}..{last8}  {phrase, hardened, QR | phrase, sha256 | preimage string}
-preimage {first8}..{last8}: not on any path, will not be cut
-preimage {first8}..{last8}: declined, will not be cut
-Keep each preimage plate apart from the policy plates and from the others.
+**The five new rows' own widths are DIGEST-DEPENDENT and cannot be pinned as
+literals** — two of them carry a `first8..last8` whose glyph widths differ per
+digest — so this step's carried figures (405, 423, 441, 447, 448) are not
+reproducible as written. On the gate's fixture they measure 419, 385, 434, 442
+and 441 px at the 464 px wrap; what IS digest-independent, and what
+`TestComposerCensusRowsAreDrawnInsideTheBand` asserts, is that every one of them
+is over the 374 px threshold and none of them draws under a button in the 411 px
+band. The census also joins `composerPagedScreens`, so the shipped W-3 gate
+covers it on every page.
+
+**§8.3's block is on the census's SECOND page** with this fixture, and
+`composerReadScreen` withholds the checkmark until the last page has been laid
+out once — so an operator (and a walk) pages to reach it. That is the shipped
+contract, not a new one.
+
+§8.3's rows, as the five bodies that produce them. They live in
+`composer_copy.go` so `TestComposerCopyTableCoversEveryBody` requires a table
+row for each, and that row is what carries §12 item 5's four gates:
+
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyPreimagePlateHeading is §8.3's heading.
+//
+// "plate(s)" IS THE SPEC'S OWN SPELLING and is kept verbatim, against this
+// file's house style (composerSlotWord renders "slot @3" or "slots @3 and @4"
+// so a refusal never reads "slots @3"). Changing spec copy inside a build gate
+// would put the shipped string and the document that is diffed against it out
+// of step; it is filed instead.
+func composerCopyPreimagePlateHeading(n int) string {
+	return fmt.Sprintf("Plus %d preimage plate(s), cut first and NOT part of this backup:", n)
+}
+
+// composerCopyPreimagePlateRow is §8.3's per-plate row.
+func composerCopyPreimagePlateRow(path int, first8last8, form string) string {
+	return fmt.Sprintf("path %d  %s  %s", path, first8last8, form)
+}
+
+// composerCopyPreimageNotOnAnyPath is §8.3's row for a retained preimage no
+// CURRENT path carries: LISTED, never cut, and nothing is deleted from
+// hashlockHeld to achieve it (§2.2 item 2).
+func composerCopyPreimageNotOnAnyPath(first8last8 string) string {
+	return "preimage " + first8last8 + ": not on any path, will not be cut"
+}
+
+// composerCopyPreimageDeclined is §8.3's row for a plate the operator declined.
+func composerCopyPreimageDeclined(first8last8 string) string {
+	return "preimage " + first8last8 + ": declined, will not be cut"
+}
+
+func composerCopyPreimageKeepApart() string {
+	return "Keep each preimage plate apart from the policy plates and from the others."
+}
 ```
 
 and the stand-alone notice form, for a review whose only entry is an unused
-preimage, MEASURED **107 drawn / headroom 455**:
+preimage — **MEASURED on `errorScreenBody`: 107 drawn / headroom 455**, which is
+the spec's own carried number, confirmed:
 
-```
-One preimage this composition holds is on no path of this policy. It will not be cut. Go back and set a path's hash to it, or leave it.
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyPreimageOnlyNotice is §8.3's stand-alone notice form, for a review
+// whose ONLY preimage entry is one no path carries. The terse row says what
+// happened; on a review with nothing else to read there is room to say what to
+// do about it.
+func composerCopyPreimageOnlyNotice() string {
+	return "One preimage this composition holds is on no path of this policy. It " +
+		"will not be cut. Go back and set a path's hash to it, or leave it."
+}
 ```
 
 **A retained preimage no current path carries is LISTED, never cut**, for BOTH
@@ -2695,13 +2867,45 @@ number of plates.
 
 - [ ] **Step 3: cut order — preimage plates FIRST.**
 
-```
-for _, pl := range plates {           // §6, one Plate per accepted preimage
-        if !NewEngraveScreen(ctx, pl).Engrave(ctx, &engraveTheme) {
-                return composerAbortNoPreimage(ctx, th, st)   // §8.4a
-        }
+```go file=fork/gui/composer_flow.go mode=fragment
+	// ─── §5.4: PREIMAGE PLATES FIRST ────────────────────────────────────────
+	//
+	// Ordering removes the window in which the md1 plates exist and the preimage
+	// does not. The ms1 secret cards keep their place at the head of `cards`
+	// above, so the whole run is secrets-then-preimages-then-policy.
+	accepted := composerAcceptedPreimagePlates(plates)
+	cut := 0
+	for _, p := range accepted {
+		plate, err := composerHashlockPlateFor(ctx.Platform, p,
+			composerHashlockLocator(p, template, keyed))
+		if err != nil {
+			showError(ctx, th, "Preimage plate", composerCopyPreimagePlateRefusal())
+			if cut > 0 {
+				return composerAbortPreimageCut(ctx, th)
+			}
+			return composerAbortNoPreimage(ctx, th)
+		}
+		composerNotePlateCut("preimage")
+		if !NewEngraveScreen(ctx, plate).Engrave(ctx, &engraveTheme) {
+			// §8.4's TWO windows, and the ORDER is what creates the second.
+			if cut > 0 {
+				return composerAbortPreimageCut(ctx, th)
+			}
+			return composerAbortNoPreimage(ctx, th)
+		}
+		cut++
+	}
+
+	composerNotePlateCut("policy")
+	// §10.3: PREIMAGE REQUIRED on the md1 AND the mk1 key cards, never a
+	// cardMS1 -- bundlePlateMark's own exclusion, unchanged.
+	done := bundleEngrave(ctx, th, "Wallet Policy", cards,
+		composerPreimageMarkTitle(st), "") == bundleEngraveDone
+	if !done && cut > 0 {
+		return composerAbortPreimageCut(ctx, th)
+	}
+	return done
 }
-return bundleEngrave(ctx, th, "Wallet Policy", cards, markTitle, "") == bundleEngraveDone
 ```
 
 `NewEngraveScreen` is `gui/gui.go:3296`; the plate is built by Task 6's
@@ -2726,15 +2930,24 @@ so the second run cuts a SECOND bearer plate for the same secret, one of which
 the operator has no record of, while §8.3's own line tells them to store them
 apart from each other.
 
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyAbortNoPreimage is §8.4a.
+func composerCopyAbortNoPreimage() string {
+	return "NO PREIMAGE PLATE WAS CUT. The phrase dies with this composition. " +
+		"Do not fund this wallet."
+}
 ```
-NO PREIMAGE PLATE WAS CUT. The phrase dies with this composition. Do not fund this wallet.
-```
-MEASURED on `errorScreenBody`: **75 drawn / headroom 476.**
+MEASURED on `errorScreenBody`: **75 drawn / headroom 476** — the spec's carried
+number, confirmed.
 
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyAbortPreimageCut is §8.4b.
+func composerCopyAbortPreimageCut() string {
+	return "A PREIMAGE PLATE WAS CUT and no policy plate was. Store or destroy it " +
+		"now; do not leave it with the blanks."
+}
 ```
-A PREIMAGE PLATE WAS CUT and no policy plate was. Store or destroy it now; do not leave it with the blanks.
-```
-MEASURED on `errorScreenBody`: **86 drawn / headroom 476.**
+MEASURED on `errorScreenBody`: **86 drawn / headroom 476** — confirmed.
 
 **It says "dies with this composition", not "is now gone"**, and that is a
 correction rather than a style: an abort inside `bundleEngrave` returns
@@ -2747,11 +2960,17 @@ a funding decision.
 `ftWarnQR` (`gui/freetext_flow.go:1214-1216`), which already warns for strictly
 less dangerous content:
 
-```
-The QR makes the phrase readable by any camera. A photograph of the plate is a copy of the phrase, and the phrase spends this path.
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyPreimageQRWarning is §8.5, confirm-to-proceed on the model of
+// ftWarnQR (gui/freetext_flow.go:1214-1216), which already warns for strictly
+// less dangerous content.
+func composerCopyPreimageQRWarning() string {
+	return "The QR makes the phrase readable by any camera. A photograph of the " +
+		"plate is a copy of the phrase, and the phrase spends this path."
+}
 ```
 MEASURED through `confirmWarningBody` wrapped in `composerConfirmBody`:
-**126 drawn / headroom 378.**
+**126 drawn / headroom 378** — confirmed.
 
 - [ ] **Step 6: §10.1's third §8h arm.** `composerCopyHashEveryPathFor`
 (`gui/composer_copy.go:527-532`) gains a third arm, chosen when EVERY hashed
@@ -2763,15 +2982,51 @@ banner's one call site (`gui/composer_shape.go:442-443`) runs at
 operator who read "this run cuts a plate for each one" and then declined one
 would be left with a backup instruction that was false.
 
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyHashEveryPathHeld is §10.1's THIRD §8h arm: every hashed path's
+// digest has material this composition holds, and none of it is a phrase.
+func composerCopyHashEveryPathHeld() string {
+	return "HASH ON EVERY PATH\n" +
+		"Every way to spend this wallet needs the preimage of a hash. This " +
+		"composition holds the preimage for each one and can cut a plate for it " +
+		"at Done. Store those plates apart from these, and apart from each other."
+}
 ```
-HASH ON EVERY PATH
-Every way to spend this wallet needs the preimage of a hash. This composition holds the preimage for each one and can cut a plate for it at Done. Store those plates apart from these, and apart from each other.
+MEASURED on `errorScreenBody`: **185 drawn / headroom 360** and **186 / 360** —
+both confirmed.
+
+**THE FOURTH ARM'S PREDICATE IS `every`, NOT `at least one`, and the body is
+what forces it.** This step's own wording — *"a fourth when at least one of
+those came from a phrase typed here"* — makes the body's *"holds the phrase and
+method for each one"* FALSE on a mixed policy where one path's material is a
+payload preimage record carrying no phrase, and it also excludes a
+payload-delivered phrase the device does hold, whose backup burden is identical.
+The predicate wired is `composerEveryHeldPathHasAPhrase`:
+
+```go file=fork/gui/composer_preimage_plate.go mode=fragment
+// composerEveryHeldPathHasAPhrase chooses §10.1's FOURTH arm, whose body says
+// this composition "holds the phrase and method for each one".
+//
+// EVERY, NOT AT LEAST ONE, and the body is what forces it: on a mixed policy
+// where one path's material is a payload preimage record with no phrase at all,
+// "for each one" would be false. The plan's own wording ("at least one of those
+// came from a phrase typed here") also excludes a payload-delivered phrase the
+// device does hold -- and the operator's backup burden is identical either way.
+func composerEveryHeldPathHasAPhrase(st *composerState) bool {
+	if !composerEveryHashedPathHeld(st) {
+		return false
+	}
+	for _, p := range st.list.Paths {
+		if p.Hash == nil {
+			continue
+		}
+		if len(st.hashlockHeld[*p.Hash].phrase) == 0 {
+			return false
+		}
+	}
+	return true
+}
 ```
-```
-HASH ON EVERY PATH
-Every way to spend this wallet needs a hashlock preimage. This composition holds the phrase and method for each one and can cut a plate at Done. Store those plates apart from these, and apart from each other.
-```
-MEASURED on `errorScreenBody`: **185 drawn / headroom 360** and **186 / 360.**
 
 **Where the load actually falls is NOT here.** The call site is guarded by
 `composerEveryPathHashed` (`gui/composer_state.go:257-259`), which is false the
@@ -2801,9 +3056,9 @@ failures the first draft's versions could not detect:
 
 | test | MUTATION that must red it |
 | --- | --- |
-| the review is two steps; the pick screen offers the four rows BY LABEL; QR rows only when the phrase is held | put the form/QR/decline controls on `confirmReviewScreen` → **there is no control left to bind and the test cannot drive them, which is the point**; offer a QR row with no phrase held → the row assertion fails |
+| the review is two steps; the pick screen offers the four rows BY LABEL; QR rows only when the phrase is held | put the form/QR/decline controls on `confirmReviewScreen` → **there is no control left to bind and the test cannot drive them, which is the point** (ARGUED, not executed: it is unimplementable, and that is the claim); offer the two phrase rows with no phrase held → **RUN**, the payload-preimage row fails |
 | the census is READ-ONLY and REPORTS the choice | drop the declined plate silently → the census row assertion fails |
-| the census block is drawn through `composerPageLines`' band | draw it through `confirmReviewScreen`'s own wrap → `inkUnderNavOps` finds the 405-448 px rows under the column |
+| the census block is drawn through `composerPageLines`' band | draw it through `confirmReviewScreen`'s own wrap → **RUN**, and the gate is an AST assertion on `composerEngraveStep`'s call set, not a raster probe: both screens draw a paged read-only body of the same shape, `op.Drawer.ExtractText` collects a glyph's rune wherever it lands, and the real frame draws the nav buttons — so no text or raster assertion on the live screen can tell the two apart. `composer_hashlock_held_test.go`'s third test makes the same move for the same reason |
 | the plate is not a `bundleCard` | add it as a card → `bundlePlatePlan`'s count and the "all of it exists" claim change |
 | cut order | move the loop after `bundleEngrave` → an order assertion on the engrave hook fails |
 | BOTH abort arms; NEITHER on a completed run | fire either unconditionally → the success row fails; attach either to `bundleAbortWarningText` → the arm is unreachable and the §8.4b test fails |
@@ -2813,26 +3068,55 @@ failures the first draft's versions could not detect:
 - [ ] **Step 9: every new DEVICE body gets a `modal_fits_test.go` row**, measured
 ALONE as it is drawn, and **the ASCII assertion is mechanical** (`r <=
 unicode.MaxASCII` over the table), not by inspection.
-**MUTATION: put a `§` or an em dash in any body** → `assertModalBodyFits`
-reports a near-blank frame (5,004 ink pixels against a 6,000 floor) rather than
-a truncation, and the ASCII assertion names the character. **This mutation must
-be in the suite**: the spec's first draft carried non-ASCII in five bodies and
-claimed a measurement for one that the harness cannot produce.
+**MUTATION (RUN): put an em dash in `composerCopyAbortNoPreimage`** →
+`assertModalBodyFits` reports *"the modal drew only 5004 ink pixels (floor
+6000) -- this frame is near blank"* — the spec's own predicted number, exactly —
+and `TestComposerCopyIsDrawable` names the rune: *"carries the non-ASCII or
+control rune '—'"*. The ASCII assertion is mechanical and already shipped: it
+runs `ch > 126` over every row of `composerCopyTable`, so a body added without a
+table row is caught by `TestComposerCopyTableCoversEveryBody` first.
 
-**Boundary gate:** `scripts/gui-shard-test.sh ./gui/ 24`; firmware size.
+**EVERY NEW BODY OF THIS TASK IS MEASURED**, on the renderer production uses:
+
+| body | renderer | drawn | headroom |
+| --- | --- | --- | --- |
+| §8.4a, no preimage plate was cut | `errorScreenBody` | 75 | 476 |
+| §8.4b, a preimage plate was cut | `errorScreenBody` | 86 | 476 |
+| §10.1, held form | `errorScreenBody` | 185 | 360 |
+| §10.1, held-phrase form | `errorScreenBody` | 186 | 360 |
+| §8.3, the stand-alone notice | `errorScreenBody` | 107 | 455 |
+| §5.3, the preimage-plate refusal | `errorScreenBody` | 99 | 455 |
+| §8.5, the QR warning | `confirmWarningBody` + `composerConfirmBody` | 126 | 378 |
+
+Every figure the spec carried is confirmed to the character; the refusal is new
+(the plan had no body for a plate that cannot be built or does not fit).
+
+**MUTATIONS, all eleven executed (tails in `## Build gate`):** the two phrase
+rows offered with no phrase held; the declined plate dropped silently; the
+census drawn through `confirmReviewScreen`; the accepted plates added as
+`bundleCard`s; the preimage loop moved after `bundleEngrave`; §8.4b fired
+unconditionally; §8.4a fired unconditionally; §8.4a attached to
+`bundleAbortWarningText`; §10.1's future tense restored; the mark suppressed on
+`cardMK1`; and an em dash in a body.
+
+**Boundary gate (RUN):** `scripts/gui-shard-test.sh ./gui/ 24` — **1271
+top-level tests, partition verified exhaustive, all 24 shards ok.**
 
 ---
 
 ### Task 10: the Hashlock plates flow, under the Wallet Policy door (spec §5.2, §6.3)
 
-**Repo:** the fork. **Group F, after Tasks 6 and 7.** **SPECIFIED, NOT WIRED.**
+**Repo:** the fork. **Group F, after Tasks 6 and 7.** **WIRED, BUILT, TESTED AND
+MUTATED.**
 
 **Files:**
 - Create: `gui/composer_hashlock_plates.go`, `gui/composer_hashlock_plates_test.go`
-- Modify: `gui/composer_door.go`
+- Modify: `gui/composer_door.go`, `gui/wallet_policy.go` (the door's loop must actually TAKE the fourth route — the plan named the door and not its one caller, and a route nothing dispatches is the F-437 defect one level in), `gui/composer_door_test.go` (the counts signature)
 
 **Interfaces:**
-- Produces: `composerHashlockPlatesFlow(ctx, th)`, `composerDoorHasPreimage(ctx) bool`, `hashlockPlateLocator(...) []string`.
+- Produces: `composerHashlockPlatesFlow(ctx, th)`, `composerDoorHasPreimage(s *syswSession) bool`, `hashlockPlatesRecords`, `hashlockPlatesRows`, `hashlockPlatesDerive`, `hashlockPlatesScrub`, `hashlockPlatesStub`, `hashlockPlatesMatch`, `hashlockPlatesLocator`, `hashlockPlatesFormPick`, `composerRouteHashlockPlates`.
+  *(`composerDoorHasPreimage` takes the SESSION, not the `Context`: that is `composerDoorHasConsumablePolicy`'s own shape, and it is what makes the predicate testable without a running flow. `hashlockPlateLocator` is Produces of Task 9 — see there.)*
+- `composerDoorCounts` **gains a fourth return**, `preimages`, counting `ClassPreimage` and `ClassPhrase` together because the door offers ONE route for both.
 - Consumes: `ctx.sysw` only. **It builds no composition and reads nothing from `composerState`** (decision 4: it cuts "without a composition").
 
 - [ ] **Step 1: the fourth route, CONDITIONAL.** After "Scan cards", "From
@@ -2878,12 +3162,104 @@ NORMATIVE, in four parts:**
 order, immediately after the method line (phrase form) or the title (string
 form):
 
+```go file=fork/gui/composer_preimage_plate.go mode=fragment
+// hashlockPlateLocator is §6.3's locator rows, in order, pre-formatted for
+// backup.Hashlock -- which takes no dependency on md or hashlock, exactly as
+// backup.Passphrase takes none.
+//
+// THE `hash` ROW IS ALWAYS PRESENT, and that is the row standing between the
+// operator and the worst artifact this stage can cut: a phrase-form plate with
+// no locator at all is a bearer phrase in plain text with no digest, no path
+// and no payload position.
+//
+// stub is the 8 hex characters of the mk1 stub, or "" when none can be
+// computed; stubIsPolicy chooses between composer_stub.go:54's and :67's own
+// literals, so the plate and the screen the operator copied into their notebook
+// use the same words. payloadMatch is the 0-based index of the payload hash:
+// record this digest equals, or -1.
+func hashlockPlateLocator(path int, digest [32]byte, stub string, stubIsPolicy bool, payloadMatch int) []string {
+	var out []string
+	if path > 0 {
+		out = append(out, fmt.Sprintf("path %d", path))
+	}
+	out = append(out, "hash  "+hashlockFirst8Last8(digest))
+	if stub != "" {
+		label := "mk1 stub (template): "
+		if stubIsPolicy {
+			label = "mk1 stub (policy): "
+		}
+		out = append(out, label+stub)
+	}
+	if payloadMatch >= 0 {
+		out = append(out, fmt.Sprintf("matches hash %d in the payload", payloadMatch+1))
+	}
+	return out
+}
 ```
-path <n>                            (composer-native only)
-hash  <first8>..<last8>             (always)
-mk1 stub (policy): <8 hex>          (when every slot is seated)
-mk1 stub (template): <8 hex>        (otherwise, and when no policy id exists)
-matches hash <i> in the payload     (Hashlock plates flow, when one matches)
+
+**It is WIRED IN TASK 9, not here**, because Task 9's own
+`composerBuildHashlockPlate` needs the same rows for a composer-native plate and
+a second copy of the arithmetic would be a second answer to "where is this
+plate". This flow's caller is `hashlockPlatesLocator`, which supplies `path = 0`
+(no composition, so no path exists to name), the stub from an md1 record in the
+same payload, and the payload position when one matches:
+
+```go file=fork/gui/composer_hashlock_plates.go mode=fragment
+// hashlockPlatesStub is §6.3's `mk1 stub` row for THIS flow, and it is the one
+// locator row that may be absent.
+//
+// IT COMES FROM AN md1 RECORD IN THE SAME PAYLOAD, and there is no other
+// source: no payload record carries an id, so a preimage or phrase record alone
+// cannot name the policy it belongs to. When the payload holds no md1, the
+// field is OMITTED rather than filled with a placeholder -- a wrong stub on a
+// plate is worse than none, because it names a policy the plate does not
+// unlock.
+func hashlockPlatesStub(s *syswSession) (stub string, isPolicy bool) {
+	if s == nil || !s.loaded {
+		return "", false
+	}
+	var chunks []string
+	for _, r := range s.records {
+		if r.class == sysw.ClassMDMK && codex32.ValidMD(r.body) {
+			chunks = append(chunks, r.body)
+		}
+	}
+	if len(chunks) == 0 {
+		return "", false
+	}
+	b, err := md.FormAwareStubChunks(chunks)
+	if err != nil {
+		return "", false
+	}
+	_, kind, err := md.FormAwareIdChunks(chunks)
+	if err != nil {
+		return "", false
+	}
+	return fmt.Sprintf("%x", b), kind == md.WalletIdPolicy
+}
+
+// hashlockPlatesMatch is §6.3's `matches hash <i> in the payload` row: the
+// 0-based index of the payload hash: record this digest equals, or -1.
+func hashlockPlatesMatch(s *syswSession, digest [32]byte) int {
+	for i, d := range composerPayloadDigests(s) {
+		if d == digest {
+			return i
+		}
+	}
+	return -1
+}
+
+// hashlockPlatesLocator is §6.3's locator for a plate cut from a PAYLOAD record.
+//
+// THERE IS NO `path` ROW: this flow builds no composition, so no path exists to
+// name. The `hash` row is printed from the DERIVED result and is therefore
+// never blank -- a phrase-form plate with no locator at all is a bearer phrase
+// in plain text with no digest, no path and no payload position, and it is the
+// worst artifact this stage can cut.
+func hashlockPlatesLocator(s *syswSession, r hashlockPlatesRecord) []string {
+	stub, isPolicy := hashlockPlatesStub(s)
+	return hashlockPlateLocator(0, r.digest, stub, isPolicy, hashlockPlatesMatch(s, r.digest))
+}
 ```
 
 The stub labels are `gui/composer_stub.go:54,67`'s literals, so the plate and
@@ -2893,7 +3269,13 @@ in the same payload** — no payload record carries an id, so an md1 is the only
 source — and the field is omitted otherwise.
 
 MEASURED against the 32-character cap at 3.0 mm: the rows are 6, 24, 27, 29 and
-30 characters and **every one of them fits a band**. They are body rows anyway,
+30 characters and **every one of them fits a band**. Confirmed on this tree by
+`TestHashlockPlatesLocatorAlwaysCarriesTheHashRow`, which walks the three
+payload shapes that change the locator — no md1 and no matching `hash:` record
+(one row, the digest); a matching `hash:` record; and an md1 record supplying
+`mk1 stub (template): <8 hex>` — and asserts in every one of them that the
+`hash` row is present and that no `path` row is, because this flow builds no
+composition. They are body rows anyway,
 because **a band holds at most TWO LINES and this stage has already spent both**
 (`backup/passphrase.go:250-253`: *"a band offers innerMargin 10 - outerMargin 3
 = 7mm, and three 3mm lines need 9mm and run off the plate edge"*).
@@ -2907,27 +3289,44 @@ dangerous direction. Reusing the arm is the obvious implementation, which is why
 it is refused by name.
 
 - [ ] **Step 6: the tests.**
-**MUTATION: derive per frame** → the once-per-pick assertion fails.
-**MUTATION: omit the locator's `hash` row for a phrase record** → the non-empty
-assertion fails, **which is the row standing between the operator and a bearer
-plate with no locator at all**.
-**MUTATION: reuse §8.4a here** → an assertion that this flow's abort draws no
-"dies with this composition" body fails, because the material is still in flash.
-**MUTATION: offer the route when the payload holds neither class** → the door
-predicate row fails.
+**MUTATIONS, all five executed (tails in `## Build gate`):**
+**derive per pick without the once guard** → the second pick takes 11.7 ms
+against 111 ns and the timing assertion fails.
+**omit the locator's `hash` row** → the non-empty assertion fails, **which is the
+row standing between the operator and a bearer plate with no locator at all**.
+**reuse §8.4a here** → the assertion that this flow's abort draws no "dies with
+this composition" body fails, because the material is still in flash.
+**offer the route when the payload holds neither class** → the door predicate
+row fails, and the door names a route with nothing to take.
+**derive at LIST time** → the list costs 31 ms against a 13 ms derivation and
+every row reads `phrase <i>  <digest>` instead of `(derive to see the digest)`.
 
-**Boundary gate:** `scripts/gui-shard-test.sh ./gui/ 24`.
+**THE FLOW'S ISOLATION IS ASSERTED STRUCTURALLY.** Decision 4 says this route
+reads `ctx.sysw` and nothing else, and at runtime a flow that read
+`composerState` would look identical until the one payload that made it differ —
+so `TestHashlockPlatesFlowReadsNothingFromAComposition` parses
+`composer_hashlock_plates.go` and fails on any reference to `composerState`,
+`hashlockHeld` or the composition-state hook. It parses with comments OFF, so
+the file's own prose about `composerState` is not the thing under test.
+
+**Two new bodies are MEASURED** on `errorScreenBody`: this flow's own abort
+(80 drawn / headroom 476) and its empty-payload refusal (46 / 513).
+
+**Boundary gate (RUN):** `scripts/gui-shard-test.sh ./gui/ 24` — **1278
+top-level tests, partition verified exhaustive, all 24 shards ok.**
 
 ---
 
 ### Task 11: the free-text and passphrase warning, and the Password-program notice (spec §9, §8.8)
 
 **Repo:** the fork. **Group G — disjoint from every other group.**
-**SPECIFIED, NOT WIRED.**
+**WIRED, BUILT, TESTED AND MUTATED.**
 
 **Files:**
-- Modify: `gui/freetext_flow.go`, `gui/passphrase_flow.go`, `gui/sysw_session.go`, `gui/modal_fits_test.go`
-- Modify (tests): `gui/freetext_test.go`, `gui/passphrase_test.go`, `gui/sysw_session_test.go`
+- Modify: `gui/freetext_flow.go`, `gui/passphrase_flow.go`, `gui/sysw_session.go`, `gui/composer_copy.go`, `gui/modal_fits_test.go`
+- Modify (tests): `gui/freetext_flow_test.go`, `gui/passphrase_flow_test.go`; create `gui/sysw_session_test.go`
+  *(THREE OF THE FOUR TEST PATHS THIS TASK NAMED DO NOT EXIST. There is no `gui/freetext_test.go` — it is `freetext_flow_test.go`, one of nine `freetext_*_test.go` files — no `gui/passphrase_test.go` (it is `passphrase_flow_test.go`), and no `gui/sysw_session_test.go` at all until this gate created one.)*
+- **BOTH BODIES LIVE IN `gui/composer_copy.go`**, though neither is composer copy. `TestComposerCopyTableCoversEveryBody` scans that file's `composerCopy*` declarations and requires a table row for each, and the row is what carries §12 item 5's four gates — the glyph check, the raster floor, the modal-fits measurement and a fires-on-condition test. A body declared beside its own screen would ship with none of them, which is the defect that test's own comment records.
 
 - [ ] **Step 1: §9's warning. NEVER A REFUSAL** — both programs cut as typed.
 `engraveTextFlow` and `engravePassphraseFlow` gain a confirm-to-proceed at OK on
@@ -2942,11 +3341,68 @@ H2 §2 rule 3's own argument: a GROUPED plate is what `ms hashlock`'s card print
 and therefore what an operator retypes, and `codex32.IsPreimage` would answer
 false for it.
 
-```
-This looks like an ms1 string. A seed plate comes from a payload; a marked hashlock plate comes from the Wallet Policy program, from a phrase typed there or a preimage packed on the host. Continue here to cut it as plain text.
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyHashlockLooksLikeMS1 is §9's warning, shown by BOTH the free-text
+// and the passphrase programs when what has been typed looks like an ms1 string.
+//
+// NEVER A REFUSAL. Both programs cut what the operator typed; this tells them
+// what the string looks like and where the marked plate comes from, and lets
+// them continue.
+//
+// THE PASSPHRASE PROGRAM SHOWS THE SAME BODY. The string is about to become a
+// BIP-39 passphrase rather than a plate, but the sentence that matters -- what
+// it looks like, and where a marked hashlock plate comes from -- is identical,
+// and two near-identical bodies is how one of them goes stale.
+func composerCopyHashlockLooksLikeMS1() string {
+	return "This looks like an ms1 string. A seed plate comes from a payload; a " +
+		"marked hashlock plate comes from the Wallet Policy program, from a phrase " +
+		"typed there or a preimage packed on the host. Continue here to cut it as " +
+		"plain text."
+}
 ```
 MEASURED: **204 drawn / headroom 302** through `confirmWarningBody` wrapped in
-`composerConfirmBody`, and **184 / 378** on `errorScreenBody`.
+`composerConfirmBody`, and **184 / 378** on `errorScreenBody` — both confirmed.
+
+Both programs call ONE helper, which is also where the once-per-composition
+bookkeeping lives:
+
+```go file=fork/gui/sysw_session.go mode=fragment
+// syswWarnMS1Shaped is H6 §9's warning at the OK of a TEXT-ENTRY screen, shared
+// by the two programs that cut a typed string (Engrave Text and BIP-39
+// Password).
+//
+// IT LIVES HERE BECAUSE NEITHER PROGRAM OWNS IT. Both call it, the body is one
+// string by decision (§9: "two near-identical bodies is how one of them goes
+// stale"), and a copy in either flow file would be the second answer to a
+// question with one answer.
+//
+// EARLIER THAN THE CONFIRM SUMMARY, on the entry screen itself: both confirm
+// summaries are already paged (ftConfirmFlow, ppConfirmFlow), and a warning
+// that arrives after the operator has walked four more fields arrives after
+// they have stopped asking whether they are in the right program.
+//
+// ONCE PER COMPOSITION, RE-ARMED BY AN EDIT, and `accepted` is how: it holds the
+// exact text the operator was warned about, so paging back to this screen and
+// pressing OK again is silent while changing one character warns again.
+//
+// THE PREDICATE IS hashlock.IsMS1Shaped, the host's looks_like_ms1 ported byte
+// for byte -- NO CHECKSUM. That is H2 §2 rule 3's own argument: a GROUPED plate
+// is what `ms hashlock`'s card prints and therefore what an operator retypes,
+// and codex32.IsPreimage would answer false for it.
+//
+// It returns false when the operator declined, which the caller treats as "stay
+// on this screen". It is NEVER a refusal: continuing cuts the string as typed.
+func syswWarnMS1Shaped(ctx *Context, th *Colors, title, text string, accepted *string) bool {
+	if !hashlock.IsMS1Shaped(text) || *accepted == text {
+		return true
+	}
+	if !composerConfirmScreen(ctx, th, title, composerConfirmBody(composerCopyHashlockLooksLikeMS1())) {
+		return false
+	}
+	*accepted = text
+	return true
+}
+```
 
 **The passphrase program shows the SAME body.** The string is about to become a
 BIP-39 passphrase rather than a plate, but the sentence that matters — what it
@@ -2956,13 +3412,14 @@ near-identical bodies is how one of them goes stale**.
 - [ ] **Step 2: §8.8's Password-program notice.** The refusal at `progPassword`
 is correct, structural, and **completely invisible**:
 
-```go
-// gui/sysw_session.go:270-278
+```go file=fork/gui/sysw_session.go mode=fragment
 func syswOfferAlt(ctx *Context, th *Colors, want sysw.Class, title, lead, alt string) (string, bool) {
 	if ctx.sysw == nil || !ctx.sysw.has(want) {
-		return "", false          // <-- no screen is drawn
+		return "", false
 	}
 ```
+
+— that `return "", false` draws NO SCREEN, which is the whole of the defect.
 
 So the operator packs their hashlock phrase, taps, opens the program whose NAME
 matches the thing they are holding, and gets the ordinary passphrase keyboard —
@@ -2980,27 +3437,84 @@ what routes the operator around the guard**, so it is worse.
 One modal, drawn at `progPassword` when the loaded payload holds a `ClassPhrase`
 record **and no `ClassPassphrase` record**:
 
+```go file=fork/gui/composer_copy.go mode=fragment
+// composerCopyHashlockPhraseNotPassphrase is §8.8's notice at progPassword.
+//
+// WHAT IT REPLACES IS SILENCE, and silence is what routes the operator around
+// the guard. The refusal at progPassword is correct and structural
+// (syswOfferAlt returns before any screen is drawn when the payload holds no
+// ClassPassphrase), so an operator who packs a hashlock phrase, taps, and opens
+// the program whose NAME matches what they are holding gets the ordinary
+// passphrase keyboard -- no offer, no mention, no reason. The obvious next move
+// is the harmful one: re-pack the phrase as a `pass:` record so it "works",
+// which is the substitution ruling L2 exists to prevent and whose stated stake
+// is a different wallet.
+func composerCopyHashlockPhraseNotPassphrase() string {
+	return "This payload holds a HASHLOCK PHRASE, not a BIP-39 passphrase. They are " +
+		"not interchangeable: using one as the other opens a different wallet. A " +
+		"hashlock phrase is used in the Wallet Policy program."
+}
 ```
-This payload holds a HASHLOCK PHRASE, not a BIP-39 passphrase. They are not interchangeable: using one as the other opens a different wallet. A hashlock phrase is used in the Wallet Policy program.
+MEASURED on `errorScreenBody`: **165 drawn / headroom 397** — confirmed.
+
+It is drawn from `syswNoticeHashlockPhrase`, at the ONE site the offer above
+returns silently from:
+
+```go file=fork/gui/sysw_session.go mode=fragment
+// syswNoticeHashlockPhrase is H6 §8.8's notice, drawn at progPassword when the
+// loaded payload holds a hashlock phrase and no BIP-39 passphrase.
+//
+// THE ASYMMETRY IT REMOVES: §9 gives the passphrase program a warning for an
+// operator who TYPES an ms1 string at it -- the rarer mistake, with no funds
+// consequence -- while the operator whose payload literally CONTAINS a hashlock
+// phrase got nothing at all. Silence is today's behaviour, so the test is
+// whether the wrong outcome is worse than saying nothing; here saying nothing is
+// what routes the operator around the guard, so it is worse.
+//
+// AND NOT WHEN A `pass:` RECORD IS ALSO PRESENT: then syswOfferAlt DOES draw,
+// the operator is offered the passphrase the program is for, and a notice
+// beside it would be answering a question nobody asked.
+func syswNoticeHashlockPhrase(ctx *Context, th *Colors) {
+	if ctx.sysw == nil || !ctx.sysw.has(sysw.ClassPhrase) || ctx.sysw.has(sysw.ClassPassphrase) {
+		return
+	}
+	showError(ctx, th, "BIP-39 Password", composerCopyHashlockPhraseNotPassphrase())
+}
 ```
-MEASURED on `errorScreenBody`: **165 drawn / headroom 397.**
 
 - [ ] **Step 3: the tests.**
-**MUTATION: use `codex32.IsPreimage` instead of `IsMS1Shaped`** → the GROUPED
-row fails.
-**MUTATION: refuse instead of warning** → the still-cut assertion fails.
-**MUTATION: drop the notice** → the operator sees the ordinary keyboard with no
-explanation, which is today's behaviour and the finding.
-**MUTATION: draw the notice when the payload also holds a `pass:` record** →
-the both-present row fails.
+**MUTATIONS, all four executed (tails in `## Build gate`):**
+**use `codex32.IsPreimage` instead of `IsMS1Shaped`** → the warning is silent in
+BOTH programs; and `TestHashlockMS1WarningFiresOnAGroupedPlate` holds the other
+half of the argument, that `codex32.New` cannot even parse a grouped plate
+string while `IsMS1Shaped` answers true for it.
+**refuse instead of warning** → the still-cut assertions fail in both programs
+and at the shared helper.
+**drop the notice** → the hashlock-phrase row draws nothing, which is today's
+behaviour and the finding.
+**draw the notice when the payload also holds a `pass:` record** → the
+both-present row fails.
 
-**Boundary gate:** `scripts/gui-shard-test.sh ./gui/ 24`.
+**ONCE PER COMPOSITION, RE-ARMED BY AN EDIT, IS ITS OWN TEST.**
+`TestSyswWarnMS1ShapedFiresOnceAndIsReArmedByAnEdit` walks the four states in
+order — a plain string is silent; an ms1-shaped one warns and DECLINING keeps
+the operator on the screen with nothing recorded; accepting continues; the same
+text is then silent; one character changed warns again.
+
+**Both bodies are MEASURED**: §9 at **204 drawn / headroom 302** through
+`confirmWarningBody` wrapped in `composerConfirmBody` and **184 / 378** on
+`errorScreenBody`; §8.8 at **165 / 397** on `errorScreenBody`. All three are the
+spec's own carried figures, confirmed.
+
+**Boundary gate (RUN):** `scripts/gui-shard-test.sh ./gui/ 24` — **1285
+top-level tests, partition verified exhaustive, all 24 shards ok.**
 
 ---
 
 ### Task 12: the walk (spec §11.7)
 
-**Repo:** the fork. **After Tasks 8b-10.** **SPECIFIED, NOT WIRED.**
+**Repo:** the fork. **After Tasks 8b-10.** **WIRED AND RUN — THREE TIMES, IN A
+BROWSER, AGAINST THE REAL EMULATOR.**
 
 **Files:** Modify `cmd/emu/walk_hashlock_phrase.js`, `cmd/emu/needle_test.go` (if the arm changes `ok`'s shape).
 
@@ -3013,13 +3527,27 @@ the screen shows equals what is stored; it never drives through a hook."* So the
 walk asserts the SCREEN and Task 6's goldens assert the plate, and **no third
 hook carrying a preimage is added**.
 
-- [ ] **Step 2: run it three times** — unmutated, and twice against a mutation —
-with `git checkout -- <file> && git diff --quiet` proven between runs, as H5's
-Step 12 did. The two mutations: (a) drop the census row's digest, (b) perturb
-the stored digest. Both must FAIL the walk.
+**A SECOND PATH HAS TO BE ADDED, and the plan did not say so.** `md.Compose`
+refuses a wholly key-less composition (*"every path is key-less; at least one
+path must hold a key"*), so the composition this walk builds — ONE hashed,
+key-less path — cannot reach Done at all: it stops at a refusal, not at a
+census. The arm adds a 2-of-3 path and leaves it UNSEATED, which is §12 item 3's
+own shape and the one that collapses the form choice.
 
-**Boundary gate:** `GOOS=js GOARCH=wasm go vet ./cmd/emu/`; `./cmd/emu/build.sh`;
-`go test ./cmd/emu/`.
+- [ ] **Step 2: run it three times** — unmutated, and twice against a mutation.
+The two mutations: (a) drop the census row's digest, (b) perturb the digest the
+census reports. Both must FAIL the walk.
+
+**`git checkout -- <file> && git diff --quiet` IS NOT AVAILABLE HERE**: the gate
+trees are `git ls-files | tar` copies with no `.git`, so the walk file's
+integrity between runs is proven by **sha256** instead, which is the same claim
+by a stricter instrument. All four runs below ran against
+`990e67812a253061a18fe75df7ed4e83f982c4bcaf6b11b74878e40c8d6629c9`.
+
+**Boundary gate (RUN):** `GOOS=js GOARCH=wasm go vet ./cmd/emu/` — **exit 0**;
+`./cmd/emu/build.sh` — **exit 0**; `go test ./cmd/emu/` — **ok**. `needle_test.go`
+needs no change: `out.ok` is still `= true` set after the last assertion, which
+is the strongest shape `TestWalkOkContainsNoDriverSuppliedPlateCount` accepts.
 
 ---
 
@@ -3091,12 +3619,23 @@ repository at the baseline revision:
 
 `scripts/h6-plan-blocks-vs-tree.sh` compares every block carrying a `file=`
 header against those trees, through a symlink farm rooted at `fork`, `ms` and
-`me`. **65 blocks checked, 0 FAIL.**
+`me`. **86 blocks checked, 0 FAIL.** *(The plan author's own run of the same
+script reported 70, not the 65 this paragraph claimed; the 16 added since are
+Tasks 8b-12's, headed by the build gate below.)*
 
 ### WHAT WAS WIRED AND RUN, AND WHAT WAS NOT
 
 **A gate that hides its blind spot is worse than no gate**, so this is stated
 before the results rather than after them.
+
+**TASKS 8b-12 ARE NOW WIRED, BUILT, TESTED AND MUTATED TOO** (build-gate agent,
+engrave `4b9a4dd8`), in the SAME fork scratch tree the author left. Every block
+in them carries a `file=` header, every one is byte-for-byte the text that was
+compiled, every `MUTATION:` in them was executed and its failure quoted, and
+every measured number in them was produced by a run on this tree rather than
+carried from the spec. The verbatim record — RED/GREEN tails, mutation tails,
+the measured bodies and geometry, the fix table and the shard-18 diagnosis — is
+`design/agent-reports/hashlock-H6-plan-gate-8b-12.md`.
 
 **WIRED, BUILT AND RUN by the plan author** — every block in these tasks is
 byte-for-byte the text that was compiled and tested, and every `MUTATION:` in
@@ -3122,14 +3661,35 @@ them was executed and its failure quoted:
 - **Task 8a** (fork `gui/`): the retention field, the provenance, the hold, the
   scrub and its three tests.
 
-**SPECIFIED AND NOT WIRED** — Tasks **8b, 9, 10, 11 and 12**.
-Their blocks carry no `file=` header and the checker does not check them. They
-are the fork's `gui` surface: two new screens, a new flow, a changed
-`composerCensusLines` signature, five new copy bodies and a walk arm. **Every
-measured number quoted in them is the R0-GREEN spec's own measurement, carried
-across, not the author's** — the author measured nothing on those screens.
-Treat those five tasks as a specification an implementer must build and gate,
-not as gated text; the first thing each of them owes is its own RED.
+**WIRED, BUILT AND RUN by the build-gate agent** — Tasks **8b, 9, 10, 11 and
+12**, the fork's `gui` surface: two new screens, a new flow, a changed
+`composerCensusLines` signature, thirteen new copy bodies (the plan said five),
+and a walk arm that RAN.
+
+- **Task 8b**: the two new `Which hash?` bands, the `(in payload)` annotation,
+  the derive-only payload route, the preimage-record route and its own confirm
+  body, the `taking` predicate, the HOLD in `hashlockPhraseRoute`.
+- **Task 9**: step (A)'s pick screen, the census's new signature and §8.3 block,
+  the cut order, both §8.4 arms, §8.5's QR warning, §10.1's two held arms,
+  §10.3's `PREIMAGE REQUIRED`, the locator, the plate builder, and
+  `hashlock.MethodLine`/`hashlock.QRText` — the §8.6 twins no task had wired.
+- **Task 10**: the fourth door route and its predicate, the door's preimage
+  count, the flow, lazy derivation with a flow-local result and its scrub, the
+  payload locator, and this flow's own abort.
+- **Task 11**: §9's shared warning at both text-entry screens and §8.8's
+  Password-program notice.
+- **Task 12**: the H6 arm of `walk_hashlock_phrase.js`, RUN in a browser against
+  the real emulator — unmutated, then twice against a mutation, then unmutated
+  again.
+
+**EVERY CARRIED NUMBER THE SPEC SUPPLIED FOR THESE TASKS WAS CONFIRMED TO THE
+CHARACTER** — 75/476, 86/476, 185/360, 186/360, 107/455, 126/378, 204/302,
+184/378, 165/397, the four pick-row widths 128/138/180/196 px, the 41-character
+343 px annotation, the 50-character two-line alternative, 427/374/459 px, and
+the em-dash mutation's 5,004 ink pixels. **Two were not reproducible**: this
+step's five census-row widths are digest-dependent (Task 9 Step 2), and the
+"23 px per row" of Task 8b Step 1 is the label height and not the 29 px row
+pitch that decides how many rows a page holds.
 
 ### Per-task boundary gates, in order, as run
 
@@ -3143,7 +3703,13 @@ not as gated text; the first thing each of them owes is its own RED.
 | 6 | fork: `go test ./backup/` | ok |
 | 7 | fork: `go test ./sysw/` | ok — **68 of 68 corpus rows classify identically on the host and the device, including all 21 `phrase:` rows** |
 | 8a | fork: `go test -run 'TestComposerHolds…\|TestComposerFlowExitScrubs\|TestComposerScrubIsInThe' ./gui/` | ok |
-| — | fork, final sweep: `go test ./engrave/ ./backup/ ./codex32/ ./sysw/ ./hashlock/` | **all ok** |
+| 8b | fork: `scripts/gui-shard-test.sh ./gui/ 24` | **1250 tests, exhaustive, 24 of 24 shards ok** |
+| 9 | fork: the same | **1271 tests, exhaustive, 24 of 24 ok** |
+| 10 | fork: the same | **1278 tests, exhaustive, 24 of 24 ok** |
+| 11 | fork: the same | **1285 tests, exhaustive, 24 of 24 ok** |
+| 12 | fork: `go test ./cmd/emu/`; `GOOS=js GOARCH=wasm go vet ./cmd/emu/`; `./cmd/emu/build.sh` | **ok / exit 0 / exit 0** |
+| 12 | fork: `walk_hashlock_phrase.js` in a browser, four runs | **(a) ok=true 60.3 s; (b) census digest dropped → RED; (c) census digest perturbed → RED; (d) ok=true 60.3 s** |
+| — | fork, final sweep: `go test ./engrave/ ./backup/ ./codex32/ ./sysw/ ./hashlock/ ./cmd/emu/` | **all ok** |
 
 **The three baseline reds, each MEASURED on the pristine checkouts:**
 1. `gofmt -l gui/ sysw/ backup/ engrave/ codex32/` on the pristine fork prints
@@ -3163,14 +3729,27 @@ not as gated text; the first thing each of them owes is its own RED.
 ### Whole-package gates on the fork
 
 - `GOOS=js GOARCH=wasm go vet ./cmd/emu/` — **exit 0**.
-- `./cmd/emu/build.sh` — **exit 0**, `built emu.wasm (10882452 bytes)`.
-- `scripts/gui-shard-test.sh ./gui/ 24` — **1242 top-level tests, partition
-  verified exhaustive (1242 == 1242), 23 of 24 shards ok, shard 18 FAIL**, run
-  twice with the same single failure:
+- `./cmd/emu/build.sh` — **exit 0**, `built emu.wasm (11010867 bytes)` over the
+  fully wired tree (10882452 B at the author's Task-8a tree).
+- `scripts/gui-shard-test.sh ./gui/ 24` at the author's TASK-8a tree — **1242
+  top-level tests, partition verified exhaustive (1242 == 1242), 23 of 24 shards
+  ok, shard 18 FAIL**, run twice with the same single failure:
   `TestComposerEveryScreenFunctionHasAProductionCaller` names
   `composerHoldHashlockMaterial`. **That red is CORRECT and is Task 8a's own
   finding** — see the note there: 8a and 8b land in one commit, and the
   exemption table is not the instrument.
+  **REPRODUCED AND DIAGNOSED by the build gate**, once, at that same tree: the
+  failure is deterministic (not the F-490 load flake in
+  `TestEngraveScreenReleasesResumeStateOnReturn` — that test passed in the same
+  run), it is not a regression from Tasks 4-8a, and it **CLOSED the moment Task
+  8b landed** its two production callers. The 24-shard run over the fully wired
+  tree is **1285 top-level tests, exhaustive, all 24 shards ok**.
+- `gofmt -l gui/ hashlock/ backup/ codex32/ sysw/ engrave/ cmd/emu/` over the
+  fully wired tree prints the same three baseline files and no fourth.
+- `go vet ./gui/` exits 1 with the same two pre-existing
+  `testing.ArtifactDir requires go1.26 or later` diagnostics
+  (`freetext_sizeproof_golden_test.go`, `transaction_golden_test.go`); H6 adds
+  no new class.
 
 ### Firmware size
 
@@ -3180,12 +3759,28 @@ pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller
 | tree | flash | ram |
 | --- | --- | --- |
 | pristine fork `fb0dd04` | **1,599,208 B** | 62,856 B |
-| the wired tree (Tasks 4, 5, 6, 7, 8a; final budgets) | **1,600,944 B** | 63,248 B |
-| delta | **+1,736 B** | **+392 B** |
+| Tasks 4, 5, 6, 7, 8a (the author's tree; final budgets) | **1,600,944 B** | 63,248 B |
+| Tasks 4-12, wired (the build gate's tree) | **1,643,580 B** | 63,272 B |
+| delta, 8b-12 | **+42,636 B** | **+24 B** |
+| delta, the whole stage | **+44,372 B** | **+416 B** |
 
-That is the codec-and-plate half only. Tasks 8b-12 add two screens, a flow and
-five copy bodies, so the stage's total will be larger; §11.6 already says *"the
-delta is not expected to be small"*.
+**§11.6's "the delta is not expected to be small" is right, and the shape of it
+is not what a reader would guess.** Two probes, both measured on this tree:
+
+- **The plate layout is a small part of it.** Stubbing
+  `backup.EngraveHashlock` out of `composerHashlockPlateFor` — the only
+  production reference to Task 6's whole plate layout — measures **1,638,972 B**,
+  so making the layout REACHABLE costs 4,608 B. The rest is the screens, the
+  flow and the thirteen bodies themselves. Note what this also says about the
+  author's 1,600,944: Tasks 4-8a wired a plate layout, a constant-time QR
+  encoder and an ms1 preimage encoder that NOTHING production called, so TinyGo
+  dropped them — the codec half's real cost was not in that number either.
+- **`sort.Slice` is not the expensive one.** `composerPreimagePlates` was
+  rewritten with a hand-rolled insertion sort on the assumption that TinyGo's
+  reflection-based `sort.Slice` would dominate; it measured **1,644,120 B**,
+  i.e. **540 B WORSE**. The reflect machinery is already resident, so the call
+  is free and the loop was not. The comment at that line records the
+  measurement so the next reader does not repeat it.
 
 ---
 
@@ -3251,5 +3846,9 @@ Owning phases, per the constellation's per-phase burndown rule:
 | a reconcile-style screen for a PAYLOAD phrase (§10.2) | a later device cycle |
 | cross-run awareness of preimage plates already cut (§5.3 item 6, §8.4b) | a later device cycle |
 | `composerNotePhraseDigest`'s doc comment cites `composer_flow.go:34`; the literal is at `:48` | **Task 8a** (fix inline) |
+| §8.3's `plate(s)` is the spelling this file's own house rule refuses (`composerSlotWord` renders "slot @3" or "slots @3 and @4" so a refusal never reads "slots @3"). Kept VERBATIM by the build gate — changing spec copy inside a gate would put the shipped string and the document it is diffed against out of step | **Task 13** (records) |
+| H6 §8 carries no blockquote for four bodies the device now draws: the payload preimage-record confirm (§5.1), the masked pick lead and the plate refusal (§5.3), and the Hashlock plates flow's three screens (§5.2). They are quoted strings in `composerCopyTable`, which §11 admits, but the spec is no longer the source they are diffed against | **Task 13** (records) |
+| `Which hash?`'s first page holds FIVE rows, so a payload with a `hash:`, a preimage and a `phrase:` record puts `No hash lock` on page 2 | a later device cycle (measured, non-gating) |
+| Tasks 8b-12 add **+42,636 B** of firmware flash. Nothing in this stage is over a ceiling, but §11.6's estimate had no number behind it and now does | fork size hygiene |
 | `go.mod` says `go 1.25.10` while the toolchain is 1.26.7 and the project floor is `go1.26`, so `go vet` exits 1 on any package using `t.ArtifactDir()` | fork toolchain hygiene |
 | F-483 — the typed phrase in an unwipeable Go string | open, non-gating (2026-08-27) |
