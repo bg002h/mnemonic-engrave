@@ -7,8 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-06
+
+Hashlock preimage plates reach the host. A SeedHammer II running the matching
+firmware can now cut a HASHLOCK PREIMAGE or HASHLOCK PHRASE plate — a paper-like
+steel record of the secret that opens a hashlock spend path — and `me` is what
+puts one into a payload.
+
+### Added
+
+- **`me sysw pack --pack-preimage`** admits a hashlock preimage into a payload:
+  either an `ms1` kind-`0x03` plate string under the id `hash`, or a new
+  `phrase:<hex of "<method>,<phrase>">` record carrying the typed phrase and the
+  method that derives its preimage (`hardened` or `sha256`). Without the flag
+  both are refused by name, so a preimage can never arrive in a payload by
+  accident.
+- **Two record classes**, `Preimage` and `Phrase`, so the device can admit them
+  at its Wallet Policy program alone and offer them nowhere else.
+- **Sealing follows the content**: a payload carrying a preimage or a phrase
+  holds SECRET material, so `pack` seals it by default and says so; the
+  no-seal path names the record that made it secret.
+
 ### Changed
 
+- **`ms-codec` 0.9**, which is where the hashlock phrase rule and the plate's QR
+  text now live (they moved out of `ms-cli`, so host and device derive the same
+  digest from the same bytes by construction rather than by review).
 - `me sysw pack --pack-preimage` names WHICH conjunct of the plate shape a
   kind-0x03 record failed: a record under the id `hash` whose X is not 32 bytes
   is now refused as "under the id `hash` whose X is N bytes, not 32", where it
@@ -22,6 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (records count from 0) in the secret section: …` — the way `me sysw pack`
   already does (F-489). Behaviour unchanged: the same records are refused for the
   same reasons; only the sentence gained a locator.
+
+### What didn't change
+
+- No wire format moved. A payload written by 0.8.1 reads the same here, and a
+  payload this version writes without `--pack-preimage` is byte-compatible with
+  what 0.8.1 wrote.
+- A kind-`0x03` string is still refused everywhere `--pack-preimage` is absent,
+  and `me` still never places a preimage as a seed.
 
 ## [0.8.1] - 2026-09-04
 
