@@ -16326,6 +16326,14 @@ H6 §6.2 and §8.6 put the method line ON the phrase-form plate, so *"it is on n
 
 Why it was not folded: Task 13's brief names three repositories and three branches (fork `h6-f`, engrave `h6-records`, toolkit `h6-manual`); mnemonic-secret is not among them, `ms-codec` 0.9.0 is already **published**, and editing a fourth repo's shipped copy on an unannounced branch is exactly the merge hazard the brief's "touch only the files your tasks list" rule exists to prevent. Nothing asserts the sentence in `ms`'s own tests (`grep -rn "it is on no plate" --include=*.rs` returns the one production site), so the fix is a one-line copy edit plus `cargo fmt`/`nextest`, in a repo whose gate the next `ms` cycle already runs.
 
+
+**CLOSED 2026-09-06 (ms `a994a99`, pushed).** The card now reads *"write the
+method line next to your phrase unless the phrase is cut on a HASHLOCK PHRASE
+plate, which carries it"*. Wording only; no test asserted the old sentence
+(`grep "it is on no plate"` found the production site alone), and ms-cli's suite
+was 367/367 at the fold. This was H6 Task 13's record 4, which implementer F
+correctly declined to touch because its brief named no branch in that repo —
+the controller folded it there instead.
 ### F-502 — `the-8h-blockquotes-in-two-older-specs-show-one-arm-of-four`: `SPEC_wallet_policy_composer.md` §8h and `SPEC_hashlock_H2_device.md` §8h each quote a single `HASH ON EVERY PATH` body, while the shipped chooser has had four arms since H6 (owning phase: **spec hygiene, with the next hashlock stage**) `#hashlock` `#seedhammer` `#docs` `#records`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 1, as an OBSERVATION outside the five records the plan lists — recorded rather than folded, because neither blockquote is false and folding it is a re-decision about which spec owns §8h's copy. Measured at fork `hashlock-h6`: `composerCopyHashEveryPathFor` (`gui/composer_copy.go:582`) dispatches to four bodies — `composerCopyHashEveryPath` (`:182`), `…Phrase` (`:569`), `…Held` (`:683`) and `…HeldPhrase` (`:692`) — and the two held arms are H6's, added because the shipped pair say the preimage *"is not on this device"*, which §2.2 makes false for a composition that holds it.
