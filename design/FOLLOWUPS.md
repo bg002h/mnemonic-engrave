@@ -4295,7 +4295,7 @@ Fix is not "reword": the summariser is computing a threshold for a shape that
 does not have one. It must either enumerate the key-sets (compare-cost already
 does) or refuse to print a threshold for a non-threshold policy.
 
-### F-132 — the hashlock preimage is required to spend, absent from the backup, and unmentioned by it (owning phase: **operator journeys**) `#mnemonic`
+### F-132 — PLATE HALF CLOSED 2026-09-06 (hashlock H6) — the hashlock preimage is required to spend, absent from the backup, and unmentioned by it (remaining half's owning phase: **operator journeys**) `#mnemonic`
 
 Filed 2026-08-11, same review.
 
@@ -4320,6 +4320,33 @@ The bundle should state that the policy contains a hashlock, name which branches
 it gates, and say that the preimage is not in the backup. A backup that omits a
 required factor without saying so is the failure mode this whole project exists
 to prevent.
+
+**THE PLATE HALF IS CLOSED (hashlock H6, 2026-09-06).** *"nothing in the bundle,
+the checklist, or the plate set records that a secret the operator must supply
+from memory stands between them and five of the eight key-sets"* is no longer
+true of the plate set:
+
+- **the preimage can now BE a plate.** H6 cuts it in three forms -- the ms1
+  kind-`0x03` string, `phrase + method`, and `phrase + method + QR` -- on a
+  layout of its own that says `NOT A SEED`
+  (`SPEC_hashlock_H6_preimage_plates.md` §6; fork `backup/hashlock.go`).
+- **the policy plates SAY SO.** §10.3 marks `PREIMAGE REQUIRED` on the md1 AND
+  on the mk1 key cards, which is the half of this item that a cosigner holding
+  only a key card needed: they are the year-later reader who otherwise has
+  nothing telling them a preimage exists.
+- **the census says so before the first cut.** §8.3's block names each preimage
+  plate by path and by `first8..last8`, says it is *"NOT part of this backup"*,
+  and tells the operator to keep it apart. The emulator walk asserts that row
+  carries the same digest the confirm modal drew (H6 Task 12).
+
+**WHAT STAYS OPEN is the RESTORE-DOC half**, which is where this item was filed
+from and which H6 deliberately does not touch: `buildPlateInventoryLines`
+(`gui/multisig_build_census.go`) still does not state that the policy contains a
+hashlock, name which branches it gates, or say the preimage is not in the set.
+§8.3's ruling is that a preimage plate is not a `bundleCard` and must not enter
+`plan` -- entering it "would tell a reader it travels WITH the set" -- so the
+restore doc needs its own sentence rather than a row, and that is a decision for
+the operator-journeys phase this item is already owned by.
 
 ### F-133 — the relative tiers are INVERTED: the weakest key-set matures ~90 days before the stronger one (owning phase: **operator journeys**) `#mnemonic`
 
@@ -16007,6 +16034,17 @@ Filed 2026-09-05 from `hashlock-H2-post-impl` M-3, per the operator ruling of
 with ruling L15 (no scrub discipline beyond what the composer does by
 construction). Remedy when taken up: a byte-slice fragment in the passphrase
 keyboard with an explicit wipe, and a classify path that does not re-stringify.
+
+**RE-STATED 2026-09-06 (hashlock H6 Task 13 Step 2), still open and still not
+gating.** H6 §2.2 now HOLDS the phrase for the life of a composition and §6
+engraves it, so it is worth saying plainly what that does and does not change:
+the typed phrase reaches `kbd.Fragment` -- an immutable Go string -- BEFORE H6
+stores anything, so H6's `hashlockHeld` is downstream of the leak this item
+names and cannot fix it. What H6 does add is a scrub for its own copy
+(`composerScrubHashlockHeld`, `gui/composer_state.go:363`, run from
+`composerFlowExit`'s ONE defer), which is the part H6 owns. Secret-handling
+class: never Critical/Important (operator ruling 2026-08-27), and this stage
+does not close it.
 The interruption lens (M-3) adds: the phrase route holds a secret with §10.2.4's
 idle wipe timer disarmed, and arming it would discard the composition -- same
 class, same ruling.
@@ -16080,9 +16118,18 @@ under load. H5 does not touch the file. Same class as the toolkit's wall-clock c
 make the job completion deterministic (inject the clock or wait on the state transition), or
 move the KDF-heavy tests to their own shard.
 
-### F-491 — `h2-spec-reuse-block-drift-not-shipped-two-sentence-form`: H2 spec §4.5's reuse block quotes the four-sentence pre-drop-order form ("One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself."), while the shipped `composerCopyHashlockConfirm` (`gui/composer_copy.go:421-422` at fork main `b9a9a30`) has always drawn the drop order's two-sentence form: "One phrase per policy. Never use this phrase as a passphrase or a password anywhere else." (owning phase: **H2 spec hygiene**) `#hashlock` `#seedhammer` `#docs` `#records`
+### F-491 — CLOSED 2026-09-06 (hashlock H6 Task 13) — `h2-spec-reuse-block-drift-not-shipped-two-sentence-form`: H2 spec §4.5's reuse block quotes the four-sentence pre-drop-order form ("One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself."), while the shipped `composerCopyHashlockConfirm` (`gui/composer_copy.go:421-422` at fork main `b9a9a30`) has always drawn the drop order's two-sentence form: "One phrase per policy. Never use this phrase as a passphrase or a password anywhere else." (owning phase: **H2 spec hygiene**) `#hashlock` `#seedhammer` `#docs` `#records`
 
 Filed 2026-09-05 from hashlock H5 Task 6 Step 1 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which declines to fold it alongside the write-down/reconcile edit so `git diff` on that commit is H5's change and nothing else. Real and pre-existing, not one of H5's five follow-ups. Fix: quote the shipped two-sentence text verbatim in §4.5's fenced block in place of the four-sentence form -- a transcription, not a re-decision.
+
+**CLOSED 2026-09-06 by hashlock H6 Task 13.** H6's own record 5 rewrites the
+SECOND line of that same fenced block (*"The phrase and method are not on this
+device."*, which §2.2 falsified), and half a fold would have left the next reader
+diffing a stale sentence against a corrected one in one blockquote -- so the
+two-sentence reuse form was transcribed in the same edit. Verified against the
+shipped `composerCopyHashlockConfirm` at fork `hashlock-h6`: the block now reads
+*"One phrase per policy. Never use this phrase as a passphrase or a password
+anywhere else."*
 
 ### F-492 — `no-manual-section-documents-the-re-sealed-payloads-new-passphrase`: H5 spec §5's documentation-only item (journey M-5) asks that "the manual's unlock section" state the re-sealed payload has a new passphrase, but no such section exists -- `docs/manual/src/40-cli-reference/` holds only `41-mnemonic.md`, `42-md.md`, `43-ms.md` and `44-mk-cli.md`, and a grep of the whole tree for the refusal's own words ("Nothing was opened", "cannot be unlocked here", "not a seed") returns nothing at toolkit `46b40bb` (owning phase: **the `me`/sysw manual chapter**) `#hashlock` `#seedhammer` `#docs` `#unlock`
 
@@ -16095,3 +16142,80 @@ Filed 2026-09-05 by the controller at the H6 pre-publish gate; B (Tasks 2-3) imp
 ### F-494 — `fork-go-vet-is-red-at-baseline`: `go vet ./...` on the fork exits 1 at `main` `fb0dd04` before any H6 change — `bspline/bspline_test.go:126-127` (`bezier.Point` struct literals with unkeyed fields) and `testing.ArtifactDir requires go1.26 or later (file is go1.25)` in `gui/op/draw_test.go:176` and elsewhere (the `go.mod` language version is behind the Go 1.26 toolchain the tests already rely on). Neither package's tests fail; `vet` is not in the fork's CI gate, so nothing catches it. Fix in the fork's next hygiene cycle: key the literals, and raise the `go` directive to `1.26` (the toolchain floor the flake already pins) so `ArtifactDir` is legal by declaration, not by luck. Owning phase: next fork cycle, with F-490.
 
 Filed 2026-09-05 by the controller from the H6 group-C gate re-run on fork `hashlock-h6` at `872ba06c` (`.tmp/h6-ctl-c-check/vet.txt`); measured red at `fb0dd04` too, so not C's.
+
+### F-495 — `no-verb-emits-a-phrase-record`: H6 §3.1 gives the `phrase:` wire form a Rust constructor and §3.2 a `--pack-preimage` flag to admit it, but NO CLI verb writes one — the operator hand-builds the hex every time (owning phase: **the next `me`/`ms` cycle after H6**) `#hashlock` `#seedhammer` `#me` `#records`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (`IMPLEMENTATION_PLAN_hashlock_H6_preimage_plates.md`). **A wire form with no writer is worth its own follow-up.** §3.1 lands `phrase_record(method, phrase) -> String` and its parser, §4.2 classifies the record on the device, §5.1 draws it as `phrase record N (derive to see the digest)` and H6 Task 10 derives it on pick — an entire consumption chain over a record nothing in the constellation PRODUCES. §3.3's orphan warning (the payload holds a preimage and no matching `hash:` record) is therefore a mitigation for hand-assembly errors rather than a fix for them.
+
+Shape when taken up: either `ms hashlock … --emit-phrase-record` (it already holds the phrase and the method, and already prints the `hash:` record next to the ms1 string) or `me sysw record phrase --method …`. `ms hashlock` is the better home on the Rust-primary rule — it is where the method is decided — but it is the repo whose CLI must never take a secret on argv (§3.6), so the phrase has to arrive by `--hashlock-phrase-stdin` exactly as it does today.
+
+### F-496 — `a-payload-phrase-gets-no-reconcile-screen`: H6 §10.2 scopes `composerCopyHashlockReconcile` to phrases typed on the device, so a `phrase:` record from the payload derives, confirms and assigns with nothing telling the operator to check the digest against the host (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 2. The split is deliberate and correct as far as it goes: `hashlockPayloadRoute` is a different function from `hashlockPhraseRoute` precisely so the reconcile instruction (*"run ms hashlock with this phrase"*) cannot be drawn for a phrase the host already has, and §10.2 makes that true BY CONSTRUCTION — `composerCopyHashlockReconcile` has exactly one call site in the tree, so no runtime guard and no test for one is possible or needed.
+
+What is missing is the OTHER screen. A payload phrase still produces a digest the device derived on its own, and the operator still has no on-device proof that it equals what the host computed when it packed the record. A reconcile-STYLE screen for that route would say something different — compare against the payload's own `hash:` record, which §8.2's relation line already computes — rather than borrowing the phrase route's words. Not filed as a defect in H6: the route is right, and the screen is a new deliverable.
+
+### F-497 — `no-cross-run-awareness-of-preimage-plates-already-cut`: the composer's plate census reports what THIS run will cut and cannot know that a plate for the same digest was cut in an earlier run (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 2, against §5.3 item 6 and §8.4b. `composerState.hashlockHeld` lives for one composition and `composerFlowExit` scrubs it, so a second composition over the same phrase re-derives, re-holds and re-offers a plate with nothing on any screen saying one already exists. Two consequences, and the second is the one that costs something: the operator can cut a duplicate bearer plate without being told (more copies of a spend secret than they meant to have), and §8.4b's abort arm — *"a preimage plate was cut"* — is scoped to the run it fired in, so an abort in run 2 says nothing about run 1's plate still being on the bench.
+
+Any fix needs persistent state the device does not currently keep for this, and "what plates has this machine cut" is a bigger question than the hashlock stage — the SH2 has no camera, so it cannot read a plate back to find out (see `sh2-has-no-camera`). Deliberately not attempted in H6.
+
+### F-498 — `composerNotePhraseDigest-cites-a-stale-line-for-the-composerState-literal`: three sites say the production `composerState` literal is at `gui/composer_flow.go:34`; MEASURED at fork `hashlock-h6` it is at `:51` (owning phase: **next fork hygiene cycle, with F-490 and F-494**) `#seedhammer` `#docs` `#records`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (H6 spec §2.2 item 1 names it as a nit for this stage's fold; the plan's own text says `:48`, which is itself stale). Measured with `grep -n "st := &composerState{" gui/composer_flow.go` at the H6 integration tip:
+
+```
+gui/composer_flow.go:51:	st := &composerState{reg: &seedRegistry{}, bound: composerBoundFrom(ctx.sysw)}
+```
+
+Three comments carry the wrong number — `gui/composer_state.go:304` (`composerNotePhraseDigest`'s doc comment, the one the spec names), `gui/composer_state_hook.go:17` and `gui/composer_provenance_test.go:25`. The claim each one makes is TRUE (the literal is a zero-value struct literal at one production site, which is why the map insertions must allocate); only the line number decayed, and it decays again on the next commit that adds a line above it. Fix when taken up: cite the SYMBOL (`composerFlow`) rather than the line, which is the form that cannot rot — a line number in a comment is a citation with no gate behind it.
+
+### F-499 — `fork-gofmt-is-red-at-baseline-in-FIVE-files-not-three`: `gofmt -l` on the pristine fork lists five files, and every H6 document that names the baseline says three (owning phase: **next fork hygiene cycle, with F-490 and F-494**) `#seedhammer` `#tests` `#records`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 2 — baseline red 1 of the plan's Global Constraints, **re-measured rather than transcribed**. Reproduction, on a detached worktree of fork `main` `fb0dd04` with no H6 change in it:
+
+```
+$ gofmt -l .
+gui/transaction.go
+gui/transaction_golden_test.go
+gui/transaction_txrecord_test.go
+mt/mt.go
+mt/mt_test.go
+```
+
+The plan's Global Constraints name the first three and say *"H6 touches none of the three and may not leave a fourth"*; `mt/mt.go` and `mt/mt_test.go` are equally pre-existing and equally unformatted. The rule H6 was actually held to is therefore "no SIXTH", and it held: the same command at the H6 integration tip (`hashlock-h6` + Tasks 12-13) prints the same five and nothing else. Fix when taken up: run `gofmt -w` over all five in a commit that does nothing else, so the next stage's baseline is empty and a regression is a one-line diff rather than a count to remember.
+
+### F-500 — `history-purge-trio-fails-for-want-of-zsh-not-for-a-box-quirk`: three `mnemonic-engrave` tests fail on this machine because `/usr/bin/zsh` does not exist, and they fail BY DESIGN rather than skip (owning phase: **this box's toolchain; no code change**) `#mnemonic` `#tests`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 2 — baseline red 3 of the plan's Global Constraints, with the CAUSE measured rather than the symptom recorded. Reproduction at engrave master `5e7211d0`:
+
+```
+$ cargo nextest run --locked --no-fail-fast -p mnemonic-engrave
+     Summary [0.349s] 621 tests run: 618 passed, 3 failed, 2 skipped
+        FAIL mnemonic-engrave::history_purge editing_the_file_alone_is_the_trap_the_message_warns_about
+        FAIL mnemonic-engrave::history_purge the_emitted_zsh_recipe_actually_purges_the_entry
+        FAIL mnemonic-engrave::history_purge the_harness_records_history_at_all
+```
+
+Each prints its own reason, verbatim: *"/usr/bin/zsh is required: F-264's gate is 'the emitted recipe, RUN under a real interactive zsh, actually removes the entry', and there is no way to run it without zsh. This is deliberately a FAILURE and not a skip — a skipped gate prints ok and exit 0. If CI lacks zsh, install it there rather than weakening this."* `which zsh` returns nothing on this box (Omarchy, after the 2026-09-02 distro hop, which did not carry it).
+
+So this is **not** a flaky test, not a code defect, and emphatically not something to weaken — it is the `skipped-gates-are-the-default-failure` rule working exactly as intended, and the fix is `pacman -S zsh`, not an edit. Recorded so the next implementer reading "618 of 621, box-local" knows in one line why, and does not spend a round on it. `--no-fail-fast` is required to see the 618: without it nextest stops at 465 of 621.
+
+**Baseline red 2 of the same set — `go vet` red at `fb0dd04` — is already F-494 and is not re-filed here.** Two numbers measured while confirming it: `go vet ./engrave/` reports **2** at pristine `fb0dd04` and **3** at the H6 tip (`engrave/h6_qr_test.go:516`), not the 6 the plan's Global Constraints predict; across `./...` the `ArtifactDir` count goes 8 → 10 (H6's two new golden tests), on top of 33 pre-existing `bspline` unkeyed-field findings that the plan's baseline never mentions.
+
+### F-501 — `ms-cli-engraving-card-still-says-the-method-line-is-on-no-plate`: record 4 of H6 spec §0's five falsified records was NOT folded, because it lives in a repo H6 Task 13 was given no branch in (owning phase: **the next `ms` cycle; before H6 ships to an operator**) `#hashlock` `#ms` `#docs` `#records`
+
+Filed 2026-09-06 by H6 Task 13's implementer, as a **deviation from the plan**, not a discovery. `crates/ms-cli/src/cmd/hashlock.rs:352` in mnemonic-secret still prints, on the engraving card:
+
+> `phrase:          {n} characters -- write the method line next to your phrase; it is on no plate; …`
+
+H6 §6.2 and §8.6 put the method line ON the phrase-form plate, so *"it is on no plate"* is false from the moment a phrase-form plate is cut. It errs SAFE — it asks for a copy the operator no longer strictly needs — which is why it is filed rather than escalated.
+
+Why it was not folded: Task 13's brief names three repositories and three branches (fork `h6-f`, engrave `h6-records`, toolkit `h6-manual`); mnemonic-secret is not among them, `ms-codec` 0.9.0 is already **published**, and editing a fourth repo's shipped copy on an unannounced branch is exactly the merge hazard the brief's "touch only the files your tasks list" rule exists to prevent. Nothing asserts the sentence in `ms`'s own tests (`grep -rn "it is on no plate" --include=*.rs` returns the one production site), so the fix is a one-line copy edit plus `cargo fmt`/`nextest`, in a repo whose gate the next `ms` cycle already runs.
+
+### F-502 — `the-8h-blockquotes-in-two-older-specs-show-one-arm-of-four`: `SPEC_wallet_policy_composer.md` §8h and `SPEC_hashlock_H2_device.md` §8h each quote a single `HASH ON EVERY PATH` body, while the shipped chooser has had four arms since H6 (owning phase: **spec hygiene, with the next hashlock stage**) `#hashlock` `#seedhammer` `#docs` `#records`
+
+Filed 2026-09-06 from hashlock H6 Task 13 Step 1, as an OBSERVATION outside the five records the plan lists — recorded rather than folded, because neither blockquote is false and folding it is a re-decision about which spec owns §8h's copy. Measured at fork `hashlock-h6`: `composerCopyHashEveryPathFor` (`gui/composer_copy.go:582`) dispatches to four bodies — `composerCopyHashEveryPath` (`:182`), `…Phrase` (`:569`), `…Held` (`:683`) and `…HeldPhrase` (`:692`) — and the two held arms are H6's, added because the shipped pair say the preimage *"is not on this device"*, which §2.2 makes false for a composition that holds it.
+
+The composer spec quotes only the first arm and the H2 spec only the first two, so a reader of either sees a screen the device draws in fewer and fewer cases. `SPEC_hashlock_H6_preimage_plates.md` §10.1 carries all four and is the live authority; what these two owe is a pointer to it rather than a fourth copy of the copy.

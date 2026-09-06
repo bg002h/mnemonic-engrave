@@ -383,9 +383,15 @@ Primary: pick from the payload's `hash:` records, each row `hash <i>  <first 8>.
 `sha256(H)` compiles to `OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL`, so
 the preimage MUST be exactly 32 bytes; a digest of a passphrase directly can never
 be spent (§8i; the reference wallet's own README records months of exactly that).
-From H2 the composer derives a preimage in RAM for the length of one screen and
-never stores, shows or engraves it; it puts a digest in a script (§14). When
-every path of the policy carries a hash, the §8h warning fires before consent.
+From H6 the composer HOLDS a preimage -- with its phrase and method -- for the
+life of one composition and can cut it onto a plate of its own
+(`SPEC_hashlock_H6_preimage_plates.md` §2.2, §5.3, §6). This paragraph used to
+read *"From H2 the composer derives a preimage in RAM for the length of one
+screen and never stores, shows or engraves it"*; H6 lifts three of ruling L7's
+four verbs (store, show, engrave) and leaves the fourth (source: reading a
+preimage plate back into a seed flow) refused. What goes in the SCRIPT is still
+only the digest (§14). When every path of the policy carries a hash, the §8h
+warning fires before consent.
 
 (H2, fork `hashlock-h2` `a1fd139`, the leg reviewed at `17b3979`:
 `SPEC_hashlock_H2_device.md` §4.1 adds a `Type a hashlock phrase` row ahead of
@@ -1075,7 +1081,7 @@ table, so the glyph and modal-fits gates cover it.
 | unspendable-xpub NUMS form | F-449, its own cycle |
 | quantum framing of pk vs pkh in tr | F-448 |
 | NFC seating | C8: payload first; NFC hardware not yet in hand |
-| on-device preimage storage, display or engraving | C25; §6c. Derivation is no longer out of scope: from H2 the device derives one in RAM for the length of one screen (`SPEC_hashlock_H2_device.md` §1 item 5) |
+| on-device preimage SOURCING -- reading a preimage plate back in as a seed | C25; §6c. Storage, display and engraving are no longer out of scope either: H2 derives a preimage in RAM (`SPEC_hashlock_H2_device.md` §1 item 5) and H6 holds one for the life of a composition and cuts it onto a plate (`SPEC_hashlock_H6_preimage_plates.md` §2.2, §5.3, §6). Only the fourth verb of ruling L7 survives: a preimage plate presented to any seed flow is still refused (`codex32.IsPreimage`) |
 | removing or redirecting Multisig Build | C7: comment only; its dead-end (F-150 item 1) stays as filed and is not fixed by this cycle |
 | scrub timing at every abandon point of the composer's seed screens | secret-handling, non-gating by the 2026-08-27 ruling; filed as a follow-up for optimisation |
 | on-screen QR display of a descriptor | staged plan 6b, deferred |
