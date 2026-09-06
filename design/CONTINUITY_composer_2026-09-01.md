@@ -3110,3 +3110,6 @@ Command to resume: /resume-composer
   w3*/w4*). The H6 plan checker's default tree args no longer exist; point
   it at real checkouts (ms master, engrave master, fork main) if it is ever
   re-run.
+- `.tmp` emptied entirely at the operator's word (1,854 entries, ~3.8 GB
+  more: h1b-target and the shipped-cycle scratch). The directory itself
+  stays -- it is TMPDIR for every Cargo/nextest run here.
