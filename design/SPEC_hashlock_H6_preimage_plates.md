@@ -1,17 +1,22 @@
 # SPEC — Hashlock H6: preimage plates on the SeedHammer II
 
-**STATUS: DRAFT -- R0 pending (0 lenses run).** Written from
-`design/BRAINSTORM_hashlock_H6_preimage_plates.md` against the operator's
+**STATUS: DRAFT -- R0 round 0 folded; r1 fold verification pending.** Written
+from `design/BRAINSTORM_hashlock_H6_preimage_plates.md` against the operator's
 rulings of 2026-09-05 (decisions 1-9 of
 `design/agent-briefs/hashlock-H6-brainstorm-draft-brief.md`, and the Group A/B
 rulings that settled `design/agent-reports/hashlock-H6-brainstorm-draft-report.md`
-and `design/agent-reports/hashlock-H6-brainstorm-journey-questions.md`). Nothing
-here has been reviewed. **Every number in this spec is a measurement of the text
-and the geometry as written**, taken on the scratch gate tree
-`/scratch/code/shibboleth/.tmp/h6-gate` (a copy of fork main `fb0dd04`); the
-capture is `design/agent-reports/hashlock-H6-spec-author-report.md` §1.
-Citations measured at engrave `07a92e9b`, fork main `fb0dd04`, mnemonic-secret
-`504ff46`; re-grep at plan time.
+and `design/agent-reports/hashlock-H6-brainstorm-journey-questions.md`). Round 0
+of the R0 gate ran three lenses -- fidelity (4C/7I/7M/3N), journey (1C/7I/7M/2N)
+and tests (0C/3I/1M/1N) -- and section 16 records what each finding changed.
+**Every number in this spec is a measurement of the text and the geometry as
+written.** The round-0 fold re-took every one of them in its own detached fork
+worktree at `fb0dd04` (`/scratch/code/shibboleth/.tmp/h6-fold`, Go 1.26.7,
+removed after the run), by running the fork's own functions -- `qr.Encode` at
+ECC-L, `ConstantQR` with section 7 applied literally, `backup.CharsPerLine` /
+`LinesPerPlate` / `fixedCharWidth`, `assertModalBodyFits` / `modalHeadroom`,
+`codex32.NewSeed`. Numbers that did not reproduce were REPLACED by the fold's
+measurement, never re-stated. Citations measured at engrave `a0f832d0`, fork main
+`fb0dd04`, mnemonic-secret `504ff46`; re-grep at plan time.
 
 **What this stage does, in one sentence.** It puts a hashlock preimage on steel:
 either as the ms1 kind-`0x03` string `ms hashlock` prints, or as the phrase and
@@ -34,6 +39,14 @@ THIS stage:
    derives a preimage in RAM for the length of one screen and never stores, shows
    or engraves it."*
 
+
+4. `crates/ms-cli/src/cmd/hashlock.rs:352` -- the engraving card's *"write the
+   method line next to your phrase; **it is on no plate**"*. §6.2 and §8.6 put the
+   method line ON the phrase-form plate, so that sentence becomes false. It errs
+   safe (it asks for a copy the operator no longer strictly needs), but it is a
+   record this stage falsifies in a repo the spec otherwise treats as primary,
+   and it was missing from this list. (Round-0 journey, closing note.)
+
 `codex32/mspayload.go:63-93`'s `IsPreimage` header keeps its second half (*"a
 hashlock preimage is not a seed; engraved as one it exposes a spend secret as a
 backup"*) -- still true, and still the reason the plate this stage cuts is not a
@@ -48,22 +61,31 @@ not here"* sentence, which H6 makes false.
 
 1. Two plate FORMS on one dedicated layout (§6): the ms1 preimage string
    (text only), and the phrase with its method (optional QR).
-2. Raising the constant-time QR encoder from v5 to **v9** so the decided QR text
-   can be cut without leaking the phrase through the toolpath (§7).
+2. Raising the constant-time QR encoder from v5 to **v9**, AND giving its module
+   engraver a scale-2 arm, so the decided QR text can be cut at all and cut
+   without leaking the phrase through the toolpath (§7). Both halves are
+   normative: without the scale-2 arm `ConstantQRCmd.Engrave` panics on the only
+   scale the plate fits at, and without the raised `constantTimeQRModules`
+   budget every raised version refuses (§7.3, §7.4).
 3. A new payload record class for the ms1 preimage string, and a NEW
    `phrase:` record for a phrase and its method -- Rust first, with corpus rows
    (§3), ported to Go (§4).
+3a. `codex32.EncodeMS1Preimage` on the DEVICE, so a composer-derived preimage has
+   an ms1 string to engrave at all (§3.5). The Rust encoder this ports already
+   exists and is the one `ms hashlock` prints the plate with, so there is no
+   new Rust-first deliverable here -- only the Go port and its lockstep.
 4. `me sysw pack --pack-preimage`, the sealing consequence, and four host
    warnings (§3).
 5. The `hash` id requirement on the H6 admission path, both sides (§4.3).
 6. `Which hash?` gains preimage and phrase rows (§5.1); a **Hashlock plates**
-   flow under the Wallet Policy door (§5.2); the Done review, folded into the
-   `Plates To Cut` census (§5.3).
+   flow under the Wallet Policy door (§5.2); a per-plate PICK step and the Done
+   review, the latter folded into the `Plates To Cut` census (§5.3).
 7. Retention of phrase, method and preimage for the composition's lifetime,
    keyed by digest, scrubbed by the flow-exit defer (§2.2).
-8. `PREIMAGE REQUIRED` marking on the composer's md1 plates (§10.3); the abort
-   arm (§8.4); provenance-aware §8h and reconcile copy (§10.1, §10.2).
-9. The free-text and passphrase ms1 warning (§9).
+8. `PREIMAGE REQUIRED` marking on the composer's md1 **and mk1** plates
+   (§10.3); the two abort arms (§8.4); provenance-aware §8h copy (§10.1).
+9. The free-text and passphrase ms1 warning (§9), and the Password-program
+   notice that names where a hashlock phrase is used (§8.8).
 
 **Out (§13):** reading a preimage plate back into any seed flow; the sealed
 **Sealed Payload** container (`me seal`), whose refusal stands unchanged; the
@@ -103,13 +125,17 @@ where `hashlockMaterial` carries `phrase []byte`, `method hashlockMethod`,
 `hashlockFromPayload`). Rules:
 
 1. **One insertion site**, `composerHoldHashlockMaterial(st, h, m)`, which
-   ALLOCATES when the map is nil. `composerState` is built as a zero-value
-   struct literal at its one production site (`gui/composer_flow.go:48`) and in
-   every test, so the map arrives nil and an assignment into a nil map panics --
+   ALLOCATES when the map is nil. `composerState` is built at its one production
+   site (`gui/composer_flow.go:48`) as
+   `&composerState{reg: &seedRegistry{}, bound: composerBoundFrom(ctx.sysw)}` --
+   two fields set and every other field zero -- and the same way in every test,
+   so `hashlockHeld` arrives nil and an assignment into a nil map panics --
    in the GUI goroutine, at the moment the operator holds to confirm a hash that
    gates funds. This is `composerNotePhraseDigest`'s rule
    (`gui/composer_state.go:280-286`) applied to the second map, and it is
-   normative for the same demonstrated reason.
+   normative for the same demonstrated reason. (That function's own comment cites
+   `gui/composer_flow.go:34` for the construction site, which is stale -- the
+   literal is at `:48`. Fixing the comment is a nit for this stage's fold.)
 2. **Nothing deletes.** A digest no path carries is not removed; it is REPORTED
    (§5.3 item 4). Deletion is what `phraseDigests`' own comment
    (`gui/composer_state.go:46-50`) refuses, and the same argument holds here.
@@ -123,7 +149,7 @@ where `hashlockMaterial` carries `phrase []byte`, `method hashlockMethod`,
 4. **Retention survives a Back out of the engrave step.** `composerEngraveStep`
    returning false sends `composerFlow` round its loop
    (`gui/composer_flow.go:47-131`) with the state intact; the material is gone
-   only when `composerFlow` returns or power is lost. §8.4's abort copy says
+   only when `composerFlow` returns or power is lost. §8.4a's copy says
    exactly that and no more.
 5. Secret-handling defects in this field are non-gating (operator ruling
    2026-08-27) and are logged as follow-ups. F-483 already records that the
@@ -146,7 +172,7 @@ must speak about everything it may cut.
 
 | carrier | wire form | why this shape |
 | --- | --- | --- |
-| **preimage** | the bare ms1 kind-`0x03` string, id `hash`, 75 characters | it is what `ms hashlock --out` writes (`crates/ms-cli/src/cmd/hashlock.rs:299-306`); a prefixed re-encoding would make the operator transform a file they already hold |
+| **preimage** | the bare ms1 kind-`0x03` string, id `hash`, 75 characters | it is what `ms hashlock --out` writes (`crates/ms-cli/src/cmd/hashlock.rs:299-306`), from `ms_codec::encode(Tag::HASH, &Payload::Preimage(x))` at `:298`; a prefixed re-encoding would make the operator transform a file they already hold |
 | **phrase** | `phrase:<hex of the UTF-8 text "<method>,<phrase>">` | the `now:` idiom exactly (`sysw/composer_records.go:136-160`): hex of a UTF-8 text, one `,`, cut on the FIRST comma so the phrase may contain commas |
 
 `<method>` is `hardened` or `sha256` -- the spelling
@@ -172,6 +198,19 @@ exactly `hardened` or `sha256`; everything after it must pass the phrase rule of
 characters -- which is `ms-cli`'s `validate_phrase`
 (`crates/ms-cli/src/hashlock_phrase.rs:118`) and the device's
 `hashlock.ValidatePhrase` (`hashlock/hashlock.go:92-111`), byte for byte.
+
+**The ms1 preimage ENCODER already exists in Rust and is not re-decided here.**
+`ms_codec::encode` (`crates/ms-codec/src/encode.rs:16`) takes `(Tag, &Payload)`
+and writes the `0x03` prefix through `envelope::payload_wire_bytes`
+(`crates/ms-codec/src/envelope.rs:261`); `PayloadKind::Preimage`'s
+`single_tag()` is `Tag::HASH` (`crates/ms-codec/src/payload.rs:23-28`), and
+`encode` REFUSES any `tag != payload.kind().single_tag()` with
+`Error::TagKindMismatch` (`encode.rs:24-31`). So the Rust primary structurally
+cannot emit a preimage under id `entr`, the corpus already pins the string, and
+§3.5 is a Go PORT, not a new Rust-first deliverable. (Round-0 journey C-1 read
+the gap as a missing Rust encoder; the operator's ruling was "add the encoder,
+Rust first", and the controller then established that the Rust half is already
+shipped. §3.5 is that ruling applied to the half that is actually missing.)
 
 **Rust first.** `crates/me-cli/src/sysw/composer_records.rs` gains
 `PHRASE_PREFIX`, `PhraseRecord`, `phrase_record(method, phrase)`, the parse arm
@@ -200,10 +239,51 @@ One flag, both carriers, in the pattern of `--seal-secret`
 pack_preimage: bool,
 ```
 
-Without it, `me sysw pack` keeps refusing by index through
-`admit_check` (`crates/me-cli/src/sysw/mod.rs:463-470`) and
-`unknown_reason`'s preimage arm (`:209-211`), and the shipped text
-(`crates/me-cli/src/main.rs:2805-2810`) gains one sentence -- §8.1.
+**Where the flag acts -- NORMATIVE, and it is ADMISSION, never classification
+(round-0 fidelity C-3).** The spec's first draft named the flag and its refusal
+but never said which function consults it, and the two readings an implementer
+could take each break something funds-relevant. This settles it:
+
+1. **Classification is UNCONDITIONAL on both sides.** `Classify` /
+   `classify_with` answer `Preimage` and `Phrase` for these records whatever the
+   admission, exactly as they answer `Key`, `Hash` and `Now`. The flag is not a
+   parameter of what a record IS.
+2. **`Admission` (`crates/me-cli/src/sysw/mod.rs:233-236`) gains
+   `pack_preimage: bool`, and `admit_check` (`:463-470`) gains a SECOND refusal
+   rule** beside its existing `Class::Unknown` one: a record classifying
+   `Preimage` or `Phrase` is refused by index unless `adm.pack_preimage`. It is a
+   new `SyswError` arm, not a `Class::Unknown` / `UnknownReason`, because the
+   record is not unclassifiable -- it is perfectly well understood and simply not
+   asked for. §8.1.1 is that arm's text.
+3. **`decide_sealing` (`crates/me-cli/src/main.rs:2353-2410`) is UNCHANGED and
+   still calls `sysw::classify` (`sysw/mod.rs:246-248`).** Because
+   classification is unconditional, the strict classifier already sees the two
+   classes, `is_secret()` is true for both, and the payload SEALS by default
+   (§3.4 item 1) with no second call site to keep in step.
+4. **The vendored corpus keeps ONE truth per row.** `CASES`
+   (`crates/me-cli/src/sysw/composer_records.rs:306`) generates
+   `record_class_vectors.json` with `classify`, and the fork's
+   `TestComposerRecordsClassifyExactlyAsTheHost`
+   (`sysw/composer_records_test.go:64-75`) compares it against the device's
+   `Classify`. Unconditional classification is what lets the H6 rows carry the
+   same class on both sides; an admission-gated classifier would make the host
+   row say `Unknown` and the device say `ClassPreimage`, and the lockstep gate
+   would red.
+
+**Why not thread `admission` into `decide_sealing` instead** (round-0 fidelity
+C-3's own suggested remedy, declined with a reason): that fix works, but it adds
+a SECOND call site that must be kept in step with the first, which is the exact
+defect the shipped `--expect` comment records at `main.rs:1488-1494` -- built
+without `admission`, `--expect` produced *"a false refusal carrying a false
+message, on the funds path, inside the feature added to prevent exactly that."*
+Gating admission rather than classification leaves `decide_sealing` byte-unchanged
+and has no second site to forget.
+
+Without the flag, `me sysw pack` refuses by index through `admit_check`
+(`crates/me-cli/src/sysw/mod.rs:463-470`) with §8.1.1. `unknown_reason`'s
+preimage arm (`:210`) is UNTOUCHED and keeps the case it actually covers today --
+a kind-`0x03` single under an id outside `{entr, hash}`, which really is
+unclassifiable (§4.3).
 
 ### §3.3 Host warnings -- NORMATIVE, all four (§8.2)
 
@@ -214,12 +294,49 @@ Without it, `me sysw pack` keeps refusing by index through
 2. **When the flag is given and no preimage or `phrase:` record is present:** the
    no-op warning (§8.2.2). A warning, never a refusal -- the flag loosens
    admission and loosening it over nothing costs nothing.
-3. **When an admitted preimage's digest matches none of the payload's `hash:`
-   records:** the orphan warning (§8.2.3). Payload-wide, so it lives with
-   `pack_with` (`crates/me-cli/src/sysw/mod.rs:335`) beside the "at most one
-   `now:`" rule, not in the per-record `admit_check`.
+3. **When an admitted preimage OR `phrase:` record's digest matches none of the
+   payload's `hash:` records:** the orphan warning (§8.2.3). **It covers BOTH
+   carriers, and the `phrase:` half is the one that matters** (round-0 journey
+   I-3): a preimage record is produced by `ms hashlock --out` and is correct by
+   construction, while a `phrase:` record has no CLI producer at all -- §3.1
+   specifies a Rust function, §3.2 adds only a flag -- so the operator hand-builds
+   it as hex, following the `text:`/`pass:` precedent the `pack` help already sets
+   (`crates/me-cli/src/main.rs:219`). Two hand-build errors pass every check §3.1
+   lists and are caught by nothing else:
+   - **a space after the comma.** §3.1 cuts on the FIRST `,` so the phrase may
+     contain commas, and the remainder must be printable ASCII `0x20..=0x7E` -- a
+     leading `0x20` is printable, so `hardened, my phrase` is admitted and derives
+     a DIFFERENT preimage from `my phrase`. The `now:` idiom §3.1 follows is safe
+     from this only because both of its fields are digit-constrained
+     (`ParseNowRecord`, `sysw/composer_records.go:136-160`, via `digitsInRange`);
+     a free-form phrase field does not inherit that safety.
+   - **the wrong method selector.** `sha256,<phrase>` when the host derived with
+     `hardened` is a valid record and a valid method. §5.1 removes the method
+     PICK; nothing checked the RECORD.
+
+   Both are one PBKDF2 run away on the host -- milliseconds there against ~10 s on
+   the device, after a pick, at a screen with no copy for a digest that matches
+   nothing. So the host derives an admitted `phrase:` record's preimage at pack
+   time and warns when its digest matches no `hash:` record.
+
+   **Giving `phrase:` a producer is OUT of scope this stage and named in §13**, so
+   the hand-build path is the one this warning has to cover.
 4. **When the payload is SEALED and holds a preimage or `phrase:` record:** the
    sealed-transit note (§8.2.4).
+
+**Where they print, and in what order against the passphrase ceremony --
+NORMATIVE (round-0 fidelity M-6).** All four are payload-wide, so none belongs in
+the per-record `admit_check`. Warnings 1-3 print in `main.rs`'s pack arm
+**BEFORE** the passphrase ceremony, alongside the existing `--expect` and
+unsigned-override reporting, which `main.rs:1474-1494` already orders that way and
+says why: F-246 -- *"a warning the operator reads after writing a passphrase down
+is a warning about work already done"*. Warning 4 prints **AFTER** the sealing
+line, because its own wording (*"the device needs the passphrase above"*) refers
+to it. §3.3's earlier draft placed the orphan check "with `pack_with`
+(`crates/me-cli/src/sysw/mod.rs:335`) beside the 'at most one `now:`' rule"; that
+is wrong on both halves -- the `now:` rule is enforced in `split`
+(`sysw/mod.rs`) and again in `main.rs:1597` for ordering reasons, and `pack_with`
+is the entry point above them, with no stderr of its own.
 
 ### §3.4 Sealing -- NORMATIVE, and one correction to the ruling's premise
 
@@ -252,6 +369,64 @@ The F-474 arm (`gui/unlock_kdf.go:415-420`, its noun at `:433`) belongs to
 at pack time already (`crates/me-cli/src/seal/record.rs:130-136`). §8.2.4 states
 what is true of each container and claims nothing about the other.
 
+### §3.5 `codex32.EncodeMS1Preimage` -- the device half, a PORT -- NORMATIVE
+
+Without it a composer-derived preimage has no ms1 string to engrave, and the
+string form -- decision 1's DEFAULT -- silently becomes payload-only.
+`codex32.EncodeMS1` (`codex32/msencode.go:17-31`) is the fork's only ms1 encoder
+and is `entr`-only by construction: its own header pins the id as the *"FIXED
+literal `entr`"*. The primitive it wraps is general, so this is a sibling
+wrapper, not new codec design:
+
+```go
+// EncodeMS1Preimage encodes a hashlock preimage X as the ms1 kind-0x03 plate
+// string: NewSeed("ms", 0, "hash", 's', [0x03‖X]). It is the Go port of
+// ms_codec::encode(Tag::HASH, &Payload::Preimage(x)) (SPEC_ms_hashlock §1
+// rule 2) and is DOWNSTREAM of it -- the Rust side decides the wire form.
+//
+// The id is the FIXED literal "hash" and there is no parameter for it. That is
+// the whole point: NewSeed will mint a kind-0x03 payload under id "entr" quite
+// happily (MEASURED -- see below), and the Rust encoder refuses that shape
+// outright, so the id must not be reachable from a caller here either.
+func EncodeMS1Preimage(x [32]byte) (string, error)
+```
+
+**MEASURED against the ms corpus, in the fold's own worktree.** The wrapper
+reproduces `hashlock-v0.8.json`'s `kind` row byte for byte:
+
+```
+X        = 0xab * 32
+encoded  = ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c
+corpus   = ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c
+len=75  matchesCorpus=true  id="hash"  IsPreimage=true
+DecodeMS1Preimage round-trip = true
+```
+
+and the copy-paste hazard is real rather than hypothetical:
+
+```
+EncodeMS1(entr) on the same 32 bytes
+  = ms10entrsqz46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kdv3c0wn2hx0lq
+    matches corpus entr32_pair = true   IsPreimage = false
+NewSeed("ms", 0, "entr", 's', [0x03‖X])          <-- NOT refused by NewSeed
+  = ms10entrsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kp9wv63u5a0u7q
+    IsPreimage = true   IsPreimagePlate = false
+```
+
+The third line is the finding: **the Go primitive has no equivalent of the Rust
+encoder's `tag != payload.kind().single_tag()` refusal**, so a mistagged plate is
+one parameter away, it satisfies the wide `IsPreimage`, and §4.3's admission
+predicate then refuses it on the way back in -- an operator's only backup of a
+spend secret, on steel, that no tool will read. Hence the fixed id and §11.1's
+mutation.
+
+**Its tests (§11.1):** the corpus `kind` row lockstep (id `hash`, kind `0x03`,
+75 characters, the `ms1` field byte for byte); `DecodeMS1Preimage(New(
+EncodeMS1Preimage(x))) == x` over random X; and the negative -- **the function
+cannot emit id `entr` for any input**, asserted on the OUTPUT (`Split()`'s id is
+`"hash"`), not on the source, so a future refactor that reintroduces an id
+parameter reds. The provenance pin records `ms-codec` and the corpus sha.
+
 ---
 
 ## §4. Device admission and classification
@@ -278,9 +453,14 @@ preimage out of every seed class. The preimage class is answered BEFORE it, by
 
 ### §4.3 The `hash` id is required on the H6 path -- NORMATIVE (ruling A7)
 
-`codex32.IsPreimage` (`codex32/mspayload.go:94-101`) does not consult the id, and
-the host's `preimage_plate` (`crates/me-cli/src/seal/record.rs:287-320`) does not
-either -- it tests `unshared && len(data)==33 && data[0]==0x03`. That was the
+`codex32.IsPreimage` (`codex32/mspayload.go:94-101`) does not consult the id. The
+host's `preimage_plate` (`crates/me-cli/src/seal/record.rs:287-320`) consults it
+**only to route an `entr`/`hash` mismatch elsewhere** -- it opens with
+`if id_kind_mismatch(s) { return false; }` (`:292-295`, the predicate at
+`:269-276`, keyed on `ms_codec::Error::TagKindMismatch`) and for every OTHER id
+tests `unshared && len(data)==33 && data[0]==0x03`. (Round-0 fidelity I-5: the
+first draft said it does not consult the id at all, which is false and made
+§8.1.2's row untestable for the most likely wrong id.) That was the
 safe direction under H0, where the consequence of a false positive was a
 REFUSAL: *"A refusal costs a re-encode; a wrong cut exposes a spend secret"*
 (`codex32/mspayload.go:78-92`). H6 inverts the consequence -- a false positive
@@ -306,7 +486,24 @@ func IsPreimagePlate(s String) bool {
 narrowing as `preimage_plate_admissible(s)`, leaving `preimage_plate` -- the
 DIAGNOSTIC predicate behind the refusal message -- unchanged, so a mistagged
 plate is still named a preimage plate when it is refused and still not admitted
-when `--pack-preimage` is passed. The refusal copy is §8.1.2.
+when `--pack-preimage` is passed.
+
+**The three ids, and which refusal each one gets -- NORMATIVE** (round-0
+fidelity I-5 + journey I-4; the id partition is what makes each row testable):
+
+| id, on a kind-`0x03` unshared single | what answers | copy |
+| --- | --- | --- |
+| `hash` | admissible under `--pack-preimage`; refused without it | §8.1.1 |
+| `entr` | `id_kind_mismatch` -> `U::TagKindMismatch` (`sysw/mod.rs:207`), **already shipped** | `main.rs:2799-2804`, UNCHANGED |
+| anything else | `preimage_plate` -> `U::PreimagePlate` (`sysw/mod.rs:210`) | §8.1.2 |
+
+**There is no NEW arm.** The first draft added §8.1.2 as a fresh
+`unknown_reason` arm; measured, `entr` never reaches it (the mismatch is
+diagnosed first, and the shipped `TagKindMismatch` body already cites
+`SPEC_ms_hashlock §1 rule 2`), and every other id already lands on
+`U::PreimagePlate`. So §8.1.2 is the EXISTING `U::PreimagePlate` body rewritten,
+not a second one. §9's own rule -- *"two near-identical bodies is how one of them
+goes stale"* -- is the reason.
 
 **H0's inertness elsewhere is untouched:** `DecodeMS1` keeps refusing `0x03` at
 all five callers (`gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`,
@@ -352,6 +549,34 @@ method (§3.1); the device does not offer the method screen for it, so the
 mistake J4-1 describes -- picking the wrong method for a phrase the operator did
 not choose -- cannot occur.
 
+**Which means a payload phrase CANNOT use `hashlockPhraseRoute`, and this stage
+names the path it uses instead** (round-0 journey N-2). `hashlockPhraseRoute`
+(`gui/composer_hashlock.go:43-86`) does both of the things a payload phrase must
+not do: it calls `hashlockMethodPick` (`:53`) and it ends on
+`composerCopyHashlockReconcile` (`:83`). The payload path is a DERIVE-ONLY
+sibling -- no phrase screen, no method pick, no reconcile screen -- reusing
+`hashlockDeriveFlow` for the countdown and `composerCopyHashlockConfirm` (with
+`hashlockRelationLine` and `hashlockOtherPathLine`) for the confirm, then
+assigning the digest and entering the material into `hashlockHeld` with
+`provenance = hashlockFromPayload`. The provenance distinction §10 needs is then
+a property of WHICH PATH RAN, not a runtime test.
+
+**When a `hash:` digest and a preimage or `phrase:` record in the same payload
+carry the SAME digest, the `hash:` row says so** (round-0 journey M-4). Packed at
+full fidelity -- `hash:` from `ms hashlock`'s stdout, the preimage from its
+`--out` -- bands 1 and 2 draw `hash 1  b867db87..edbc96cb` and
+`preimage 1  b867db87..edbc96cb`: identical digest text, adjacent, differing by
+one word, and with different consequences (band 1 assigns the digest and holds
+NO material, so no plate is offered at Done and §5.3 item 4 will not list it
+either; band 2 cuts a plate). The `hash:` row is annotated
+`hash <i>  <first8>..<last8>  (in payload)`.
+
+MEASURED at `sh2DisplaySize` in `composerPageLines`' 411 px band (23 px per
+line), on the longest two-digit form: **41 characters, 343 px, ONE line.** The
+longer wording the round-0 finding suggested, `(preimage in payload)`, is 50
+characters and **348 px over two lines**, so it is not taken -- a two-line row in
+a picker band is what `composerPickScreenMaxRows` budgets against.
+
 `taking` (`gui/composer_hash.go:194`), which fires the §8i rule modal, extends to
 the two new bands. `composerPickScreenMaxRows` (`gui/composer_paged.go:243`) is
 checked against the longest row set.
@@ -369,18 +594,96 @@ The flow: list the payload's preimage and phrase records; the operator picks;
 per record it offers form and QR (§5.3 item 3); then it cuts. It builds no
 composition and reads nothing from `composerState`.
 
+**A `phrase:` record DERIVES ON PICK, and the result lives for the flow --
+NORMATIVE** (round-0 fidelity I-7 = journey I-2). §6.3 makes the digest row
+unconditional, and for a `phrase:` record there is no digest in the payload: it
+is `sha256(PBKDF2-HMAC-SHA256(phrase, "ms-hashlock-v1", 100000, 32))`
+(`hashlock/hashlock.go:21,24,27`), about 10 s at the measured 9,715
+iterations/s. So:
+
+1. **The LIST draws without deriving.** A phrase row reads
+   `phrase record <i> (derive to see the digest)`, exactly as §5.1's band 3
+   does. Deriving to draw the list is the *"three records would be a 30 s stall
+   before a list could be drawn"* §5.1 rejects, and this flow has more phrase
+   records than the composer typically does, not fewer.
+2. **Picking one derives ONCE, behind the `Deriving` countdown** (H2 §4.4) --
+   never silently, because a 10 s stall with no screen is a hang to the operator.
+3. **The result lives in a LOCAL of the flow**, keyed by record index, scrubbed
+   on return. Not `composerState`: §2.3's "holds nothing" stays true, and a
+   redraw, a page or a Back must not re-run the KDF.
+4. **The locator's `hash` row is printed from that result**, so it is never
+   blank. A phrase-form plate with no locator at all -- a bearer phrase in plain
+   text with no digest, no path, and no payload position -- is the worst artifact
+   this stage can cut, and it is what a literal reading of the first draft
+   produced.
+
+**An abort in THIS flow needs no §8.4 warning, and must not borrow one**
+(round-0 journey N-1). §8.4's arms say the phrase *"dies with this composition"*
+and speak about a run that also cuts policy plates. Neither is true here: this
+flow builds no composition, and the material it cuts stays in the payload, in
+flash. Telling the operator a secret is gone when it is still in flash is false
+in the dangerous direction. Reusing the arm is the obvious implementation, which
+is why it is refused by name.
+
+**The door's lead names these records** (round-0 journey M-5). `composerDoorCounts`
+(`gui/composer_door.go:37-52`) counts `ClassKey`, `ClassMnemonic`/
+`ClassCodex32Secret` and `ClassUnknown` and nothing else, so `composerDoorLines`'
+`default` arm draws `composerCopyNoKeys()` -- a lead saying there are no keys,
+above a door offering the Hashlock plates route for exactly that payload. It
+gains a preimage/phrase count so the lead and the routes agree. This is the
+screen that tells the operator the tap worked, and §12 item 3's payload is the
+one that reads wrongest.
+
 **Its locator header** (§6.3) prints the digest always, the matching `hash:`
 record's position when one matches, and the `mk1 stub` **only when it can compute
 one from an md1 record in the same payload** -- no payload record carries an id
 (`sysw/record.go:14-21`, `sysw/composer_records.go:24-31`), so an md1 in the same
 payload is the only source, and the field is omitted otherwise.
 
-### §5.3 The Done review -- folded into `Plates To Cut`
+### §5.3 The Done review -- a PICK step, then the `Plates To Cut` census
 
-The review is at the ENGRAVE Done, inside `composerEngraveStep`
-(`gui/composer_flow.go:335-394`), on the census screen
-`confirmReviewScreen(ctx, th, "Plates To Cut", composerCensusLines(...))`
-(`:389-390`, `gui/multisig_build.go:1895`). Normative:
+**The per-plate decisions do NOT live on `confirmReviewScreen`, and the first
+draft's claim that they did was unimplementable** (round-0 fidelity C-4 =
+journey I-1). `confirmReviewScreen` (`gui/multisig_build.go:1895`) is paged and
+READ-ONLY, and every input the machine has is already bound:
+`backBtn = Button1`, `contBtn = Button3 + Center`, `pageBtn = Button2`. Its body
+lines are `widget.Labelw` ops offset into the frame, **not `Clickable`s**, so
+they are not touch targets -- and the SH2's only production input is the ft6x36
+panel. W-2 measured exactly this failure once already: 205 taps that moved
+nothing, on a screen whose rows were not targets. Three per-row interactions
+(pick form, toggle QR, decline) had no control to attach to. `confirmReviewScreen`
+is also SHARED -- `buildReviewFlow` draws the Policy Review through it -- so
+rewriting it into a picker changes a screen the build path depends on.
+
+So the review is TWO steps, both inside `composerEngraveStep`
+(`gui/composer_flow.go:335-394`), in this order:
+
+**(A) The per-plate PICK step**, one `composerPickScreen`
+(`gui/composer_paged.go:278`) per held digest, before the census. That primitive
+already has what this needs and nothing else does: a tap on a row selects it,
+Button3 takes the highlighted row, Button1 declines, Button2 pages, and
+`composerPickScreenMaxRows = 24` (`:243`) bounds the hit areas. Its rows, MEASURED
+at `sh2DisplaySize` in the 411 px band (23 px per line), each ONE line:
+
+| row | chars | px |
+| --- | --- | --- |
+| `preimage string` | 15 | 128 |
+| `phrase + method` | 15 | 138 |
+| `phrase + method + QR` | 20 | 180 |
+| `do not cut this preimage` | 24 | 196 |
+
+The QR rows are offered only when the device holds the phrase (decision 1), and
+taking one fires §8.5's warning. **Back contract:** Button1 on this screen is
+`do not cut` for the highlighted plate, matching `composerPickScreen`'s shipped
+decline arm; backing out of the STEP (the first screen's Back) returns to the
+engrave step's entry and thence round `composerFlow`'s loop with the state
+intact, which is §2.2 item 4 unchanged.
+
+**(B) The census**, `confirmReviewScreen(ctx, th, "Plates To Cut",
+composerCensusLines(...))` (`:389-390`), which REPORTS the choices already made
+and stays read-only -- its contract, honoured rather than stretched.
+
+Normative:
 
 1. **The preimage plate is not a `bundleCard` and does not enter `plan`.** It
    follows S6b's passphrase-plate precedent (`gui/multisig_build_census.go:88-93`:
@@ -389,33 +692,57 @@ The review is at the ENGRAVE Done, inside `composerEngraveStep`
    when all of it exists"* claim (`:66-72`) are about the policy plates alone
    and stay byte-unchanged.
 2. **Its own census block**, appended by `composerCensusLines`
-   (`gui/composer_census.go:86-94`): a heading, one row per plate, and the
-   apart-storage line (§8.3).
-3. **Form and QR are chosen PER PLATE**, on the same screen, because two
-   preimages in one policy may want different forms. The QR is offered only on
-   the phrase form (decision 1) and only when the device holds the phrase.
+   (`gui/composer_census.go:86`): a heading, one row per plate, and the
+   apart-storage line (§8.3). **Its signature must change and the first draft did
+   not say so** (round-0 fidelity N-3): it is
+   `composerCensusLines(params engrave.Params, cards []bundleCard)`, which can see
+   neither the plate decisions of step (A) nor `hashlockHeld`. It gains the
+   accepted-plate list as a third parameter -- a value, computed by step (A) --
+   rather than reading state, so the census reports a decision instead of
+   recomputing one.
+
+   **These rows are drawn through `composerPageLines`' 411 px band, not
+   `confirmReviewScreen`'s own wrap** (round-0 fidelity M-7). MEASURED at
+   `sh2DisplaySize`: `confirmReviewScreen` wraps at `dims.X - 2*8 = 464` px and
+   centres on the whole panel, while the navigation column starts at 427 px, so
+   any row wider than **374 px** has its right edge under a button. Every new row
+   is over it -- 405, 423, 441, 447, 448 px -- and so is the SHIPPED completeness
+   line (*"Each plate takes minutes to cut ... a set is only a backup when all of
+   it exists"*, **459 px**), which is why this is named as a pre-existing property
+   rather than something H6 invents. H6 still may not add five more rows to it:
+   this is the W-3 class the composer's paged screens were rebuilt to remove, and
+   `composerPageLines` is the surface that already solves it.
+3. **Form and QR are chosen PER PLATE**, on step (A), because two preimages in
+   one policy may want different forms. The QR is offered only on the phrase form
+   (decision 1) and only when the device holds the phrase. The census (B) then
+   NAMES the choice per row (§8.3), so the operator confirms what they picked.
 4. **A retained preimage no current path carries is LISTED, never cut**, for BOTH
    provenances (ruling B; journey Q4): a row
    `preimage <first8>..<last8>: not on any path, will not be cut`. Nothing is
    deleted from `hashlockHeld` to achieve this (§2.2 item 2).
 5. **A declined plate is dropped from the plan and NAMED in the census** as
-   `declined, will not be cut`. Declining does not abort the run: a preimage
+   `declined, will not be cut` -- declined on step (A), reported on step (B).
+   Declining does not abort the run: a preimage
    plate is not part of the policy set, so `bundleEngrave`'s set-level
    "a partial bundle can't be used" reasoning (`gui/bundle_flow.go:625-631`) does
    not reach it.
 6. **No cap on the number of preimage plates.** One per path that carries held
    material, one per payload record in the Hashlock plates flow.
-7. **A phrase is MASKED on screen, with a `show` toggle** (journey Q13). The
+7. **A phrase is MASKED on screen, and NOT revealed here** (journey Q13). The
    review and the Hashlock plates flow print `phrase: <n> characters` and the
-   method, and reveal the characters only while the toggle is held -- the
-   affordance the operator already met on the phrase keyboard, which
-   `NewPassphraseKeyboard` carries (`gui/passphrase_keyboard.go:80`) and H2 §4.2
-   inherits as-is. It applies to BOTH provenances: a device-typed phrase was
-   just typed, but a payload-delivered one is a secret the operator never typed,
+   method, and show no characters at all. **The first draft called this "the
+   affordance the operator already met on the phrase keyboard ... revealed only
+   while the toggle is held", and both halves are wrong** (round-0 journey I-1):
+   the shipped affordance is `{label: "show", action: ppReveal}`
+   (`gui/passphrase_keyboard.go:141`), a KEY ON A KEYBOARD GRID, and it LATCHES
+   (`k.revealed = !k.revealed`, `:221`) rather than being held. Neither a pick
+   screen nor a paged confirm screen has a key grid to put it on. Item 7 itself
+   argues the right answer: *the plate preview is the one screen that must show
+   the phrase, and the review is not* -- so the review does not show it, and no
+   new control is invented for a screen with no spare input. This applies to BOTH
+   provenances: a payload-delivered phrase is a secret the operator never typed,
    may not own, and did not ask to see, in whatever room the machine lives in.
-   Secret-handling and therefore non-gating, so it costs no round; it is
-   specified rather than left out because the plate preview is the one screen
-   that must show the phrase and the review is not.
+   Secret-handling and therefore non-gating either way.
 
 ### §5.4 Cut order -- preimage plates FIRST
 
@@ -434,10 +761,25 @@ return bundleEngrave(ctx, th, "Wallet Policy", cards, markTitle, "") == bundleEn
 `NewEngraveScreen` is `gui/gui.go:3296`; the plate is built by §6's own layout
 function and `toPlate` (`gui/gui.go:3620`), on the `ppBuildPlate` pattern
 (`gui/passphrase_flow.go:570-588`). Ordering removes the window in which the md1
-plates exist and the preimage does not; §8.4's abort arm covers the window
-ordering cannot (a blank runs out mid-plate). The ms1 secret cards keep their
-place at the head of `cards` (`gui/composer_flow.go:388`), so the whole run is
+plates exist and the preimage does not. The ms1 secret cards keep their place at
+the head of `cards` (`gui/composer_flow.go:381`), so the whole run is
 secrets-then-policy.
+
+**Ordering opens a SECOND window, and both get copy** (round-0 fidelity I-1 =
+journey I-7). The order creates two distinct aborts, not one:
+
+| window | what the operator holds | arm |
+| --- | --- | --- |
+| a preimage plate's own `Engrave` returns false, none cut yet | no plate of any kind; the phrase held only by this composition | §8.4a |
+| at least one preimage plate cut, then the run ends | a BEARER plate on the bench and no usable policy set | §8.4b |
+
+The second is the one the new order creates -- before §5.4 the preimage plate did
+not exist, and this decision is what puts it on the bench first. Its danger is
+specific: `bundleEngrave`'s existing set-level copy tells the operator a partial
+bundle cannot be used, whose natural response is to run the composition again;
+§5.3 item 6 sets no cap, so the second run cuts a SECOND bearer plate for the
+same secret, one of which the operator has no record of, while §8.3's own line
+tells them to store them apart from each other. §8.4b is what stops that.
 
 ---
 
@@ -469,6 +811,32 @@ type Hashlock struct {
 }
 ```
 
+**The string form is cut LOWERCASE and UNGROUPED, and "VERBATIM" means exactly
+that** (round-0 journey M-1). The fork's shipped ms1 secret plate does the
+opposite -- `EngraveSeedString` upper-cases (`strings.ToUpper`) and groups in
+tens, and carries a QR -- and `ms hashlock`'s own engraving card groups too
+(`render_grouped`, `crates/ms-cli/src/cmd/hashlock.rs:340`). So the default plate
+this stage cuts is the only one of the three renderings of the same 75 characters
+that is a single unbroken lowercase run with no machine-readable copy, and that is
+a decision rather than an oversight:
+
+- MEASURED: at 6.0 mm the plate holds 19 characters per line. The raw string is
+  75 characters = **4 rows**; grouped in tens it is 82 characters and, because a
+  10-character group plus a separator plus the next group is 21 and will not fit,
+  it takes **8 rows** -- +24.0 mm against a 65 mm budget the string form uses
+  60.0 mm of. **Grouping does not fit at 6.0 mm.** It fits at 5.0 mm (23
+  characters per line holds two groups, so grouped and raw are both 4 rows), which
+  would move §6.5's string row down a rung and change every golden.
+- It is not a data-loss question either way: bech32 carries a checksum and the
+  fork ships BCH correction (`codex32.Correct`), so a mistranscription is refused,
+  never silently wrong. The cost of the ungrouped form is re-read effort, once,
+  into a tool that checksums it.
+- The QR is declined for this form by ruling A2, so grouping cannot be traded
+  against a machine-readable copy here.
+
+The plate is therefore cut at 6.0 mm, ungrouped, lowercase. §11.4's goldens pin
+that rendering so "VERBATIM" cannot drift into "as the sibling does it".
+
 `SpaceMark` (`backup/passphrase.go:21`) and its legend
 (`passphraseLegend`, `:168`) are reused unchanged on the phrase form: *"one space
 and two look identical ... while 'hunter2 ' is a different wallet from
@@ -486,9 +854,9 @@ space.
 
 MEASURED lengths: 17, 15, 10 -- all inside `MaxTitleLen = 18`
 (`backup/backup.go:71`), the cap `TestTitleCapFitsAtEveryRung`
-(`backup/freetext_test.go:75`) proves clears the screw holes at 6.0 mm by
+(`backup/freetext_test.go:109`) proves clears the screw holes at 6.0 mm by
 0.620 mm. Both are engraved VERBATIM, never through `TitleString`, which
-upper-cases and truncates (`backup/freetext.go:11-19`).
+upper-cases and truncates (`TitleString`, `backup/backup.go:111`).
 
 **The phrase form's method line is the first body row, directly beneath the
 title band** (ruling A4). It is a BODY row, not a band row.
@@ -509,18 +877,39 @@ matches hash <i> in the payload     (Hashlock plates flow, when one matches)
 The stub labels are `gui/composer_stub.go:53-70`'s literal labels, so the plate
 and the screen the operator copied into their notebook use the same words. A
 key-less or partially seated composition has no Policy-ID
-(`gui/composer_engrave.go:40-61`: *"no id yet"*; `gui/composer_stub.go:56-72`
+(`gui/composer_engrave.go:80`: *"no id yet"*; `gui/composer_stub.go:56-72`
 adds the keyed pair only when keyed chunks exist), which is why the template stub
 is the fallback rather than an empty field.
 
-**They are body rows because they do not fit a band.** MEASURED at the smallest
-rung, `constant.Font`, W advance 600 against `Metrics{Ascent:800, Height:900}`,
-so the advance at 3.0 mm is exactly 12,800 units = 2.0000 mm: the passphrase
-plate's own 64 mm band ceiling (`backup/passphrase_test.go:521`, 409,600 units)
-holds **32 characters** at 3.0 mm, 25 at 3.8 mm and 16 at 6.0 mm.
-`mk1 stub (template): 1a2b3c4d` is 29 characters and
-`path 2   hash  b867db87..edbc96cb` is 33 -- the second is over the cap at every
-rung. The body wraps at the full 79 mm width instead (39 characters at 3.0 mm).
+**They are body rows because a band holds at most TWO LINES and this stage has
+already spent both** -- not because they are too wide (round-0 fidelity I-2,
+M-2). The first draft justified them on width and the justification is
+measurably false. MEASURED at 3.0 mm, `constant.Font`, W advance 600 against
+`Metrics{Ascent:800, Height:900}`: the advance is exactly 12,800 units =
+2.0000 mm, so the passphrase plate's 64 mm band ceiling
+(`backup/passphrase_test.go:521`, 409,600 units) holds **32 characters** at
+3.0 mm, 25 at 3.8 mm and 16 at 6.0 mm. Against that cap the locator rows are:
+
+| row | chars |
+| --- | --- |
+| `path <n>` | 6 |
+| `hash  <first8>..<last8>` | 24 |
+| `mk1 stub (policy): <8 hex>` | 27 |
+| `mk1 stub (template): <8 hex>` | 29 |
+| `matches hash <i> in the payload` | 30 |
+
+**The longest is 30, and every one of them fits a band at 3.0 mm.** The
+33-character `path 2   hash  b867db87..edbc96cb` the first draft cited is a
+CONCATENATION that appears nowhere in the row list above, which puts `path <n>`
+and `hash ...` on separate rows.
+
+The real constraint is the LINE COUNT. `passphraseLayoutFor`'s own comment
+records it (`backup/passphrase.go:250-253`): *"At most two lines fit -- a band
+offers innerMargin 10 - outerMargin 3 = 7mm, and three 3mm lines need 9mm and run
+off the plate edge (spec 4.3)."* §6.2 already spends the top band on the title
+and the bottom band on the space legend plus `NOT A SEED`, so there is no room
+for up to four locator rows at any width. The body wraps at the full 79 mm width
+instead (39 characters at 3.0 mm).
 
 ### §6.4 The QR -- phrase form only, BELOW the text (rulings A2, A3)
 
@@ -548,11 +937,29 @@ All at `sh2.Params()` (`internal/sh2/params.go:43-53`: `Millimeter = 6400`,
 | rung | chars/line (79 mm) | lines/plate | advance |
 | --- | --- | --- | --- |
 | 6.0 mm | 19 | 13 | 4.000 mm |
-| 5.0 mm | 23 | 15 | 3.435 mm |
+| 5.0 mm | 23 | 15 | 3.333 mm |
 | 4.4 mm | 26 | 17 | 2.933 mm |
 | 3.8 mm | 31 | 20 | 2.533 mm |
 | 3.4 mm | 34 | 23 | 2.267 mm |
 | 3.0 mm | 39 | 26 | 2.000 mm |
+
+**The advance cell at 5.0 mm was 3.435 mm in the first draft and does not
+reproduce** (round-0 fidelity M-3 = tests I-1). `fixedCharWidth(constant.Font,
+F(5.0)) = 600 * 32000 / 900 = 21,333` units = **3.3333 mm** -- the only value
+consistent with the linear pattern every other rung satisfies
+(`advance = 2.0 mm * rung/3.0`) and with this table's own 5.0 mm row below
+(80.0 mm / 3.3333 = 24.0 exactly; / 3.435 = 23.28, not a whole line count), so
+the wrong number never reached a verdict. Every other cell reproduces exactly.
+
+**The body wraps at exactly `charsPerLine` CHARACTERS, never on word boundaries**
+(round-0 fidelity M-4), which `passphraseLayoutFor` already does
+(`backup/passphrase.go:275`: `l.rows = (len(l.glyphs)+l.rowLen-1)/l.rowLen`). It
+is forced rather than chosen: a 100-character phrase and a 75-character ms1
+string are SINGLE TOKENS, so a word wrapper has nothing to break them on. Every
+row count in the table below is `ceil(len / charsPerLine)`. The consequence worth
+stating is that an 8-hex stub splits mid-token at the narrow rungs; that is
+accepted, because the alternative is a wrapper that cannot lay out the plate's
+main content at all.
 
 The vertical budget for the centred group is **65 mm** (85 − 2 × `innerMargin`),
 the span `passphraseLayoutFor` centres inside while the bands hold the title and
@@ -572,10 +979,23 @@ blank, and a 100-character phrase; or the same header, a blank and the
 
 **Three normative consequences.**
 
-1. **The QR scale is 2, not the passphrase plate's 3.** At 53 modules, scale 3 is
-   47.70 mm and does not fit at any rung; scale 2 is 31.80 mm. This is the free-text
-   plate's own scale (`freeTextQRScale = 2`, `backup/fit.go:16-19`: *"0.6mm modules
-   against the 0.9mm every other plate uses"*).
+1. **The QR scale is 2, not the passphrase plate's 3 -- and the constant-time
+   engraver must LEARN scale 2 for that to be possible at all** (round-0 fidelity
+   C-2). MEASURED: at 53 modules scale 3 is 47.70 mm and does not fit at any rung
+   (3.0 mm gives 79.70 mm against a 65 mm budget); scale 2 is 31.80 mm. The module
+   pitch matches the free-text plate's (`freeTextQRScale = 2`, `backup/fit.go:16-19`:
+   *"0.6mm modules against the 0.9mm every other plate uses"*) but NOT its code
+   path. `ConstantQRCmd.Engrave` renders every module through `engraveModule`
+   (`engrave/engrave.go:689-709`), whose `switch scale` has only `case 3` and
+   `case 4` and a `default: panic("unsupported module scale")` -- so as the first
+   draft stood, the one configuration the plate fits at PANICS. §7.3 makes the
+   `case 2` arm a normative deliverable; **this whole table depends on it.**
+
+   Re-fitting at a supported scale was considered and is not available: scale 3
+   needs the text block down to 5 rows at 3.0 mm, and the worst-case phrase (3
+   rows) plus the method line (2 rows) is already 5 with zero locator rows and
+   zero blanks -- and the locator is ruling A5. There is no rung at which the
+   phrase form carries a scale-3 QR.
 2. **The worst-case phrase-plus-QR plate fits at exactly one rung, with
    1.20 mm to spare.** The layout AUTO-FITS down `backup.FontSizes`
    (`backup/backup.go:83`) and REFUSES at the bottom rung rather than drawing
@@ -646,51 +1066,230 @@ cannot be transcribed wrong):
 3. **`ConstantQR`'s bound becomes `dim > 53`**, and its comment records the new
    pair (v9, 192 bytes at the last full step below 194 -- see §7.1's table) and
    the same "raise both together" rule.
-4. **The constant-time argument is re-earned, not inherited.**
-   `constantTimeQRModules`, `constantTimeStartEnd` and `findPath`
-   (`engrave/engrave.go:349`, `:377-379`, `:430-470`) all take `dim`; the deliverable is
-   a test that, for each of v6..v9, the emitted move count is a function of `dim`
-   ALONE -- identical for two different payloads of the same version -- and that
-   `findPath` never returns "QR modules spaced too far for constant time
-   engraving" on any of them. Without that test the raise is a size change with
-   an unproven security property.
-5. **Goldens.** One golden per newly-admitted version (v6, v7, v8, v9) on a
-   fixed payload, in `backup/testdata/`, alongside the plate goldens of §11.
+4. **`constantTimeQRModules` GAINS AN ARM PER NEW VERSION, and without it every
+   raised version refuses** (round-0 fidelity C-1 = tests I-3). The first draft
+   cited that function only as one that "takes `dim`". Read in full
+   (`engrave/engrave.go:349-374`), it tabulates 21/25/29/33/37 and returns **0**
+   for everything else -- *"Not supported, return a low number to force error"* --
+   and `nmod` is both the budget `ConstantQR` checks (`if len(modules) > nmod`)
+   and the loop count `ConstantQRCmd.Engrave` runs (`for range nmod`). Applying
+   items 1-3 literally and nothing else, MEASURED:
+
+   ```
+   constantTimeQRModules(41)=0  (45)=0  (49)=0  (53)=0
+   v6 dim=41  ConstantQR err=too many dims 41 QR modules for constant time engraving
+   v7 dim=45  ConstantQR err=too many dims 45 QR modules for constant time engraving
+   v9 dim=53  ConstantQR err=too many dims 53 QR modules for constant time engraving
+   ```
+
+   So the headline deliverable -- a phrase plate carrying a QR -- is produced at
+   none of the four versions the raise admits. The fork already says this is the
+   shape of the work: `TestPassphraseQRFitsSupportedVersion`'s header
+   (`engrave/engrave_test.go:696-707`) records that module COUNT varies with
+   content at a fixed version (*"578..664 measured at dim 37"*), that the bound
+   *"was derived by fuzzing, not by this test"*, and that a raise means
+   *"constantTimeQRModules needs a v6 entry derived by fuzzing. Do NOT fall back
+   to the non-constant-time engrave.QR for a secret."*
+
+   **The number cannot be invented, because it is content-dependent**, and a
+   budget between the observed min and max makes the plate cuttable for some
+   phrases and refused for others at the SAME QR version -- an operator-visible,
+   content-dependent failure on the funds path, which is the exact class
+   `ConstantQR` exists to remove.
+
+   **Deliverable: four fuzzing runs on the protocol the v5 entry records**
+   (`engrave/engrave.go:363-371`: 18.5M executions, 32 min, converged with 24.9
+   min of quiet), each recording observed max, sample count and the
+   max/`dim`² ratio in the code comment as v5's does, and each buffered upward
+   where the ratio falls below the trend, for the reason v5's comment gives
+   verbatim: *"an underestimate produces content-dependent engrave-time failures
+   on a permanent plate, an overestimate costs ~2% more engraving time."*
+
+   **The fold ran a partial campaign and its numbers are a FLOOR, not the
+   answer.** 216,000 §8.6-shaped payloads per dim, sampled across the phrase
+   lengths that reach each version, in the fold's worktree:
+
+   | dim | v | samples | observed max | max/dim² | `findPath` errors |
+   | --- | --- | --- | --- | --- | --- |
+   | 41 | 6 | 216,000 | 813 | 0.4836 | 0 |
+   | 45 | 7 | 216,000 | 945 | 0.4667 | 0 |
+   | 49 | 8 | 216,000 | 1161 | 0.4835 | 0 |
+   | 53 | 9 | 216,000 | 1369 | 0.4874 | 0 |
+
+   against the shipped ratios 0.3764 / 0.4176 / 0.4590 / 0.4977 / 0.4850 at
+   21/25/29/33/37. Two things follow and both are normative:
+
+   - **The campaign has NOT converged and a short one will underestimate.** An
+     independent 4,000-payload sample during the same round saw maxima of 785 at
+     dim 41 and 1281 at dim 53; 216,000 payloads found **813** and **1369**. The
+     ceiling was still climbing by +28 and +88 between those sample counts. A
+     plan-time entry that comes in BELOW the floor above is proof of an
+     under-converged run, and that is a checkable gate rather than a hope.
+   - **v7 is the suspect entry.** Its ratio, 0.4667, sits below its neighbours
+     (0.4836, 0.4835, 0.4874); the trend-implied max at ~0.485 is about 982
+     against an observed 945. That is precisely the signal the v5 comment used to
+     justify a buffer of 20 rather than the historical 5, and v7's buffer is set
+     the same way.
+   - **Zero `findPath` failures in 864,000 payloads** -- no "QR modules spaced too
+     far for constant time engraving" at any raised version. That is evidence the
+     path-finder scales, not proof; §11.3 keeps it as a row.
+
+5. **The constant-time argument is re-earned, not inherited -- and the first
+   draft's test could not earn it.** It asked for a test that *"the emitted move
+   count is a function of `dim` ALONE -- identical for two different payloads of
+   the same version"*. `Engrave` loops `for range nmod` and pads every move to
+   `maxDur` via `DelayMove`, so the emitted count is a function of `dim` alone
+   **for any value of `nmod`, correct or not** -- the test passes on a budget of
+   0, on 700, and on a correct one. It is a regression guard, not a proof. The
+   property that actually needs proving is the OTHER one: that `nmod`
+   upper-bounds `len(modules)` over all payloads at that version. §11.3 states
+   both, separately, and says which is which.
+6. **Goldens.** One golden per newly-admitted version (v6, v7, v8, v9) on a
+   fixed payload, at **scale 2**, in `backup/testdata/`, alongside the plate
+   goldens of §11.
+
+### §7.3 `engraveModule` gains a scale-2 arm -- NORMATIVE (round-0 fidelity C-2)
+
+`engraveModule` (`engrave/engrave.go:689-709`) has `case 3`, `case 4` and
+`default: panic("unsupported module scale")`. §6.5 puts the phrase plate's QR at
+scale 2, which is the only scale it fits at, so the arm is a deliverable of this
+stage rather than a nicety.
+
+**Its geometric contract, and it is not "copy case 3 with smaller numbers".**
+`centerOf` (`engrave/engrave.go:628-631`) is
+`(p*scale + 1)*sw + sw/2`, which puts the centre of module `p` at
+`p*scale*sw + 1.5*sw` -- correct for scale 3 (the cell centre) but **half a
+stroke off-centre for scale 2**, exactly as it is for scale 4, whose arm
+compensates with an asymmetric shape. So the scale-2 arm is asymmetric too: the
+cell is `[p*2sw, p*2sw+2sw]`, the centre sits at `+1.5sw` inside it, so relative
+to the centre the painted extent must be `[-1.5sw, +0.5sw]` and the PATH must run
+`[-sw, 0]` on both axes -- a closed square on the corners `(-sw,-sw)`, `(0,-sw)`,
+`(0,0)`, `(-sw,0)`.
+
+**MEASURED, implemented literally in the fold's worktree:**
+
+```
+scale=2 p={0 0} cmds=5 ink x=[0,3840] want [0,3840] OK | y=[0,3840] want [0,3840] OK
+scale=2 p={1 0} cmds=5 ink x=[3840,7680] want [3840,7680] OK
+scale=2 p={5 7} cmds=5 ink x=[19200,23040] OK | y=[26880,30720] OK
+scale=3 p={5 7} cmds=5 ink x=[28800,34560] OK | y=[40320,46080] OK   (control)
+```
+
+3,840 units = **0.6 mm**, the cell exactly, at every probed position, with no
+overlap into a neighbour.
+
+**It emits FIVE commands per module -- the same constant as `case 3` -- so the
+constant-time argument survives**, and that is the property the arm has to carry:
+`ConstantQRCmd.Engrave` pads every move to `maxDur` and runs `for range nmod`, so
+a per-module command count that is constant in the CONTENT is what keeps the
+toolpath content-independent. A scale-2 arm whose command count varied by module
+would re-open the leak the whole section exists to close. §11.3 asserts the count.
+
+### §7.4 The two halves are ONE deliverable
+
+The version raise (§7.1-§7.2) and the scale-2 arm (§7.3) do not ship apart. With
+the raise alone, `ConstantQR` returns a command for a 53-module code and
+`Engrave` panics on the only scale it fits at; with the arm alone, `ConstantQR`
+refuses the code before `Engrave` is reached. Both together, and only then, does
+the phrase form's QR exist. §11.3's rows are written so that removing either half
+reds.
 
 ---
 
 ## §8. Copy -- operator-facing strings
 
-ASCII only. Every DEVICE body below was measured on the gate tree with
-`assertModalBodyFits` (`gui/modal_fits_test.go:202`), which renders the specific
-body and binary-searches its headroom with `modalHeadroom` (`:183`), requiring at
-least `modalBodyMargin = 80` normalised characters (`:52`). Host lines are stderr
-and carry no panel budget.
+**ASCII only, and it is a HARD RULE with a mechanism, not house style**
+(round-0 fidelity I-6 = tests I-2). `font/bitmap/bitmap.go:33` sets
+`indexLen = unicode.MaxASCII` and `glyphFor` rejects `int(r) >= indexLen`, and the
+consequence is not a dropped character: **an unrenderable rune blanks the ENTIRE
+body of its frame**, while `ExtractText` still reports the text as present, so a
+string assertion cannot see it. MEASURED on the same body at the same length,
+only the marked glyph differing:
+
+```
+section-sign   the modal drew only 5004 ink pixels (floor 6000) -- near blank
+em-dash        the modal drew only 5004 ink pixels (floor 6000) -- near blank
+ascii-S        drawnFully=true drew=153 want=153
+```
+
+The first draft opened with "ASCII only" and then broke it in five of its own
+bodies. **Every DEVICE body in this section is now ASCII**, and the rule is
+enforced by §11.5's table rather than by care.
+
+**Host lines are stderr, carry no panel budget, and are EXEMPT** -- they may
+carry an em dash, and the shipped ones already do (`crates/me-cli/src/seal/record.rs:130-136`,
+`main.rs:2805-2810`). Each body below is LABELLED with which it is:
+
+- **HOST (stderr, exempt):** §8.1.1, §8.2.1, §8.2.2, §8.2.3, §8.2.4.
+- **DEVICE (ASCII, measured):** §8.3, §8.4a, §8.4b, §8.5, §8.8, §9, §10.1.
+- **§8.1.2 is a HOST body kept ASCII deliberately**, and measured on the device
+  renderer anyway, because its content is the one refusal a future stage is most
+  likely to surface on-device (§4.3's collision). It is exempt from the rule and
+  written to it.
+
+**A body may not claim a device measurement unless it has been measured**, which
+is the specific failure §8.1.2 committed in the first draft.
+
+Every DEVICE body below was measured with `assertModalBodyFits`
+(`gui/modal_fits_test.go:202`), which renders the specific body and
+binary-searches its headroom with `modalHeadroom` (`:183`), requiring at least
+`modalBodyMargin = 80` normalised characters (`:52`).
 
 ### §8.1 Host refusals
 
-**§8.1.1** `crates/me-cli/src/main.rs:2805-2810`'s existing text gains one
-sentence (decision 7):
+**§8.1.1 (HOST, stderr).** The refusal `admit_check`'s new rule raises for a
+well-formed preimage plate (id `hash`) or a `phrase:` record packed without the
+flag. It reuses `crates/me-cli/src/main.rs:2805-2810`'s wording and adds decision
+7's sentence:
 
 > record {i} (records count from 0) is a hashlock PREIMAGE plate (kind 0x03),
-> not a seed record; this container cannot place one yet. A preimage backs a
+> not a seed record; this payload did not ask for one. A preimage backs a
 > hashlock spend path, not a wallet — keep it with the policy it unlocks, and do
 > not re-encode it as entropy. Re-run with --pack-preimage if that is what you
 > intend.
 
-**§8.1.2** A NEW arm, for a kind-`0x03` single whose id is not `hash` (§4.3):
+**The final sentence is emitted ONLY when the id is `hash`** (round-0 journey
+I-4). For any other id the advice is affirmatively false -- `--pack-preimage`
+will refuse the record on the next run (§4.3), and the operator is then sent to
+`ms hashlock`, which refuses it a third time in a message written for a different
+audience. Three refusals, and none of them says the one thing that is true and
+actionable. So a wrong-id record gets §8.1.2 straight away, from the no-flag path
+too, and sees ONE refusal.
+
+**§8.1.2 (HOST, stderr).** The EXISTING `U::PreimagePlate` body
+(`main.rs:2805-2810`), rewritten for the case it actually covers -- a kind-`0x03`
+single whose id is outside `{entr, hash}` (§4.3's table; an `entr` mismatch
+reaches the shipped `U::TagKindMismatch` text at `:2799-2804` and that text is
+UNCHANGED):
 
 > record {i} (records count from 0) is a kind-0x03 preimage payload whose
 > 4-character id is not `hash`. A preimage plate is kind 0x03 under the id
-> `hash` (SPEC_ms_hashlock §1 rule 2), and --pack-preimage admits only that.
-> Re-encode it with `ms hashlock` rather than editing the string.
+> `hash` (SPEC_ms_hashlock rule 2), and --pack-preimage admits only that.
+> Re-encode it with `ms hashlock` rather than editing the string. If this string
+> is a 33-byte seed backup that happens to begin 0x03, it is not a preimage:
+> roughly 1 in 256 of them look like this.
 
-Its device-side twin is not a modal: such a record is `ClassUnknown` and inert,
-visible only in the door's not-understood count (`gui/composer_door.go:41-56`).
-The wording measured **165 characters drawn, headroom 397** on `errorScreenBody`
-so that it can be surfaced later without a re-measure.
+**The last sentence is the point** (round-0 journey I-4). §4.3 exists for exactly
+one case, which `codex32/mspayload.go:78-92` states outright -- *"A plain BIP-93
+33-byte seed that begins 0x03 is indistinguishable from a preimage plate ...
+Roughly 1 in 256 of 33-byte seeds"* -- and the first draft's copy never named it,
+so the operator most likely to hit this refusal was the one least told what it
+meant.
 
-### §8.2 Host warnings
+**Its device-side twin is not a modal**: such a record is `ClassUnknown` and
+inert, visible only in the door's not-understood count
+(`gui/composer_door.go:41-56`).
+
+**The first draft's measurement for this body is WITHDRAWN.** It claimed *"165
+characters drawn, headroom 397 on `errorScreenBody` so that it can be surfaced
+later without a re-measure"*, and the text as printed carried a `§`, so measured
+it **blanks the frame** (5,004 ink pixels against a 6,000 floor) and draws
+nothing. The ASCII body above measures **236 drawn / headroom 320** on
+`errorScreenBody`, and with the collision sentence **340 drawn / headroom 223** --
+both clear the 80-character margin, and both are host bodies measured on the
+device renderer only so the text is ready if it is ever surfaced there.
+
+### §8.2 Host warnings -- all four are HOST, stderr, and exempt from the ASCII rule
 
 **§8.2.1, transit -- always, when a preimage or `phrase:` record is admitted:**
 
@@ -704,12 +1303,32 @@ so that it can be surfaced later without a re-measure.
 > me: --pack-preimage was passed and this payload holds no preimage plate and no
 > `phrase:` record. Nothing was admitted that would otherwise have been refused.
 
-**§8.2.3, orphan digest:**
+**§8.2.3, orphan digest -- TWO bodies, one per carrier** (round-0 journey I-3;
+the two are distinguishable because the operator's next move differs):
 
 > me: WARNING — record {i} (records count from 0) is a preimage whose digest
 > {first8}..{last8} matches no `hash:` record in this payload. Nothing here
 > tells the device which policy it unlocks, and the Hashlock plates flow will
 > print the digest alone.
+
+> me: WARNING — record {i} (records count from 0) is a hashlock phrase whose
+> digest {first8}..{last8} matches no `hash:` record in this payload. Check the
+> method selector and the text after the first comma — a space after the comma
+> is part of the phrase and derives a different preimage.
+
+**When the payload holds NO `hash:` record at all, both drop to a note rather
+than a `WARNING —`** (round-0 journey M-6). §12 item 3's own acceptance path --
+`ms hashlock --out X.txt` then `me sysw pack` -- produces exactly that payload,
+because `ms hashlock` writes only the ms1 string to `--out` and prints `hash:`
+to stdout, so the minimal correct journey would fire a WARNING every single time,
+which is how a warning stops being read. The distinction the operator needs is
+**incomplete** (no `hash:` records were packed; nothing is inconsistent) versus
+**contradictory** (the payload holds `hash:` records and this digest matches none
+of them), and only the second is a warning:
+
+> me: note — this payload holds no `hash:` record, so nothing here says which
+> policy the preimage unlocks. The Hashlock plates flow will print the digest
+> alone.
 
 **§8.2.4, sealed transit** (see §3.4's correction -- each clause is true of the
 container it names):
@@ -726,11 +1345,19 @@ Heading, then one row per plate, then the apart-storage line:
 
 > path {n}  {first8}..{last8}  {phrase, hardened, QR | phrase, sha256 | preimage string}
 
+The third field is the choice made on §5.3's step (A), reported here read-only.
+
 > preimage {first8}..{last8}: not on any path, will not be cut
 
 > preimage {first8}..{last8}: declined, will not be cut
 
 > Keep each preimage plate apart from the policy plates and from the others.
+
+MEASURED at `sh2DisplaySize`, these rows are 405-448 px wide and every one of
+them is over `confirmReviewScreen`'s 374 px centred-safe width -- as is the
+SHIPPED completeness line at 459 px, which is why §5.3 item 2 routes the block
+through `composerPageLines`' 411 px band instead of adding five more rows to a
+pre-existing W-3 overlap.
 
 The stand-alone notice form of the fourth row, for a review whose only entry is
 an unused preimage, measured **107 drawn / headroom 455**:
@@ -738,28 +1365,61 @@ an unused preimage, measured **107 drawn / headroom 455**:
 > One preimage this composition holds is on no path of this policy. It will not
 > be cut. Go back and set a path's hash to it, or leave it.
 
-### §8.4 The abort arm
+### §8.4 The abort arms -- BOTH on the composer's own screens
 
-`bundleAbortWarningText` (`gui/bundle_flow.go:780-792`) gains a third clause,
-prepended to the seed clause because it is the funds-losing fact:
+**`bundleAbortWarningText` is UNCHANGED, and the first draft's placement was
+dead code** (round-0 fidelity I-1). It said the clause was *"prepended"* to
+`bundleAbortWarningText` (`gui/bundle_flow.go:780-792`) and *"fires when the run
+ends before every accepted preimage plate is cut"*. That text is reachable only
+from `bundleAbortWarning` at `gui/bundle_flow.go:625` and `:640`, both INSIDE
+`bundleEngrave` -- and §5.4 cuts every accepted preimage plate BEFORE calling it.
+At every site where the text can be built, every accepted plate is already cut.
+The clause could never fire.
+
+It also could not be plumbed. `bundleAbortWarningText(p bundlePlate, secret bool)`
+has no channel for the new fact, and the shipped comment at
+`gui/bundle_flow.go:610-616` PROHIBITS the obvious workaround by name: a variadic
+tail *"would leave order and arity unchecked on the value deciding whether a
+plate says PASSWORD REQUIRED"*.
+
+So both arms are the COMPOSER's screens, drawn by `composerEngraveStep` after the
+fact -- `bundleEngrave` already draws its own abort warning and then returns
+`bundleEngraveAborted`, so the operator sees the set-level screen and then this
+one. Each is measured ALONE, which is what it is drawn as.
+
+**§8.4a, `composerAbortNoPreimage` -- no preimage plate was cut:**
 
 > NO PREIMAGE PLATE WAS CUT. The phrase dies with this composition. Do not fund
 > this wallet.
 
-Fires when the run ends before every accepted preimage plate is cut. MEASURED on
-`errorScreenBody`: **288 drawn / headroom 244** alone, and **411 drawn /
-headroom 121** in the LONGEST variant, with the shipped seed clause following it.
+MEASURED on `errorScreenBody`: **75 drawn / headroom 476.**
 
-**Four longer drafts were measured and rejected**, because headroom is a LINE
-budget and each cost a line: *"...leaving the composer or losing power destroys
-it, and no plate already cut can recover it..."* 488/**39**; *"...leaving the
-composer or losing power destroys it..."* 455/**79**; *"...The phrase is held
-only by this composition and dies with it..."* 428/**79**; *"...and no plate
-already cut carries it..."* 441/**79**. All four are under the 80-character
-margin in the combined body and none may be restored without re-measuring.
+**§8.4b, `composerAbortPreimageCut` -- at least one was, and no policy set:**
 
-**It says "dies with this composition", not "is now gone"** (report §2, deviation
-D2). An abort inside `bundleEngrave` returns `bundleEngraveAborted`, so
+> A PREIMAGE PLATE WAS CUT and no policy plate was. Store or destroy it now; do
+> not leave it with the blanks.
+
+MEASURED on `errorScreenBody`: **86 drawn / headroom 476.**
+
+**The first draft's numbers for this section did not reproduce and are
+withdrawn** (round-0 fidelity I-6, tests I-2). It stated *"288 drawn / headroom
+244 alone"*; measured, §8.4a alone is **75 / 476**. Its companion figure was
+`411 / 121` for a "LONGEST variant" in which the arm was prepended to the shipped
+seed clause -- that combination measures **414 / 121** here and is in any case a
+body this stage no longer builds, because the arms are separate screens. (The
+3-character gap is the caller context: `bundleAbortWarningText` interpolates
+`cardIdx`, `cardTotal` and `label`, which the first draft never pinned. Nothing
+in §8 now depends on it.)
+
+**Four longer drafts of §8.4a were measured and rejected** in the first draft,
+because headroom was a LINE budget in the combined body and each cost a line:
+488/**39**, 455/**79**, 428/**79**, 441/**79**. Those numbers belong to the
+combined body and no longer bind: on its own screen §8.4a has 476 characters of
+headroom. They are kept only as the record that the wording was chosen, not
+defaulted -- **any replacement is re-measured on `errorScreenBody` alone.**
+
+**It says "dies with this composition", not "is now gone"** (author report §2,
+deviation D2). An abort inside `bundleEngrave` returns `bundleEngraveAborted`, so
 `composerEngraveStep` returns false and `composerFlow` loops back to the shape
 with the state intact (`gui/composer_flow.go:47-131`) -- the phrase is still
 held. Saying it is gone would be false on the screen whose job is to stop a
@@ -815,11 +1475,69 @@ Rules:
    100-character phrase (§6.5, §7.1). It is pinned by corpus rows in the
    `ms hashlock` corpus (§11.2), because `ms hashlock` learning to parse it is a
    follow-on and the text must be fixed before the parser exists.
+5. **The plate names the ALGORITHM and not the `--method` selector, and that is
+   declined here with a reason rather than foreclosed by arithmetic** (round-0
+   journey M-2). A year-later operator scanning the QR reads
+   `method: pbkdf2-hmac-sha256 ...` and must map it to
+   `ms hashlock --method hardened`, a mapping on no part of the plate; the
+   `sha256` plate has no such gap, because its line IS the selector. Appending
+   the selector to the method line costs 32 characters (105 total, MEASURED),
+   and §6.5 pins the line at 73 with a 79th character pushing the worst case over
+   budget -- so it cannot go THERE. It could go on its own body row
+   (`ms hashlock --method hardened`, 29 characters, one line at 3.0 mm), and it
+   is not taken: the plate's job is to let a reader reproduce the derivation with
+   ANY tool, which the algorithm line does and a flag name does not, and
+   `args.method.unwrap_or(Method::Hardened)`
+   (`crates/ms-cli/src/cmd/hashlock.rs:184`) already makes `hardened` the default
+   the plate does not need to name. Recorded so the next reader sees a decision
+   rather than a constraint.
 
 ### §8.7 The plate's own words
 
-Band texts are §6.2's four literals. The phrase form's space legend is
-`passphraseLegend` (`backup/passphrase.go:168`), reused verbatim.
+Band texts are §6.2's **three distinct literals** -- `HASHLOCK PREIMAGE`,
+`HASHLOCK PHRASE`, `NOT A SEED` -- in four table cells, because `NOT A SEED` is
+the footer of both forms (round-0 fidelity N-1; §6.2's own "MEASURED lengths: 17,
+15, 10" gives three numbers, and "four band literals" was a miscount). The phrase
+form's space legend is `passphraseLegend` (`backup/passphrase.go:168`), reused
+verbatim.
+
+### §8.8 The Password program says where a hashlock phrase is used -- NORMATIVE
+
+**The refusal at `progPassword` is correct, structural, and completely invisible**
+(round-0 journey I-6). §4.1 is emphatic that a hashlock phrase is never admitted
+there, and `admitted[progPassword]` is `{ClassPassphrase: true}`
+(`gui/sysw_admit.go:35`). But the mechanism that enforces it draws nothing:
+
+```go
+// gui/sysw_session.go:270-278
+func syswOfferAlt(ctx *Context, th *Colors, want sysw.Class, title, lead, alt string) (string, bool) {
+	if ctx.sysw == nil || !ctx.sysw.has(want) {
+		return "", false          // <-- no screen is drawn
+	}
+```
+
+So the operator packs their hashlock phrase, taps, opens the program whose NAME
+matches the thing they are holding, and gets the ordinary passphrase keyboard --
+no offer, no mention that the payload holds a phrase, no reason. The obvious next
+move is the harmful one: re-pack the phrase as a `pass:` record so it "works",
+which is the substitution ruling L2 exists to prevent and whose stated stake is a
+different wallet.
+
+Note the asymmetry this leaves without §8.8: §9 gives the passphrase program a
+warning for an operator who TYPES an ms1 string at it -- the rarer mistake, with
+no funds consequence, since free text and passphrase both cut as typed -- while
+the operator whose payload literally CONTAINS a hashlock phrase gets nothing.
+
+Silence is today's behaviour, so the test is whether the wrong outcome is worse
+than saying nothing. Here saying nothing is what routes the operator around the
+guard, so it is worse. **One modal, drawn at `progPassword` when the loaded
+payload holds a `ClassPhrase` record and no `ClassPassphrase` record:**
+
+> This payload holds a HASHLOCK PHRASE, not a BIP-39 passphrase. They are not
+> interchangeable: using one as the other opens a different wallet. A hashlock
+> phrase is used in the Wallet Policy program.
+
+MEASURED on `errorScreenBody`: **165 drawn / headroom 397.**
 
 ---
 
@@ -867,45 +1585,123 @@ third arm, chosen when EVERY hashed path's digest has material in
 `hashlockHeld` that this run will cut:
 
 > HASH ON EVERY PATH
-> Every way to spend this wallet needs the preimage of a hash. This run cuts a
-> preimage plate for each one. Store those plates apart from these, and apart
-> from each other.
+> Every way to spend this wallet needs the preimage of a hash. This composition
+> holds the preimage for each one and can cut a plate for it at Done. Store those
+> plates apart from these, and apart from each other.
 
 and, when at least one of those digests came from a phrase typed here:
 
 > HASH ON EVERY PATH
-> Every way to spend this wallet needs a hashlock preimage. This run cuts a
-> plate for each phrase and its method. Store those plates apart from these, and
-> apart from each other.
+> Every way to spend this wallet needs a hashlock preimage. This composition
+> holds the phrase and method for each one and can cut a plate at Done. Store
+> those plates apart from these, and apart from each other.
 
-MEASURED on `errorScreenBody`: **153 drawn / headroom 378** and **159 / 378**.
+MEASURED on `errorScreenBody`: **185 drawn / headroom 360** and **186 / 360.**
+
+**Both are in the PRESENT TENSE of what is HELD, not the future tense of what
+will be cut, and that is a correction** (round-0 fidelity I-4). The first draft
+said *"This run cuts a preimage plate for each one"*.
+`composerCopyHashEveryPathFor` has one call site,
+`gui/composer_shape.go:442-443`, inside `composerShapeFlow`, which `composerFlow`
+runs at line 75 -- while `composerEngraveStep`, where §5.3's accept/decline
+happens, runs at line 125. The banner is drawn several steps BEFORE the plate set
+exists: before the form pick, before the census, and before the operator can
+decline a plate, which §5.3 item 5 explicitly permits. An operator who read "this
+run cuts a plate for each one" and then declined one would be left with a backup
+instruction that was false, on the screen whose whole job is to say what spending
+needs. That is the class H5 §1.2 removed from the confirm modal, and §8.4 cites
+the same standard in its own reasoning; it now applies here too. The two measured
+figures above are of the CORRECTED wording; the first draft's 153/378 and 159/378
+belong to the withdrawn future-tense text.
+
 When some hashed path has no plate in this run, the SHIPPED forms stand
 unchanged -- they say the preimage is "not on these plates", which is then true
 of at least one path, and H5 §2.5 already recorded that this family overcounts in
 the safe direction.
 
-### §10.2 The reconcile screen is suppressed for payload phrases
+**Where the load actually falls: NOT here, on the ordinary wallet** (round-0
+journey M-3). The call site is guarded by `composerEveryPathHashed`
+(`gui/composer_state.go:257-259`), which is false the moment ONE path is keyed --
+i.e. on the ordinary mixed hashlock wallet. The fork already records this:
+`gui/composer_hashlock.go:70-79` says §8h *"is guarded by composerEveryPathHashed
+... which is false the moment ONE path is keyed -- so on the ordinary mixed wallet
+the line was drawn nowhere at all"*, which is why H5 moved the reconcile line into
+the phrase route. H6 does not make it worse and does not change the guard. It is
+written down so a plan built from §10.1 does not add an arm believing it is the
+surface that carries this information: **on a mixed policy it is §8.3's census
+block at Done that tells the operator a preimage plate is being cut**, for every
+composition, and that is why §8.3 is not optional.
 
-`composerCopyHashlockReconcile` (`gui/composer_copy.go:484-490`) tells the operator
-to *"run ms hashlock with this phrase and method on the host and check the digest
-matches"*. For a phrase that CAME from the host in the payload the host already
-has it and the instruction is a no-op that reads as a task. The screen is drawn
-only when the digest's provenance is `hashlockFromPhrase`. Its TEXT is unchanged
--- H5 §1.1's needle *"run ms hashlock with this phrase"* survives, and
+### §10.2 The reconcile screen is provenance-correct BY CONSTRUCTION -- no guard
+
+**The first draft added a runtime guard here and it would have changed nothing**
+(round-0 fidelity I-3). It said the reconcile screen *"is drawn only when the
+digest's provenance is `hashlockFromPhrase`"*.
+`composerCopyHashlockReconcile` (`gui/composer_copy.go:484-490`) has exactly ONE
+call site in the whole tree -- `gui/composer_hashlock.go:83`, inside
+`hashlockPhraseRoute`, immediately after a device-typed phrase's confirm. A
+payload `phrase:` record is picked from `Which hash?`'s band 3 and takes §5.1's
+derive-only path, which never enters `hashlockPhraseRoute`. **The screen is
+already unreachable for payload provenance**, so the guard is dead code and the
+§11.5 mutation the first draft paired with it (*"key §10.2 on `phraseDigests`
+instead of provenance"*) could not fail either: at that call site no keying draws
+the screen for a payload row, because the payload row does not execute that code.
+
+So there is **no guard and no new test**. What this section records instead is
+WHY the property holds, so the next reader does not re-open it: the two
+provenances run different code paths (§5.1), and the reconcile screen belongs to
+one of them. Its TEXT is unchanged -- H5 §1.1's needle *"run ms hashlock with this
+phrase"* survives, and
 `TestHashlockReconcileScreenIsReachableOnAMixedPolicy`
-(`gui/composer_hashlock_test.go:920`) and the walk (`cmd/emu/walk_hashlock_phrase.js:458`)
-keep theirs.
+(`gui/composer_hashlock_test.go:920`) and the walk
+(`cmd/emu/walk_hashlock_phrase.js:458`) keep theirs.
 
-### §10.3 `PREIMAGE REQUIRED` on the composer's md1 plates
+**If a payload phrase should ALSO get a reconcile-style screen, that is a
+different screen and this stage does not add one** -- for a phrase that came from
+the host in the payload the host already has it, and *"run ms hashlock with this
+phrase and method on the host and check the digest matches"* is a no-op that
+reads as a task. §13 records it as out of scope rather than leaving it implied.
+
+### §10.3 `PREIMAGE REQUIRED` on the composer's md1 AND mk1 plates
 
 `composerEngraveStep` passes a marking to `bundleEngrave`
 (`gui/composer_flow.go:393`, today `"", ""`): `markTitle = "PREIMAGE REQUIRED"`
 when any path of the composition carries a hash, `""` otherwise; the footer stays
 empty. This is the single-sig mechanism unchanged
 (`singleSigPlateMark`, `gui/singlesig.go:365-374`, whose `"PASSWORD REQUIRED"` is
-also 17 characters against `MaxTitleLen = 18`), and `bundlePlateMark`
-(`gui/bundle_flow.go:565-579`) already refuses to mark a `cardMS1`, so the seed
-plates in the same run stay unmarked with no change.
+also 17 characters against `MaxTitleLen = 18`, `backup/backup.go:71`).
+
+**It marks the md1 plates AND the mk1 key cards, and the first draft described an
+effect it does not have** (round-0 journey I-5). `bundlePlateMark`
+(`gui/bundle_flow.go:573-578`) excludes exactly one kind:
+
+```go
+func bundlePlateMark(kind bundleCardKind, title, footer string) (string, string) {
+	if kind == cardMS1 { return "", "" }
+	return title, footer
+}
+```
+
+and the template form's card list is `cardMD1` **plus** the minted `cardMK1` key
+cards (`composerMintCards`, `gui/composer_cards.go:69-74`). So a run-level
+`markTitle` stamps every mk1 key card too -- cards whose title band is empty
+today, and which in a multisig composition are the artifacts that LEAVE for other
+cosigners.
+
+**That behaviour is taken, deliberately, and stated rather than discovered.** It
+is `singleSigPlateMark`'s own precedent, where `PASSWORD REQUIRED` reaches mk1 the
+same way, and it is what F-132 asks for: a cosigner holding a key card should
+learn that the wallet needs a preimage, because they are exactly the year-later
+reader who otherwise has nothing telling them one exists. The alternative --
+passing the marking per card kind -- would suppress the message on the only
+artifact that travels.
+
+What is NOT acceptable is the first draft's test, which could not tell the
+difference: *"marks the md1 plates when any path is hashed and no plate when none
+is, and never marks a `cardMS1`"* passes whether or not the key cards are marked.
+§11.5's row now names the mk1 cards; a row that does not is proving nothing about
+the sentence it sits under. The seed (`cardMS1`) plates in the same run stay
+unmarked with no change.
 
 It closes the plate half of F-132 (`design/FOLLOWUPS.md:4298`): the year-later
 reader holding only the descriptor plates is the one person nothing on the device
@@ -922,19 +1718,53 @@ currently tells that a preimage exists.
   an ms1-shaped phrase, non-UTF-8 bytes, uppercase hex, an unknown method.
   MUTATION: cut on the LAST comma → the comma-bearing phrase row fails.
   MUTATION: accept an unknown method → the unknown-method row classifies.
-- `--pack-preimage` admits a plate and a `phrase:` record; without it both are
-  refused by index with §8.1.1's text. MUTATION: admit unconditionally → the
-  no-flag rows classify.
-- The id rule (§4.3): a kind-`0x03` single under id `hash` is admissible; the
-  same payload under any other id is refused with §8.1.2. MUTATION: drop the id
-  test from `preimage_plate_admissible` → the mistagged row is admitted.
-  **This row is the funds-relevant one**: without it a plain BIP-93 33-byte
-  secret beginning `0x03` reaches a plate flow.
+- **Classification is unconditional:** `classify` answers `Preimage`/`Phrase`
+  under `Admission::default()` AND under `pack_preimage`. MUTATION: gate the
+  classifier on admission → the corpus row and the device's `Classify` disagree
+  and the vendored lockstep test reds.
+- `--pack-preimage` admits a plate and a `phrase:` record through `admit_check`'s
+  new rule; without it both are refused by index with §8.1.1's text. MUTATION:
+  drop the new `admit_check` rule → the no-flag rows are admitted.
+- **`decide_sealing` is reached with the flag and SEALS.** `--pack-preimage`
+  alone (no `--no-passphrase`) seals and the sealing line names the class.
+  MUTATION: make `classify` admission-gated and leave `decide_sealing` on the
+  strict classifier → the row reports `NOT SEALED` and the payload ships bearer
+  material in cleartext. **This row is why §3.2 gates admission and not
+  classification**, and it is the funds-relevant one on the host.
+- The id rule (§4.3): a kind-`0x03` single under id `hash` is admissible; under
+  an id outside `{entr, hash}` it is refused with §8.1.2; **under `entr` it is
+  refused with the SHIPPED `TagKindMismatch` text**, with and without the flag.
+  MUTATION: drop the id test from `preimage_plate_admissible` → the mistagged row
+  is admitted. MUTATION: use `entr` as the "any other id" case → the row must
+  expect the shipped text, not §8.1.2. **The first row is the funds-relevant
+  one**: without it a plain BIP-93 33-byte secret beginning `0x03` -- roughly 1 in
+  256 of them -- reaches a plate flow.
+- **§8.1.1's final sentence is emitted only for id `hash`.** MUTATION: emit it
+  unconditionally → the wrong-id row sends the operator to a flag that will
+  refuse them.
+- **`codex32.EncodeMS1Preimage` (§3.5), three rows.** (a) lockstep: it reproduces
+  the `hashlock-v0.8.json` `kind` row's `ms1` byte for byte for that row's
+  `preimage_hex` -- id `hash`, kind `0x03`, 75 characters. (b) round trip:
+  `DecodeMS1Preimage(New(EncodeMS1Preimage(x))) == x` over random X. (c) **it can
+  never emit id `entr`**, asserted on `Split()`'s id of the OUTPUT rather than on
+  the source, over the same random X. MUTATION: pass `"entr"` to `NewSeed` →
+  (a) and (c) both red, and the string produced satisfies `IsPreimage` while
+  failing `IsPreimagePlate` -- which is the copy-paste hazard, reproduced.
+  MUTATION: reintroduce an `id string` parameter → (c) reds.
 - `decide_sealing` seals a payload holding a preimage and says so; with
   `--no-passphrase` it does not and says so. MUTATION: make the class non-secret
   → the seal row reports NOT SEALED.
-- All four warnings of §8.2 fire on their condition and not otherwise.
-  MUTATION: drop the orphan check → the orphan row prints no warning.
+- All four warnings of §8.2 fire on their condition and not otherwise, in the
+  §3.3 order against the passphrase ceremony (1-3 before the sealing line, 4
+  after). MUTATION: drop the orphan check → the orphan row prints no warning.
+  MUTATION: move warning 1 after the ceremony → the F-246 ordering row reds.
+- **The orphan check covers `phrase:` records**: a `phrase:` record whose derived
+  digest matches no `hash:` record warns; one that matches does not; a payload
+  holding NO `hash:` record gets the note, not the `WARNING —`. MUTATION: drop the
+  phrase arm → the hand-built rows print nothing. MUTATION: hex
+  `hardened, my phrase` (a space after the comma) → the digest differs from
+  `hardened,my phrase` and the warning fires, which is the row that catches the
+  hand-build error.
 - The corpus is regenerated and re-vendored; the Go side asserts the sha256
   literal. MUTATION: edit one vendored row → the sha test reds.
 
@@ -951,28 +1781,59 @@ MUTATION: put `phrase:` before `method:` → every row fails.
 
 - The alignment table of §7.2 is DERIVED in the test from the encoder's own
   bitmap and compared against the table the code carries, for v2..v9.
-  MUTATION: change one centre → the derivation disagrees.
+  MUTATION: change one centre → the derivation disagrees. (Re-derived in the
+  round-0 fold and every row of §7.2 reproduced exactly.)
 - `ConstantQR` accepts 41/45/49/53 and refuses 57. MUTATION: raise the bound to
   57 without the table → `bitmapForQRStatic` panics, which the test asserts it
   no longer does.
-- Constant-time: for each of v6..v9, two different payloads of the same version
-  emit the SAME move count, and `findPath` returns no error. MUTATION: make the
+- **THE ROW THAT CAN ACTUALLY FAIL: `len(modules) <= constantTimeQRModules(dim)`
+  for N fuzzed §8.6 payloads at each of v6..v9**, and `findPath` returns no
+  error on any of them. This is the budget proof, and it is stated separately
+  because the move-count row below cannot substitute for it. MUTATION: set any
+  of the four `constantTimeQRModules` arms to the round-0 fold's observed maximum
+  MINUS ONE (812 / 944 / 1160 / 1368) → that version's row reds, which is also
+  the check that the entry was derived rather than guessed.
+- **THE REGRESSION GUARD, labelled as one: for each of v6..v9, two different
+  payloads of the same version emit the SAME move count.** MUTATION: make the
   move list depend on a module's colour → the two payloads differ.
-- Goldens for v6, v7, v8, v9 on fixed payloads.
+  **This row passes on a WRONG budget and on a budget of 0**, because `Engrave`
+  loops `for range nmod` and pads every move to `maxDur` -- so it proves the
+  padding, not the bound. It is kept for what it does prove and named for what it
+  does not.
+- **Scale 2 (§7.3):** `engraveModule` emits a constant FIVE commands per module at
+  scale 2, the same as scale 3; the painted extent of a module at `p` is exactly
+  `[p*2sw, p*2sw+2sw]` on both axes; and a v9 `ConstantQRCmd.Engrave(..., 2)`
+  completes without panicking. MUTATION: remove the `case 2` arm → the panic
+  returns and the phrase plate cannot be built at the only scale it fits at.
+  MUTATION: make the arm symmetric about the centre (the `case 3` shape scaled
+  down) → the extent assertion reds, because `centerOf` puts the scale-2 centre
+  half a stroke off the cell centre.
+- Goldens for v6, v7, v8, v9 on fixed payloads, **at scale 2**.
 
 ### §11.4 The plate
 
 - Golden bytes for both forms at their fitting rungs, with and without the QR.
+  The string form's golden pins it LOWERCASE and UNGROUPED at 6.0 mm (§6.1), so
+  "VERBATIM" cannot drift into `EngraveSeedString`'s upper-cased, grouped
+  rendering. MUTATION: group in tens → at 19 characters per line the body goes
+  from 10 rows to 14 and the fit gate reds at 6.0 mm.
 - The §6.5 fit gate: the worst-case phrase plate (100-character phrase, hardened
   method line, three header rows, QR) lays out at 3.0 mm and REFUSES at any
   larger rung, measured on the real render rather than on arithmetic.
   MUTATION: add one character to the method line → the worst case no longer
   fits and the gate reds. MUTATION: set the QR scale to 3 → it reds.
-- Band budget: the four band literals are within `MaxTitleLen`; every locator
-  row is a BODY row and no locator ink lands in a screw-hole band.
-  MUTATION: move `mk1 stub (template): <8 hex>` into a band → the geometry gate
-  fails at 3.0 mm (29 characters against the 32-character cap is inside, but the
-  33-character `path` row is not, and the gate measures the longest).
+- Band budget: the three band literals are within `MaxTitleLen`; every locator
+  row is a BODY row and **no locator ink lands in a screw-hole band**.
+  MUTATION: draw any locator row at `l.topY` or `l.bottomY` → the ink-in-band
+  assertion fires. **The first draft's mutation could not fail** and is replaced:
+  it claimed moving `mk1 stub (template): <8 hex>` into a band would red because
+  "the 33-character `path` row is not [inside the cap]", but measured, every
+  locator row is 6-30 characters against a 32-character cap at 3.0 mm, and the
+  33-character row is a concatenation §6.3 does not produce. The constraint is
+  placement and line count, so the mutation tests placement.
+- **The wrap rule:** the body wraps on characters, not words. MUTATION: wrap on
+  word boundaries → the 100-character phrase and the 75-character ms1 string are
+  single tokens with no break point and the layout fails or overflows.
 - The QR encodes §8.6's text and NOT the ms1 string. MUTATION: encode
   `plate.MS1` → the decode assertion fails.
 - Spaces: a phrase with a leading, trailing or doubled space renders `SpaceMark`
@@ -991,33 +1852,86 @@ MUTATION: put `phrase:` before `method:` → every row fails.
 - A `phrase:` row shows the derive marker before it is picked and its digest
   after. MUTATION: derive at row-build time → a timing assertion on the screen's
   first frame fails.
+- **The Hashlock plates flow does the same** (§5.2): its list screen draws its
+  first frame without running the KDF; picking a `phrase:` record derives ONCE
+  behind the countdown; the plate it cuts carries a NON-EMPTY `hash` locator row
+  whose digest equals the host's. MUTATION: derive per frame → the once-per-pick
+  assertion fails. MUTATION: omit the locator's `hash` row when the record is a
+  phrase → the non-empty assertion fails, which is the row standing between the
+  operator and a bearer plate with no locator at all.
+- **A `hash:` row whose digest is matched by a preimage or `phrase:` record in
+  the same payload is annotated `(in payload)`** and draws on one line.
+  MUTATION: drop the annotation → the both-present row shows two adjacent rows
+  with identical digest text and different consequences.
 - `hashlockHeld` on a zero-value `composerState` built exactly as `composerFlow`
   builds it: one HOLD, no panic, the material present. MUTATION: assign without
   the nil check → panic.
 - `composerFlowExit` scrubs it. MUTATION: remove the scrub call → a test reading
   the map through the `!tinygo` seam after exit finds the phrase.
+- **The review is two steps and the per-plate choices are on the PICK step.** By
+  LABEL: the pick screen offers `preimage string` / `phrase + method` /
+  `phrase + method + QR` / `do not cut this preimage`, the QR rows only when the
+  phrase is held; taking a QR row fires §8.5. The census is READ-ONLY and reports
+  the choice. MUTATION: put the form/QR/decline controls on `confirmReviewScreen`
+  → there is no control left to bind and the test cannot drive them, which is the
+  point. MUTATION: offer a QR row when the device holds no phrase → the row
+  assertion fails.
 - The review: a declined plate is dropped and named; an unused preimage is listed
   and not cut; the plan's remaining plates are unchanged. MUTATION: drop the
   declined plate silently → the census row assertion fails.
+- **The census block is drawn through `composerPageLines`' band**, and no census
+  row's ink lands under a navigation button. MUTATION: draw the block through
+  `confirmReviewScreen`'s own wrap → the ink-under-nav scanner
+  (`inkUnderNavOps`) finds the 405-448 px rows under the column.
 - Cut order: the preimage plates are engraved before `bundleEngrave` is called.
   MUTATION: move the loop after it → an order assertion on the engrave hook
   fails.
-- The abort arm fires when the run ends before a preimage plate is cut, and not
-  when every one was. MUTATION: fire unconditionally → the all-cut row fails.
-- §10.1's third §8h form fires on its predicate and not otherwise; §10.2's
-  reconcile screen is drawn for a device-typed phrase and not for a payload one.
-  MUTATION: key §10.2 on `phraseDigests` instead of provenance → the payload row
-  draws it.
-- `PREIMAGE REQUIRED` marks the md1 plates when any path is hashed and no plate
-  when none is, and never marks a `cardMS1`. MUTATION: mark unconditionally →
-  the unhashed row fails.
+- **BOTH abort arms**, on the composer's own screens: §8.4a fires when the run
+  ends with NO preimage plate cut; §8.4b fires when at least one was cut and no
+  policy set completed; NEITHER fires on a completed run. MUTATION: fire either
+  unconditionally → the success row fails. MUTATION: attach either to
+  `bundleAbortWarningText` → the arm is unreachable, because §5.4 cuts every
+  accepted preimage plate before `bundleEngrave` is called, and the test that
+  asserts §8.4b appears after an abort inside `bundleEngrave` fails.
+- **The Hashlock plates flow does NOT draw either arm** (§5.2). MUTATION: reuse
+  §8.4a there → an assertion that the flow's abort draws no "dies with this
+  composition" body fails, because the material is still in the payload.
+- §10.1's third §8h form fires on its predicate and not otherwise, **and its body
+  does not claim a plate was cut**: a run in which a plate is DECLINED at §5.3
+  step (A) leaves the §8h body true. MUTATION: restore the future-tense wording
+  ("This run cuts a preimage plate for each one") → the decline row asserts a
+  body that is false about what the run did.
+- **§10.2 gets no test**, because it gets no guard: the reconcile screen has one
+  call site, inside `hashlockPhraseRoute`, which a payload phrase never enters
+  (§5.1). The existing
+  `TestHashlockReconcileScreenIsReachableOnAMixedPolicy` continues to cover the
+  device-typed path unchanged.
+- `PREIMAGE REQUIRED` marks the md1 plates **and the mk1 key cards** when any
+  path is hashed, marks no plate when none is, and never marks a `cardMS1`.
+  **The mk1 assertion is required, not optional**: without it every assertion in
+  this row passes whether or not the key cards are marked, and the row would be
+  proving nothing about §10.3's sentence. MUTATION: mark unconditionally → the
+  unhashed row fails. MUTATION: suppress the marking on `cardMK1` → the key-card
+  row fails.
 - §9's warning fires for a grouped ms1 plate string, an ungrouped one and an
   UPPERCASE one, and not for ordinary text; the plate is still cut as typed.
   MUTATION: use `codex32.IsPreimage` instead of `IsMS1Shaped` → the grouped row
   fails. MUTATION: refuse instead of warning → the still-cut assertion fails.
-- Every body §8 adds is in `modal_fits_test.go`'s table and passes
-  `assertModalBodyFits`; §8.4's LONGEST variant (preimage arm + seed arm) is the
-  row that matters.
+- **§8.8's Password-program notice** is drawn when the payload holds a
+  `ClassPhrase` record and no `ClassPassphrase` record, and NOT when it holds a
+  `pass:` record. MUTATION: drop the notice → the operator sees the ordinary
+  keyboard with no explanation, which is today's behaviour and the finding.
+- Every DEVICE body §8 adds is in `modal_fits_test.go`'s table and passes
+  `assertModalBodyFits`: §8.1.2, §8.3's rows and its stand-alone notice, §8.4a,
+  §8.4b, §8.5, §8.8, §9's body and §10.1's two arms. Each is measured ALONE, as
+  it is drawn.
+- **Every DEVICE body is ASCII**, asserted mechanically over the table (`r <=
+  unicode.MaxASCII` for every rune), not by inspection. MUTATION: put a `§` or an
+  em dash in any body → `assertModalBodyFits` reports a near-blank frame (5,004
+  ink pixels against a 6,000 floor) rather than a truncation, and the ASCII
+  assertion names the character. **This mutation is the one that must be in the
+  suite**: the first draft carried non-ASCII in five bodies and claimed a
+  measurement for one of them that the harness cannot produce.
 
 ### §11.6 Whole gates
 
@@ -1048,15 +1962,40 @@ H6 is done when, on the flashed device:
    returns §8.6's text byte for byte, and `ms hashlock --hashlock-phrase-stdin`
    over the phrase on that plate reproduces the digest the composer showed.
 2. The same composition's md1 plates carry `PREIMAGE REQUIRED`.
-3. `ms hashlock --out X.txt`, `me sysw pack --pack-preimage --no-passphrase`, a
-   tap, the Hashlock plates flow, and a cut plate whose ms1 string round-trips
-   through `ms hashlock --in`.
+3. `ms hashlock --out X.txt` **plus its `hash:` record**,
+   `me sysw pack --pack-preimage --no-passphrase`, a tap, the Hashlock plates
+   flow, and a cut plate whose ms1 string round-trips through `ms hashlock --in`.
+   The `hash:` record is in the invocation deliberately: `ms hashlock` writes only
+   the ms1 string to `--out` and prints `hash:` to stdout, so the minimal
+   invocation packs a payload with no `hash:` record at all and the acceptance
+   walk would take §8.2.3's orphan path every time (round-0 journey M-6). The
+   orphan path is exercised as its OWN item (5a), not as the happy one.
+3a. **A device-derived preimage cut in the STRING form** -- the default form
+   (decision 1) on the composer-native path: type the anchor phrase, reach Done,
+   pick `preimage string`, and the cut plate's 75 characters round-trip through
+   `ms hashlock --in` to the digest the composer showed. This item exists because
+   nothing else in this list cuts a string-form plate from device-derived
+   material, which is what §3.5's encoder is for.
 4. A `phrase:` record in the same payload appears on `Which hash?` as
    `phrase record 1 (derive to see the digest)`, derives on pick, and its digest
    matches the host's.
-5. A kind-`0x03` string under an id other than `hash` is refused on the host with
-   §8.1.2 and is inert on the device.
+5. A kind-`0x03` string under an id outside `{entr, hash}` is refused on the host
+   with §8.1.2, one refusal and not three; the same payload under `entr` is
+   refused with the shipped `TagKindMismatch` text; both are inert on the device.
+5a. A payload holding a preimage and no `hash:` record draws §8.2.3's NOTE, and a
+   payload holding `hash:` records none of which match draws its WARNING.
 6. A preimage plate presented to any seed flow is still refused (H0's walk).
+7. A payload holding only a `phrase:` record, opened at the Password program,
+   draws §8.8's notice (round-0 journey I-6). This is the one refusal in the
+   stage whose correctness is otherwise unobservable from outside the code.
+8. **The QR is a GATE, not an assumption** (round-0 journey M-7). Before the QR
+   toggle ships, one test plate is cut at the WORST case -- a 100-character
+   hardened phrase, v9, 53 modules, scale 2, 0.6 mm modules -- and scanned with a
+   phone. 53 modules at scale 2 has no precedent in this tree on either axis, and
+   §11.3's gates are all bytes and toolpath. If it does not scan, the QR toggle
+   does not ship and the phrase form is text-only; the plate is still complete,
+   because §6.4 makes the text authoritative. Cut it with the single-character
+   test-plate pattern (~2 s a try) rather than a full plate (~21 min).
 
 Until the operator walks it, §11.7's emulator arm and §11.4's goldens are the
 acceptance. **The SH2 has no camera**, so nothing on the device can read a plate
@@ -1076,9 +2015,25 @@ follow-on); `ms split` of a preimage (F-468); the salt and iteration parameters
 and its census refusal (F-457); a restore document for the composer; secret
 handling of the retained phrase (F-483, non-gating by the 2026-08-27 ruling).
 
+Added by round 0, so each is a decision rather than an omission:
+
+- **A CLI producer for `phrase:` records** -- `ms hashlock ... --emit-phrase-record`
+  or `me sysw record phrase --method ...`. §3.1 gives the wire form a Rust
+  function and §3.2 a flag; no verb emits one, so the operator hand-builds hex
+  every time. §3.3's phrase-orphan warning is what covers that path this stage,
+  and it is a mitigation, not a fix. A wire form with no writer is worth its own
+  follow-up.
+- **A reconcile-style screen for a PAYLOAD phrase** (§10.2). The device-typed
+  screen's instruction is a no-op for a phrase the host already has, and what a
+  payload phrase should be told instead is a separate design question.
+- **Cross-run awareness of preimage plates already cut** (§5.3 item 6, §8.4b).
+  The census cannot know what a previous run of the same composition cut, and
+  this stage does not give it a way to find out; §8.4b tells the operator a
+  bearer plate exists so that they can, which is the honest half.
+
 ---
 
-## §14. Citations -- measured at fork `fb0dd04`, engrave `07a92e9b`, ms `504ff46`
+## §14. Citations -- measured at fork `fb0dd04`, engrave `a0f832d0`, ms `504ff46`
 
 | claim | where |
 | --- | --- |
@@ -1086,10 +2041,17 @@ handling of the retained phrase (F-483, non-gating by the 2026-08-27 ruling).
 | the composer's own record that H6 makes false | `gui/composer_hash.go:27-28`; `SPEC_wallet_policy_composer.md` §6c, §14 |
 | `composerState`, `phraseDigests`, the nil-map rule, the value-set predicate | `gui/composer_state.go:26-79`, `:53`, `:46-50`, `:280-286`, `:299` |
 | state construction, the ONE defer, the 96 B second-defer measurement | `gui/composer_flow.go:20-23`, `:48`, `:59`, `:53-57` |
-| the engrave step, the census call, `bundleEngrave`'s marking parameters | `gui/composer_flow.go:335-394`, `:388`, `:389-390`, `:393` |
+| the engrave step, the ms1-secrets-first append, the census call, `bundleEngrave`'s marking parameters | `gui/composer_flow.go:335-394`, `:381`, `:389-390`, `:393` |
 | `Which hash?` rows, the label-keyed switch, the `taking` predicate, the row form | `gui/composer_hash.go:157-175`, `:184-224`, `:194`, `:38-41`, `:161` |
-| the door, its counts, its conditional route | `gui/composer_door.go:41-56`, `:93-97`, `:98-119` |
-| the census and its completeness claim; the passphrase-plate exclusion precedent | `gui/multisig_build_census.go:63-73`, `:88-93`; `gui/composer_census.go:86-94` |
+| the phrase route: method pick and reconcile, the two things a payload phrase must skip | `gui/composer_hashlock.go:43-86`, `:53`, `:83` |
+| the pick screen with row touch targets, its row cap, the text band | `gui/composer_paged.go:278`, `:243`, `:49-54` |
+| the `show` key: a keyboard-grid key, and it LATCHES | `gui/passphrase_keyboard.go:141`, `:221` |
+| `syswOfferAlt` returns without drawing | `gui/sysw_session.go:270-278` |
+| the minted mk1 key cards the marking reaches | `gui/composer_cards.go:69-74` |
+| `composerEveryPathHashed` and the §8h guard already on the record | `gui/composer_state.go:257-259`; `gui/composer_shape.go:442-443`; `gui/composer_hashlock.go:70-79` |
+| the glyph rule that BLANKS a frame | `font/bitmap/bitmap.go:33` |
+| the door, its counts, its conditional route, the no-keys lead | `gui/composer_door.go:37-52`, `:41-56`, `:86-90` (`composerDoorHasConsumablePolicy`), `:98-119` |
+| the census and its completeness claim; the passphrase-plate exclusion precedent; the signature that must change | `gui/multisig_build_census.go:63-73`, `:88-93`; `gui/composer_census.go:86` |
 | `confirmReviewScreen` (paged) | `gui/multisig_build.go:1895` |
 | `bundleEngrave`, the plate plan, the set-level abort, the marking rule | `gui/bundle_flow.go:616-657`, `:466`, `:625-631`, `:565-579`, `:780-792` |
 | the standalone-plate cut pattern | `gui/passphrase_flow.go:570-588`, `gui/gui.go:3296` (`NewEngraveScreen`), `:3620` (`toPlate`) |
@@ -1100,31 +2062,41 @@ handling of the retained phrase (F-483, non-gating by the 2026-08-27 ruling).
 | `sysw.Open` runs no admission | `sysw/open.go:36-73` |
 | the F-474 arm belongs to the Sealed Payload | `gui/unlock_flow.go:98`, `gui/unlock_kdf.go:415-420`, `:433`; `seal/open.go:149` |
 | the classifier, the reserved prefixes, `IsSecret` | `sysw/record.go:14-21`, `:24-54`, `:60-66`, `:111-139` |
+| the vendored lockstep test | `sysw/composer_records_test.go:64-75` |
 | the composer record parsers and the hex rule | `sysw/composer_records.go:24-31`, `:58`, `:82-97`, `:100`, `:136-160` |
 | H0's ms1 inertness in the classifier | `sysw/classify.go:116-127` |
 | `IsPreimage` (no id), its stated trade, `DecodeMS1Preimage`, `Split` | `codex32/mspayload.go:78-101`, `:113-128`; `codex32/codex32.go:394-401` |
 | the five `DecodeMS1` callers and the two door refusals | `gui/ms1_decode.go:22`, `gui/codex32_polish.go:106`, `:232-235`, `gui/singlesig_verify.go:185`, `gui/multisig_verify.go:1237`, `bundle/verify.go:138`, `gui/scan.go:89` |
+| the SIX live `IsPreimage` call sites, so a plan-time grep re-decides none of them | `gui/codex32_polish.go:232`, `gui/scan.go:89`, `gui/unlock_session.go:197`, `seal/record.go:260`, `:298`, `sysw/classify.go:126` |
 | the phrase rule, the ms1 shape test, the constants | `hashlock/hashlock.go:21,24,27`, `:92-111`, `:122-148` |
-| the passphrase plate: struct, space mark, legend, QR rules, bands, stacking, gap | `backup/passphrase.go:21`, `:23-49`, `:70-74`, `:93-100`, `:112-114`, `:168`, `:250-254`, `:283-292` (`:289`) |
+| the passphrase plate: struct, space mark, legend, QR rules, bands, stacking, gap | `backup/passphrase.go:21`, `:23-49`, `:70-74`, `:93-100`, `:112-114`, `:168`, `:239`, `:250-253` (the two-line band), `:275` (the character wrap), `:283-292` (`:289`) |
 | the 64 mm band ceiling | `backup/passphrase_test.go:521` |
 | plate constants, the size ladder, the capacity functions, `EngraveText`'s refusal | `backup/backup.go:71`, `:83`, `:88-96`, `:388-400` |
-| the free-text QR scale and the title cap | `backup/fit.go:16-19`; `backup/freetext.go:11-19`, `backup/freetext_test.go:75` |
+| the free-text QR scale and the title cap | `backup/fit.go:16-19`; `TitleString` at `backup/backup.go:111`, `MaxTitleLen` at `:71`, `TestTitleCapFitsAtEveryRung` at `backup/freetext_test.go:109` |
 | `ftWarnQR` and the free-text confirm | `gui/freetext_flow.go:1214-1216`, `:1362-1402`, `:1485` |
 | the passphrase confirm | `gui/passphrase_flow.go:497` |
-| `ConstantQR`'s bound and its "raise both together" rule; `bitmapForQRStatic`; `engrave.QR` | `engrave/engrave.go:418-426`, `:394-414`, `:277`, `:378-380`, `:430-470` |
+| `ConstantQR`'s bound and its "raise both together" rule; `bitmapForQRStatic`; `engrave.QR` | `engrave/engrave.go:418-426`, `:394-414`, `:277`, `:377-379`, `:430-470` |
+| `constantTimeQRModules` and the v5 fuzzing provenance | `engrave/engrave.go:349-374`, `:363-371` |
+| `engraveModule`'s scale switch and its panic; `centerOf` | `engrave/engrave.go:689-709`, `:628-631` |
+| `ConstantQRCmd.Engrave`'s `for range nmod` and `DelayMove` padding | `engrave/engrave.go:633-687` |
+| the fork's own "a raise needs a fuzzed entry" record | `engrave/engrave_test.go:696-707` |
 | machine parameters | `internal/sh2/params.go:43-53` |
 | the fit gate: per-body render, headroom search, margin 80, "no capacity constant" | `gui/modal_fits_test.go:202`, `:183`, `:52`, `:33-35` |
 | the composer confirm surface and its HOLD | `gui/composer_shape.go:77`; `gui/composer_copy.go:36-38` |
 | the §8h forms and their chooser; the reconcile body | `gui/composer_copy.go:182-186`, `:520-525`, `:527-532`, `:484-490` |
 | the single-sig marking this reuses | `gui/singlesig.go:365-374` |
-| the stub labels the locator copies | `gui/composer_stub.go:53-70`, `:62-72`; `gui/composer_engrave.go:40-61` |
+| the stub labels the locator copies | `gui/composer_stub.go:54`, `:67`; *"no id yet"* at `gui/composer_engrave.go:80` |
 | `me sysw pack`: the flag pattern, the preimage refusal, admission, sealing, `--no-passphrase` | `crates/me-cli/src/main.rs:126`, `:244`, `:932-937`, `:2353-2410`, `:2805-2810`; `crates/me-cli/src/sysw/mod.rs:209-211`, `:335`, `:463-470` |
-| the host preimage predicate that does not consult the id | `crates/me-cli/src/seal/record.rs:287-320`; the Sealed Payload refusal at `:130-136` |
+| the host preimage predicate and its id/kind exclusion | `crates/me-cli/src/seal/record.rs:287-320`, `:292-295`; `id_kind_mismatch` at `:269-276`; the Sealed Payload refusal at `:130-136` |
+| the shipped `TagKindMismatch` and `PreimagePlate` bodies; their `unknown_reason` arms | `crates/me-cli/src/main.rs:2799-2804`, `:2805-2810`; `crates/me-cli/src/sysw/mod.rs:207`, `:210` |
+| `Admission`, `classify`/`classify_with`, `admit_check`; the F-246 ordering and the `--expect` admission precedent | `crates/me-cli/src/sysw/mod.rs:233-236`, `:246-248`, `:252`, `:463-470`; `crates/me-cli/src/main.rs:1474-1494`, `:1696` |
 | the host composer records, Rust-primary | `crates/me-cli/src/sysw/composer_records.rs:28-32`, `:306` |
 | the vendored corpus and its provenance pin | `sysw/testdata/record_class_vectors.provenance.json` (commit `c05074f1…1dbd`, sha256 `5b3960ca…b312`, 47 rows) |
 | the derivation constants and the phrase cap, Rust-primary | `crates/ms-codec/src/hashlock.rs:27,30,32`; `crates/ms-cli/src/hashlock_phrase.rs:24`, `:118` |
 | `ms hashlock`'s method line, its grouped plate output, `--out` | `crates/ms-cli/src/cmd/hashlock.rs:281-288`, `:299-306`, `:340,348` |
-| the ms1 preimage string is 75 characters, id `hash`, kind `0x03` | `SPEC_ms_hashlock` §1; corpus `kind[0].ms1` |
+| the ms1 preimage string is 75 characters, id `hash`, kind `0x03` | `SPEC_ms_hashlock` §1; corpus `crates/ms-codec/tests/vectors/hashlock-v0.8.json` `kind[0]` (`preimage_hex`, `digest`, `ms1`, `entr32_pair_ms1`) |
+| the Rust encoder the plate comes from, and its id/kind refusal | `crates/ms-codec/src/encode.rs:16`, `:24-31`; `crates/ms-codec/src/payload.rs:23-28`; `crates/ms-codec/src/envelope.rs:248`, `:261`; used at `crates/ms-cli/src/cmd/hashlock.rs:298` |
+| the fork's entr-only encoder and the `NewSeed` primitive | `codex32/msencode.go:17-31`; `codex32/codex32.go:279` |
 | F-132 (a preimage required, absent from the backup, unmentioned by it) | `design/FOLLOWUPS.md:4298` |
 | F-483 (the phrase in an unwipeable Go string) | `design/FOLLOWUPS.md:16003` |
 
@@ -1137,23 +2109,133 @@ handling of the retained phrase (F-483, non-gating by the 2026-08-27 ruling).
 | decisions 1-9 (2026-09-05) | throughout; §1 lists what each fixes |
 | A1 constant time kept; raise the encoder | §7 (ceiling **v9 = 53 modules**, correcting "v7") |
 | A2 QR only with the phrase form | §6.4; B5 of the draft report is declined |
-| A3 QR below the text, passphrase stacking | §6.4, §6.5 (scale **2**, not the passphrase plate's 3 -- measured) |
-| A4 form-specific bands | §6.2 |
+| A3 QR below the text, passphrase stacking | §6.4, §6.5 (scale **2**, not the passphrase plate's 3 -- measured), and §7.3, which is what makes scale 2 reachable |
+| A4 form-specific bands | §6.2 (three distinct literals in four cells) |
 | A5 the `mk1 stub` locator, policy then template | §6.3 |
-| A6 the classes are secret; seal by default | §3.4, with the F-474 premise corrected |
-| A7 the `hash` id on the H6 admission path | §4.3, §8.1.2 |
+| A6 the classes are secret; seal by default | §3.4, with the F-474 premise corrected; §3.2 gates ADMISSION so `decide_sealing` sees them |
+| A7 the `hash` id on the H6 admission path | §4.3 (three-id partition), §8.1.1's conditional sentence, §8.1.2 |
 | A8 the free-text warning names the route | §9 (fits as ruled; no wording change) |
-| B: preimage plate cut first + abort arm | §5.4, §8.4 |
+| B: preimage plate cut first + abort arm | §5.4 (two windows), §8.4a and §8.4b |
 | B: its own layout, own census line, excluded from the completeness claim | §6.1, §5.3 items 1-2 |
 | B: retain phrase + method + preimage keyed by digest, scrubbed at flow exit | §2.2 |
 | B: unused retained material listed, both provenances | §5.3 item 4, §8.3 |
 | B: lazy derivation of payload phrase records | §5.1 |
-| B: review at the engrave Done, per-plate form and QR, declined plates named | §5.3 |
-| B: `PREIMAGE REQUIRED` marking | §10.3 |
-| B: provenance-aware §8h and reconcile | §10.1, §10.2 |
+| B: review at the engrave Done, per-plate form and QR, declined plates named | §5.3, as a pick step (A) plus a read-only census (B) |
+| B: `PREIMAGE REQUIRED` marking | §10.3 (md1 AND mk1, stated and tested) |
+| B: provenance-aware §8h and reconcile | §10.1; §10.2 records that provenance is correct BY CONSTRUCTION and needs no guard |
 | B: `phrase:` at `progWalletPolicy` only, never Password | §4.1 |
 | B: the QR toggle carries an `ftWarnQR`-shaped warning | §8.5 |
 | B: a `SpaceMark` equivalent | §6.1 |
 | B: wire shape and method spelling follow the siblings, Rust first | §3.1 |
 | B: the ms hashlock corpus owns the QR text rows | §11.2 |
-| journey Q1-Q14 | Q1 §5.4+§8.4, Q2 §5.3, Q3 §6.1, Q4 §5.3.4, Q5 §8.5, Q6 §6.3, Q7 §5.1, Q8 §10.3, Q9 §2.2, Q10 §10.1-§10.2, Q11 §4.1, Q12 §5.3.6, Q13 §5.3 (masked with `show`), Q14 §9 |
+| C-1 ruling (2026-09-05): the ms1 preimage encoder, Rust first | §3.5 -- the Rust encoder already exists (`ms_codec::encode`) and is cited; the Go port is the deliverable |
+| journey Q1-Q14 | Q1 §5.4+§8.4a/b, Q2 §5.3, Q3 §6.1, Q4 §5.3.4, Q5 §8.5, Q6 §6.3, Q7 §5.1, Q8 §10.3, Q9 §2.2, Q10 §10.1-§10.2, Q11 §4.1, Q12 §5.3.6, Q13 §5.3 (masked; no reveal control -- item 7), Q14 §9 |
+
+---
+
+## §16. R0 round 0 folded here
+
+Three lenses ran against `a0f832d0`: **fidelity** (4C/7I/7M/3N,
+`design/agent-reports/hashlock-H6-spec-R0-r0-fidelity.md`), **journey**
+(1C/7I/7M/2N, `-journey.md`), **tests** (0C/3I/1M/1N, `-tests.md`). Every
+Critical and Important is folded or declined below with its reason; Minors and
+Nits are folded where they were truth fixes. **Every number the fold introduces
+or replaces is its own measurement**, taken at fork `fb0dd04` in
+`/scratch/code/shibboleth/.tmp/h6-fold`.
+
+### Criticals
+
+| finding | change | measurement |
+| --- | --- | --- |
+| fidelity C-1 = tests I-3 -- the raise omits `constantTimeQRModules` | §7.2 item 4: a normative arm per version, the fuzzing protocol named, the fold's 216,000-payload floor tabulated, v7 flagged as the under-converged entry; §11.3 splits the budget row from the regression row | reproduced the failure (all four dims return 0, every raised version errors); fuzzed 216,000 §8.6 payloads per dim: max **813 / 945 / 1161 / 1369** at v6/v7/v8/v9, ratios 0.4836 / 0.4667 / 0.4835 / 0.4874, **0** `findPath` errors in 864,000 |
+| fidelity C-2 -- scale 2 panics `engraveModule` | **Scale 2 is kept and the engraver gains the arm** (new §7.3, §7.4); §6.5 consequence 1 states the dependency and why re-fitting is unavailable | implemented `case 2` and ran it: **5 commands per module** (the scale-3 constant), ink exactly `[p*2sw, p*2sw+2sw]` = **0.6 mm** at every probed position; scale 3 at 53 modules is 47.70 mm and over budget at every rung |
+| fidelity C-3 -- `--pack-preimage` has no stated place | §3.2: **admission, never classification**. `Admission.pack_preimage`, a second `admit_check` rule, `decide_sealing` UNCHANGED, one corpus truth | read `decide_sealing` (`main.rs:2353-2410`), its call at `:1696` without admission, the admission value at `:1478`, `classify`/`classify_with` (`sysw/mod.rs:246`, `:252`), `admit_check` (`:463-470`), the lockstep test (`sysw/composer_records_test.go:64-75`) |
+| fidelity C-4 = journey I-1 -- the review has no input budget | §5.3 splits it: a `composerPickScreen` step (A) then the read-only census (B); Back contract stated; the `show` toggle DROPPED with its true mechanism | `confirmReviewScreen`'s three bound buttons and label-not-`Clickable` rows (`gui/multisig_build.go:1895`); `composerPickScreen`'s row targets (`gui/composer_paged.go:278`); pick rows measured 128/138/180/196 px, all one line in the 411 px band; `ppReveal` is a keyboard key and LATCHES (`gui/passphrase_keyboard.go:141`, `:221`) |
+| journey C-1 -- no ms1 preimage encoder | New §3.5, per the operator's ruling **as corrected by the controller**: the Rust encoder already exists and is what `ms hashlock` prints the plate with, so §3 gains NO Rust-first deliverable; the **Go** wrapper `codex32.EncodeMS1Preimage` is the gap, with the corpus row as its vectors | the wrapper reproduces the corpus `kind` row **byte for byte** (75 chars, id `hash`), round-trips through `DecodeMS1Preimage`; and `NewSeed` will mint a kind-0x03 payload under id `entr` **unrefused** -- the copy-paste hazard, reproduced, which is why the id is fixed and §11.1 asserts it on the output |
+
+### Importants
+
+| finding | change |
+| --- | --- |
+| fidelity I-1 -- §8.4's clause could never fire | §8.4 rewritten: both arms are the composer's screens, `bundleAbortWarningText` UNCHANGED (its `:610-616` comment prohibits the variadic tail the plumbing would need) |
+| fidelity I-2 + M-2 -- the band mutation cannot fail; the width justification is false | §6.3 re-justified on LINE COUNT with the shipped two-line record; §11.4's mutation replaced with a placement one. Measured: locator rows are 6/24/27/29/30 chars against a 32-char cap -- **all fit** |
+| fidelity I-3 -- §10.2 guards an unreachable screen | §10.2 rewritten: **no guard, no test**; the property is by construction (one call site, inside `hashlockPhraseRoute`) and the reason is recorded so it is not re-opened |
+| fidelity I-4 -- §10.1 asserts a decision not yet made | Both arms moved to the present tense of what is HELD; §11.5 gains a decline row. Re-measured: **185/360** and **186/360** |
+| fidelity I-5 -- the `preimage_plate` sentence is false | §4.3 corrected and given the three-id partition table; §8.1.2 becomes the EXISTING `PreimagePlate` body rewritten, not a new arm, because `entr` never reaches it |
+| fidelity I-6 = tests I-2 -- non-ASCII and two unreproducible numbers | §8's preamble carries the blanking mechanism and the host/device split; every device body is ASCII; §11.5 asserts it mechanically. §8.1.2: **236/320** (ASCII), **340/223** with the collision sentence -- the claimed 165/397 is withdrawn. §8.4a alone: **75/476** -- the claimed 288/244 is withdrawn |
+| fidelity I-7 = journey I-2 -- the flow cannot compute a phrase digest | §5.2 gains the four-part derive rule: list without deriving, derive once on pick behind the countdown, keep it in a flow-local, print the locator from it |
+| journey I-3 -- the orphan check misses `phrase:` records | §3.3 item 3 extended to both carriers with the two hand-build errors named; §8.2.3 gains the phrase body; §11.1 gains the space-after-comma mutation |
+| journey I-4 -- three refusals, none naming the collision | §8.1.1's final sentence is conditional on id `hash`; §8.1.2 gains the 1-in-256 sentence and fires from the no-flag path too. Measured to fit |
+| journey I-5 -- the marking reaches mk1 too | §10.3 states md1 **and** mk1, gives F-132 as the reason, and §11.5's row now names the mk1 cards -- without which every assertion passed either way |
+| journey I-6 -- the Password refusal is invisible | New §8.8, measured **165/397**, with a §11.5 row and §12 item 7 |
+| journey I-7 -- the new order opens a second abort window | §5.4 tables both windows; §8.4b is its arm, measured **86/476**, with the re-run/second-bearer-plate reasoning that makes it necessary |
+| tests I-1 = fidelity M-3 -- the 5.0 mm advance | §6.5's cell corrected to **3.333 mm**; measured 21,333 units = 3.3333 mm |
+
+### Minors and Nits folded (truth fixes)
+
+fidelity M-1 (the `composerState` literal, plus the stale `:34` comment noted),
+M-2 (with I-2), M-4 (the character-wrap rule stated, with its reason and a
+§11.4 row), M-5 (**all five drifted citations corrected**: `freetext_test.go:109`,
+`composer_engrave.go:80`, `composer_door.go:86-90`, `composer_flow.go:381`,
+`TitleString` at `backup/backup.go:111`), M-6 (the warning site and the F-246
+ordering), M-7 (the census block routed through `composerPageLines`, with the
+measurement: new rows 405-448 px, the SHIPPED completeness line **459 px**,
+against a 374 px centred-safe width -- so the overlap is pre-existing and H6 does
+not join it), N-1 (**three** distinct band literals, not four), N-2 (the
+inventory of **six** live `IsPreimage` call sites in §14), N-3
+(`composerCensusLines`' signature must gain the plate list).
+Journey M-1 (the string form's rendering decided and measured), M-2 (the
+selector declined with a reason in §8.6 rule 5), M-3 (the §8h guard recorded and
+the load placed on §8.3), M-4 (the `(in payload)` annotation, measured to one
+line at **41 chars / 343 px**; the longer wording it replaced is **2 lines**),
+M-5 (the door lead), M-6 (§12 item 3 packs the `hash:` record; the orphan path
+becomes item 5a and §8.2.3 distinguishes incomplete from contradictory), M-7 (the
+text-is-authoritative statement and §12 item 8's scan gate), N-1 (§5.2 forbids
+reusing §8.4's arms), N-2 (the derive-only path named in §5.1). The journey
+lens's closing note is folded as the **fourth** falsified shipped record in §0.
+
+### Declined, with reasons
+
+- **fidelity C-3's prescribed remedy** (thread `admission` into `classify_with`
+  and `decide_sealing`). The DEFECT is folded; the remedy is not. It adds a
+  second call site that must be kept in step, which is the exact failure the
+  shipped `--expect` comment records at `main.rs:1488-1494` (*"a false refusal
+  carrying a false message, on the funds path"*), and it forces the corpus to
+  carry two answers per row. Gating admission leaves `decide_sealing`
+  byte-unchanged and keeps one truth per row.
+- **journey C-1's option (a) as literally worded** (a new Rust-first encoder
+  deliverable). The controller established that `ms_codec::encode` already exists,
+  already carries the id/kind refusal, and is already the encoder `ms hashlock`
+  prints the plate with, with the corpus row already pinned. Adding a Rust
+  deliverable would have specified work that is shipped. The Go half -- the
+  actual gap -- is folded in full.
+- **journey I-1's `show`-toggle alternatives** (a Center-press latch). Neither is
+  taken: item 7's own argument is that the plate preview is the screen that shows
+  the phrase, so the review shows none, and no new control is invented for a
+  screen with no spare input. Secret-handling and non-gating either way
+  (2026-08-27 ruling).
+- **journey M-1's grouping suggestion.** Measured and declined: grouping in tens
+  does not fit at 6.0 mm (8 rows against 4) and would move the form to 5.0 mm and
+  change every golden. The ungrouped rendering is stated instead, with its reason.
+- **journey M-2's fourth QR line.** The QR has room (226 bytes is still under
+  v10's 231 threshold) but the plate's job is tool-independent reproduction;
+  declined in §8.6 rule 5 with the reasoning, so it reads as a decision.
+- **tests M-1** is explicitly not a finding against the spec (a reconstruction
+  gap in `bundleAbortWarningText`'s unpinned caller context). It is moot now that
+  §8.4's arms are measured alone; recorded in §8.4.
+- **fidelity M-7's "measure and accept" option.** The overlap is pre-existing,
+  but adding five more rows to it is the W-3 class the paged screens exist to
+  remove, so the block is routed through `composerPageLines` instead.
+
+### Not consistent, and named
+
+- **The four `constantTimeQRModules` values are NOT settled by this spec.** The
+  fold's 216,000-payload floor is a lower bound and demonstrably not converged: an
+  independent 4,000-payload sample the same round saw 785 and 1281 where 216,000
+  saw **813** and **1369**. The four fuzzing runs are plan-time work with a stated
+  protocol and a checkable floor, not a number to paste.
+- **§12 item 8's scan is unrun.** 53 modules at 0.6 mm on steel has no precedent
+  in this tree and the SH2 has no camera, so nothing before a physical test plate
+  can settle it. The spec states the fallback (text-only phrase form) so a
+  negative result is a decision rather than a re-plan.
+
