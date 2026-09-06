@@ -3136,3 +3136,21 @@ Command to resume: /resume-composer
   0.9.0 release brief (H1b/0.8.1 ritual: `push-me-v0.8.1-release-brief.md`
   precedent) -> then the next follow-up. Gate worktrees are detached and
   disposable once the implementer's branches exist.
+- **F-503 IMPLEMENTED (implementer, 2026-09-06), three branches, nothing
+  pushed.** me `f503` at `277c6336` (off engrave master `4df46e22`), fork
+  `f503` at `b32ff08` (off fork main `3cadffa8`, signed off), ms
+  `f503-records` at `81d67b85` (off ms master `cacf5da`; the plan's baseline
+  `a994a99` is its ancestor, two records commits back). Tasks in the plan's
+  order: me first (the Rust-primary rule), then the fork as a CONVERGENCE
+  port, then records. Boundary numbers at the tips: me `cargo nextest run
+  --locked -p mnemonic-engrave --no-fail-fast` 634 run / 631 passed / 3
+  failed (the `history_purge` zsh trio, F-500) / 2 skipped, `cargo fmt --all
+  -- --check` clean, clippy only the pre-existing `manual_is_multiple_of` at
+  `composer_records.rs:177`; fork `gofmt -l codex32/ sysw/` empty, all 54
+  non-gui packages ok, `gui-shard-test.sh ./gui/ 24` -> all 1289 tests across
+  24 shards. Seam corpus byte-identical in both repos at
+  `f53a17dc9d1ea5a4c0ff913786e82a5f19de004f4719536bb6d957bccdef1ee8`, both
+  pins re-set. Four mutations run and reverted, each killing exactly the
+  tests the plan named. Report:
+  `design/agent-reports/f503-implementation-report.md`. NEXT: sonnet
+  post-impl check (plan §4) -> merge + ship three repos -> me 0.9.0.
