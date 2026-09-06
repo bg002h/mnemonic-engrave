@@ -3154,3 +3154,15 @@ Command to resume: /resume-composer
   tests the plan named. Report:
   `design/agent-reports/f503-implementation-report.md`. NEXT: sonnet
   post-impl check (plan §4) -> merge + ship three repos -> me 0.9.0.
+- **CORRECTION to the entry above, same session: the me suite is FULLY GREEN at
+  the F-503 tip.** The operator installed the system zsh (`/usr/bin/zsh`, zsh
+  5.9.2) while the implementer was working, so the three `history_purge` tests
+  the plan's Global constraints list as expected failures (F-500) now pass.
+  Re-measured at me `f503` `cb0628e7` after the install: `cargo nextest run
+  --locked -p mnemonic-engrave --no-fail-fast` -> **634 tests run: 634 passed,
+  2 skipped**, exit 0 (the controller measured 633/633/2 on engrave master; the
+  634th is F-503's new integration test). The "3 failed (zsh trio)" figure in
+  the entry above was true when measured and is superseded here. **F-500's
+  expected-failure note is now stale on this box** -- from here a failing
+  `history_purge` test is a real finding, not the missing shell. Nothing was
+  edited to achieve this: no plan change, no `history_purge.rs` change.
