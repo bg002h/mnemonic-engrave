@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is now refused as "under the id `hash` whose X is N bytes, not 32", where it
   used to be told its id was not `hash` and handed the 1-in-256 collision
   sentence that is true only of a 33-byte payload (F-503, the host half). The
-  same records are refused; only the text changed. Four seam corpus rows pin
-  the F-503 shapes on both sides (`codex32_seam_vectors.json`, re-pinned).
+  same records are refused; only the text changed. Five seam corpus rows pin
+  the F-503 shapes on both sides (`codex32_seam_vectors.json`, re-pinned), the
+  fifth being the UPPERCASE spelling the device now also treats as inert
+  (F-506).
 - `me seal` names the record it refuses by position and section — `record N
   (records count from 0) in the secret section: …` — the way `me sysw pack`
   already does (F-489). Behaviour unchanged: the same records are refused for the

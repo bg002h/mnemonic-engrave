@@ -178,6 +178,12 @@
       "consult": "record-refusal"
     },
     {
+      "origin": "codex32_seam/hash-kind03-16-byte-x-uppercase",
+      "record": "MS10HASHSQVQQQQQQQQQQQQQQQQQQQQQQQQQQMV3LQLGKN6S5C",
+      "class": "Unknown",
+      "consult": "record-refusal"
+    },
+    {
       "origin": "mt.rs/even#0",
       "record": "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
       "class": "Mt",
