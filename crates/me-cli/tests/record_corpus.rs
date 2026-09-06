@@ -76,6 +76,8 @@ fn class_name(c: Class) -> &'static str {
         Class::Key => "Key",
         Class::Hash => "Hash",
         Class::Now => "Now",
+        Class::Preimage => "Preimage",
+        Class::Phrase => "Phrase",
         Class::Unknown => "Unknown",
     }
 }
@@ -139,6 +141,15 @@ fn the_capture_is_the_whole_corpus() {
 }
 
 /// **Invariant 2's first half.** Not one of these records may change class.
+///
+/// **H6 MOVED EXACTLY ONE ROW, deliberately, and it is recorded here rather
+/// than absorbed.** `codex32_seam/preimage-plate-0x03` was `Unknown` under H0,
+/// whose whole design was that a hashlock preimage plate is INERT on this
+/// device -- no class of its own -- and it is `Preimage` from H6, which gives
+/// the shape a class so it can be admitted at one program and cut onto a plate
+/// of its own. Its sibling `codex32_seam/preimage-shape-entr-id` STAYS
+/// `Unknown`, and that pair is the id narrowing of H6 §4.3 stated as data: the
+/// kind byte alone is not enough to reach the flow that engraves.
 #[test]
 fn every_corpus_record_classifies_as_it_did_before_s2() {
     let mut checked = 0usize;
@@ -220,6 +231,10 @@ fn the_capture_covers_every_class_s2_must_not_move() {
             "MdMk" => "MdMk",
             "Mt" => "Mt",
             "Tx" => "Tx",
+            // H6: the one class this capture gained, and it is here rather
+            // than absorbed into the panic arm so a FUTURE unexpected class
+            // still stops the run.
+            "Preimage" => "Preimage",
             "Unknown" => "Unknown",
             other => panic!("{CAPTURE}: unexpected class {other}"),
         })

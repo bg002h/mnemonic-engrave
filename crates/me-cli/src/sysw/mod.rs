@@ -94,6 +94,12 @@ pub enum SyswError {
     /// Normalised passphrase longer than `[passphrase-bounds]` (§12.5) allows.
     PassphraseTooLong(usize),
     NotUtf8,
+    /// A record that classifies `Preimage` or `Phrase` in a payload that did
+    /// not pass `--pack-preimage` (H6 §3.2 item 2, §8.1.1).
+    ///
+    /// NOT an `Unclassifiable`: the record is perfectly well understood. The
+    /// class rides along so the message can name which carrier it was.
+    PreimageNotAdmitted(usize, record::Class),
 }
 
 /// Why [`classify`] could not place a record.
@@ -234,6 +240,15 @@ pub struct Admission {
     /// Admit a `tx:` record whose transaction parses but has at least one
     /// input carrying neither a scriptSig nor a witness.
     pub allow_unsigned_inputs: bool,
+    /// Admit a hashlock PREIMAGE into this payload: an `ms1` kind-`0x03` plate
+    /// string, or a `phrase:` record.
+    ///
+    /// It gates ADMISSION, never CLASSIFICATION (H6 §3.2). Both are BEARER
+    /// material — whoever holds the preimage can spend any key-less hashlock
+    /// path it unlocks — so admission is explicit, exactly as `--seal-secret`
+    /// makes encrypting seed material explicit. It is NOT `--seal-secret` and
+    /// the two do not substitute.
+    pub pack_preimage: bool,
 }
 
 /// Which section a record belongs in.
@@ -287,6 +302,7 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
             Ok(composer_records::ComposerRecord::Key(_)) => Class::Key,
             Ok(composer_records::ComposerRecord::Hash(_)) => Class::Hash,
             Ok(composer_records::ComposerRecord::Now { .. }) => Class::Now,
+            Ok(composer_records::ComposerRecord::Phrase(_)) => Class::Phrase,
             Err(_) => Class::Unknown,
         };
     }
@@ -297,6 +313,20 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
     // the strict check is self-contained.
     if mt::valid_mt(record) {
         return Class::Mt;
+    }
+    // H6 §3.2 item 1: CLASSIFICATION IS UNCONDITIONAL. A preimage plate is a
+    // preimage plate whatever the admission, exactly as a `key:` record is a
+    // key record — the flag is not a parameter of what a record IS. That is
+    // what lets `decide_sealing` stay byte-unchanged on the strict classifier
+    // and still seal a payload holding one, and what keeps ONE truth per
+    // corpus row for the device's lockstep test.
+    //
+    // The predicate is `preimage_plate_admissible`, not `preimage_plate`: the
+    // wider one stays the DIAGNOSTIC behind the refusal message, so a kind-0x03
+    // single under an id outside {entr, hash} is still NAMED a preimage plate
+    // when it is refused and is still not admitted.
+    if crate::seal::record::preimage_plate_admissible(record) {
+        return Class::Preimage;
     }
     match crate::seal::record::validate_record(record) {
         Ok(crate::seal::record::RecordKind::Ms) => Class::Codex32Secret,
@@ -462,8 +492,17 @@ pub fn pack_deterministic_with(
 /// own note about `pack`/`pack_deterministic` drifting apart.
 pub fn admit_check(records: &[String], adm: Admission) -> Result<(), SyswError> {
     for (i, r) in records.iter().enumerate() {
-        if matches!(classify_with(r, adm), record::Class::Unknown) {
+        let class = classify_with(r, adm);
+        if matches!(class, record::Class::Unknown) {
             return Err(SyswError::Unclassifiable(i, unknown_reason(r)));
+        }
+        // H6 §3.2 item 2. A SECOND refusal rule, beside the `Unknown` one and
+        // deliberately NOT a `Class::Unknown` / `UnknownReason`: the record is
+        // not unclassifiable — it is perfectly well understood and simply not
+        // asked for, and a reason enum that said otherwise would make the
+        // refusal message lie about what `me` found.
+        if !adm.pack_preimage && matches!(class, record::Class::Preimage | record::Class::Phrase) {
+            return Err(SyswError::PreimageNotAdmitted(i, class));
         }
     }
     Ok(())
@@ -870,13 +909,35 @@ mod tests {
         const PLATE: &str =
             "ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c";
         assert_eq!(PLATE.chars().count(), 75);
+        // H6 §3.2: a WELL-FORMED plate (id `hash`) is now a CLASS, so without
+        // --pack-preimage it is refused by the admission rule and not by the
+        // "unclassifiable" one. The distinction is the finding H6 folded: the
+        // record is not unclassifiable -- it is perfectly well understood and
+        // simply not asked for -- and the refusal says so and names the flag.
         assert_eq!(
             pack(vec![PLATE.into()], None, ITER),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+            Err(SyswError::PreimageNotAdmitted(0, record::Class::Preimage)),
         );
-        // R0 r0 fidelity I-1: the shape names a 0x03 single whatever its id,
-        // exactly as the device does -- the seam corpus's `test`-id 33-byte row
-        // is a plate here; its 48-char sibling (a 16-byte payload) is not.
+        // ... and WITH the flag it is admitted.
+        assert!(pack_with(
+            vec![PLATE.into()],
+            None,
+            ITER,
+            Admission {
+                pack_preimage: true,
+                ..Default::default()
+            }
+        )
+        .is_ok());
+        // R0 r0 fidelity I-1: the DIAGNOSTIC shape names a 0x03 single whatever
+        // its id, exactly as the device's IsPreimage does -- the seam corpus's
+        // `test`-id 33-byte row is a plate here; its 48-char sibling (a 16-byte
+        // payload) is not.
+        //
+        // H6 §4.3 narrows only ADMISSION: `preimage_plate` is unchanged and is
+        // still what names this record in the refusal, so a mistagged plate is
+        // called a preimage plate rather than "unrecognised" -- and
+        // --pack-preimage does NOT admit it, which the row below asserts.
         assert_eq!(
             pack(
                 vec![
@@ -904,6 +965,29 @@ mod tests {
                 vec!["ms10hashsqw46h2at4w46h2at4w46h2at4w4ssrnvvaudn2k4d".into()],
                 None,
                 ITER
+            ),
+            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+        );
+        // H6 §4.3, the funds-relevant row: --pack-preimage admits the id `hash`
+        // and NOTHING else. A kind-0x03 single under any other id stays
+        // unclassifiable WITH the flag, so a plain BIP-93 33-byte secret
+        // beginning 0x03 -- roughly 1 in 256 of them -- never reaches a flow
+        // that engraves.
+        //
+        // MUTATION: drop the id test from `preimage_plate_admissible` -> this
+        // becomes Ok(_) and the mistagged record is packed.
+        assert_eq!(
+            pack_with(
+                vec![
+                    "ms10testsqvrsu9guyv4rzwplgex4gkmzd9c8wl593jfe4gdg47mtm3xt6tv7qh3pm4xrfdlvvp"
+                        .into()
+                ],
+                None,
+                ITER,
+                Admission {
+                    pack_preimage: true,
+                    ..Default::default()
+                }
             ),
             Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
         );
