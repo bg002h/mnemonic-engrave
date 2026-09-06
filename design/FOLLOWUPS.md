@@ -16057,6 +16057,34 @@ wipe, and a wipe of the OK copy after derivation. The idle-timer item stays as i
 kept; not pulled into the next device code cycle, which spends its slots on F-487 and
 F-480 (what the operator sees).
 
+
+**CLOSED 2026-09-06 by operator ruling — the two avoidable copies are gone, the
+third is accepted** (fork `f483` c63af37b, merged 5cf93fd7). This entry named
+three copies, and they are not the same kind of problem:
+
+1. **`seal.isPreimageRecord` stringifying a second time — REMOVED.** `Classify`
+   already parsed the record and already asked `codex32.IsPreimage`, then threw
+   the answer away, so the refusal path parsed the same bytes again and
+   allocated a second immutable string of a record that may be a preimage plate.
+   `Classify` is now a wrapper over an internal `classify()` returning the fact
+   it already knows. The kind still has no `Classification` of its own (H0's
+   deliberate choice) and the fall-through is byte for byte what H0 shipped.
+2. **The per-OK `[]byte(kbd.Fragment)` copy — WIPED on the refusal path.** A
+   rejected phrase is usually retyped, so each attempt left another
+   unreferenced copy behind. The copy is ours, so it is cleared before looping.
+3. **The `kbd.Fragment` string itself — ACCEPTED, not fixed.** It is an
+   immutable Go string for the life of the phrase screen and across every Back.
+   Wiping it means changing what the keyboard hands back: 76 call sites and
+   every text-entry screen, for a threat model this device largely does not
+   have. The H6 brainstorm already accepted RAM retention until Done as decision
+   9, naming this follow-up — so this closure records that decision rather than
+   leaving an open item nobody intends to act on.
+
+Gates: 54 non-gui packages ok; gui 1289 across 24 shards; gofmt clean. Inverting
+the preimage answer reds `TestPreimagePlateIsRefusedByIndexAndNamedAsAPreimage`
+and `TestPlainShareInThePublicSectionIsRefusedByIndexAndClass`, so the
+refactored path is pinned by tests that already existed. The wipe itself is
+unobservable to a test and carries none.
 ### F-484 — ~~`hashlock-phrase-lead-paints-inside-the-back-button-margin`~~ **CLOSED 2026-09-05 by fork `fb0dd04`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `gui/composer_hashlock_geometry_test.go`, asserting the lead's ink stays out of the nav button rects): the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#geometry`
 
 Filed 2026-09-05 from the ultracode geometry lens (`hashlock-H2-post-impl-lens-geometry.md` M-1),
