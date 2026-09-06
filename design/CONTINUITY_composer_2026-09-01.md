@@ -2819,3 +2819,20 @@ Command to resume: /resume-composer
   61f8125c). NEXT: gate report -> ONE fold of plan + spec (gate fixes + nine
   findings) -> checker -> three plan lenses -> fold -> verification ->
   implementers by file groups.
+- **H6 PLAN FULLY GATED (`55950604`; gate report 4d87dadd).** Gate agent (opus)
+  wired Tasks 8b-12: GATE GREEN WITH FIXES (17) -- `sysw.Record` did not exist;
+  the §8.6 method line and qr_text's Go twin had no task; §8.4b unreachable;
+  census drawn through the forbidden panel-wide wrap; §10.1's fourth-arm
+  predicate false on a mixed policy; map-ordered census; Task 10 named the
+  door not its caller; three phantom test paths. gui 1285 / 24 shards ok; 40
+  mutations red; the walk ran x4 in a browser (ok, red, red, ok); shard 18 =
+  Task 8a's own every-screen-has-a-caller guard, closed by 8b. Firmware at the
+  wired tree 1,643,580 / 63,272 (+44,372 B flash vs fb0dd04; plate layout
+  reachability 4,608 B; hand-rolled sort was 540 B WORSE). Controller re-run:
+  checker 86/0; fork packages ok; 1285/24 ok. **FOLD AUTHOR DISPATCHED**
+  (opus, brief 6d1ef3c0): the nine spec findings (controller decisions: phrase
+  rule into ms-codec + PUBLISHED ms-codec minor release as the first
+  deliverable; argv guard consequence; unfalsifiable mutations replaced;
+  seam-corpus class change re-pinned) + the 17 gate fixes into spec AND plan.
+  NEXT: fold -> checker -> three plan lenses (briefs pre-written) -> fold ->
+  verification -> ms-codec 0.9.0 release -> implementers by file group.
