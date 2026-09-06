@@ -2865,3 +2865,18 @@ Command to resume: /resume-composer
   divided per try; the pick step's Back contract differs from the gated tree
   (Button1 silently declines). Fidelity lens in flight; fold brief SHAs
   filled (plan e6d84d9c, spec 5bb46948).
+- H6 plan R0 r0: fidelity lens landed (5571103e, 0C/8I/4M/2N): the plan's content
+  holds under measurement (every copy string, geometry number, corpus sha,
+  budget entry, H0 guard); its SCHEDULING does not -- the disjoint-file-group
+  claim is false (Tasks 9/10/11 share composer_copy.go, composer_copy_test.go,
+  modal_fits_test.go), Task 6's boundary gate fails in the declared order
+  (qr_text rows arrive in Task 7), hashlock/hashlock.go's two normative
+  deliverables are unscheduled; MethodLine/QRText pinned to a literal (a
+  Rust-primary re-vendor leaves the suite green with a stale line); §8.2.4
+  says "the passphrase above" under a line that says "below". All four
+  round-0 reports persisted (spec verification GREEN; tests 0C/0I; journey
+  1C/5I; fidelity 0C/8I). **ROUND-0 FOLD AUTHOR DISPATCHED** (opus, brief
+  d5053818 with SHAs): re-order/re-group tasks so every boundary passes in
+  order and groups are truly disjoint; the locator test; the vendored-row
+  pin; plan + spec + three trees; checker. NEXT: r1 verification (brief
+  62daddda) -> GREEN -> ms-codec 0.9.0 release -> implementers.
