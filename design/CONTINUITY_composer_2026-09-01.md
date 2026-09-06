@@ -2880,3 +2880,21 @@ Command to resume: /resume-composer
   order and groups are truly disjoint; the locator test; the vendored-row
   pin; plan + spec + three trees; checker. NEXT: r1 verification (brief
   62daddda) -> GREEN -> ms-codec 0.9.0 release -> implementers.
+- **H6 PLAN R0 ROUND 0 FOLDED (plan `7021ea43`, spec `95418b2c`, report b0cbf154).**
+  1C/13I/8M folded across plan, spec and the three gated trees: new Task 5b
+  (ms corpus re-vendor + hashlock/hashlock.go deliverables) so every boundary
+  passes IN ORDER (with hashlock/ at baseline Task 6's gate fails "0 qr_text
+  rows"; passes in the new order); groups E/F/G merged into ONE sequential
+  implementer (shared gui files; Task 10 compiles against six Task 9 symbols);
+  the locator test (RED on locator=[] and on a pre-derive locator, via a
+  nil-in-production seam); MethodLine/QRText pinned to the vendored rows;
+  §8.2.4 above/below; the pick step's Back contract as implemented; the
+  phrase: prefix described; the QR-scan gate costed (43m32s per plate); fmt
+  added to the gate (red in 7 files before); a stray zero-byte test file
+  deleted; clippy unprovable under the pinned 1.85.0. Journey I-2 declined on
+  fit (364/64 vs 80). Controller re-run: checker 97/0; fork packages ok; gui
+  1286 / 24 shards ok. Fold author's suites: ms 562/562; me 633/630+3; wasm
+  vet 0; emu build 0; firmware 1,643,580 / 63,272 (byte-identical). Browser
+  walk NOT re-run (walk sha unchanged). **r1 sonnet verification DISPATCHED**
+  (brief 82364f1f). NEXT: GREEN -> STATUS -> ms-codec 0.9.0 release (Task 1;
+  H1 ritual) -> implementer briefs from the plan's final groups -> dispatch.
