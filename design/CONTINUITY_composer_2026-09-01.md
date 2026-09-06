@@ -3096,3 +3096,11 @@ Command to resume: /resume-composer
   all merged; safe to remove. Open follow-ups: F-483, F-487, F-490,
   F-495..F-505 (F-503 is H0-class: device seed-classifies a 17-byte 0x03
   single the host refuses).
+- **Merged worktrees removed (operator: "Cleanup merged worktrees").** Gone,
+  branches deleted with `-d` (merged only): ms h6-a; engrave h6-b,
+  h6-records; fork h6-c/d/e/f + hashlock-h6; toolkit h6-manual plus three
+  older merged ones (feat/export-allow-phase1, feat/export-addresses-phase1b,
+  f324-git-source). Kept (unmerged): the `_experiment/{A,B}` pairs
+  (exp/tx-plan-driven, exp/tx-brief-driven) and seedhammer-corpus-sync
+  (mdcli-corpus-sync). The `.tmp/h6-*` gated scratch trees and target dirs
+  are not worktrees and were left alone.
