@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- `sysw::composer_records::phrase_record` returns `Zeroizing<String>`: it is the
+  one constructor in that family carrying a secret, and its three siblings build
+  public data and keep their plain `String` (F-493). No caller changed — the
+  function had none in production when the ruling was made.
 
 - The refusal for a kind-`0x03` record that `--pack-preimage` will not admit is
   composed from the faults actually found: the UPPERCASE spelling is told that

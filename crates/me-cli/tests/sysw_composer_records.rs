@@ -3,8 +3,8 @@
 //! fixture the Go port is measured against (§12 item 8).
 
 use mnemonic_engrave::sysw::composer_records::{
-    hash_record, key_record, now_indices, now_record, parse, ComposerRecord, ComposerRecordError,
-    HASH_PREFIX, KEY_PREFIX, NOW_PREFIX,
+    hash_record, key_record, now_indices, now_record, parse, phrase_record, ComposerRecord,
+    ComposerRecordError, HashlockMethod, HASH_PREFIX, KEY_PREFIX, NOW_PREFIX,
 };
 
 /// The wallet-policy journey's cosigner @0: master 73c5da0a at m/48'/0'/0'/2'.
@@ -530,4 +530,58 @@ fn regenerate() {
     std::fs::write(fixture_path(), &json).unwrap();
     println!("wrote {} rows to {}", rows.len(), fixture_path().display());
     println!("sha256 {}", hex(&sha2::Sha256::digest(json.as_bytes())));
+}
+
+/// F-493: `phrase_record` is the one constructor in this family that carries a
+/// SECRET, and its type says so.
+///
+/// The binding below is the guard, and it is a compile-time one on purpose: if
+/// the return type goes back to `String` this file stops building, which is a
+/// louder failure than an assertion and cannot be satisfied by accident. Its
+/// three siblings (`key_record`, `hash_record`, `now_record`) build public data
+/// and keep their plain `String` — the point is the asymmetry, not a house
+/// style.
+///
+/// The capacity assertion pins that the buffer is sized up front and never
+/// grows: `Zeroizing` protects the buffer it holds, so a reallocation part-way
+/// through would leave the abandoned one unwiped and the wrapper none the wiser.
+///
+/// WHAT IT DOES NOT PIN, measured rather than assumed: wrapping a finished
+/// `format!` instead of building into the buffer PASSES this test — `format!`
+/// happened to return a `String` already sized to its content, so capacity
+/// equals length either way. That version is worse (the phrase exists in an
+/// unprotected `String` before the wrap), and nothing here can tell. The
+/// no-intermediate property is argued from the four lines of the function, not
+/// tested, and this paragraph is here so nobody later reads the assertion as
+/// covering it.
+///
+/// MUTATION that DOES red it: reserve a capacity larger than the body (e.g.
+/// `+ 8`) -> `the buffer grew past what was reserved` fires on the mismatch.
+#[test]
+fn a_phrase_record_is_wiped_on_drop_and_never_reallocates() {
+    let phrase = "correct horse battery staple";
+    let rec: zeroize::Zeroizing<String> = phrase_record(HashlockMethod::Hardened, phrase);
+
+    assert_eq!(
+        &*rec, "phrase:68617264656e65642c636f727265637420686f727365206261747465727920737461706c65",
+        "the record is not the corpus row `phrase-hardened`"
+    );
+    assert_eq!(
+        rec.capacity(),
+        rec.len(),
+        "the buffer grew past what was reserved, so an unwiped copy was abandoned on the way"
+    );
+
+    // The property has to hold at the awkward widths too, not just this one.
+    for p in ["", "x", &"0".repeat(100), "a phrase, with a comma"] {
+        for m in [HashlockMethod::Hardened, HashlockMethod::Sha256] {
+            let r = phrase_record(m, p);
+            assert_eq!(
+                r.capacity(),
+                r.len(),
+                "method {m:?}, phrase of {} chars",
+                p.len()
+            );
+        }
+    }
 }
