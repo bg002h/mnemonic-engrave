@@ -16118,6 +16118,26 @@ under load. H5 does not touch the file. Same class as the toolkit's wall-clock c
 make the job completion deterministic (inject the clock or wait on the state transition), or
 move the KDF-heavy tests to their own shard.
 
+
+**CLOSED 2026-09-06 (fork `f490`).** The test slept for `confirmDelay` and then
+polled 32 frames for `engraveDone`. The engrave goroutine does real work, so a
+frame count is a bet on the host scheduler having run it enough times before the
+test looked. Each iteration now calls `synctest.Wait()` first — the barrier this
+package already uses in 22 other places, and which returns only when every other
+goroutine in the bubble is durably blocked — so the state read has settled. The
+32 bound stays as a backstop against a job that genuinely never finishes, but
+the test no longer depends on it, and the second suggestion in this entry
+(moving the KDF-heavy tests to their own shard) is not needed.
+
+**The flake was NOT reproduced on demand**, and the change is argued from the
+mechanism rather than measured against a reproduction: twelve runs of the
+ORIGINAL under 24 busy loops (load average 4.7) all passed. What WAS measured:
+the test still catches the mutation it names — dropping
+`s.job.releaseResumeState()` at `gui/gui.go:3323` fails it with *"2 resume knots
+survive after EngraveScreen.Engrave returned in a terminal state"* — gofmt is
+clean, and the whole gui shard set is ok at 1289 tests across 24 shards. If it
+ever reports INCONCLUSIVE again, that is now a signal about the job, not about
+the box.
 ### F-491 — CLOSED 2026-09-06 (hashlock H6 Task 13) — `h2-spec-reuse-block-drift-not-shipped-two-sentence-form`: H2 spec §4.5's reuse block quotes the four-sentence pre-drop-order form ("One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself."), while the shipped `composerCopyHashlockConfirm` (`gui/composer_copy.go:421-422` at fork main `b9a9a30`) has always drawn the drop order's two-sentence form: "One phrase per policy. Never use this phrase as a passphrase or a password anywhere else." (owning phase: **H2 spec hygiene**) `#hashlock` `#seedhammer` `#docs` `#records`
 
 Filed 2026-09-05 from hashlock H5 Task 6 Step 1 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which declines to fold it alongside the write-down/reconcile edit so `git diff` on that commit is H5's change and nothing else. Real and pre-existing, not one of H5's five follow-ups. Fix: quote the shipped two-sentence text verbatim in §4.5's fenced block in place of the four-sentence form -- a transcription, not a re-decision.
