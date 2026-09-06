@@ -16183,10 +16183,42 @@ anywhere else."*
 
 Filed 2026-09-05 from hashlock H5 Task 6 Step 3 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which measured the grep before filing rather than inventing a target: writing an unlock chapter is a documentation deliverable of its own, several screens wide, and a free-floating sentence in the `ms hashlock` chapter would sit where nobody reading about unlocking would find it. The device's own refusal text already carries the instruction (H5 spec §5); this follow-up is only the manual-side gap.
 
+
+**CLOSED 2026-09-06 (toolkit `90cb039f`).** The section the entry said did not
+exist now does: `docs/manual/src/30-workflows/3B-payload-unlock-refusals.md`,
+"When the SeedHammer II refuses a payload". It takes the refusal apart clause by
+clause — *Nothing was opened* (the derivation runs first, so the wait is real and
+the outcome is still nothing), *records count from 0* (a 1-based reading deletes
+the record ABOVE the refused one, often a seed), and *any others like it* (the
+admission pass returns on the first refusal, and the index MOVES between rounds)
+— and then carries the fact H5 §5 asked for: sealing again generates a FRESH
+passphrase, so the card from the first attempt is stale.
+
+That fact is MEASURED in the page rather than quoted from the spec: packing the
+same records twice printed `present police parade steak` and then `ahead travel
+protect february`. `make lint` exits 0 (markdownlint, cspell, lychee,
+flag-coverage, glossary-coverage, index bidirectionality).
 ### F-493 — `me-phrase-record-builds-the-phrase-into-a-plain-string`: H6 Task 2's `phrase_record(method, phrase) -> String` (plan block at `IMPLEMENTATION_PLAN_hashlock_H6_preimage_plates.md`, "pub fn phrase_record") returns the typed hashlock phrase in an unprotected `String`, the same class as the pre-publish review's M-2 on ms-codec's `qr_text` (`design/agent-reports/hashlock-H6-A-pre-publish-review.md`), which WAS folded to `Zeroizing<String>` before the 0.9.0 publish because ms-codec's convention for secrets is `Zeroizing`. `me`'s convention is different — its record text (mnemonics included) already flows as plain `String`/`&str` through `validate_record`, `check_public` and `seal_deterministic` — so folding one function would be inconsistent rather than safer. Secret-handling class: never Critical/Important (operator ruling 2026-08-27). Owning phase: the next `me` secret-hygiene pass (with F-483), not H6.
 
 Filed 2026-09-05 by the controller at the H6 pre-publish gate; B (Tasks 2-3) implements the plan's `String` form as written.
 
+
+**CLOSED 2026-09-06 (me `1d10db17`), and the ruling turned on a measurement.**
+This entry argued the fold would be inconsistent, because `me`'s record text
+flows as plain `String`. Measured before deciding: `phrase_record` had **no
+production call site at all** — eight test uses and nothing else — and its three
+siblings (`key_record`, `hash_record`, `now_record`) build PUBLIC data, so the
+plain `String` is right for them and was wrong only here. With no consumer to
+change, the operator ruled the fold (2026-09-06) and it cost nothing: 646 tests
+pass with no test edits, the uses reaching `str` through `Deref`.
+
+The buffer is `Zeroizing` from the first byte and sized up front. A test pins the
+type as a COMPILE-TIME guard and asserts capacity equals length at four phrase
+widths and both methods. **What it does not pin, measured and recorded in its own
+comment:** wrapping a finished `format!` passes it, because `format!` returned a
+`String` already sized to its content — so the no-unwiped-intermediate property
+is argued from the function's four lines, not tested. The mutation the comment
+names instead (reserve eight bytes too many) does red it.
 ### F-494 — `fork-go-vet-is-red-at-baseline`: `go vet ./...` on the fork exits 1 at `main` `fb0dd04` before any H6 change — `bspline/bspline_test.go:126-127` (`bezier.Point` struct literals with unkeyed fields) and `testing.ArtifactDir requires go1.26 or later (file is go1.25)` in `gui/op/draw_test.go:176` and elsewhere (the `go.mod` language version is behind the Go 1.26 toolchain the tests already rely on). Neither package's tests fail; `vet` is not in the fork's CI gate, so nothing catches it. Fix in the fork's next hygiene cycle: key the literals, and raise the `go` directive to `1.26` (the toolchain floor the flake already pins) so `ArtifactDir` is legal by declaration, not by luck. Owning phase: next fork cycle, with F-490.
 
 Filed 2026-09-05 by the controller from the H6 group-C gate re-run on fork `hashlock-h6` at `872ba06c` (`.tmp/h6-ctl-c-check/vet.txt`); measured red at `fb0dd04` too, so not C's.
