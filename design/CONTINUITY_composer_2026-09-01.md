@@ -3032,3 +3032,22 @@ Command to resume: /resume-composer
   h6-records (merge; FOLLOWUPS conflicts possible) + staging push; toolkit
   h6-manual staging-PR; ms master push (report commit + F-501 fold) ->
   signed image via ~/bin/sh/sh2-flash -b -> physical QR-scan gate (operator).
+- **H6 POST-IMPL REVIEW: NOT GREEN 0C/1I/2M/2N (report f5265690) -> I-1
+  FOLDED (fork `hashlock-h6` tip eb914a62); DELTA RE-REVIEW IN FLIGHT.**
+  I-1: `hashlockPlatesRecords` decoded `r.body` untrimmed while `sysw.Classify`
+  and `Which hash?` band 2 TrimSpace, so a space/CR-padded preimage plate
+  record was offered at the door and refused by the flow (§5.2 / F-437
+  shape). Controller folded INLINE: test
+  `TestHashlockPlatesListsAPaddedPreimageRecordLikeTheDoorDoes` RED on three
+  padded cases -> one-call fix -> GREEN -> TrimSpace dropped = RED -> restored;
+  gofmt clean; gui 1288/24 shards. M-1 (device seed-classifies a 17-byte 0x03
+  single; pre-existing at fb0dd04; H0-class) = F-503; N-1 (uppercase plate
+  refusal wording) = F-504; N-2 (emu.wasm size not a pin) = F-505. Engrave
+  master now carries `h6-records` (merge 733b3840) and `h6-b` (merge
+  b94766bb; ff impossible after the records commits): nextest 642/639/3 (zsh
+  trio), fmt 0. Reviewer resumed for the eb914a62 delta (two questions).
+  NEXT: delta GREEN -> persist -> SHIP: fork main ff eb914a62 + plain push
+  (main unprotected); engrave master via scripts/push-via-staging.sh; toolkit
+  `h6-manual` staging PR; ms master push (report commit 4755061 + F-501 fold
+  a994a99) -> `~/bin/sh/sh2-flash -b` signed image at the fork tip ->
+  operator: flash + physical QR-scan gate (ACCEPTANCE item 8, ~43 min/plate).
