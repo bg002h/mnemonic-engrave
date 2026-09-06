@@ -1,15 +1,21 @@
 # Hashlock H6 — Preimage Plates Implementation Plan (three repos)
 
-**STATUS: DRAFT, awaiting R0 round 0.** Written by the plan author (opus) from
-`design/SPEC_hashlock_H6_preimage_plates.md` (R0 GREEN at engrave `a67a3924`).
-The build gate below was run BY THE AUTHOR at every task boundary in three
-scratch trees; `## Build gate` records what was wired and how it was gated.
-**Every task is now wired**: Tasks 1-8a by the plan author, and Tasks 8b-12 —
-the fork's `gui` surface — by the build-gate agent, in the same trees. Every
-code block carries a `file=` header and `scripts/h6-plan-blocks-vs-tree.sh`
-checks all 86 of them. Reports:
-`design/agent-reports/hashlock-H6-plan-author-report.md` and
-`design/agent-reports/hashlock-H6-plan-gate-8b-12.md`.
+**STATUS: DRAFT — fully gated; R0 round 0 pending.** Written by the plan author
+(opus) from `design/SPEC_hashlock_H6_preimage_plates.md`, which was R0 GREEN at
+engrave `a67a3924` and has since taken this round's own fold (its
+`## Plan-round fold` section). The build gate below was run BY THE AUTHOR at
+every task boundary in three scratch trees; `## Build gate` records what was
+wired and how it was gated. **Every task is now wired**: Tasks 1-8a by the plan
+author, and Tasks 8b-12 — the fork's `gui` surface — by the build-gate agent, in
+the same trees. Every code block carries a `file=` header and
+`scripts/h6-plan-blocks-vs-tree.sh` checks all 86 of them. Reports:
+`design/agent-reports/hashlock-H6-plan-author-report.md`,
+`design/agent-reports/hashlock-H6-plan-gate-8b-12.md` and this round's fold
+report, `design/agent-reports/hashlock-H6-plan-gate-fold-report.md`.
+**Nothing here is awaiting a spec change**: `## Build gate folded here` below
+lists, item by item, where every finding and every gate fix now lives in the
+spec, so R0 round 0 reviews the two documents against each other rather than
+against a gap.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
@@ -45,7 +51,9 @@ fork's `gui` touch harness, TinyGo via `nix develop -c tinygo build …` for siz
 whole `gui` package.
 
 **Spec:** `design/SPEC_hashlock_H6_preimage_plates.md` (R0 GREEN at engrave
-`a67a3924`: three lenses, one fold, one verification). Parents:
+`a67a3924`: three lenses, one fold, one verification; **plus this round's fold**,
+which added §3.6, §8.9 and `## Plan-round fold` and reopened §§1, 2.2, 3.1, 4.2,
+4.3, 5.1-5.4, 6.5, 7.2, 8.3, 8.6, 10.1, 11.1, 11.3-11.7, 12, 13, 14 and 16). Parents:
 `design/SPEC_hashlock_H2_device.md`, `design/SPEC_hashlock_H5_device_polish.md`,
 `SPEC_wallet_policy_composer.md`, `SPEC_ms_hashlock` (mnemonic-secret).
 
@@ -85,11 +93,12 @@ whole `gui` package.
      `editing_the_file_alone_is_the_trap_the_message_warns_about`,
      `the_emitted_zsh_recipe_actually_purges_the_entry`). Box-local; 618 of 621
      pass. **A fourth failure is a finding.**
-- **`ConstantQR`'s raise falsifies TWO SHIPPED TESTS the spec does not name, and
-  both are rewritten here rather than deleted** (author finding, §14 carries
-  neither): `TestConstantQRLargeVersionsFailClosed`
+- **`ConstantQR`'s raise falsifies TWO SHIPPED TESTS, and both are rewritten here
+  rather than deleted** (author report §4 finding 6; the spec's §14 now lists both with
+  their new expectations, and its `## Plan-round fold` records the round they
+  came from): `TestConstantQRLargeVersionsFailClosed`
   (`engrave/engrave_test.go:544-568`) asserts that dim 41 is REFUSED, and
-  `TestPassphraseQRTooLong` (`backup/passphrase_test.go:775-791`) uses a
+  `TestPassphraseQRTooLong` (`backup/passphrase_test.go:774-791`) uses a
   200-character passphrase — 194+ bytes, dim 53 — as its "beyond ConstantQR's
   reach" case. Both properties survive; only the version each is asserted at
   moves, to v10 (dim 57). A third record, the comment on
@@ -596,8 +605,10 @@ SECRET and both BEARER:
 
 - [ ] **Step 4: `preimage_plate_admissible`, and `preimage_plate` UNCHANGED.**
 
-**TWO NARROWINGS, and the second one is a defect the SHIPPED test caught.** The
-spec's §4.3 gives one — the id `hash`. The author's first implementation stopped
+**TWO NARROWINGS, and the second one is a defect the SHIPPED test caught**
+(author report §4 finding 4; **the spec has since folded it** — §4.3 now tables
+all three conjuncts and §11.1 carries both mutations). As §4.3 first stood it
+gave one — the id `hash`. The author's first implementation stopped
 there and `cargo nextest` reddened
 `sysw::tests::a_preimage_plate_is_named_not_misdiagnosed`, whose R0-r0-tests-I-3
 row is *a kind-0x03 single under the id `hash` whose X is 16 bytes* (50
@@ -1108,17 +1119,20 @@ uppercase rows, and gains two H6 rows:
         // becomes Ok(_) and the mistagged record is packed.
 ```
 
-- [ ] **Step 10: THE ARGV SURFACE MOVED, and this is the plan's third finding.**
-`Class::Preimage` and `Class::Phrase` are BEARER, so `is_argv_forbidden()` is
-true and `argv_secret_guard` (`crates/me-cli/src/main.rs:566`) refuses either on
-the command line BEFORE the parser runs. Two consequences, and the spec states
-neither:
+- [ ] **Step 10: THE ARGV SURFACE MOVED** (author report §4 finding 5; **the spec
+has since folded it** as a new §3.6, and §12 item 3 -- the one acceptance item
+that packs a record -- now says `--in`).
+`Class::Preimage` and `Class::Phrase` are BEARER, so `is_argv_forbidden()`
+(`crates/me-cli/src/sysw/record.rs:118-120`) is true and `argv_secret_guard`
+(`crates/me-cli/src/main.rs:551`, its bearer arm at `:566` — the line this step
+replaces) refuses either on the command line BEFORE the parser runs. Two
+consequences:
 
 1. **Every invocation must use the private channel.** `me sysw pack
    --pack-preimage --no-passphrase <ms1>` — §12 item 3's own acceptance
    invocation — is now REFUSED. `--in records.txt` is the route, and it is the
-   one the guard's own message already offers. **§12 item 3 and the toolkit
-   manual must say so** (Task 13).
+   one the guard's own message already offers. **§12 item 3 now says so; the
+   toolkit manual still must** (Task 13).
 2. **The guard's MESSAGE was false for the new classes**, and a refusal that
    names the wrong material is a defect in what the tool claims to have found.
    It said *"BEARER material -- a signed transaction, or the mt1 set carrying
@@ -1387,9 +1401,11 @@ The four arms, as measured:
 		return 1379 + 20
 ```
 
-**§11.3's BUDGET MUTATION CANNOT FIRE FROM AN IN-SUITE SAMPLE, and this plan
-adds the row that can** (author finding, MEASURED). §11.3 says *"set any of the
-four `constantTimeQRModules` arms to the observed maximum MINUS ONE
+**§11.3's BUDGET MUTATION COULD NOT FIRE FROM AN IN-SUITE SAMPLE, and this plan
+added the row that can** (author report §4 finding 3, MEASURED; **the spec has since
+folded it** — §11.3 now carries the PIN below as its own row and the retired mutation is
+recorded in its `## Plan-round fold`). As the spec first stood, §11.3 said *"set
+any of the four `constantTimeQRModules` arms to the observed maximum MINUS ONE
 → that version's row reds, which is also the check that the entry was derived
 rather than guessed."* Run it: with the arms at 822 / 959 / 1178 / 1378 the
 fuzzed row **still PASSES**, because its 400 payloads per dimension observe
@@ -1811,12 +1827,15 @@ type Hashlock struct {
 row of the phrase form, the locator follows it, a blank separates each block,
 and the SECRET is last so a reader knows where it ends.
 
-**A SPEC INCONSISTENCY, resolved and recorded** (author finding): §6.2 and §6.3
-put the method line first and the locator after it, while §6.5's worst-case
-listing reads *"header … a blank, the … method line, a blank, and a
-100-character phrase"* — locator FIRST. The NORMATIVE sections win. The row
-count is identical either way (3 + 1 + 2 + 1 + 3 = 10 at 3.0 mm), so no
-measurement in §6.5 moves.
+**A SPEC INCONSISTENCY, resolved and now FOLDED** (author report §4 finding 8; spec
+`## Plan-round fold` item 8). §6.2 and §6.3 put the method line first and the
+locator after it, while §6.5's worst-case listing read *"header … a blank, the …
+method line, a blank, and a 100-character phrase"* — locator FIRST. The NORMATIVE
+sections won, and §6.5 now states that single order with the layout's own
+segment list. **The order this code draws, MEASURED**: the method line
+(2 rows at 3.0 mm), a blank, the three locator rows, a blank, the phrase
+(3 rows) — **2 + 1 + 3 + 1 + 3 = 10 rows = 30.00 mm**. The count is 10 either
+way, so no measurement in §6.5 moved.
 ```go file=fork/backup/hashlock.go mode=fragment
 // hashlockWrap splits s into rows of at most n CHARACTERS. It never breaks on
 // word boundaries, and that is forced rather than chosen: a 100-character
@@ -2091,9 +2110,11 @@ transcription — the defect the corpus exists to prevent:
 ```
 
 
-**§11.4's method-line MUTATION AS WRITTEN CANNOT FAIL, and this plan replaces
-it** (author finding, MEASURED). §11.4 says *"add one character to the method
-line → the worst case no longer fits"*. At 39 characters per line a 73-character
+**§11.4's method-line MUTATION AS WRITTEN COULD NOT FAIL, and this plan replaced
+it** (author report §4 finding 2, MEASURED; **the spec has since folded it** — §11.4 now
+carries the 79-character threshold and records the retired mutation in its
+`## Plan-round fold`). As the spec first stood, §11.4 said *"add one character to
+the method line → the worst case no longer fits"*. At 39 characters per line a 73-character
 line wraps to 2 rows anywhere from 40 to 78 characters, so 74, 75, 76, 77 and 78
 ALL still fit — all five run, all five pass. §6.5 consequence 3's own number is
 the real threshold and is what the test carries:
@@ -2770,11 +2791,12 @@ no spare input.** This applies to BOTH provenances: a payload-delivered phrase
 is a secret the operator never typed, may not own, and did not ask to see, in
 whatever room the machine lives in.
 
-- [ ] **Step 2: the census (B).** `confirmReviewScreen(ctx, th, "Plates To Cut",
-composerCensusLines(...))` (`gui/composer_flow.go:389-390`), REPORTING the
-choices already made and staying read-only. `composerCensusLines`
-(`gui/composer_census.go:86`) appends §8.3's block: a heading, one row per
-plate, and the apart-storage line.
+- [ ] **Step 2: the census (B).** At `gui/composer_flow.go:389-390`, where
+`confirmReviewScreen(ctx, th, "Plates To Cut", composerCensusLines(...))` stands
+today — REPORTING the choices already made and staying read-only.
+`composerCensusLines` (`gui/composer_census.go:86`) appends §8.3's block: a
+heading, one row per plate, and the apart-storage line. **The spec's §5.3 (B)
+and its §8.3 heading now name `composerReadScreen` too** (gate fix F10).
 
 **Drawn through `composerPageLines`' 411 px band, NOT `confirmReviewScreen`'s
 own wrap** — so `composerEngraveStep` calls `composerReadScreen`, which has
@@ -2799,10 +2821,12 @@ is over the 374 px threshold and none of them draws under a button in the 411 px
 band. The census also joins `composerPagedScreens`, so the shipped W-3 gate
 covers it on every page.
 
-**§8.3's block is on the census's SECOND page** with this fixture, and
+**§8.3's block does not fit on the census's first page** with this fixture, and
 `composerReadScreen` withholds the checkmark until the last page has been laid
 out once — so an operator (and a walk) pages to reach it. That is the shipped
-contract, not a new one.
+contract, not a new one. MEASURED by the fold round: **11 census lines over 3
+pages**, §8.3's heading and its first three rows on page 2 and the apart-storage
+line on page 3. The spec's §11.7 carries the number.
 
 §8.3's rows, as the five bodies that produce them. They live in
 `composer_copy.go` so `TestComposerCopyTableCoversEveryBody` requires a table
@@ -3527,7 +3551,8 @@ the screen shows equals what is stored; it never drives through a hook."* So the
 walk asserts the SCREEN and Task 6's goldens assert the plate, and **no third
 hook carrying a preimage is added**.
 
-**A SECOND PATH HAS TO BE ADDED, and the plan did not say so.** `md.Compose`
+**A SECOND PATH HAS TO BE ADDED, and neither document said so until this round**
+(the spec's §11.7 now does). `md.Compose`
 refuses a wholly key-less composition (*"every path is key-less; at least one
 path must hold a key"*), so the composition this walk builds — ONE hashed,
 key-less path — cannot reach Done at all: it stops at a refusal, not at a
@@ -3784,71 +3809,172 @@ is not what a reader would guess.** Two probes, both measured on this tree:
 
 ---
 
+## Build gate folded here
+
+**Written by the plan-gate fold author (opus), after the build gate closed.**
+This section exists so that R0 round 0 reviews the plan and the spec against each
+other rather than against a gap: everything the plan author and the build gate
+found is now NORMATIVE SPEC TEXT, and the table below is the index.
+
+The counterpart section in the spec is its `## Plan-round fold`, which carries
+each change with its own measurement. **Every number in both sections was
+re-measured by the fold author in private copies of the three gated trees** --
+modal bodies through `assertModalBodyFits`, row widths through `widget.Labelw` in
+`composerTextBand`, plate geometry through `hashlockLayoutFor` /
+`backup.CharsPerLine`, budgets through `constantTimeQRModules`, corpora through
+`sha256sum`, firmware through `tinygo build -size short` -- and each replaced
+mutation was RUN.
+
+### The plan author's nine findings
+
+Indexed by `design/agent-reports/hashlock-H6-plan-author-report.md` §4, which is
+now also this document's numbering (see the renumbered list below) and the
+spec's.
+
+| # | now in the spec at | the plan's own step |
+| --- | --- | --- |
+| 1 | §1 item 3b, §3.1 (the move + the 0.9.0 release ritual), §12 item 0 | Task 1 Step 6, Task 2 Step 0 |
+| 2 | §11.4 (the 79-character mutation) | Task 6 Step 7 |
+| 3 | §11.3 (the fuzzed row AND the pin), §7.2 item 4, §16 | Task 4 Steps 3, 5 |
+| 4 | §4.3 (three conjuncts, tabled), §11.1 (both mutations) | Task 2 Step 4 |
+| 5 | §3.6 (new), §12 item 3 on `--in` | Task 3 Step 10 |
+| 6 | §14 (both tests, with their v10 expectations) | Task 4 Step 6, Task 6 Step 8 |
+| 7 | §2.2 item 6, §11.6 | Task 8a's boundary note |
+| 8 | §6.5 (ONE order: `2 + 1 + 3 + 1 + 3 = 10`) | Task 6 Step 2 |
+| 9 | §4.2 (the three corpora re-pinned; the one that does NOT move) | Task 2 Step 7, Task 7 Steps 5-6 |
+
+### The build gate's seventeen fixes
+
+Five changed only this document and nothing normative -- **F1** (`sysw.Record`
+does not exist), **F2** (an uncompilable Step-3 sketch), **F7** (two signatures),
+**F16** (three test paths that do not exist), **F17** (an annotation inside a
+cited fragment). The other twelve are spec text now:
+
+| # | now in the spec at |
+| --- | --- |
+| F3 | §5.1 -- the payload preimage record's own confirm body, **274 / 186** |
+| F4 | §5.1 -- `composerHashRows` gains `st *composerState` |
+| F5 | §5.1 -- the `(in payload)` annotation and the underived `phrase:` record |
+| F6 | §5.1 (five rows, 29 px pitch), §11.5, §13 |
+| F8 | §8.6 rule 4a -- `hashlock.MethodLine` / `hashlock.QRText` as deliverables |
+| F9 | §5.4 -- §8.4b's cut counter |
+| F10 | §5.3 (B) -- `composerReadScreen`; §11.5 -- the AST gate |
+| F11 | §5.3 item 2 and §8.3 -- the digest-independent property; the withdrawn literals |
+| F12 | §10.1 -- `every`, not `at least one`; §11.5 -- the mixed and partial rows |
+| F13 | §5.3 step (A) -- the two-line lead; §11.5 |
+| F14 | §5.3 -- the deterministic plate order; §11.5 |
+| F15 | §5.2 -- the session-shaped predicate, the door's caller, the `:86-90` citation |
+
+**The gate's two deliberate non-changes are recorded, not reversed.** §8.3's
+`plate(s)` stays verbatim in both documents and is filed; the seven bodies with no §8
+blockquote (measured: 20 added, 13 blockquoted) are now tabulated with their
+measurements in the spec's new **§8.9** and filed the same way. Changing shipped copy inside a build gate puts the string
+and the document it is diffed against out of step.
+
+### What this round measured for itself
+
+| claim | measured |
+| --- | --- |
+| the four new modal bodies | 274/186, 99/455, 80/476, 46/513, and every carried figure re-confirmed (75/476, 86/476, 185/360, 186/360, 107/455, 126/378, 165/397, 204/302, 184/378) |
+| the census geometry | panel 480, nav column 427, `confirmReviewScreen` wrap 464, centred-safe 374, band 411, shipped completeness line 459; the five new rows 419/385/434/442/441 at the wrap |
+| `Which hash?` and the pick step | the `(in payload)` row 41 chars / 343 px / one line; five rows on page 1; four pick rows 128/138/180/196 px |
+| the plate | rungs 19/23/26/31/34/39 chars and 4.0000/3.3333/2.9333/2.5333/2.2666/2.0000 mm; budget 416,000 units = 65.00 mm; QR envelope 31.80 mm at scale 2, 47.70 at scale 3; method line 73 chars; worst case 10 rows, 63.80 mm, **1.20 mm spare** |
+| the budget arms | `constantTimeQRModules` = 843 / 1013 / 1199 / 1399; the shipped five 171/266/391/547/684 untouched |
+| the corpora | class `3575ccb0…a1c4abaf` (68 rows) identical on both sides; ms `4f1819cd…aba21d4` identical on both sides; seam `2c2fbb3f…6bd541b` unchanged and correctly so |
+| the firmware | 1,599,208 -> 1,643,580 B flash, 62,856 -> 63,272 B RAM; the plate layout 4,560 B of it (1,639,020 B stubbed) |
+| the mutations re-run | the 79-character method line (and 74-78 all still fitting); the budget pin at `1378`; both `preimage_plate_admissible` conjuncts; §10.1's fourth arm at `at least one`; the census through `confirmReviewScreen`; the pick lead at four lines. **Six red, each with its tail quoted in the fold report.** |
+
+---
+
 ## What this plan found against the R0-GREEN spec
 
-Nine things the spec does not say, every one of them measured. None is a
-Critical against the spec's design; six are things an implementer following it
-literally would have got wrong.
+Nine things the spec did not say, every one of them measured. None is a Critical
+against the spec's design; six are things an implementer following it literally
+would have got wrong. **All nine are now FOLDED into the spec** — the numbering
+below is the plan author's report `§4`, which the spec's `## Plan-round fold`
+uses, and each item names the section that now carries it.
 
-1. **`me` cannot call the phrase rule the spec names.** §3.1 requires a
+**RENUMBERED to the author report's §4 order**, which the spec's fold uses, so
+the same finding carries the same number in all three documents.
+
+1. **`me` could not call the phrase rule the spec named.** §3.1 required a
    `phrase:` body to pass *"`ms-cli`'s `validate_phrase` … byte for byte"*, and
    `me-cli` depends on `ms-codec`, not on `ms-cli`. A literal reading produces a
    THIRD copy of the rule. **Task 1 moves it into the codec** and makes the
    stage's first deliverable a published release. *(Blocks Task 2; the plan
    author stood a `[patch.crates-io]` in front of it to build the rest.)*
-2. **§11.4's method-line mutation cannot fail.** *"Add one character to the
+   → **spec §1 item 3b, §3.1, §12 item 0.**
+2. **§11.4's method-line mutation could not fail.** *"Add one character to the
    method line → the worst case no longer fits"* — measured, 74, 75, 76, 77 and
    78 characters all still fit, because 39 characters per line wraps a
    73-character line to 2 rows anywhere below 79. §6.5 consequence 3's own
    number (*"a 79th character"*) is the threshold, and Task 6 carries it.
-3. **`preimage_plate_admissible` needs TWO more conjuncts than §4.3 gives it**,
+   → **spec §11.4**, which now carries the 79-character mutation.
+3. **§11.3's budget mutation could not fire from any in-suite sample.** With the
+   four arms at the campaign maximum MINUS ONE, the fuzzed row still passes —
+   its 400 payloads per dimension see 792 / 910 / 1143 / 1322, and the true
+   maxima took 7 to 14 million. Task 4 adds
+   `TestConstantTimeQRBudgetEntriesAreTheFuzzedOnes`, a PIN, which is the row
+   that actually carries "derived rather than guessed".
+   → **spec §11.3**, which now carries the fuzzed row AND the pin, and **§7.2
+   item 4 / §16**, where the campaign's result is recorded and the "not settled"
+   item is closed.
+4. **`preimage_plate_admissible` needed TWO more conjuncts than §4.3 gave it**,
    and the shipped `a_preimage_plate_is_named_not_misdiagnosed` found both: a
    kind-`0x03` single under the id `hash` whose X is 16 bytes, and the UPPERCASE
    spelling of a plate. The device's `codex32.IsPreimage` already required
    `len(d) == 33 && d[0] == 0x03`, so **Go was right and Rust needed narrowing** —
    which is the Rust-primary rule's own "whenever a defect is found in a Go port
    we MUST check the Rust" running in reverse.
-4. **The raise falsifies two shipped tests §14 does not list.**
-   `TestConstantQRLargeVersionsFailClosed` asserts dim 41 is REFUSED;
-   `TestPassphraseQRTooLong` uses a 200-character passphrase (dim 53) as its
-   out-of-reach case. Both are rewritten at v10 in Tasks 4 and 6.
-5. **`composerHoldHashlockMaterial` trips the fork's own join guard**, so §2.2's
-   retention cannot land as a commit of its own. Recorded on Task 8a.
-6. **§6.2/§6.3 and §6.5 disagree about body-row ORDER** — method line first
-   versus locator first. The normative sections win; the row count is identical
-   either way, so no measurement moves. Recorded on Task 6 Step 2.
-7. **Making the classes BEARER moves the argv surface**, and the spec does not
+   → **spec §4.3** (all three conjuncts, tabled) **and §11.1** (both mutations).
+5. **Making the classes BEARER moved the argv surface**, and the spec did not
    say so. `me sysw pack --pack-preimage --no-passphrase <ms1>` — §12 item 3's
    own acceptance invocation — is refused by `argv_secret_guard` before the
    parser runs, and the guard's message named *"a signed transaction, or the
    mt1 set carrying one"* for a hashlock preimage. **The refusal is correct and
    its wording was not**; Task 3 Step 10 fixes the wording and Task 13 fixes the
-   acceptance path.
-8. **§11.3's budget mutation cannot fire from any in-suite sample.** With the
-   four arms at the campaign maximum MINUS ONE, the fuzzed row still passes —
-   its 400 payloads per dimension see 792 / 910 / 1143 / 1322, and the true
-   maxima took 7 to 14 million. Task 4 adds
-   `TestConstantTimeQRBudgetEntriesAreTheFuzzedOnes`, a PIN, which is the row
-   that actually carries "derived rather than guessed".
+   toolkit manual.
+   → **spec §3.6** (new) **and §12 item 3**, on `--in`.
+6. **The raise falsifies two shipped tests §14 did not list.**
+   `TestConstantQRLargeVersionsFailClosed` asserts dim 41 is REFUSED;
+   `TestPassphraseQRTooLong` uses a 200-character passphrase (dim 53) as its
+   out-of-reach case. Both are rewritten at v10 in Tasks 4 and 6.
+   → **spec §14**, which now lists both with their new expectations and the
+   third record rewritten with them.
+7. **`composerHoldHashlockMaterial` trips the fork's own join guard**, so §2.2's
+   retention cannot land as a commit of its own. Recorded on Task 8a.
+   → **spec §2.2 item 6**, which also states why the exemption table is not the
+   instrument, and **§11.6**.
+8. **§6.2/§6.3 and §6.5 disagreed about body-row ORDER** — method line first
+   versus locator first. The normative sections win; the row count is identical
+   either way, so no measurement moves. Recorded on Task 6 Step 2.
+   → **spec §6.5**, which now states the single order the gated layout draws,
+   `2 + 1 + 3 + 1 + 3 = 10`.
 9. **The `preimage-plate-0x03` seam row moves class**, from `Unknown` to
    `Preimage`, in a corpus whose test is named *"not one of these records may
    change class"*. Its `entr`-id sibling stays `Unknown`, and that PAIR is §4.3
    stated as data. Recorded in Task 2 Step 7 rather than absorbed.
+   → **spec §4.2**, which tables the three corpora H6 re-pins on BOTH sides and
+   names the one two-repo corpus that does NOT move.
 
 ## Follow-ups this plan files
 
 Owning phases, per the constellation's per-phase burndown rule:
 
+Every row below is ALSO recorded in the spec now — §13's "Added by the plan
+round" list, §8.9, or the section the row names — so a reader of either document
+finds the same set.
+
 | item | owning phase |
 | --- | --- |
-| a CLI producer for `phrase:` records — a wire form with no writer | a later `ms`/`me` cycle |
-| §12 item 3's acceptance invocation must use `--in`; the argv guard refuses a preimage on the command line | **Task 13** (records) |
-| a reconcile-style screen for a PAYLOAD phrase (§10.2) | a later device cycle |
-| cross-run awareness of preimage plates already cut (§5.3 item 6, §8.4b) | a later device cycle |
+| a CLI producer for `phrase:` records — a wire form with no writer | a later `ms`/`me` cycle (spec §13) |
+| the TOOLKIT MANUAL must use `--in`; the argv guard refuses a preimage on the command line. *(§12 item 3 is FIXED in the spec, not deferred.)* | **Task 13** (records) |
+| a reconcile-style screen for a PAYLOAD phrase (§10.2) | a later device cycle (spec §13) |
+| cross-run awareness of preimage plates already cut (§5.3 item 6, §8.4b) | a later device cycle (spec §13) |
 | `composerNotePhraseDigest`'s doc comment cites `composer_flow.go:34`; the literal is at `:48` | **Task 8a** (fix inline) |
 | §8.3's `plate(s)` is the spelling this file's own house rule refuses (`composerSlotWord` renders "slot @3" or "slots @3 and @4" so a refusal never reads "slots @3"). Kept VERBATIM by the build gate — changing spec copy inside a gate would put the shipped string and the document it is diffed against out of step | **Task 13** (records) |
-| H6 §8 carries no blockquote for four bodies the device now draws: the payload preimage-record confirm (§5.1), the masked pick lead and the plate refusal (§5.3), and the Hashlock plates flow's three screens (§5.2). They are quoted strings in `composerCopyTable`, which §11 admits, but the spec is no longer the source they are diffed against | **Task 13** (records) |
-| `Which hash?`'s first page holds FIVE rows, so a payload with a `hash:`, a preimage and a `phrase:` record puts `No hash lock` on page 2 | a later device cycle (measured, non-gating) |
-| Tasks 8b-12 add **+42,636 B** of firmware flash. Nothing in this stage is over a ceiling, but §11.6's estimate had no number behind it and now does | fork size hygiene |
+| H6 §8 carries no blockquote for the bodies the device now draws: the payload preimage-record confirm (§5.1), the masked pick lead and the plate refusal (§5.3), and the Hashlock plates flow's three screens (§5.2). They are quoted strings in `composerCopyTable`, which §11 admits, but the spec is no longer the source they are diffed against. **The spec's new §8.9 now TABULATES all SEVEN (measured: 20 bodies added, 13 blockquoted) with their measurements and files the blockquotes** | **Task 13** (records) |
+| `Which hash?`'s first page holds FIVE rows, so a payload with a `hash:`, a preimage and a `phrase:` record puts `No hash lock` on page 2 | a later device cycle (measured, non-gating; spec §5.1 states it, §11.5 pins it, §13 files it) |
+| The whole stage adds **+44,372 B** of firmware flash and **+416 B** of RAM (Tasks 8b-12 are +42,636 B of the flash). Nothing in this stage is over a ceiling, but §11.6's estimate had no number behind it and now does — **the spec's §11.6 carries the table, re-measured at both ends by the fold round** | fork size hygiene |
 | `go.mod` says `go 1.25.10` while the toolchain is 1.26.7 and the project floor is `go1.26`, so `go vet` exits 1 on any package using `t.ArtifactDir()` | fork toolchain hygiene |
 | F-483 — the typed phrase in an unwipeable Go string | open, non-gating (2026-08-27) |
