@@ -2793,3 +2793,29 @@ Command to resume: /resume-composer
   pending). NEXT: plan lands -> commit + persist -> three lenses -> fold ->
   verification -> implementers by file groups (A..D) -> merge -> gates + walk
   + the three-run discipline -> post-impl -> merge fork main -> push -> image.
+- **H6 PLAN LANDED HALF-GATED (`4b9a4dd8`; checker c7988749; author report
+  39b6c525).** 3,255 lines, 13 tasks Rust-first (ms -> me -> fork codec ->
+  fork device -> records), parallel groups by disjoint files (Group E =
+  8a/8b/9 share composer_flow.go). Wired + gated: Tasks 1-8a in three scratch
+  trees (`.tmp/h6-ms` @504ff46, `.tmp/h6-me` @75f00b56, `.tmp/h6-gate` fork
+  @fb0dd04); checker 70/70. NOT wired: Tasks 8b-12 (fork gui surface: two
+  screens, the Hashlock plates flow, censusLines signature, five bodies, the
+  walk arm) -- no file= headers, numbers carried from the spec. Budget fuzz
+  complete: 43,458,059 payloads, maxima 823/960/1179/1379 (all above the spec
+  floors; v7 buffer widened to 53). Firmware +1,736 B / +392 RAM. Shard 18
+  FAIL = `TestComposerEveryScreenFunctionHasAProductionCaller` tripped by 8a's
+  screens whose callers land in 8b-12 (a finding, expected to clear). **Nine
+  findings against the GREEN spec** (§4 of the report): (1) `me` cannot call
+  ms-cli's phrase rule -> Task 1 moves it into ms-codec and a PUBLISHED
+  ms-codec release becomes the stage's first deliverable (blocks Task 2);
+  (2)(3) two spec mutations cannot fail (method line 74-78 all fit, 79 is the
+  threshold; the budget mutation needs a pin); (4) preimage_plate_admissible
+  needs two more conjuncts; (5) bearer classes move the argv guard -- §12
+  item 3's acceptance invocation is refused on argv (use --in) and the guard
+  copy named a transaction; (6) the raise falsifies two shipped tests; (7)
+  composerHoldHashlockMaterial trips the fork's join guard; (8) §6.2/§6.3 vs
+  §6.5 body-row order; (9) the seam corpus row `preimage-plate-0x03` moves
+  class Unknown -> Preimage. **GATE AGENT for 8b-12 DISPATCHED** (opus, brief
+  61f8125c). NEXT: gate report -> ONE fold of plan + spec (gate fixes + nine
+  findings) -> checker -> three plan lenses -> fold -> verification ->
+  implementers by file groups.
