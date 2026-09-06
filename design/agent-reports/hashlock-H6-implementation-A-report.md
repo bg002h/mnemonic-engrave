@@ -274,3 +274,128 @@ the crate-local predicate left no dead code — clippy at `-D warnings` confirms
 *Written by implementer A as its final action. Nothing pushed; no commit on
 `master`; the report is uncommitted for the controller to persist in its own
 commit.*
+
+---
+
+## Post-review fold (M-1, M-2)
+
+Folded at the controller's instruction after the pre-publish review came back
+GREEN (0C/0I) with two Minors. **One further commit on `h6-a`:**
+
+**`1a4f4aa8a3b4b29e5e6f7a479b4c57bc0e073fea`** — *"H6 Task 1 (ms): pre-publish
+review fold -- the dated CHANGELOG heading, and qr_text returns
+Zeroizing<String>"*. New branch tip; nothing pushed.
+
+### M-1 — the CHANGELOG heading is dated
+
+`CHANGELOG.md:7` read `## ms-codec [0.9.0] — unreleased`; every other entry in
+the file carries a date. It now reads:
+
+```
+## ms-codec [0.9.0] — 2026-09-05
+```
+
+matching `## ms-cli [0.18.0] — 2026-09-05` at `:49` and `## ms-codec [0.8.0] —
+2026-09-05` at `:72`.
+
+### M-2 — `qr_text` returns `Zeroizing<String>`
+
+**The exact new signature line, from the tree:**
+
+```rust
+pub fn qr_text(hardened: bool, phrase: &str) -> Zeroizing<String> {
+```
+
+The buffer is `Zeroizing` **from the first byte**, with its exact capacity
+reserved up front — `String::with_capacity(HEAD.len() + method.len() +
+LABEL.len() + phrase.len())` followed by four `push_str` calls — rather than a
+finished `String` wrapped at the end. Wrapping would have been no protection at
+all: `format!` would have built the phrase in the clear and the wrap would have
+guarded only the copy. Reserving exactly means no `push_str` can reallocate and
+abandon an unwiped buffer part-way through. The `method` line stays an ordinary
+`String`: it is three compile-time constants and carries nothing of the phrase.
+
+No dependency was added — `ms-codec` already depends on `zeroize` and
+`Zeroizing` was already imported in this file (`crates/ms-codec/src/hashlock.rs:21`).
+
+**Call sites, grepped across the workspace** (excluding `target/` and `vendor/`):
+the only caller is `crates/ms-codec/tests/hashlock_qr_text.rs`. Nothing in
+`ms-cli` calls it. The gated `me` tree (`/scratch/code/shibboleth/.tmp/h6-me`)
+has **no** `qr_text` call site either, so Task 2 is unaffected by the signature
+change; the fork's `MethodLine`/`QRText` are an independent Go implementation
+pinned against the vendored corpus rows, which do not move.
+
+**The test needed exactly one line, and the compiler named it:**
+
+```
+error[E0308]: mismatched types
+  --> crates/ms-codec/tests/hashlock_qr_text.rs:51:25
+                            ^^^^^^^^^^^ expected `Zeroizing<String>`, found `String`
+```
+
+`assert_eq!(got, row.qr_text, …)` → `assert_eq!(*got, row.qr_text, …)`. Every
+other assertion reaches `str`'s inherent methods through `Deref` and is
+untouched: `got.len()`, `got.ends_with('\n')`, `got.lines().count()`,
+`got.lines().next_back()`, and both `.lines().nth(1)` calls.
+
+**The assertions still assert** — re-mutated through the new return type, both
+run and reverted (`22-remut-a.txt`, `23-remut-b.txt`):
+
+| Re-mutation | Result |
+| --- | --- |
+| append a newline after the phrase | row anchor-hardened fails with a message **byte-identical to the pre-fold run**; `the_worst_case_is_194_bytes` reads `left: 195 right: 194` |
+| drop the final `out.push_str(phrase)` — a failure mode the old `format!` could not have had | `left: "…\nphrase: "` vs `right: "…\nphrase: correct horse battery staple"`, and `left: 94 right: 194` |
+
+The CHANGELOG's `qr_text` bullet now names the full signature, since the return
+type is the point of M-2.
+
+### The five gates at the new tip `1a4f4aa8`
+
+| # | Command | Output (log) |
+| --- | --- | --- |
+| 1 | `cargo nextest run --locked` | `562 tests run: 562 passed, 11 skipped` — exit 0, unchanged (`30-tip-nextest.txt`) |
+| 2 | `cargo fmt --all -- --check` | exit 0, zero bytes of output (`31-tip-fmt.txt`) |
+| 3 | `cargo clippy --all-targets --locked -- -D warnings` | exit 0, zero warnings, at the pinned 1.85.0 (`32-tip-clippy.txt`) |
+| 4 | `cargo publish -p ms-codec --locked --dry-run` | exit 0, `Uploading ms-codec v0.9.0` / `warning: aborting upload due to dry run` (`33-tip-dryrun.txt`) |
+| 5 | `sha256sum crates/ms-codec/tests/vectors/hashlock-v0.8.json` | `4f1819cdd0862b101afd48d0478e8f0b218f933dd3da449915fa3c5eaaba21d4` — **unchanged** (`34-tip-corpus.txt`) |
+
+The corpus did not move, so the CHANGELOG's pin, implementer C's Task 5b
+vendoring and the fork's provenance pin are all unaffected by this fold.
+
+Gate 4 initially failed with `to proceed despite this and include the
+uncommitted changes, pass the --allow-dirty flag`: `cargo publish` requires a
+clean tree, so it was re-run after the commit rather than with `--allow-dirty`.
+The result above is the post-commit run.
+
+### ⚠ Consequence the controller must decide on: the PLAN text is now stale
+
+**M-2 makes two of the plan's pinned code blocks false.** Re-running
+`scripts/h6-plan-blocks-vs-tree.sh` with this worktree as the ms tree
+(`35-tip-blocks.txt`) — it was `97 blocks checked, 0 FAIL` before the fold:
+
+```
+PASS …:283  fragment  ms/crates/ms-codec/src/hashlock.rs            (83 lines, verbatim substring)
+FAIL …:380  fragment  ms/crates/ms-codec/src/hashlock.rs            -- not a verbatim substring of the tree file.
+PASS …:412  fragment  ms/crates/ms-cli/src/hashlock_phrase.rs       (11 lines, verbatim substring)
+PASS …:426  fragment  ms/crates/ms-cli/src/argv_guard.rs            (26 lines, verbatim substring)
+FAIL …:492  fragment  ms/crates/ms-codec/tests/hashlock_qr_text.rs  -- not a verbatim substring of the tree file.
+PASS …:516  fragment  ms/crates/ms-codec/tests/hashlock_qr_text.rs  (6 lines, verbatim substring)
+
+97 blocks checked, 2 FAIL
+```
+
+Exactly the two blocks M-2 touches, and no others — plan Step 2's `qr_text` body
+at `:380` and Step 5's `assert_eq!(got, …)` fragment at `:492`. This is a
+**deliberate departure from an R0-GREEN plan, ordered after the plan closed**,
+not a drift: the branch is right and the plan text is behind it.
+
+It matters beyond bookkeeping. The plan is what the remaining implementers read,
+and at `:380` it now shows a **signature that does not exist** — `-> String`.
+Anyone writing a Rust caller from the plan (Task 2's author, or a later reader of
+§8.6) would write it against the wrong type. Recommend the controller fold both
+plan fragments to match the branch before Task 2 is dispatched, and re-run the
+checker to `0 FAIL`. This implementer did not edit the plan: it is outside the
+brief's file list, and the plan is the controller's artifact.
+
+*Nothing pushed. Branch `h6-a` tip `1a4f4aa8a3b4b29e5e6f7a479b4c57bc0e073fea`,
+working tree clean.*
