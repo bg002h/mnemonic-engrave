@@ -2898,3 +2898,22 @@ Command to resume: /resume-composer
   walk NOT re-run (walk sha unchanged). **r1 sonnet verification DISPATCHED**
   (brief 82364f1f). NEXT: GREEN -> STATUS -> ms-codec 0.9.0 release (Task 1;
   H1 ritual) -> implementer briefs from the plan's final groups -> dispatch.
+- **H6 PLAN R0 GREEN (plan `3890ad64`, spec `95418b2c`; r1 report 49abc5ca).**
+  Sonnet r1 verification: every C/I fix reproduced (10 mutations
+  red-then-clean, numbers re-measured), checker 97/0, both Rust trees
+  fmt-clean; 0C/0I + 2 new Minors, folded inline in the STATUS commit (me's
+  1.85.0 pin lives in release.yml, not rust-toolchain.toml; Task 13's manual
+  entry carries the `phrase:` wire form). Checker at the fold: 97/0. Briefs
+  A-F + the ms-codec 0.9.0 release brief committed (8ec16bee, C's ordering
+  addendum 1fd3e628). **IMPLEMENTATION DISPATCHED (two opus implementers):**
+  A = Task 1 on ms branch `h6-a` (`/scratch/code/shibboleth/ms-worktrees/h6-a`);
+  C = Tasks 4, 5 now, then 5b (needs A's corpus commit; stops and waits for a
+  message if absent) and 6 on fork branch `h6-c`
+  (`/scratch/code/shibboleth/.tmp/seedhammer-h6-c`). NEXT: A report -> merge
+  `h6-a` to ms master -> release agent (ms-codec 0.9.0, H1 ritual) AND
+  message C the corpus sha -> B (needs 0.9.0 published) -> C report -> merge
+  into fork `hashlock-h6` -> D -> E -> F -> controller gates + walk x3 + QR
+  goldens -> post-impl review -> fold -> merge fork main + engrave + toolkit
+  + ms -> signed image -> physical QR-scan gate. The macOS-aarch64 build job
+  on engrave run 34015170572 failed on a GitHub artifact-upload timeout
+  (non-required; infrastructure, no action).
