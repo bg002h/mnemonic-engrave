@@ -1,0 +1,10 @@
+You are the PUSH agent (sonnet tier) for mnemonic-secret at `/scratch/code/shibboleth/mnemonic-secret`. Local master tip `a994a99` is TWO commits over `origin/master` `990df82` (the ms-codec 0.9.0 release report 4755061, and a one-line wording fix to `crates/ms-cli/src/cmd/hashlock.rs` -- the engraving card no longer says the method line is on no plate; ms-cli tests 367/367). Ship them via the ci/staging ritual so the required contexts are SATISFIED, never bypassed.
+
+Follow the newest-by-mtime `design/agent-reports/push-ms-*.md` and the push section of `design/agent-reports/release-ms-codec-0.9.0.md` in that repo as the precedent (same steps, same evidence). The ritual: `git -C <repo> push origin master:refs/heads/ci/staging`; find the run(s) for the exact full SHA (`gh run list --repo bg002h/mnemonic-secret --commit <full sha>`, `gh run view <id> --json jobs`; full SHAs and `--repo`, per-job conclusions -- `gh` fails silently empty otherwise); wait until the FOUR required contexts succeed: `test (ubuntu-latest)`, `clippy`, `test (ms-codec)`, `clippy (ms-codec)`; report the non-required `vendor-freshness` result too; then `git -C <repo> push origin master` and QUOTE its output -- any line containing "Bypassed rule violations" means FAILURE (report it as such; do not retry); then `git -C <repo> push origin --delete ci/staging`. Do not commit or amend anything on master before the push; the controller is frozen off ms master for the window. Do NOT tag or publish anything.
+
+Report (your final action): write `/scratch/code/shibboleth/mnemonic-secret/design/agent-reports/push-ms-a994a99.md` (create; must not exist) with every command, run id, per-job conclusion and the verbatim final-push output, then commit ONLY that file on master with a five-line message ending in the trailers
+```
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+```
+(use `git commit -F <file>`; the shell is fish and eats backticks). Return two lines: outcome + path. Never read any `.jsonl`.

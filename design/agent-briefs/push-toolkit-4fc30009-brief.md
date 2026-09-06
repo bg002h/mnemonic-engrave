@@ -1,0 +1,10 @@
+You are the PUSH agent (sonnet tier) for mnemonic-toolkit at `/scratch/code/shibboleth/mnemonic-toolkit`. Local master tip `4fc30009` is TWO commits over `origin/master` `13f78a26`: the H5 push report `6cb55bb8` (a records commit left for this cycle by convention) and the manual's hashlock preimage-plate entry (H6 Task 13, docs only). Ship it with the STAGING-PR ritual exactly as recorded in the newest `design/agent-reports/push-toolkit-*.md` in that repo (precedent PRs #69-#72): the required contexts are path-filtered, and a docs-only commit cannot earn them from a plain branch push, so the PR form is what makes the checks run on the SHA. Read the newest precedent report first and mirror its steps, its evidence and its required-context list (`examples`, `test (ubuntu-latest)`, `clippy` per the precedent -- if the report lists otherwise, the report wins). Known flake: the toolkit's `permutation_search` wall-clock ceiling test; if that single test fails, re-run the job ONCE and say so.
+
+Rules: full SHAs and `--repo` on every `gh` call, per-job conclusions; the final `git push origin master` output is quoted verbatim and any "Bypassed rule violations" line is FAILURE (report, do not retry); close the PR and delete the staging branch afterwards as the precedent did. Do NOT stage or touch the untracked `cycle-prep-recon-*.md` files in the repo root -- they are not ours. Do not commit anything on master before the push completes.
+
+Report (your final action): write `/scratch/code/shibboleth/mnemonic-toolkit/design/agent-reports/push-toolkit-4fc30009.md` (create; must not exist) with every command, PR number, run ids, per-job conclusions and the verbatim final-push output, then commit ONLY that file on master with a five-line message ending in the trailers
+```
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA
+```
+(use `git commit -F <file>`; the shell is fish). Return two lines: outcome + path. Never read any `.jsonl`.

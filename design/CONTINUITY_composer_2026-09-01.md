@@ -3051,3 +3051,20 @@ Command to resume: /resume-composer
   `h6-manual` staging PR; ms master push (report commit 4755061 + F-501 fold
   a994a99) -> `~/bin/sh/sh2-flash -b` signed image at the fork tip ->
   operator: flash + physical QR-scan gate (ACCEPTANCE item 8, ~43 min/plate).
+- **H6 GREEN -> SHIPPING (2026-09-06).** Delta re-review of eb914a62: GREEN
+  for the whole stage, 0C/0I (report 751f30df), one new Minor M-3 (the stub
+  reader untrimmed, same class) folded inline on the fork: test RED on three
+  paddings -> TrimSpace -> GREEN -> mutation red -> restored; gui 1289/24;
+  fork `hashlock-h6` tip bdc2f06c (no re-review: trivial fold with a failing
+  test). Fork main: merge commit from hashlock-h6, plain push (unprotected).
+  Signed image built with `~/bin/sh/sh2-flash -b` at that tip (NOT flashed:
+  operator away from device; never unattended). Engrave master carries
+  h6-records + h6-b + F-503..F-505; toolkit master ff'd to h6-manual
+  4fc30009 (two commits over origin 13f78a26); ms master a994a99 (two over
+  origin 990df82). Push agents (sonnet): toolkit staging-PR (brief
+  push-toolkit-4fc30009-brief.md), ms ci/staging (push-ms-a994a99-brief.md),
+  engrave ci/staging (brief committed after the push with its report, since
+  it names the tip). **ENGRAVE MASTER FROZEN from this commit until the push
+  agent reports.** Operator-owned after the pushes: flash the H6 image
+  (`~/bin/sh/sh2-flash <image>`), the H4 device walk, and ACCEPTANCE item 8
+  (one worst-case QR plate cut and phone-scanned, ~43 min).
