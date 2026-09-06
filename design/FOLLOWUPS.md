@@ -16236,6 +16236,23 @@ derived phrase matches, the locator row already proves it and a second screen is
 noise the operator learns to page past. When it does not, there is nothing to
 check the derivation against, and that is exactly where the reconcile screen
 earns its place. Still owned by the hashlock stage after H6; not implemented.
+
+**CLOSED 2026-09-06 (fork `62d2faeb`).** `hashlockPayloadRoute` draws the
+reconciliation screen when `payloadStatesDigest` is false — the payload carries
+the phrase and no `hash:` record equal to the derived digest, so nothing has
+compared the device's derivation to the host's and the operator, who has the
+phrase in the payload, can run the host command against it. When the payload
+DOES state the digest the confirm modal's relation line has already shown the
+match and a second screen is noise.
+
+§10.2's "true by construction" scoping is gone with its argument: the claim that
+the instruction is a no-op for a payload phrase was true only of the
+matching-hash case. Both function comments are rewritten and the test that
+encoded the old property now covers both branches, the second in its own fixture
+because a `hash:` record would be a sixth row on a page that holds five.
+`hashlockPreimageRecordRoute` deliberately gets none: a preimage record carries
+X directly, so there is no derivation to reconcile and no phrase for the host
+command to take.
 ### F-497 — `no-cross-run-awareness-of-preimage-plates-already-cut`: the composer's plate census reports what THIS run will cut and cannot know that a plate for the same digest was cut in an earlier run (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2, against §5.3 item 6 and §8.4b. `composerState.hashlockHeld` lives for one composition and `composerFlowExit` scrubs it, so a second composition over the same phrase re-derives, re-holds and re-offers a plate with nothing on any screen saying one already exists. Two consequences, and the second is the one that costs something: the operator can cut a duplicate bearer plate without being told (more copies of a spend secret than they meant to have), and §8.4b's abort arm — *"a preimage plate was cut"* — is scoped to the run it fired in, so an abort in run 2 says nothing about run 1's plate still being on the bench.
@@ -16248,6 +16265,25 @@ keeps no durable record of past cuts, and adding one means new flash state with
 its own failure modes and a migration. The census must therefore say it reports
 THIS run, so nobody reads it as a complete inventory of what exists on steel.
 A copy change, owned by the hashlock stage after H6; not implemented.
+
+**CLOSED 2026-09-06 (fork `62d2faeb`).** The census carries
+`composerCopyPreimageCensusScope`: *"This is what this composition will cut.
+Plates cut in earlier runs are not known to this device and are not listed."* It
+sits with the plate rows and nowhere else — the stand-alone notice form lists no
+plates to cut, so a caveat about a list's completeness would be a caveat about
+nothing.
+
+**The independent check found a Critical here, and it is worth reading.** The
+commit named a mutation (append the line outside the accepted-plates arm) and
+said it fails. It did not: every fixture held ONE unassigned preimage, and the
+census returns the stand-alone notice before the row-building path runs at all,
+so the mutation was dead on arrival and all 1290 tests stayed green under it.
+The gap was reachable — two held-but-unassigned preimages skip both early
+returns with zero accepted, and the mutated code then reads "this is what this
+composition will cut" over a census cutting nothing. That fixture is now the
+block's third case and the mutation reds it (fold `4f1d06bc`, delta review
+GREEN). Also measured on the way: the copy table proves a body exists, is
+spelled right and fits, and proves nothing about anything drawing it.
 ### F-498 — `composerNotePhraseDigest-cites-a-stale-line-for-the-composerState-literal`: three sites say the production `composerState` literal is at `gui/composer_flow.go:34`; MEASURED at fork `hashlock-h6` it is at `:51` (owning phase: **next fork hygiene cycle, with F-490 and F-494**) `#seedhammer` `#docs` `#records`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (H6 spec §2.2 item 1 names it as a nit for this stage's fold; the plan's own text says `:48`, which is itself stale). Measured with `grep -n "st := &composerState{" gui/composer_flow.go` at the H6 integration tip:
