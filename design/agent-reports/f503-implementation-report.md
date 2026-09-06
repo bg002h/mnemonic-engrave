@@ -11,7 +11,7 @@ the branch tip, captured under `/scratch/code/shibboleth/.tmp/f503-runs/`.
 
 | repo | branch | tip | baseline |
 | --- | --- | --- | --- |
-| mnemonic-engrave | `f503` | **`cb0628e70e0c8e579c98214d3e2ab31e5872f29c`** | master `4df46e22` |
+| mnemonic-engrave | `f503` | **`2eed4eaf445134349878b4c0daecc06cf6d89cd1`** | master `4df46e22` |
 | seedhammer (fork) | `f503` | **`b32ff08ab0f6f025c3c3242a6546a522ffcc80ed`** | main `3cadffa8` |
 | mnemonic-secret | `f503-records` | **`81d67b85be98de3d25246099f02e6ef4bb949240`** | master `cacf5da` |
 
@@ -29,6 +29,7 @@ at their tips (`git status --porcelain` empty).
 | `81d67b85` | 3 | spec: SPEC_ms_hashlock states F-503's precise device rule … |
 | `6ea358db` | 3 | records: F-503 CLOSED — me f503 277c6336, fork f503 b32ff08, ms f503-records 81d67b85 |
 | `cb0628e7` | — | followup: F-506 — the UPPERCASE spelling of the F-503 string is still a device seed class (deviation D6, §6) |
+| `2eed4eaf` | — | records: the me suite is fully green at the F-503 tip — the operator installed zsh, so the F-500 trio passes (§9) |
 
 Every commit carries `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` and
 `Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA`;
@@ -36,20 +37,24 @@ backticks verified intact with `git log -1 --format=%B`.
 
 ## 2. Boundary numbers, measured at the tips
 
-**me** (`cargo nextest run --locked -p mnemonic-engrave --no-fail-fast`, at
-`6ea358db`, re-run at the tip; `final-me-suite.txt`):
+**me** (`cargo nextest run --locked -p mnemonic-engrave --no-fail-fast`, at the
+tip `2eed4eaf`; `final-me-suite-tip.txt`):
 
 ```
-Summary [   0.366s] 634 tests run: 631 passed, 3 failed, 2 skipped
+Summary [   0.360s] 634 tests run: 634 passed, 2 skipped
 ```
 
-The three failures are the `history_purge` zsh trio (F-500, no `/usr/bin/zsh` on
-this box), named exactly: `the_harness_records_history_at_all`,
+**Exit 0 — fully green, no failures at all.** See §9: the operator installed
+`/usr/bin/zsh` mid-session, so the three `history_purge` tests the plan lists as
+expected failures (F-500) now pass. The earlier measurement, taken before the
+install and matching the plan's expected 634 / 631 / 3 / 2, is in
+`t1s9-suite.txt` and `final-me-suite.txt`; the three failures there were the
+zsh trio exactly — `the_harness_records_history_at_all`,
 `editing_the_file_alone_is_the_trap_the_message_warns_about`,
-`the_emitted_zsh_recipe_actually_purges_the_entry`. **This is the plan's
-expected figure, 634 / 631 / 3 / 2.**
+`the_emitted_zsh_recipe_actually_purges_the_entry` — and nothing else.
 
-- `cargo fmt --all -- --check` → exit 0, no output (`t1s9-fmt.txt`).
+- `cargo fmt --all -- --check` → exit 0, no output (`t1s9-fmt.txt`; re-run at
+  the tip `2eed4eaf`, still exit 0).
 - `cargo clippy --locked --all-targets -p mnemonic-engrave` → exit 0, ONE
   warning, the pre-existing `manual implementation of .is_multiple_of()` at
   `crates/me-cli/src/sysw/composer_records.rs:177` (`t1s9-clippy.txt`). Nothing
@@ -266,6 +271,7 @@ D6:
 - ms `81d67b85`: `design/SPEC_ms_hashlock.md`.
 - me `6ea358db`: `design/FOLLOWUPS.md`, `design/CONTINUITY_composer_2026-09-01.md`.
 - me `cb0628e7`: `design/FOLLOWUPS.md`.
+- me `2eed4eaf`: `design/CONTINUITY_composer_2026-09-01.md`.
 
 ## 8. For the post-impl check (plan §4)
 
@@ -277,3 +283,40 @@ D6:
   PASS at the tip, 42 records.
 - **Read F-506 (§6/D6) before merging the fork branch** — it names a comment in
   `sysw/classify.go` that is measurably false as shipped.
+
+## 9. Environment note — the F-500 zsh trio now PASSES
+
+**The box changed under this task, in its favour.** The operator installed the
+system zsh (`/usr/bin/zsh`, `zsh 5.9.2` — verified with `which zsh` and
+`zsh --version` at the tip) while Task 3 was being written. The plan's Global
+constraints say "The three `history_purge` tests fail on this box for want of
+`/usr/bin/zsh` (F-500); the me suite's expected figure is **634 run: 631 passed,
+3 failed, 2 skipped**". That constraint is now stale.
+
+Measured, both before and after, at this branch:
+
+| when | tip | result |
+| --- | --- | --- |
+| before the install | `6ea358db` | `634 tests run: 631 passed, 3 failed, 2 skipped` (exit 100) — the zsh trio, the plan's figure |
+| after the install | `cb0628e7` | `634 tests run: 634 passed, 2 skipped` (exit 0) |
+| after the install | `2eed4eaf` (tip) | `634 tests run: 634 passed, 2 skipped` (exit 0) |
+
+633 of those are engrave master's (the controller measured `633 tests run: 633
+passed, 2 skipped` there); the 634th is F-503's new integration test
+`a_hash_id_plate_with_a_short_x_is_refused_for_its_length_not_its_id`.
+
+**The pass criterion for this task is therefore a fully green suite, and it is
+met.** Nothing was edited to reach it — the plan and
+`crates/me-cli/tests/history_purge.rs` are both untouched, as instructed; the
+three tests went green because their missing dependency arrived.
+
+**Consequence for whoever reads this next: on this box a failing `history_purge`
+test is now a REAL finding, not the missing shell.** F-500's expected-failure
+note should be revisited (it is not this task's to close). The correction is also
+appended to `design/CONTINUITY_composer_2026-09-01.md` in commit `2eed4eaf`, so
+the branch's own record does not carry the superseded "3 failed" figure forward;
+the original entry is left standing as the measurement of its moment rather than
+rewritten.
+
+Unaffected by any of this: every RED, GREEN and mutation in §3 and §4 (none
+involves `history_purge`), the fork's numbers, and the seam parity in §2.
