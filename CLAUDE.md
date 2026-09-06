@@ -74,6 +74,13 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
   -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller`.
   Measured 2026-09-02: fork main `321acb56` 1,506,884 B flash / 62,592 B RAM;
   `b77449db` (composer S3) 1,579,924 / 62,800.
+- **The fork's pristine gofmt baseline is FIVE files, not three (measured
+  2026-09-06, F-499).** `gofmt -l .` at fork main `fcd1546` lists
+  `gui/transaction.go`, `gui/transaction_golden_test.go`,
+  `gui/transaction_txrecord_test.go`, `mt/mt.go`, `mt/mt_test.go` — the last
+  two are the `mt` package, which arrived after earlier records said "three".
+  A gate should diff `gofmt -l` against this five-file set, not assert it
+  comes back empty.
 
 ## Parallel execution — this machine has 24 CPU cores
 

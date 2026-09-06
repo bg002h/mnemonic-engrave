@@ -719,12 +719,44 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 > holds 2 of the 3 signatures this path needs.
 > Liana will refuse it.
 
-### 8h. Every path needs a preimage
+### 8h. Every path needs a preimage — FOUR arms, chosen by `composerCopyHashEveryPathFor`
+
+`composerCopyHashEveryPathFor` (`gui/composer_copy.go:582`) chooses among four
+bodies: the two shipped originally, for a composition that does not hold every
+hashed path's material, and two H6 §10.1 added, for one that does.
+
+**Not held, no phrase** (`composerCopyHashEveryPath`):
 
 > HASH ON EVERY PATH
 > Every way to spend this wallet needs the preimage
 > of a hash. It is not on this device and not on
-> these plates. Back the preimage up separately.
+> these plates. Back up every preimage separately.
+
+**Not held, at least one path's hash set by phrase** (`composerCopyHashEveryPathPhrase`):
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs a hashlock
+> preimage. It is not on this device and not on these
+> plates. Back up every phrase and its method, and every
+> preimage plate, separately.
+
+**Held, no held path has a phrase** (`composerCopyHashEveryPathHeld`):
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs the preimage
+> of a hash. This composition holds the preimage for
+> each one and can cut a plate for it at Done. Store
+> those plates apart from these, and apart from each
+> other.
+
+**Held, every held path has a phrase** (`composerCopyHashEveryPathHeldPhrase`):
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs a hashlock
+> preimage. This composition holds the phrase and
+> method for each one and can cut a plate at Done.
+> Store those plates apart from these, and apart from
+> each other.
 
 ### 8i. Hashlock entry rule (at entry and at consent)
 

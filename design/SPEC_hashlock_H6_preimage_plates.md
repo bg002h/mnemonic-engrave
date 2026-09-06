@@ -2502,6 +2502,16 @@ test seam in `composer_preimage_plate.go`, and a comment in `engrave.go`):
 **1,643,580 B flash / 63,272 B ram, byte-identical.** `./cmd/emu/build.sh`, which
 is not the firmware, moved 11,010,867 -> 11,011,084 B.
 
+**11,011,084 B is an OBSERVATION here, not a pin (F-505, measured 2026-09-06):**
+`cmd/emu/emu.wasm` is neither the firmware nor a shipped artifact, a rebuild
+from the same source moved it a further two bytes (11,011,082 B), and it is not
+byte-reproducible across rebuilds the way the flash/RAM figures above are. A
+spec that needs a reproducible identity for the emulator should pin
+`cmd/emu/walk_hashlock_phrase.js`'s sha256 instead
+(`dfb9e6d5cf5521349db0c116cf7426039e7ff6c177f86e269f92105ddc9bc581` at fork
+`e089a539`, unchanged at the current tip) — the walk file is source, and
+hashes exactly, where the wasm build does not.
+
 Nothing here is over a ceiling; the estimate above had no number behind it and
 now does. The SHAPE is worth recording because it is not what a reader would
 guess: stubbing `backup.EngraveHashlock` out of `composerHashlockPlateFor` --

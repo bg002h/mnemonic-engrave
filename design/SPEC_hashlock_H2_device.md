@@ -359,8 +359,19 @@ unchanged.
 §8h stays at Done (`gui/composer_shape.go:443`, guarded by
 `composerEveryPathHashed(st.list)`), where its predicate is true; it is NOT shown
 in the per-path confirm modal, where the shape is partial and the banner would be
-false most times it appears. Its copy gains a phrase-route form: when every path
-is hashed and at least one hash was set by phrase, the text reads
+false most times it appears. Its copy is chosen among FOUR arms by
+`composerCopyHashEveryPathFor` (`gui/composer_copy.go:582`) — the two below
+predate this route, and two H6 §10.1 added for a composition that holds the
+preimage itself:
+
+**Not held, no phrase** (`composerCopyHashEveryPath`):
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs the preimage
+> of a hash. It is not on this device and not on
+> these plates. Back up every preimage separately.
+
+**Not held, at least one path's hash set by phrase** (`composerCopyHashEveryPathPhrase`, this section's original subject):
 
 > HASH ON EVERY PATH
 > Every way to spend this wallet needs a hashlock
@@ -368,11 +379,26 @@ is hashed and at least one hash was set by phrase, the text reads
 > plates. Back up every phrase and its method, and every
 > preimage plate, separately.
 
-(the shipped text now ends *"Back up every preimage separately."*, still
-naming only "the preimage" -- an artifact this route cannot produce;
-`composerCopyHashEveryPath` at `gui/composer_copy.go:169-173` at `b9a9a30`). The
-§8i rule modal fires at the pick (§5) as today, once; it is not repeated in the
-confirm modal (journey N-1, fidelity M-4).
+**Held, no held path has a phrase** (`composerCopyHashEveryPathHeld`):
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs the preimage
+> of a hash. This composition holds the preimage for
+> each one and can cut a plate for it at Done. Store
+> those plates apart from these, and apart from each
+> other.
+
+**Held, every held path has a phrase** (`composerCopyHashEveryPathHeldPhrase`):
+
+> HASH ON EVERY PATH
+> Every way to spend this wallet needs a hashlock
+> preimage. This composition holds the phrase and
+> method for each one and can cut a plate at Done.
+> Store those plates apart from these, and apart from
+> each other.
+
+The §8i rule modal fires at the pick (§5) as today, once; it is not repeated in
+the confirm modal (journey N-1, fidelity M-4).
 
 ---
 
