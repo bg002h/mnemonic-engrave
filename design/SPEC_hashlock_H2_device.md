@@ -262,14 +262,32 @@ method: hardened   chars: <n>        (or: method: sha256   chars: <n>)
 <other-path line, only when another path of this policy already carries a different
 hash: "another path has a different hash: back up every phrase">
 Write down this phrase, the method and this digest
-now. The phrase and method are not on this device.
+now. This composition holds them until it ends.
 Without both, this path can never be spent.
-One phrase per policy. Spending any path of a wsh
-wallet publishes this digest. Never use this phrase
-as a passphrase or a password anywhere else -- a
-spend publishes the preimage, and anyone can then
-test guesses at the phrase itself.
+One phrase per policy. Never use this phrase as a
+passphrase or a password anywhere else.
 ```
+
+**THE SECOND LINE WAS FALSIFIED BY H6 AND IS REWRITTEN HERE**
+(`SPEC_hashlock_H6_preimage_plates.md` §0 record 5, plan round 0 journey I-2; the
+shipped string is rewritten by H6 Task 8a Step 5, where its `modal_fits` gate
+is, and this blockquote is what it is diffed against). It read *"The phrase and
+method are not on this device."* H6 §2.2 stores both in `hashlockHeld` for the
+composition's lifetime and §6 engraves both onto a plate, so in
+`hashlockPhraseRoute` the falsification is ONE STATEMENT WIDE: the next
+production statement after this modal is accepted is
+`composerHoldHashlockMaterial`. It erred in the DANGEROUS direction -- it said a
+backup did not exist on a modal drawn on EVERY phrase route, while §10.1's held
+arms, which were written to fix exactly that, are guarded by
+`composerEveryPathHashed` and so draw on almost no real wallet.
+
+**The last two lines of the blockquote were ALSO stale, and not by H6's doing.**
+The shipped body dropped *"Spending any path of a wsh wallet publishes this
+digest"* and the *"-- a spend publishes the preimage, and anyone can then test
+guesses at the phrase itself"* clause before H6 began: both are already absent at
+fork `main` `fb0dd04`. They are folded here because record 5's mandate is that
+this blockquote and the shipped string stay in step, and half a fold would leave
+the next reader diffing a stale sentence against a corrected one.
 
 The reconciliation lines are drawn on their own post-HOLD `showError` screen,
 shown immediately after HOLD assigns the digest and reachable for every policy
