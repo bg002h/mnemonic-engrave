@@ -1,6 +1,6 @@
 # SPEC — Hashlock H6: preimage plates on the SeedHammer II
 
-**STATUS: R0 GREEN; plan-round fold pending verification.** The R0 gate closed
+**STATUS: R0 GREEN (0 Critical / 0 Important open); plan-round fold `a2a031fa` verified GREEN (sonnet, `hashlock-H6-spec-plan-round-verification.md`: 26/26 applied, every number re-measured).** The R0 gate closed
 0C/0I; the plan round then reopened this spec, and `## Plan-round fold` at the
 end lists every change with its own measurement. Brainstorm walked live with the operator (nine decisions + Group A rulings + the C-1 encoder ruling, recorded in `design/CONTINUITY_composer_2026-09-01.md`); draft `a0f832d0` by the opus design author; round 0 (three lenses): fidelity + design (opus, `hashlock-H6-spec-R0-r0-fidelity.md`, 4C/7I/7M/3N), journey walk (opus, `-journey.md`, 1C/7I/7M/2N), tests + citations (sonnet, `-tests.md`, 0C/3I/1M/1N); fold `4881474f` by an opus fold author (every number its own measurement; steps that could be run were run: budget fuzz, scale-2 arm); r1 fold verification (sonnet, `hashlock-H6-spec-R0-r1-fold-verification.md`) **GREEN**, every claim re-derived from scratch. Lens-closure: fidelity, journey, tests/citations, fold-verification. §16 names the two items only the plan (budget values) and a physical plate (the QR scan gate) can settle. Written
 from `design/BRAINSTORM_hashlock_H6_preimage_plates.md` against the operator's
