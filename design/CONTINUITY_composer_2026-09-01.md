@@ -2853,3 +2853,15 @@ Command to resume: /resume-composer
   all eight guard mutations caught; suites 562/562, 630/627+3, 1285/1285).
   Fidelity + journey lenses in flight; round-0 fold brief pre-written
   (d5053818). Engrave origin/master 4e71a8c4.
+- H6 plan R0 r0: journey lens landed (0dd7368a, 1C/5I/4M/2N). C-1: the Hashlock
+  plates flow's phrase-form LOCATOR is tested only with preimage records --
+  the named mutation and a locator built before the derive (a plate reading
+  `hash 00000000..00000000`) both leave 1285 tests green. Importants: the
+  `phrase:` prefix is described nowhere operator-facing and its refusal
+  misnames it; the HOLD modal says "not on this device" one statement before
+  retention stores it (and is missing from §0's falsified list); §8.2.2 fires
+  for carriers §4.3 narrowed out; the QR-scan gate's "~2 s a try" vs a
+  measured 43m32s per plate (QR alone 32m12s) and a toolpath that cannot be
+  divided per try; the pick step's Back contract differs from the gated tree
+  (Button1 silently declines). Fidelity lens in flight; fold brief SHAs
+  filled (plan e6d84d9c, spec 5bb46948).
