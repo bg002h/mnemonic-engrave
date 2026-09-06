@@ -3113,3 +3113,26 @@ Command to resume: /resume-composer
 - `.tmp` emptied entirely at the operator's word (1,854 entries, ~3.8 GB
   more: h1b-target and the shipped-cycle scratch). The directory itself
   stays -- it is TMPDIR for every Cargo/nextest run here.
+- **F-503 BURNDOWN STARTED (operator, 2026-09-06, "start with 503").** Facts:
+  ms-codec reads the first payload byte as the KIND at every width (0x03 +
+  wrong length = PreimageLengthMismatch, never a seed); `me` refuses the
+  F-503 string but its text misnames the cause (says the id is not `hash`);
+  the device tests only the 33-byte shape, and the seam corpus pins a 16-byte
+  0x03 payload under `test` as device-admits TRUE by H0's design (device is
+  BIP-93-wide, host narrower). **Operator rulings:** (1) device rule = kind
+  0x03 under the id `hash` at ANY length is inert (not "reserve the id"; not
+  "any id"); (2) ONE `me` release (0.9.0: H6 host half + F-503) AFTER F-503
+  lands; (3) plan + build gate, R0 round SKIPPED, straight to the
+  implementer. **Plan written and gated** from scratch implementations in two
+  gate worktrees (`me-worktrees/f503-gate`, `.tmp/seedhammer-f503-gate`):
+  me 634/631/3(zsh)/2, fmt 0, clippy pre-existing only; fork codex32+sysw ok,
+  gui 1289/24; every new test proven red under its named mutation; checker
+  14 blocks / 0 FAIL. Plan `design/IMPLEMENTATION_PLAN_hashlock_F503_hash_kind_inert.md`;
+  brief `design/agent-briefs/f503-implementer-brief.md`. **HANDOFF POINT for
+  the switch to opus.** NEXT (opus session): dispatch the implementer (opus)
+  from the brief with the current engrave master SHA -> persist its report
+  -> sonnet post-impl check (§4 of the plan) -> merge + ship three repos
+  (engrave staging, fork plain push + `sh2-flash -b`, ms staging) -> me
+  0.9.0 release brief (H1b/0.8.1 ritual: `push-me-v0.8.1-release-brief.md`
+  precedent) -> then the next follow-up. Gate worktrees are detached and
+  disposable once the implementer's branches exist.
