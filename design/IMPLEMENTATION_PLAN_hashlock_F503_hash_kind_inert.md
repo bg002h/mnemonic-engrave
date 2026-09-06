@@ -18,7 +18,7 @@
 - Cargo env: `PATH=$HOME/.cargo/bin:$PATH TMPDIR=/scratch/code/shibboleth/.tmp CARGO_TARGET_DIR=/scratch/code/shibboleth/.tmp/<own dir>`; `cargo nextest run --locked -p mnemonic-engrave --no-fail-fast`; `cargo fmt --all -- --check` before every commit; clippy under the box's rustc 1.98 warns ONLY on the pre-existing `manual_is_multiple_of` in `composer_records.rs` (known; not yours).
 - Go: `/scratch/code/shibboleth/.toolchain/go/bin/go` first on PATH; whole-gui counts only via `scripts/gui-shard-test.sh ./gui/ 24` from the fork worktree.
 - The three `history_purge` tests fail on this box for want of `/usr/bin/zsh` (F-500); the me suite's expected figure is **634 run: 631 passed, 3 failed, 2 skipped**.
-- Commit per task, `git commit -F <file>` (`-s` on the fork), trailers `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA`; stage paths explicitly; nothing pushed; no `master`/`main` commits.
+- Commit per task, `git commit -F <file>` (`-s` on the fork), trailers `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` and `Claude-Session: https://claude.ai/code/session_01Fs3bg7TRfuSaFcCEkskwXA`; stage paths explicitly; nothing pushed; no `master`/`main` commits.
 - The seam corpus is SHARED BYTE FOR BYTE (its own header says how): edit it in me, re-pin `SEAM_VECTORS_SHA256` (Rust) AND `seamVectorsSHA256` (Go) to the same value, copy the file to the fork. The value for this change is `f53a17dc9d1ea5a4c0ff913786e82a5f19de004f4719536bb6d957bccdef1ee8`.
 
 ## File structure
