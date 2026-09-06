@@ -156,13 +156,19 @@ pub enum UnknownReason {
     /// string is a constellation record, just not one this container places
     /// yet (H0, §9).
     ///
-    /// Carries no number because none would be true of every case: a
-    /// well-formed plate is 75 characters with the id `hash`, and a malformed
-    /// `0x03` string (a 34-byte payload at 77 characters, §1's
-    /// `PreimageLengthMismatch`) is named the same way — the predicate asks
-    /// the codec about the KIND, not about a length or an id
-    /// (post-implementation review M-1).
-    PreimagePlate,
+    /// Carries WHICH conjunct of the admission shape failed, so the refusal
+    /// can say what to fix (F-503: the text used to claim the id was not
+    /// `hash` for a string whose id WAS `hash` and whose X was 16 bytes).
+    /// `id_is_hash` is the id read from bytes 4..8 of the trimmed record;
+    /// `x_len` is `Some(n)` when the codec refused the payload as
+    /// `PreimageLengthMismatch { got: n }` (an X of `n` bytes, not 32) and
+    /// `None` when the payload is a well-formed 33-byte kind under a wrong id.
+    /// Both false-shaped (`id_is_hash: true, x_len: None`) cannot occur: that
+    /// string is admissible and never reaches here.
+    PreimagePlate {
+        id_is_hash: bool,
+        x_len: Option<usize>,
+    },
     /// An ms1 string whose 4-character id and kind byte disagree (SPEC_ms_hashlock
     /// §1 rule 2, `TagKindMismatch`, ruling L24 — refused, never read by either
     /// field). Damaged or forged: re-encode from the source rather than editing.
@@ -213,7 +219,13 @@ fn unknown_reason(record: &str) -> UnknownReason {
         return UnknownReason::TagKindMismatch;
     }
     if crate::seal::record::preimage_plate(record) {
-        return UnknownReason::PreimagePlate;
+        let trimmed = record.trim();
+        let id_is_hash = trimmed.as_bytes().get(4..8) == Some(b"hash".as_slice());
+        let x_len = match ms_codec::decode(trimmed) {
+            Err(ms_codec::Error::PreimageLengthMismatch { got }) => Some(got),
+            _ => None,
+        };
+        return UnknownReason::PreimagePlate { id_is_hash, x_len };
     }
     if crate::seal::record::bip93_outside_the_profile(record) {
         return UnknownReason::Bip93OutsideTheProfile(record.trim().chars().count());
@@ -947,7 +959,13 @@ mod tests {
                 None,
                 ITER
             ),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::PreimagePlate {
+                    id_is_hash: false,
+                    x_len: None
+                }
+            )),
         );
         assert!(!matches!(
             pack(
@@ -955,7 +973,10 @@ mod tests {
                 None,
                 ITER
             ),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate))
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::PreimagePlate { .. }
+            ))
         ));
         // R0 r0 tests I-3: a kind-0x03 single whose X is not 32 bytes (id hash,
         // 16-byte X, 50 characters) is refused by the codec as
@@ -966,7 +987,13 @@ mod tests {
                 None,
                 ITER
             ),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::PreimagePlate {
+                    id_is_hash: true,
+                    x_len: Some(16)
+                }
+            )),
         );
         // H6 §4.3, the funds-relevant row: --pack-preimage admits the id `hash`
         // and NOTHING else. A kind-0x03 single under any other id stays
@@ -989,7 +1016,13 @@ mod tests {
                     ..Default::default()
                 }
             ),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::PreimagePlate {
+                    id_is_hash: false,
+                    x_len: None
+                }
+            )),
         );
         // Post-impl M-3: the `unshared` conjunct and the case-insensitive share
         // index are load-bearing. A 2-of-N SHARE whose SSS point begins 0x03
@@ -1006,11 +1039,20 @@ mod tests {
                 None,
                 ITER
             ),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate))
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::PreimagePlate { .. }
+            ))
         ));
         assert_eq!(
             pack(vec![PLATE.to_ascii_uppercase()], None, ITER),
-            Err(SyswError::Unclassifiable(0, UnknownReason::PreimagePlate)),
+            Err(SyswError::Unclassifiable(
+                0,
+                UnknownReason::PreimagePlate {
+                    id_is_hash: false,
+                    x_len: None
+                }
+            )),
         );
         // The control: an entr string of the same length is still a seed.
         assert!(matches!(

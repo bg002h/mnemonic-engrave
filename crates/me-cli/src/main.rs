@@ -3086,25 +3086,44 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      field (SPEC_ms_hashlock §1 rule 2). A damaged or forged plate — \
                      re-encode it from the source rather than editing the string."
                 ),
-                // H6 §8.1.2 -- THE EXISTING BODY REWRITTEN, not a second arm.
-                // Measured: `entr` never reaches here (id_kind_mismatch is
-                // diagnosed first, above), and a kind-0x03 single under the id
-                // `hash` is now a CLASS and reaches PreimageNotAdmitted
-                // instead. So the only case this arm actually covers is an id
-                // outside {entr, hash}, and the body now says so.
-                //
-                // THE LAST SENTENCE IS THE POINT: §4.3 exists for exactly one
-                // case, and the operator most likely to hit this refusal is the
-                // one holding a 33-byte seed backup that happens to begin 0x03.
-                U::PreimagePlate => format!(
-                    "record {i} (records count from 0) is a kind-0x03 preimage payload \
-                     whose 4-character id is not `hash`. A preimage plate is kind 0x03 \
-                     under the id `hash` (SPEC_ms_hashlock rule 2), and --pack-preimage \
-                     admits only that. Re-encode it with `ms hashlock` rather than editing \
-                     the string. If this string is a 33-byte seed backup that happens to \
-                     begin 0x03, it is not a preimage: roughly 1 in 256 of them look like \
-                     this."
-                ),
+                // H6 §8.1.2, and F-503: this arm covers THREE shapes, not
+                // one. A kind-0x03 single under the id `hash` with a
+                // well-formed 33-byte payload is a CLASS and reaches
+                // PreimageNotAdmitted instead, so what lands here is (a) an id
+                // outside {entr, hash} with a well-formed payload -- the §4.3
+                // collision case, and the ONLY one the 1-in-256 sentence is
+                // true of; (b) the id `hash` with an X that is not 32 bytes --
+                // a damaged or hand-built plate, which the text used to
+                // misdiagnose as a wrong id (F-503); (c) a wrong id AND a wrong
+                // length. The reason carries the diagnosis; the text says only
+                // what is true of the record in hand.
+                U::PreimagePlate { id_is_hash, x_len } => match (id_is_hash, x_len) {
+                    (true, Some(n)) => format!(
+                        "record {i} (records count from 0) is a kind-0x03 preimage payload \
+                         under the id `hash` whose X is {n} bytes, not 32. A preimage plate \
+                         is kind 0x03 followed by exactly 32 bytes (SPEC_ms_hashlock §1), \
+                         and --pack-preimage admits only that. This string is a damaged or \
+                         hand-built plate: re-encode it with `ms hashlock` from the phrase or \
+                         the 32-byte preimage rather than editing the string."
+                    ),
+                    (false, Some(n)) => format!(
+                        "record {i} (records count from 0) is a kind-0x03 preimage payload \
+                         whose 4-character id is not `hash` and whose X is {n} bytes, not 32. \
+                         A preimage plate is kind 0x03 under the id `hash` followed by exactly \
+                         32 bytes (SPEC_ms_hashlock §1 rule 2), and --pack-preimage admits \
+                         only that. Re-encode it with `ms hashlock` rather than editing the \
+                         string."
+                    ),
+                    (_, None) => format!(
+                        "record {i} (records count from 0) is a kind-0x03 preimage payload \
+                         whose 4-character id is not `hash`. A preimage plate is kind 0x03 \
+                         under the id `hash` (SPEC_ms_hashlock rule 2), and --pack-preimage \
+                         admits only that. Re-encode it with `ms hashlock` rather than editing \
+                         the string. If this string is a 33-byte seed backup that happens to \
+                         begin 0x03, it is not a preimage: roughly 1 in 256 of them look like \
+                         this."
+                    ),
+                },
                 U::Bip93OutsideTheProfile(len) => format!(
                     "record {i} (records count from 0) is a VALID BIP-93 codex32 string — the \
                      checksum is good — but not a constellation `ms1` record, so this \

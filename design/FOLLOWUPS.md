@@ -16241,7 +16241,7 @@ Filed 2026-09-06 from hashlock H6 Task 13 Step 1, as an OBSERVATION outside the 
 
 The composer spec quotes only the first arm and the H2 spec only the first two, so a reader of either sees a screen the device draws in fewer and fewer cases. `SPEC_hashlock_H6_preimage_plates.md` §10.1 carries all four and is the live authority; what these two owe is a pointer to it rather than a fourth copy of the copy.
 
-### F-503 — `device-classifies-a-17-byte-kind-0x03-single-as-a-seed-while-the-host-refuses-it`: a kind-`0x03` ms1 single under id `hash` whose X is 16 bytes (`ms10hashsqvqqqqqqqqqqqqqqqqqqqqqqqqqqmv3lqlgkn6s5c`) is refused by `me sysw pack` as `Unclassifiable(0, PreimagePlate)` (the 33-byte conjunct fails) but classifies `ClassCodex32Secret` -- a SEED class -- on the device, because `codex32.IsPreimage` needs `len(d)==33`, so `isStrictMs1`'s `!codex32.IsPreimage(c)` conjunct is satisfied. Pre-existing at fork `fb0dd04` (measured: class 2 there too), unchanged by H6, and unreachable through `me`; it is the one host/device classification divergence in the H6 post-impl probe set (`design/agent-reports/hashlock-H6-post-impl.md` M-1). Fix belongs to an H0-class change: narrow `isStrictMs1` (kind 0x03 under any id, any length, is never a seed) with its own inertness argument and corpus row, Rust-first (`me`'s `preimage_plate` already refuses it by name). Owning phase: next fork hashlock cycle.
+### F-503 — `device-classifies-a-17-byte-kind-0x03-single-as-a-seed-while-the-host-refuses-it`: a kind-`0x03` ms1 single under id `hash` whose X is 16 bytes (`ms10hashsqvqqqqqqqqqqqqqqqqqqqqqqqqqqmv3lqlgkn6s5c`) is refused by `me sysw pack` as `Unclassifiable(0, PreimagePlate)` (the 33-byte conjunct fails) but classifies `ClassCodex32Secret` -- a SEED class -- on the device, because `codex32.IsPreimage` needs `len(d)==33`, so `isStrictMs1`'s `!codex32.IsPreimage(c)` conjunct is satisfied. Pre-existing at fork `fb0dd04` (measured: class 2 there too), unchanged by H6, and unreachable through `me`; it is the one host/device classification divergence in the H6 post-impl probe set (`design/agent-reports/hashlock-H6-post-impl.md` M-1). Fix belongs to an H0-class change: narrow `isStrictMs1` (kind 0x03 under any id, any length, is never a seed) with its own inertness argument and corpus row, Rust-first (`me`'s `preimage_plate` already refuses it by name). Owning phase: next fork hashlock cycle. CLOSED 2026-09-06: me 277c6336, fork b32ff08, ms 81d67b85; rule = kind 0x03 under `hash` at every length (operator ruling), control row `hash-id-kind00-16-byte`.
 
 Filed 2026-09-06 by the controller from the H6 post-impl review.
 
@@ -16252,3 +16252,31 @@ Filed 2026-09-06 by the controller from the H6 post-impl review.
 ### F-505 — `emu-wasm-size-is-not-a-reproducible-pin`: `cmd/emu/emu.wasm` rebuilds to 11,011,082 B from the H6 tip (Go 1.26.7, `sh ./cmd/emu/build.sh`) against the 11,011,084 B that H6 spec §11.6 and implementer F's runs record -- two bytes, in an artifact that is neither the firmware nor shipped. Do not treat that figure as a pin; if a spec needs a reproducible emulator identity, pin the walk file's sha256 (`dfb9e6d5…9bc581` at e089a539) instead (`design/agent-reports/hashlock-H6-post-impl.md` N-2). Owning phase: ownerless residue.
 
 Filed 2026-09-06 by the controller from the H6 post-impl review.
+
+### F-506 — `uppercase-hash-id-kind-0x03-short-x-is-still-a-device-seed-class`: F-503's fix is CASE-SENSITIVE by design (`sysw.isHashIdPreimageKind` reads the id from `codex32.String.Split()` and compares to the literal `"hash"`, mirroring `codex32.IsPreimagePlate`), so the UPPERCASE spelling of the F-503 string -- `MS10HASHSQVQQQQQQQQQQQQQQQQQQQQQQQQQQMV3LQLGKN6S5C`, the QR-alphanumeric form of a 17-byte 0x03 payload under `HASH` -- still classifies `ClassCodex32Secret` on the device. Measured at fork `f503` b32ff08 with a throwaway probe (deleted): lowercase F-503 string `Classify = 0` (fixed), UPPERCASE `Classify = 2` (a SEED class), lowercase plate `13` (ClassPreimage), UPPERCASE plate `0`, and the pinned H0 row `ms10testsqv0…` `2` (unchanged, as intended). The host refuses the uppercase string by name (`me sysw pack --pack-preimage` → "whose 4-character id is not `hash` and whose X is 16 bytes, not 32"), so this is the same host/device divergence F-503 closed, surviving in the other case. **The behaviour matches the operator's ruling** (stated as the id `hash`) and does not gate that ruling; what is wrong today is the JUSTIFICATION: `isHashIdPreimageKind`'s doc comment claims the uppercase spelling "is refused elsewhere (H6 §4.3) and never reaches a seed class", which is measured true of the uppercase PLATE (33 bytes, `Classify = 0`, because `IsPreimage` reads `Seed()` and is case-insensitive) and measured FALSE of the uppercase short-X form this follow-up is about. Minimum fix: correct that comment. Wider fix, if the operator wants it: compare the id case-insensitively in `isHashIdPreimageKind` (and decide whether `IsPreimagePlate` should follow), Rust-first as always. Unreachable through `me`, which never packs the record. Related but distinct: F-504 is the host-side WORDING for the uppercase plate; this is a device-side seed CLASS. Owning phase: next fork hashlock cycle.
+
+Filed 2026-09-06 by the F-503 implementer, from a measurement taken while transcribing the plan's comment.
+
+**CLOSED 2026-09-06 by the operator's ruling — the id is compared
+case-insensitively.** `sysw.isHashIdPreimageKind` now uses
+`strings.EqualFold(id, "hash")`, so the uppercase spelling is inert too (fork
+`f503` d5d331d0, me `f503` 10faf109). The contrast with
+`codex32.IsPreimagePlate`, which KEEPS its case-sensitive read, is the reasoning
+rather than an inconsistency: that predicate decides ADMISSION, where strictness
+yields a REFUSAL — the safe direction, and §5.3 hashes a record in canonical
+lowercase anyway — while this one decides INERTNESS, where the same strictness
+yields the opposite, leaving the string a seed class. `EqualFold` can only ever
+make MORE strings inert, never fewer, and no constellation record carries the id
+`hash` in any case (the profile's seed id is `entr`).
+
+Pinned by the seam row `hash-kind03-16-byte-x-uppercase` (host false, device
+false) in both repos; the shared corpus re-pinned to
+`a669e10f7936478f4ec1d17f417864aab6cf5c48e3824591d4c73f9c1f3b7bd9`. Mutation
+`EqualFold` → `==` reds exactly that row: `hash-kind03-16-byte-x-uppercase:
+device admits = true, want false (Classify = 2)`. The doc comment that made the
+false claim is rewritten in the same fork commit.
+
+**One thing this SHARPENS rather than closes:** the host's refusal for the
+uppercase string still reads *"whose 4-character id is not `hash`"* — measured
+at me `f503` after this fold — which is now at odds with a device that reads the
+id in either case. That is F-504, and it is the next item.

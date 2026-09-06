@@ -446,3 +446,47 @@ fn no_hash_record_at_all_is_a_note_not_a_warning() {
         "the contradictory case drew the NOTE:\n{e}"
     );
 }
+
+/// F-503: the refusal names the conjunct that failed. The F-503 string is the
+/// kind 0x03 under the id `hash` with an X of 16 bytes -- `ms10hashsqv...` at
+/// 50 characters -- and before F-503 the body said its "4-character id is not
+/// `hash`", which was false, and ended with the 1-in-256 collision sentence,
+/// which is true only of a 33-byte payload. Now it says what is wrong (the X
+/// is 16 bytes, not 32) and what to do (re-encode with `ms hashlock`), and it
+/// says neither false thing. WITH and WITHOUT the flag, one refusal.
+///
+/// MUTATION: make `x_len` always `None` in the naming arm -> the body falls
+/// back to the wrong-id sentence, and this fails on the first assertion.
+#[test]
+fn a_hash_id_plate_with_a_short_x_is_refused_for_its_length_not_its_id() {
+    const HASH_16: &str = "ms10hashsqvqqqqqqqqqqqqqqqqqqqqqqqqqqmv3lqlgkn6s5c";
+    for extra in [
+        vec!["--no-passphrase"],
+        vec!["--no-passphrase", "--pack-preimage"],
+    ] {
+        let o = run_with(&extra, &[HASH_16]);
+        assert!(!o.status.success(), "the short-X plate packed: {extra:?}");
+        let e = stderr(&o);
+        assert!(
+            e.contains("under the id `hash` whose X is 16 bytes, not 32"),
+            "F-503: the length is not named: {e}"
+        );
+        assert!(
+            !e.contains("4-character id is not `hash`"),
+            "F-503: the id IS `hash`, and the body still says it is not: {e}"
+        );
+        assert!(
+            !e.contains("roughly 1 in 256"),
+            "the collision sentence is true only of a 33-byte payload: {e}"
+        );
+        assert!(
+            e.contains("re-encode it with `ms hashlock`"),
+            "the remedy is missing: {e}"
+        );
+        assert_eq!(
+            e.matches("records count from 0").count(),
+            1,
+            "one refusal, not several: {e}"
+        );
+    }
+}

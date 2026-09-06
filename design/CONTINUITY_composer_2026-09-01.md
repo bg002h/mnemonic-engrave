@@ -3136,6 +3136,36 @@ Command to resume: /resume-composer
   0.9.0 release brief (H1b/0.8.1 ritual: `push-me-v0.8.1-release-brief.md`
   precedent) -> then the next follow-up. Gate worktrees are detached and
   disposable once the implementer's branches exist.
+- **F-503 IMPLEMENTED (implementer, 2026-09-06), three branches, nothing
+  pushed.** me `f503` at `277c6336` (off engrave master `4df46e22`), fork
+  `f503` at `b32ff08` (off fork main `3cadffa8`, signed off), ms
+  `f503-records` at `81d67b85` (off ms master `cacf5da`; the plan's baseline
+  `a994a99` is its ancestor, two records commits back). Tasks in the plan's
+  order: me first (the Rust-primary rule), then the fork as a CONVERGENCE
+  port, then records. Boundary numbers at the tips: me `cargo nextest run
+  --locked -p mnemonic-engrave --no-fail-fast` 634 run / 631 passed / 3
+  failed (the `history_purge` zsh trio, F-500) / 2 skipped, `cargo fmt --all
+  -- --check` clean, clippy only the pre-existing `manual_is_multiple_of` at
+  `composer_records.rs:177`; fork `gofmt -l codex32/ sysw/` empty, all 54
+  non-gui packages ok, `gui-shard-test.sh ./gui/ 24` -> all 1289 tests across
+  24 shards. Seam corpus byte-identical in both repos at
+  `f53a17dc9d1ea5a4c0ff913786e82a5f19de004f4719536bb6d957bccdef1ee8`, both
+  pins re-set. Four mutations run and reverted, each killing exactly the
+  tests the plan named. Report:
+  `design/agent-reports/f503-implementation-report.md`. NEXT: sonnet
+  post-impl check (plan §4) -> merge + ship three repos -> me 0.9.0.
+- **CORRECTION to the entry above, same session: the me suite is FULLY GREEN at
+  the F-503 tip.** The operator installed the system zsh (`/usr/bin/zsh`, zsh
+  5.9.2) while the implementer was working, so the three `history_purge` tests
+  the plan's Global constraints list as expected failures (F-500) now pass.
+  Re-measured at me `f503` `cb0628e7` after the install: `cargo nextest run
+  --locked -p mnemonic-engrave --no-fail-fast` -> **634 tests run: 634 passed,
+  2 skipped**, exit 0 (the controller measured 633/633/2 on engrave master; the
+  634th is F-503's new integration test). The "3 failed (zsh trio)" figure in
+  the entry above was true when measured and is superseded here. **F-500's
+  expected-failure note is now stale on this box** -- from here a failing
+  `history_purge` test is a real finding, not the missing shell. Nothing was
+  edited to achieve this: no plan change, no `history_purge.rs` change.
 - **F-500 CLOSED and F-503 + F-506 IMPLEMENTED (2026-09-06, opus session).**
   zsh: the operator installed `/usr/bin/zsh` 5.9.2, so the history_purge trio
   passes and the me suite is FULLY GREEN on this box for the first time (633
