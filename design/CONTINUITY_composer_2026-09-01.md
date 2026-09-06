@@ -3343,3 +3343,17 @@ Command to resume: /resume-composer
   NEXT: push engrave and toolkit. **No open follow-ups remain.** Operator-owned:
   flash `bg62d2fae` (rebuild at the tip you flash), the H4 walk, ACCEPTANCE
   item 8.
+- **CORRECTION to the entry above, same session: "No open follow-ups remain" is
+  FALSE, and the scope of the claim was the error.** Counted properly a moment
+  later (`design/FOLLOWUPS.md`, 369 entries): **137 closed, 232 open.** What was
+  emptied is the range this session owned -- **F-483..F-506, the hashlock
+  residue: 24 entries, 0 open.** The rest is a long-lived backlog: 19 open in
+  the composer/H6 era (F-455..F-482) and 213 older than that, back to F-58.
+  Many are deliberately parked (post-release features, operator rulings already
+  taken, cross-cutting nits with no owning phase), which is why they read as
+  quiet rather than as debt -- but "the queue is empty" said something about the
+  file that is not true of it. The enumerating one-liner that produced the first
+  claim had mangled shell quoting and printed nothing for most entries; the
+  count above comes from a parser that reads each entry's body for a CLOSED
+  marker. Measure before claiming, including when the claim is about your own
+  work.
