@@ -2848,3 +2848,8 @@ Command to resume: /resume-composer
   verification (sonnet) + plan R0 r0 lenses fidelity (opus), tests (sonnet),
   journey (opus), briefs 9f9d2a0f. NEXT: persist -> fold -> r1 verification
   -> GREEN -> ms-codec 0.9.0 release (Task 1) -> implementers by file group.
+- H6: spec plan-round verification GREEN (94146272; 26/26, all numbers re-measured)
+  -> spec STATUS back to R0 GREEN at `5bb46948`. Plan tests lens 0C/0I/2M (3eef61eb:
+  all eight guard mutations caught; suites 562/562, 630/627+3, 1285/1285).
+  Fidelity + journey lenses in flight; round-0 fold brief pre-written
+  (d5053818). Engrave origin/master 4e71a8c4.
