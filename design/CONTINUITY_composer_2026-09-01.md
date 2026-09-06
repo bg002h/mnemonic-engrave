@@ -2969,3 +2969,13 @@ Command to resume: /resume-composer
   both resumed from transcript via SendMessage -- D's report was already
   complete on disk. NEXT: release report -> B (needs 0.9.0 on crates.io) ->
   E report -> merge -> F -> controller gates + walk x3 -> post-impl review.
+- **ms-codec 0.9.0 RELEASED (2026-09-06 10:36 UTC).** Release agent: records
+  commit 990df82 (MIGRATION.md v0.8->v0.9; cross-repo FOLLOWUPS entry; the N-3
+  follow-up) pushed via ci/staging, four contexts green, no bypass; annotated
+  tag `ms-codec-v0.9.0` on origin at 990df82; published; controller verified
+  crates.io `max_version` 0.9.0 and the tag. ms local master carries the
+  release report commit 4755061 UNPUSHED (repo convention: rides the next
+  push). ms master unfrozen. **B DISPATCHED** (Tasks 2-3, me `h6-b` off
+  engrave master aec48835, consuming the published crate). E still running.
+  NEXT: E report -> merge -> F (needs `<FORK_MERGE_SHA>`); B report ->
+  controller gates; then the post-impl review (brief aec48835, tips to fill).
