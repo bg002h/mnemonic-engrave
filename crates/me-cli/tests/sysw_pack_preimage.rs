@@ -490,3 +490,103 @@ fn a_hash_id_plate_with_a_short_x_is_refused_for_its_length_not_its_id() {
         );
     }
 }
+
+/// F-504: the refusal states each fault it FOUND, so the UPPERCASE spelling is
+/// told what is actually wrong with it. `MS10HASH…` is `hash` in another case —
+/// bech32 reads it as the same string — so the old body's "4-character id is
+/// not `hash`" was false, and its closing "roughly 1 in 256" collision sentence
+/// is true only of a 33-byte payload under a FOREIGN id, the one case where a
+/// plate and a seed backup are genuinely indistinguishable. The remedy differs
+/// too: this string needs lowercasing, not re-encoding.
+///
+/// The second row is the same string with a 16-byte X, where BOTH faults hold:
+/// the case clause and the width clause are both stated, and the lowercase hint
+/// is withheld because lowercasing would fix nothing.
+///
+/// MUTATION: map `HashOtherCase` to `Other` in the naming arm -> the first row
+/// regains "4-character id is not `hash`" and the collision sentence, and both
+/// rows lose the case clause; this fails on the first assertion.
+#[test]
+fn the_uppercase_spelling_is_told_its_case_not_a_wrong_id() {
+    let upper_plate = PLATE.to_ascii_uppercase();
+    const UPPER_SHORT_X: &str = "MS10HASHSQVQQQQQQQQQQQQQQQQQQQQQQQQQQMV3LQLGKN6S5C";
+
+    let o = run_with(&["--no-passphrase", "--pack-preimage"], &[&upper_plate]);
+    assert!(!o.status.success(), "the uppercase plate packed");
+    let e = stderr(&o);
+    assert!(
+        e.contains("written in another case"),
+        "F-504: the case is not named: {e}"
+    );
+    assert!(
+        !e.contains("4-character id is not `hash`"),
+        "F-504: the id IS `hash`, in the other case, and the body still denies it: {e}"
+    );
+    assert!(
+        !e.contains("roughly 1 in 256"),
+        "the collision sentence is true only of a 33-byte payload under a foreign id: {e}"
+    );
+    assert!(
+        e.contains("lowercase the string"),
+        "F-504: the remedy for a case fault is to lowercase it: {e}"
+    );
+
+    let o = run_with(&["--no-passphrase", "--pack-preimage"], &[UPPER_SHORT_X]);
+    assert!(!o.status.success(), "the uppercase short-X record packed");
+    let e = stderr(&o);
+    assert!(
+        e.contains("written in another case") && e.contains("whose X is 16 bytes, not 32"),
+        "both faults must be stated when both hold: {e}"
+    );
+    assert!(
+        !e.contains("lowercase the string"),
+        "lowercasing a record whose X is the wrong width fixes nothing, so the hint must \
+         not be offered: {e}"
+    );
+    assert_eq!(
+        e.matches("records count from 0").count(),
+        1,
+        "one refusal, not several: {e}"
+    );
+}
+
+/// The §4.3 collision sentence survives where it is TRUE: a well-formed 33-byte
+/// kind-0x03 payload under a foreign id is exactly the string that can also be
+/// a plain BIP-93 seed backup, and that operator must be told so.
+///
+/// …and NOT where it is false. A foreign id with an X that is not 32 bytes
+/// cannot be a 33-byte seed backup either, so the sentence would point at a
+/// cause that is not there.
+///
+/// MUTATION: drop the `x_len.is_none()` conjunct from the collision test -> the
+/// second row below carries the sentence and fails. (Measured: without that row
+/// the mutation SURVIVES every other test in this file — the wrong-id short-X
+/// combination is reachable and was pinned by nothing.)
+#[test]
+fn the_collision_sentence_survives_where_it_is_true_and_only_there() {
+    // A well-formed 33-byte kind-0x03 payload under a foreign id: the one
+    // string that can genuinely also be a plain BIP-93 seed backup.
+    let o = run_with(&["--no-passphrase", "--pack-preimage"], &[WRONG_ID]);
+    assert!(!o.status.success(), "the wrong-id plate packed");
+    let e = stderr(&o);
+    assert!(
+        e.contains("4-character id is not `hash`") && e.contains("roughly 1 in 256"),
+        "§4.3's row lost its collision sentence: {e}"
+    );
+
+    // Foreign id AND a 16-byte X, inside the profile's lengths at 50
+    // characters: no seed backup has this shape.
+    const FOREIGN_SHORT_X: &str = "ms10testsqvqqqqqqqqqqqqqqqqqqqqqqqqqq4wguarz27vqf8";
+    let o = run_with(&["--no-passphrase", "--pack-preimage"], &[FOREIGN_SHORT_X]);
+    assert!(!o.status.success(), "the foreign-id short-X record packed");
+    let e = stderr(&o);
+    assert!(
+        e.contains("4-character id is not `hash`") && e.contains("whose X is 16 bytes, not 32"),
+        "both faults must be stated when both hold: {e}"
+    );
+    assert!(
+        !e.contains("roughly 1 in 256"),
+        "a 16-byte payload cannot be a 33-byte seed backup, so the collision sentence is \
+         false here: {e}"
+    );
+}

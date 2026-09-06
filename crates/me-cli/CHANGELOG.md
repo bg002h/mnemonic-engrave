@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The refusal for a kind-`0x03` record that `--pack-preimage` will not admit is
+  composed from the faults actually found: the UPPERCASE spelling is told that
+  its id is `hash` in another case and to lowercase it, rather than that its id
+  is not `hash` and to re-encode it, and §4.3's "roughly 1 in 256" collision
+  sentence now appears only for a well-formed 33-byte payload under a foreign
+  id — the one string that can genuinely also be a seed backup (F-504). The
+  same records are refused; only the text changed.
+
 ## [0.9.0] - 2026-09-06
 
 Hashlock preimage plates reach the host. A SeedHammer II running the matching

@@ -16249,6 +16249,35 @@ Filed 2026-09-06 by the controller from the H6 post-impl review.
 
 Filed 2026-09-06 by the controller from the H6 post-impl review.
 
+
+**CLOSED 2026-09-06.** The refusal is now COMPOSED from the faults actually
+found rather than chosen from fixed combinations, because both earlier spellings
+told some operator something false. `UnknownReason::PreimagePlate` carries
+`PreimageId::{Hash, HashOtherCase, Other}` beside `x_len`, and the body states
+the id clause, the width clause when it applies, a remedy chosen per case, and
+§4.3's 1-in-256 collision sentence ONLY for a well-formed 33-byte payload under
+a foreign id — the one string that can genuinely also be a seed backup.
+Measured at me `f504`:
+
+```
+MS10HASHSQW46…  is a kind-0x03 preimage payload whose id is `hash` written in another
+                case — the uppercase, QR-alphanumeric spelling. … A record is hashed in
+                its canonical lowercase form (§5.3), so lowercase the string rather than
+                editing it — or re-encode it with `ms hashlock`.
+MS10HASHSQVQ…   …whose id is `hash` written in another case … and whose X is 16 bytes,
+                not 32. … Re-encode it with `ms hashlock` …          (no lowercase hint:
+                                                                      it would fix nothing)
+ms10testsqvrs…  …whose 4-character id is not `hash`. … roughly 1 in 256 of them look like
+                this.                                                (the sentence's one
+                                                                      true case)
+```
+
+Two tests pin it, and the second exists because a mutation SURVIVED: dropping
+the `x_len.is_none()` conjunct from the collision test changed no test outcome
+until a wrong-id-AND-wrong-width row was added, so that combination was
+reachable and pinned by nothing. Both mutations now red the test that names
+them. Related: F-503 and F-506 are the same family — a refusal or a
+classification that was true of one shape being applied to another.
 ### F-505 — `emu-wasm-size-is-not-a-reproducible-pin`: `cmd/emu/emu.wasm` rebuilds to 11,011,082 B from the H6 tip (Go 1.26.7, `sh ./cmd/emu/build.sh`) against the 11,011,084 B that H6 spec §11.6 and implementer F's runs record -- two bytes, in an artifact that is neither the firmware nor shipped. Do not treat that figure as a pin; if a spec needs a reproducible emulator identity, pin the walk file's sha256 (`dfb9e6d5…9bc581` at e089a539) instead (`design/agent-reports/hashlock-H6-post-impl.md` N-2). Owning phase: ownerless residue.
 
 Filed 2026-09-06 by the controller from the H6 post-impl review.
