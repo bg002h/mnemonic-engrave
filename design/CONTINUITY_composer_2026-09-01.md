@@ -3080,3 +3080,19 @@ Command to resume: /resume-composer
   ci/staging) push agents still running. Operator-owned: flash with
   `~/bin/sh/sh2-flash /scratch/code/shibboleth/seedhammer/seedhammerii-v0.0.0-bg3cadffa.signed.uf2`,
   the H4 device walk, ACCEPTANCE item 8 (the worst-case QR plate, ~43 min).
+- **H6 ALL FOUR REPOS PUSHED (2026-09-06).** toolkit master 4fc30009 via
+  staging PR #73 (examples/clippy/test green first try, no bypass; report
+  commit aef5ee3e local, rides the next cycle); ms master a994a99 via
+  ci/staging (run 34033401445, 13 contexts green, no bypass; report commit
+  cacf5da local); engrave f3e502f4; fork main 3cadffa8. Nothing in flight.
+  **Remaining for H6 = operator-owned:** (1) flash
+  `~/bin/sh/sh2-flash /scratch/code/shibboleth/seedhammer/seedhammerii-v0.0.0-bg3cadffa.signed.uf2`
+  (sha256 e02168d7...e098c; covers H0+H2+H5+H6); (2) the H4 device walk
+  (still ASSUMED, never measured); (3) ACCEPTANCE item 8 -- cut ONE
+  worst-case phrase-form plate (100-char hardened phrase, 53-module QR) and
+  phone-scan it (~43 min); text-only fallback if the scan fails. Worktrees
+  left in place (ms-worktrees/h6-a, me-worktrees/h6-b + h6-records,
+  .tmp/seedhammer-h6-{c,d,e,f} + hashlock-h6, tk-worktrees/h6-manual) --
+  all merged; safe to remove. Open follow-ups: F-483, F-487, F-490,
+  F-495..F-505 (F-503 is H0-class: device seed-classifies a 17-byte 0x03
+  single the host refuses).
