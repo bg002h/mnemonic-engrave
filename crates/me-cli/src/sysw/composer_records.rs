@@ -203,12 +203,34 @@ pub fn hash_record(digest: &[u8; 32]) -> String {
 
 /// `phrase:` + hex of `<method>,<phrase>`. The text is NOT validated here;
 /// `parse` is the gate, so a test can build a malformed record on purpose.
-/// The returned string is SECRET.
-pub fn phrase_record(method: HashlockMethod, phrase: &str) -> String {
-    format!(
-        "{PHRASE_PREFIX}{}",
-        hex_lower(format!("{},{phrase}", method.as_str()).as_bytes())
-    )
+///
+/// IT RETURNS `Zeroizing<String>` BECAUSE THE PHRASE IS IN IT, and it is the
+/// one member of this family that carries a secret: `key_record`,
+/// `hash_record` and `now_record` build public data, so a plain `String` is
+/// right for them and wrong here (F-493). `ms-codec`'s `qr_text` was folded the
+/// same way for the same bytes before the 0.9.0 publish.
+///
+/// The cost of the fold was nothing, which is why it happened rather than being
+/// accepted the way the keyboard's immutable fragment was (F-483): measured at
+/// the time of the ruling, this function had NO production call site — eight
+/// test uses and nothing else — so no consumer had to change and no convention
+/// had to bend.
+///
+/// The buffer is `Zeroizing` from the first byte and sized up front. Wrapping a
+/// finished `format!` would protect only the copy: the `format!` would build an
+/// unprotected `String` holding the phrase, and the wrap would guard what was
+/// left after the leak. The METHOD is a compile-time constant and carries
+/// nothing of the phrase.
+pub fn phrase_record(method: HashlockMethod, phrase: &str) -> zeroize::Zeroizing<String> {
+    let m = method.as_str();
+    let body_len = (m.len() + 1 + phrase.len()) * 2;
+    let mut out = zeroize::Zeroizing::new(String::with_capacity(PHRASE_PREFIX.len() + body_len));
+    out.push_str(PHRASE_PREFIX);
+    for b in m.as_bytes().iter().chain(b",").chain(phrase.as_bytes()) {
+        use std::fmt::Write as _;
+        write!(&mut *out, "{b:02x}").ok();
+    }
+    out
 }
 
 /// `now:` + hex of `<seconds>[,<height>]`.
