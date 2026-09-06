@@ -3195,3 +3195,31 @@ Command to resume: /resume-composer
   F-504 (the host still says the uppercase id "is not `hash`", which the
   device now reads in either case; sharpened by F-506) -> the docs cluster
   F-498/F-499/F-502/F-505 -> F-490 -> F-495/496/497 need operator decisions.
+- **F-503 + F-506 SHIPPED, me 0.9.0 RELEASED, F-504 CLOSED (2026-09-06).**
+  Post-impl check GREEN 0C/0I (report 9a8af628). Merged and pushed: fork main
+  `fcd1546` (plain push; signed image
+  `seedhammerii-v0.0.0-bgfcd1546.signed.uf2`, sha256 5285578f...6dc3e, built
+  NOT flashed -- it supersedes bg3cadffa and covers H0+H2+H5+H6+F-503/506);
+  ms master `81d67b85` via ci/staging (run 34045637413, 13 contexts, no
+  bypass; report commit f21f8b8 local per convention). **me v0.9.0 RELEASED**
+  -- master 1aee9db9 via ci/staging, tag v0.9.0 on the release commit
+  9e4ccad2, run 34045837267 all 8 jobs success, 7 assets, minisign + sha256
+  verified, binary reports `me 0.9.0`, and the three behaviour checks pass
+  (refusal without the flag, warned success with it, F-503's 16-vs-32 message)
+  -- report ab871118. Its CHANGELOG section had to be WRITTEN, not re-headed:
+  H6's host half (merge b94766bb) recorded nothing, which is worth remembering
+  the next time a stage ships in halves.
+  **F-504 closed on top** (merge b599077f, branch commit ea3229f1): the
+  refusal is now COMPOSED from the faults found -- `PreimageId::{Hash,
+  HashOtherCase, Other}` beside `x_len`; the uppercase spelling is told its
+  case and to lowercase it; §4.3's 1-in-256 sentence appears only for a
+  well-formed 33-byte payload under a foreign id. **A mutation SURVIVED and
+  found a real gap**: dropping the `x_len.is_none()` conjunct changed no test
+  outcome until a wrong-id-AND-wrong-width row was added -- that combination
+  was reachable and pinned by nothing. Whole workspace at master: 645 tests
+  run, 645 passed, 2 skipped; fmt 0. All F-503/F-504 worktrees and branches
+  removed. NEXT: push engrave master; then the docs cluster (F-498, F-499,
+  F-502, F-505) as one records commit; then F-490 (the load-flaky fork test);
+  F-495/496/497 need operator decisions; F-483 is secret-handling, last.
+  Operator-owned and unchanged: flash bgfcd1546, the H4 walk, ACCEPTANCE
+  item 8 (one worst-case QR plate, ~43 min).
