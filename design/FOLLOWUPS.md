@@ -16149,18 +16149,57 @@ Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (`IMPLEMENTATION_PLAN_hashlock_
 
 Shape when taken up: either `ms hashlock … --emit-phrase-record` (it already holds the phrase and the method, and already prints the `hash:` record next to the ms1 string) or `me sysw record phrase --method …`. `ms hashlock` is the better home on the Rust-primary rule — it is where the method is decided — but it is the repo whose CLI must never take a secret on argv (§3.6), so the phrase has to arrive by `--hashlock-phrase-stdin` exactly as it does today.
 
+
+**CLOSED 2026-09-06 — `ms hashlock --emit-record` (ms `f495` c48f4bd5).**
+Re-scoped first, at the operator's instruction to check before designing: the
+PREIMAGE route was already complete and always had been — `ms hashlock` prints
+`preimage (ms1): ms10hash…` on its card and `me sysw pack --pack-preimage` takes
+that string directly, so nothing there is hand-built. What had no verb was the
+PHRASE form alone, whose plate carries the phrase, the method line and the QR,
+which is what an operator recovering by retyping actually wants.
+
+The flag composes the record from the phrase `ms hashlock` has already read on
+stdin. The phrase is retained ONLY under the flag and only in a `Zeroizing`
+buffer, so the default path still drops it where it always did. The record
+carries the phrase, so it prints on the stderr card beside the preimage and
+never on stdout — a test asserts the card's own claim that stdout carries only
+the public digest. A source with no phrase (`--hex`, `--random`, an ms1 input)
+is a usage error, not a silent omission.
+
+**The wire form belongs to this repo** (`sysw::composer_records::phrase_record`),
+so `ms`'s test pins the emitted bytes against the committed corpus rows
+`phrase-hardened` and `phrase-sha256` in
+`crates/me-cli/testdata/record_class_vectors.json` rather than against its own
+implementation: neither side can change the encoding without that suite going
+red. One incidental finding: the first draft's refusal test used `--hex` on
+argv, which the argv guard refuses BEFORE the command line is parsed, so it was
+testing the guard rather than the flag — the test now reads an ms1 plate through
+`--in`.
 ### F-496 — `a-payload-phrase-gets-no-reconcile-screen`: H6 §10.2 scopes `composerCopyHashlockReconcile` to phrases typed on the device, so a `phrase:` record from the payload derives, confirms and assigns with nothing telling the operator to check the digest against the host (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2. The split is deliberate and correct as far as it goes: `hashlockPayloadRoute` is a different function from `hashlockPhraseRoute` precisely so the reconcile instruction (*"run ms hashlock with this phrase"*) cannot be drawn for a phrase the host already has, and §10.2 makes that true BY CONSTRUCTION — `composerCopyHashlockReconcile` has exactly one call site in the tree, so no runtime guard and no test for one is possible or needed.
 
 What is missing is the OTHER screen. A payload phrase still produces a digest the device derived on its own, and the operator still has no on-device proof that it equals what the host computed when it packed the record. A reconcile-STYLE screen for that route would say something different — compare against the payload's own `hash:` record, which §8.2's relation line already computes — rather than borrowing the phrase route's words. Not filed as a defect in H6: the route is right, and the screen is a new deliverable.
 
+
+**OPERATOR RULING 2026-09-06 — reconcile only when the payload has no matching
+`hash:` record.** When the payload carries a `hash:` record whose digest the
+derived phrase matches, the locator row already proves it and a second screen is
+noise the operator learns to page past. When it does not, there is nothing to
+check the derivation against, and that is exactly where the reconcile screen
+earns its place. Still owned by the hashlock stage after H6; not implemented.
 ### F-497 — `no-cross-run-awareness-of-preimage-plates-already-cut`: the composer's plate census reports what THIS run will cut and cannot know that a plate for the same digest was cut in an earlier run (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2, against §5.3 item 6 and §8.4b. `composerState.hashlockHeld` lives for one composition and `composerFlowExit` scrubs it, so a second composition over the same phrase re-derives, re-holds and re-offers a plate with nothing on any screen saying one already exists. Two consequences, and the second is the one that costs something: the operator can cut a duplicate bearer plate without being told (more copies of a spend secret than they meant to have), and §8.4b's abort arm — *"a preimage plate was cut"* — is scoped to the run it fired in, so an abort in run 2 says nothing about run 1's plate still being on the bench.
 
 Any fix needs persistent state the device does not currently keep for this, and "what plates has this machine cut" is a bigger question than the hashlock stage — the SH2 has no camera, so it cannot read a plate back to find out (see `sh2-has-no-camera`). Deliberately not attempted in H6.
 
+
+**OPERATOR RULING 2026-09-06 — accept it, and make the copy say so.** The device
+keeps no durable record of past cuts, and adding one means new flash state with
+its own failure modes and a migration. The census must therefore say it reports
+THIS run, so nobody reads it as a complete inventory of what exists on steel.
+A copy change, owned by the hashlock stage after H6; not implemented.
 ### F-498 — `composerNotePhraseDigest-cites-a-stale-line-for-the-composerState-literal`: three sites say the production `composerState` literal is at `gui/composer_flow.go:34`; MEASURED at fork `hashlock-h6` it is at `:51` (owning phase: **next fork hygiene cycle, with F-490 and F-494**) `#seedhammer` `#docs` `#records`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (H6 spec §2.2 item 1 names it as a nit for this stage's fold; the plan's own text says `:48`, which is itself stale). Measured with `grep -n "st := &composerState{" gui/composer_flow.go` at the H6 integration tip:
