@@ -3068,3 +3068,15 @@ Command to resume: /resume-composer
   agent reports.** Operator-owned after the pushes: flash the H6 image
   (`~/bin/sh/sh2-flash <image>`), the H4 device walk, and ACCEPTANCE item 8
   (one worst-case QR plate cut and phone-scanned, ~43 min).
+- **H6 SHIPPED: fork main 3cadffa8 (merge from hashlock-h6 bdc2f06c, plain
+  push; fork CI Test 34033330697 + Build image 34033330696 both success);
+  signed image `seedhammerii-v0.0.0-bg3cadffa.signed.uf2` sha256
+  e02168d7abaf85f797b59058edc9c5d1de37a8fc451b8a90412c406f862e098c built,
+  NOT flashed; engrave master f3e502f4 pushed via ci/staging (run
+  34033407106, no bypass) -- master UNFROZEN.** A first merge attempt used
+  `-s` (merge STRATEGY, not signoff) and failed harmlessly; the image built
+  in that window was the old bgfb0dd04 one and was superseded by the
+  bg3cadffa build. Toolkit (4fc30009, staging PR) and ms (a994a99,
+  ci/staging) push agents still running. Operator-owned: flash with
+  `~/bin/sh/sh2-flash /scratch/code/shibboleth/seedhammer/seedhammerii-v0.0.0-bg3cadffa.signed.uf2`,
+  the H4 device walk, ACCEPTANCE item 8 (the worst-case QR plate, ~43 min).
