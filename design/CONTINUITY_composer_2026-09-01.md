@@ -2979,3 +2979,20 @@ Command to resume: /resume-composer
   engrave master aec48835, consuming the published crate). E still running.
   NEXT: E report -> merge -> F (needs `<FORK_MERGE_SHA>`); B report ->
   controller gates; then the post-impl review (brief aec48835, tips to fill).
+- **H6 IMPLEMENTER B LANDED (me `h6-b` tip 8cf2a7f9 off master f82b8c11;
+  report 555ca1b5).** Task 2 (phrase: record, two classes) 4d00fbbf; Task 3
+  (--pack-preimage, refusals, four warnings) 8cf2a7f9. Controller re-ran at
+  the tip: workspace nextest 642 run / 639 pass / 3 fail = the box-local
+  history_purge trio (B's 633 was `-p mnemonic-engrave`; +9 = mnemonic-io-lib);
+  fmt 0; clippy under -D warnings fails only on the pre-existing
+  `is_multiple_of` lint (box rustc 1.98; me has no toolchain pin -- known);
+  Cargo.lock moves only ms-codec 0.8.0 -> 0.9.0 (crates.io checksum); checker
+  97 blocks, 25 FAIL all in fork/gui (E pending), every me block PASS. B's
+  three plan-fidelity findings (Task 2 transiently red on two shipped tests,
+  one named by no task; a Task 3 block needed at Task 2 for E0004; a wrong
+  mutation catcher) are recorded in its report for the post-impl review --
+  plan-record defects, not code. `h6-b` stays a branch until the post-impl
+  review is GREEN, then merges + pushes via staging. NEXT: E report -> merge
+  -> F (fill `<FORK_MERGE_SHA>`; also re-record D's provisional sysw
+  provenance pin to B's Task 2 commit 4d00fbbf) -> gates + walk x3 ->
+  post-impl review (brief aec48835: FORK_TIP, ME_TIP=8cf2a7f9, ME_BASE=f82b8c11).
