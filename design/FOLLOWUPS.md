@@ -16204,6 +16204,27 @@ So this is **not** a flaky test, not a code defect, and emphatically not somethi
 
 **Baseline red 2 of the same set — `go vet` red at `fb0dd04` — is already F-494 and is not re-filed here.** Two numbers measured while confirming it: `go vet ./engrave/` reports **2** at pristine `fb0dd04` and **3** at the H6 tip (`engrave/h6_qr_test.go:516`), not the 6 the plan's Global Constraints predict; across `./...` the `ArtifactDir` count goes 8 → 10 (H6's two new golden tests), on top of 33 pre-existing `bspline` unkeyed-field findings that the plan's baseline never mentions.
 
+
+**CLOSED 2026-09-06 — the operator installed the system zsh.** `/usr/bin/zsh`
+is `zsh 5.9.2 (x86_64-pc-linux-gnu)`, the path the test hardcodes and the one CI
+apt-installs, so nothing in `history_purge.rs` changed. Measured on engrave
+master immediately after:
+
+```
+$ cargo nextest run --locked -p mnemonic-engrave --no-fail-fast
+     Summary [   0.477s] 633 tests run: 633 passed, 2 skipped
+```
+
+The `me` suite is fully green on this box for the first time; a plan's local
+gate line no longer carries a known-failure count. **Nix was measured as an
+alternative and rejected on grounds of fit, not capability**: `nix build
+nixpkgs#zsh` yields the same 5.9.2 and it drives this test's own harness
+correctly (a planted `me sysw pack <secret>` under `script -qec "<zsh> -i -s <
+in.zsh"` with `ZDOTDIR`/`HOME` set lands in the histfile), but a store path is
+not `/usr/bin/zsh`, so using it would have meant changing `zsh_bin()` to a PATH
+lookup — a change to a gate's own mechanism, made to suit one machine, in a
+file whose comment exists to stop exactly that. The system package matches CI
+byte for byte instead.
 ### F-501 — `ms-cli-engraving-card-still-says-the-method-line-is-on-no-plate`: record 4 of H6 spec §0's five falsified records was NOT folded, because it lives in a repo H6 Task 13 was given no branch in (owning phase: **the next `ms` cycle; before H6 ships to an operator**) `#hashlock` `#ms` `#docs` `#records`
 
 Filed 2026-09-06 by H6 Task 13's implementer, as a **deviation from the plan**, not a discovery. `crates/ms-cli/src/cmd/hashlock.rs:352` in mnemonic-secret still prints, on the engraving card:
