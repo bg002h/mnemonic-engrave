@@ -3256,3 +3256,27 @@ Command to resume: /resume-composer
   report commit f21f8b8); then F-490 (the load-flaky fork test) and F-483
   (secret handling, last). Operator-owned: flash `bg1115af6` once rebuilt, the
   H4 walk, ACCEPTANCE item 8.
+- **BURNDOWN COMPLETE for everything the operator owns nothing of (2026-09-06).**
+  Closed this session: F-500 (system zsh; the me suite is fully green here for
+  the first time), F-503, F-506, F-504, F-498, F-499, F-502, F-505, F-495,
+  F-490, F-483, F-501. Released me v0.9.0. Fork main **5cf93fd7 PUSHED**
+  (F-490 ab6504c, F-483 c63af37b); ms master **c48f4bd5 PUSHED**; engrave
+  master pushed through d118c573 with the F-483/F-490/F-501 records after it.
+  Signed image rebuilt at each fork tip; the current one is
+  `seedhammerii-v0.0.0-bg<tip>.signed.uf2` -- rebuild at the tip you flash.
+  **F-490 note:** the flake was NOT reproduced on demand (12 runs of the
+  original under 24 busy loops all passed), so the fix is argued from the
+  mechanism -- `synctest.Wait()` before each check, the barrier this package
+  already uses 22 times -- and the commit and the follow-up both say so.
+  **F-483 note:** two of its three copies were avoidable and are gone; the
+  third (the keyboard's immutable Go string) is ACCEPTED per H6 brainstorm
+  decision 9, which named this follow-up. The seal half was better than
+  expected: `Classify` already knew the answer the refusal path was re-parsing
+  to get.
+  **STILL OPEN, and why:** F-496 and F-497 carry operator rulings and are owned
+  by the hashlock stage after H6 (a conditional reconcile screen; census copy).
+  F-492 is a toolkit manual section. F-493 is me's plain-String record text --
+  the same structural class F-483 accepted, awaiting the same ruling. F-494 is
+  the fork's baseline-red `go vet`, whose fix raises the go directive to 1.26
+  and therefore wants a TinyGo check before anyone does it.
+  Operator-owned and unchanged: flash, the H4 walk, ACCEPTANCE item 8.
