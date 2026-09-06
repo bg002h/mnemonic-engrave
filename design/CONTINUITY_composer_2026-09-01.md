@@ -2767,3 +2767,21 @@ Command to resume: /resume-composer
   `codex32.EncodeMS1` is entr-only; `NewSeed("ms",0,"hash",'s',[0x03||x])` is
   the primitive. Deliverable shrinks to a Go wrapper `EncodeMS1Preimage` +
   lockstep vs the corpus row + a never-emits-entr test. Fold author messaged.
+- **H6 SPEC R0 ROUND 0 FOLDED (`4881474f`; fold report 25866be1)** by an opus fold
+  author: constantTimeQRModules budget fuzzed (216k payloads/dim, floors
+  813/945/1161/1369 at v6-v9, reported as a FLOOR with the protocol);
+  scale 2 implemented and measured (5 commands/module) -> a normative
+  engraver arm; `--pack-preimage` gates ADMISSION not classification
+  (decide_sealing unchanged -- fidelity C-3's remedy declined with the
+  --expect precedent); per-plate review on its own picker screen;
+  EncodeMS1Preimage = Go wrapper over NewSeed (+ lockstep vs the corpus kind
+  row + never-entr; the entr hazard reproduced); non-ASCII device copy
+  removed, headroom re-measured (§8.1.2 blanked the frame at 5,004 ink px;
+  §8.4's 288/244 was unobtainable). §16 names two items no spec-time step
+  can settle: the fuzzed budget's final values (plan-time, checkable floor)
+  and the phone scan of a 53-module QR at 0.6 mm (a ship gate on the QR, with
+  a text-only fallback). Four self-caught propagation misses -> the r1
+  verifier re-runs the sweep. **r1 sonnet verification DISPATCHED** (brief
+  24d4d7f6). NEXT: GREEN -> plan author (brief hashlock-H6-plan-author-brief.md,
+  fill SPEC_GREEN_SHA) -> per-task gate -> lenses -> implementers by file
+  groups.
