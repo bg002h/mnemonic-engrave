@@ -3311,3 +3311,35 @@ Command to resume: /resume-composer
   baseline-red `go vet`, whose fix raises the go directive to 1.26 and wants a
   TinyGo check). Operator-owned: flash bg62d2fae, the H4 walk, ACCEPTANCE
   item 8.
+- **THE LAST THREE FOLLOW-UPS CLOSED (2026-09-06). The queue is empty.**
+  **F-494 (fork main bc197d51):** its own suggested fix was WRONG and the probe
+  is the finding -- raising the go directive to 1.26 fails the firmware build
+  ("cannot compile with Go toolchain version go1.26 (TinyGo was built using
+  toolchain version go1.25.10)"), so a hygiene item would have made the device
+  unbuildable. Done instead: 33 unkeyed `bezier.Point` literals keyed (all in
+  bspline_test.go), and `scripts/fork-vet-gate.sh` pins the ten
+  `testing.ArtifactDir` warnings that remain -- exit 0 here, exit 1 on a probe
+  finding. The gap closes when the pinned TinyGo moves.
+  **F-493 (me 1d10db17, merge ca121179):** the entry argued the fold would be
+  inconsistent; measurement decided it. `phrase_record` had NO production call
+  site (eight test uses), and its three siblings build PUBLIC data, so plain
+  `String` was right for them and wrong only here. Folded to
+  `Zeroizing<String>`; 646 tests pass with no test edits. **Second time today a
+  claimed mutation did not red:** the capacity assertion does NOT distinguish a
+  wrapped `format!` (measured -- format! returned an exactly-sized String), so
+  the comment now says the no-intermediate property is argued from the code and
+  names a mutation that does red (over-reserve by 8).
+  **F-492 (toolkit 90cb039f):** the unlock section H5 §5 asked for did not
+  exist, so it was written --
+  `docs/manual/src/30-workflows/3B-payload-unlock-refusals.md`, taking the
+  refusal apart clause by clause and carrying the measured fact that sealing
+  again generates a FRESH passphrase (packed twice: "present police parade
+  steak", then "ahead travel protect february"). `make lint` exit 0. Same file
+  pass fixed F-495 fallout: 43-ms.md still said no verb writes a `phrase:`
+  record, and `ms hashlock --emit-record` had landed hours earlier.
+  One process slip worth keeping: `git checkout -- <file>` reverted unstaged
+  keying work mid-experiment (the hazard already in memory). Redone, and the
+  second probe restored from a file copy instead.
+  NEXT: push engrave and toolkit. **No open follow-ups remain.** Operator-owned:
+  flash `bg62d2fae` (rebuild at the tip you flash), the H4 walk, ACCEPTANCE
+  item 8.
