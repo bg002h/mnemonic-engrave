@@ -1,6 +1,6 @@
 # Hashlock H6 — Preimage Plates Implementation Plan (three repos)
 
-**STATUS: DRAFT — R0 round 0 folded; r1 fold verification pending.** Written by the plan author
+**STATUS: R0 GREEN — round 0 folded at 7021ea43; round 1 fold verification GREEN (0C/0I) at 49abc5ca; its two Minors folded inline.** Written by the plan author
 (opus) from `design/SPEC_hashlock_H6_preimage_plates.md`, which was R0 GREEN at
 engrave `a67a3924` and has since taken this round's own fold (its
 `## Plan-round fold` section). The build gate below was run BY THE AUTHOR at
@@ -550,7 +550,8 @@ dependency pinned to it.) Run `RELEASE_PROCESS.md`'s checklist, in its order:
      run --locked`), `cargo clippy --all-targets -D warnings` and `cargo fmt
      --check`, across stable + beta + MSRV 1.85. **The clippy half belongs to
      CI's pinned toolchain, not to a scratch tree on this box** (measured at R0
-     round 0): both repos pin `1.85.0` in `rust-toolchain.toml` and this box
+     round 0): `ms` pins `1.85.0` in `rust-toolchain.toml`, `me` pins it as
+     `RUST_TOOLCHAIN: '1.85.0'` in `.github/workflows/release.yml`, and this box
      resolves `rustc 1.98.0`, whose clippy warns about `manual_is_multiple_of`,
      `manual div_ceil` and elided lifetimes in files H6 never touches — and the
      suggested rewrites use APIs 1.85 does not have. So run item 3 where the pin
@@ -4278,8 +4279,8 @@ sentence.
   the `gofmt` trio, the `go vet` go-directive skew, and the box-local
   `history_purge` trio.
 
-- [ ] **Step 3: the toolkit manual** — `--pack-preimage`, the two plate forms,
-§8.6's text, and the fact that `ms hashlock` does not yet PARSE it.
+- [ ] **Step 3: the toolkit manual** — `--pack-preimage`, the `phrase:` wire
+form the host accepts, the two plate forms, §8.6's text, and the fact that `ms hashlock` does not yet PARSE it.
 
 - [ ] **Step 4: §12's acceptance, transcribed into the acceptance doc**, with
 **item 8 flagged as a GATE rather than an assumption**: before the QR toggle
