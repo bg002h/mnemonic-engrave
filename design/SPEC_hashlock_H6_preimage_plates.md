@@ -1,6 +1,8 @@
 # SPEC — Hashlock H6: preimage plates on the SeedHammer II
 
-**STATUS: R0 GREEN 2026-09-05 (0 Critical / 0 Important open).** Brainstorm walked live with the operator (nine decisions + Group A rulings + the C-1 encoder ruling, recorded in `design/CONTINUITY_composer_2026-09-01.md`); draft `a0f832d0` by the opus design author; round 0 (three lenses): fidelity + design (opus, `hashlock-H6-spec-R0-r0-fidelity.md`, 4C/7I/7M/3N), journey walk (opus, `-journey.md`, 1C/7I/7M/2N), tests + citations (sonnet, `-tests.md`, 0C/3I/1M/1N); fold `4881474f` by an opus fold author (every number its own measurement; steps that could be run were run: budget fuzz, scale-2 arm); r1 fold verification (sonnet, `hashlock-H6-spec-R0-r1-fold-verification.md`) **GREEN**, every claim re-derived from scratch. Lens-closure: fidelity, journey, tests/citations, fold-verification. §16 names the two items only the plan (budget values) and a physical plate (the QR scan gate) can settle. Written
+**STATUS: R0 GREEN; plan-round fold pending verification.** The R0 gate closed
+0C/0I; the plan round then reopened this spec, and `## Plan-round fold` at the
+end lists every change with its own measurement. Brainstorm walked live with the operator (nine decisions + Group A rulings + the C-1 encoder ruling, recorded in `design/CONTINUITY_composer_2026-09-01.md`); draft `a0f832d0` by the opus design author; round 0 (three lenses): fidelity + design (opus, `hashlock-H6-spec-R0-r0-fidelity.md`, 4C/7I/7M/3N), journey walk (opus, `-journey.md`, 1C/7I/7M/2N), tests + citations (sonnet, `-tests.md`, 0C/3I/1M/1N); fold `4881474f` by an opus fold author (every number its own measurement; steps that could be run were run: budget fuzz, scale-2 arm); r1 fold verification (sonnet, `hashlock-H6-spec-R0-r1-fold-verification.md`) **GREEN**, every claim re-derived from scratch. Lens-closure: fidelity, journey, tests/citations, fold-verification. §16 names the two items only the plan (budget values) and a physical plate (the QR scan gate) can settle. Written
 from `design/BRAINSTORM_hashlock_H6_preimage_plates.md` against the operator's
 rulings of 2026-09-05 (decisions 1-9 of
 `design/agent-briefs/hashlock-H6-brainstorm-draft-brief.md`, and the Group A/B
@@ -74,6 +76,11 @@ not here"* sentence, which H6 makes false.
    an ms1 string to engrave at all (§3.5). The Rust encoder this ports already
    exists and is the one `ms hashlock` prints the plate with, so there is no
    new Rust-first deliverable here -- only the Go port and its lockstep.
+3b. **A PUBLISHED `ms-codec` 0.9.0 carrying the phrase rule and the QR text, and
+   it is the stage's FIRST deliverable** (§3.1, §12 item 0). `me` depends on the
+   codec and not on the CLI, so the rule §3.1 requires it to apply is not
+   reachable until the move is released and `me-cli`'s dependency is bumped;
+   everything in §3 is blocked on it. (Plan round, finding 1.)
 4. `me sysw pack --pack-preimage`, the sealing consequence, and four host
    warnings (§3).
 5. The `hash` id requirement on the H6 admission path, both sides (§4.3).
@@ -155,6 +162,23 @@ where `hashlockMaterial` carries `phrase []byte`, `method hashlockMethod`,
    2026-08-27) and are logged as follow-ups. F-483 already records that the
    typed phrase lives in `kbd.Fragment`, an immutable Go string, before H6
    stores anything.
+6. **THIS FIELD AND ITS CONSUMER LAND TOGETHER, IN ONE COMMIT -- NORMATIVE**
+   (plan round, finding 7). `composerHoldHashlockMaterial` is a production
+   function whose only callers are §5.1's two payload routes and the typed
+   phrase route's own HOLD. Landing the retention on its own leaves it with no
+   production caller, and the fork's
+   `TestComposerEveryScreenFunctionHasAProductionCaller`
+   (`gui/composer_join_test.go:35`) reds -- correctly, and deterministically. The
+   red was measured twice on a retention-only tree, by the plan author and again
+   by the build gate, each reporting `[composerHoldHashlockMaterial]` from one
+   shard; MEASURED here, the same test PASSES on the fully wired tree, naming
+   only the pre-existing `composerDescriptorCeilingChars` exemption. That guard is the one two R0 lenses earned after finding
+   fourteen unreachable production functions at once with a green suite, so
+   **the exemption table (`gui/composer_join_test.go:87-90`) is NOT the
+   instrument here**: it exists for a consumer DEFERRED with a follow-up number
+   (`composerDescriptorPlateFits` -> F-457), and this consumer is in this stage.
+   Adding a name to it to make the retention green alone would quiet the one
+   gate that catches this defect class.
 
 ### §2.3 Payload-delivered material is NOT copied into `composerState`
 
@@ -195,9 +219,43 @@ text must contain at least one `,`; the field before the first `,` must be
 exactly `hardened` or `sha256`; everything after it must pass the phrase rule of
 `SPEC_ms_hashlock` §4.3 in the host's order -- non-empty, printable ASCII
 `0x20..=0x7E`, not ms1-shaped, at most 100 characters, not exactly 64 hex
-characters -- which is `ms-cli`'s `validate_phrase`
-(`crates/ms-cli/src/hashlock_phrase.rs:118`) and the device's
-`hashlock.ValidatePhrase` (`hashlock/hashlock.go:92-111`), byte for byte.
+characters -- byte for byte the rule the device's `hashlock.ValidatePhrase`
+(`hashlock/hashlock.go:92-111`) already applies.
+
+**THE RULE MOVES INTO `ms-codec`, AND A PUBLISHED RELEASE IS THIS STAGE'S FIRST
+DELIVERABLE -- NORMATIVE** (plan round, finding 1). The first draft named
+`ms-cli`'s `validate_phrase` as the implementation `me` must call. MEASURED:
+`validate_phrase` is `ms-cli`'s (`crates/ms-cli/src/hashlock_phrase.rs:118`), so
+is `looks_like_ms1` (`crates/ms-cli/src/argv_guard.rs:148`), and
+`crates/me-cli/Cargo.toml:53` depends on `ms-codec = "0.8"` and on nothing of
+`ms-cli`. **`me` cannot reach either function.** A literal reading leaves only
+one route -- a THIRD copy of the rule -- and a third copy is the defect the rule
+exists to prevent, whose whole point is that no two readers of a phrase disagree
+about what one is. So:
+
+1. `validate_phrase`, `PhraseRefusal`, `looks_like_ms1`,
+   `HASHLOCK_PHRASE_MAX_CHARS` and `qr_text` (§8.6) move into
+   `crates/ms-codec/src/hashlock.rs`, beside the constants they already read
+   (`:27,30,32`). `ms-cli` DELEGATES and keeps its message rendering, so every
+   refusal sentence an operator sees is unchanged and there is still exactly one
+   implementation.
+2. **`ms-codec` 0.9.0 is PUBLISHED before anything in §3 is built**, through
+   `mnemonic-secret/design/RELEASE_PROCESS.md`'s checklist. Item 1 of that
+   checklist is what fixes the version: *"Any subsequent change to the corpus
+   that would alter the SHA requires a SemVer minor bump (`0.X+1.0`)"*, and §11.2
+   adds seven `qr_text` rows to `hashlock-v0.8.json`. MEASURED, the corpus moves
+   from the sha the H1 release recorded to
+   `4f1819cdd0862b101afd48d0478e8f0b218f933dd3da449915fa3c5eaaba21d4`, which is
+   the literal the CHANGELOG entry carries and the one the fork re-pins at §11.2.
+   The precedent is H1's own entry, `## ms-codec [0.8.0] -- 2026-09-05`, which
+   recorded `a46c197a3640fe8af4ca4370b46a9637466649227163ce6761bb032354811d30`
+   the same way; items 3, 7 and 8 (CI green, `cargo publish --dry-run`, the
+   `ms-codec-v0.9.0` tag) bind unchanged.
+3. **Then `crates/me-cli/Cargo.toml:53` bumps `ms-codec = "0.8"` to `"0.9"`.**
+   Nothing else in §3 compiles until it does. A `[patch.crates-io]` standing in
+   for the release is a scratch device for building the rest and is never
+   committed.
+
 
 **The ms1 preimage ENCODER already exists in Rust and is not re-decided here.**
 `ms_codec::encode` (`crates/ms-codec/src/encode.rs:16`) takes `(Tag, &Payload)`
@@ -427,6 +485,39 @@ cannot emit id `entr` for any input**, asserted on the OUTPUT (`Split()`'s id is
 `"hash"`), not on the source, so a future refactor that reintroduces an id
 parameter reds. The provenance pin records `ms-codec` and the corpus sha.
 
+### §3.6 The two classes are BEARER, so the COMMAND LINE is refused -- NORMATIVE
+
+**Making them bearer moves the argv surface, and the first draft said nothing
+about it** (plan round, finding 5). `Class::is_bearer`
+(`crates/me-cli/src/sysw/record.rs:102-104`) is `Mt | Tx` today and gains
+`Preimage | Phrase`; `is_argv_forbidden` (`:118-120`) is
+`is_secret() || is_bearer()`, so `argv_secret_guard`
+(`crates/me-cli/src/main.rs:551`) refuses either carrier on the command line
+**before the parser runs**. Two consequences, both normative:
+
+1. **Every invocation that carries a preimage or a `phrase:` record uses the
+   private channel.** `me sysw pack --pack-preimage --no-passphrase <ms1>` --
+   §12 item 3's own acceptance invocation as the first draft wrote it -- is
+   REFUSED, and `--in <file>` is the route the guard's own message already
+   offers. **§12 item 3 is the one acceptance item that packs a record, and it is
+   written to `--in` for that reason** (items 3a, 4, 5 and 5a describe payloads
+   and screens and carry no `pack` invocation); so is every test of §11.1. The
+   refusal is CORRECT: argv is public, and /proc,
+   `ps` and the shell history all keep a copy.
+2. **The guard's MESSAGE was false for these classes, and that is a defect in
+   what the tool claims to have found.** Its bearer arm
+   (`crates/me-cli/src/main.rs:566`) says *"BEARER material -- a signed
+   transaction, or the mt1 set carrying one. Anyone who can read it can broadcast
+   it"*, which describes neither carrier. The arm gains a hashlock case naming
+   the plate string or the phrase a `phrase:` record carries, and saying that for
+   a key-less hashlock path it alone spends the coins. A refusal that names the
+   wrong material is not a nicety; it tells the operator to look for something
+   they are not holding.
+
+Secret-handling defects are non-gating (2026-08-27), and this is not one: the
+guard already refuses correctly. What changes is the acceptance path and the
+sentence the refusal prints.
+
 ---
 
 ## §4. Device admission and classification
@@ -450,6 +541,33 @@ preimage class through a NEW predicate. `isStrictMs1`
 (`return err == nil && !codex32.IsPreimage(c)`) is H0's inertness and keeps a
 preimage out of every seed class. The preimage class is answered BEFORE it, by
 `isPreimagePlateRecord`, so the two rules never overlap.
+
+**EXACTLY ONE CORPUS ROW CHANGES CLASS, AND THE RE-PINNING IS PART OF THE SAME
+LEG -- NORMATIVE** (plan round, finding 9). `codex32_seam/preimage-plate-0x03`
+goes `Unknown` -> `Preimage` in `crates/me-cli/testdata/record_corpus_pre_s2.json`,
+a capture whose own test is named *"not one of these records may change class"*,
+so the move is RECORDED in that test's doc comment rather than absorbed. Its
+sibling `codex32_seam/preimage-shape-entr-id` STAYS `Unknown`, and **that pair is
+§4.3's id narrowing stated as data**: the kind byte alone is not enough to reach
+the flow that engraves. Three corpora and their pins, each carried identically on
+both sides so a change cannot land in one repo alone:
+
+| corpus | what H6 does to it | where the pin lives |
+| --- | --- | --- |
+| `record_class_vectors.json` | REGENERATED from `CASES`; 47 -> 68 rows, sha256 `3575ccb0e12d12646c45dde583380199170cff815ea5e8d86d4d37d4a1c4abaf` | `crates/me-cli/tests/sysw_composer_records.rs:399` **and** the fork's `sysw/testdata/record_class_vectors.provenance.json` -- both re-pinned, with the row count |
+| `hashlock-v0.8.json` | §11.2's seven `qr_text` rows; sha256 moves to `4f1819cd...aba21d4` | the ms CHANGELOG entry (§3.1) **and** the fork's `hashlock/hashlock_test.go:13` `corpusSHA256`, which reads `a46c197a...11d30` until H6 |
+| `record_corpus_pre_s2.json` | the ONE row above | `crates/me-cli/tests/record_corpus.rs` -- a `me`-only capture with no fork twin |
+
+**And the two-repo `codex32_seam_vectors.json` does NOT move -- MEASURED, and it
+is stated so nobody edits it.** Its `device_admits` column is
+`Classify(s) == ClassCodex32Secret` (`sysw/codex32_seam_test.go`) and its
+`host_admits` column is the host's seed profile; a preimage plate classifies
+`ClassPreimage`, which is not `ClassCodex32Secret`, so BOTH columns stay `false`
+and the row's meaning is unchanged. Its sha256
+`2c2fbb3fa4d38c8858b9de4769d876d275478956c76ca491005c70d9f6bd541b` is pinned as a
+literal in `crates/me-cli/tests/codex32_seam.rs:25` and
+`sysw/codex32_seam_test.go:30`, and editing it would red both suites for no
+reason.
 
 ### §4.3 The `hash` id is required on the H6 path -- NORMATIVE (ruling A7)
 
@@ -487,6 +605,33 @@ narrowing as `preimage_plate_admissible(s)`, leaving `preimage_plate` -- the
 DIAGNOSTIC predicate behind the refusal message -- unchanged, so a mistagged
 plate is still named a preimage plate when it is refused and still not admitted
 when `--pack-preimage` is passed.
+
+**`preimage_plate_admissible` takes THREE conjuncts, not the one this section
+first gave it, and the two extra ones came from a SHIPPED test rather than from
+review** (plan round, finding 4). `a_preimage_plate_is_named_not_misdiagnosed`
+(`crates/me-cli/src/sysw/mod.rs`) already carried both rows, and an
+implementation that stopped at the id reddened on each:
+
+| conjunct | the row that forces it |
+| --- | --- |
+| `preimage_plate(s)` -- the shipped kind-`0x03` unshared single test | — |
+| the id is exactly `hash`, **compared CASE-SENSITIVELY** | the UPPERCASE spelling of a plate, which `preimage_plate` DOES name as a plate. `codex32.IsPreimagePlate` reads the id out of `String.Split()` and compares it to the literal `"hash"`, and §5.3 hashes a record in its canonical lowercase form, so an uppercase string is not the record it looks like |
+| the payload decodes to exactly **33 bytes beginning `0x03`** | a kind-`0x03` single under the id `hash` whose X is 16 bytes -- the codec's `PreimageLengthMismatch`, 50 characters. `preimage_plate` deliberately answers true for it so the DIAGNOSTIC names it; ADMITTING it would put a string `DecodeMS1Preimage` refuses into a flow that engraves |
+
+**The device was already right and the Rust needed narrowing.**
+`codex32.IsPreimage` (`codex32/mspayload.go:94-101`) has required
+`len(d) == 33 && d[0] == 0x03` since H0, and `Split()`'s id comparison is
+case-sensitive -- so the third conjunct is the same shape the Go side already
+tests and the two agree by construction rather than by review. This is the
+Rust-primary rule's *"whenever a defect is found in a Go port we MUST check the
+Rust"* running in reverse, and the fix lands in Rust, with the vectors, exactly
+as the rule requires. MEASURED, each mutation run against the shipped test:
+dropping the well-formedness conjunct and comparing the id with
+`eq_ignore_ascii_case` BOTH give
+`left: Err(PreimageNotAdmitted(0, Preimage))` against
+`right: Err(Unclassifiable(0, PreimagePlate))` -- the malformed and the
+uppercase rows become a CLASS, and `--pack-preimage` would then admit them.
+§11.1 carries both.
 
 **The three ids, and which refusal each one gets -- NORMATIVE** (round-0
 fidelity I-5 + journey I-4; the id partition is what makes each row testable):
@@ -534,8 +679,28 @@ assigns (H2 §5, r2 C-4). Row order:
 Indices are 1-based positions among records of that class, as
 `composerHashRow(i+1, d)` already is (`gui/composer_hash.go:161`). MEASURED at
 `sh2DisplaySize`: every row above draws on ONE line in `composerPageLines`' band
-(411 px, 23 px per row) -- `preimage 10  b867db87..edbc96cb` and
-`phrase record 10 (derive to see the digest)` included.
+(411 px, a 23 px label) -- `preimage 10  b867db87..edbc96cb` (31 chars, 276 px)
+and `phrase record 10 (derive to see the digest)` (43 chars, 336 px) included.
+
+**`composerHashRows` GAINS A SECOND PARAMETER, `st *composerState` (nil-safe) --
+NORMATIVE** (plan round, gate fix F4). Band 3's row FORM depends on what THIS
+composition has already derived, and `composerHashRows(s *syswSession)`
+(`gui/composer_hash.go:157-175`) cannot see it. The answer comes out of §2.2's
+`hashlockHeld` -- the map that already holds the derived material -- and not out
+of a second, index-keyed map, so there is one record of what has been derived
+rather than two that can disagree.
+
+**THE FIRST PAGE HOLDS FIVE ROWS, NOT SIX, AND "23 px per row" WAS THE WRONG
+NUMBER** (plan round, gate fix F6). 23 px is the LABEL height; the row PITCH is
+29 px (`sz.Y + 6`, `gui/composer_paged.go:147`), the content box is 224 px, and
+the lead and its spacer are drawn through the same band before any row. MEASURED
+on a payload holding a `hash:` record, a preimage record and a `phrase:` record
+-- six rows -- **page 1 draws 5 touch targets and `No hash lock` is on page 2**.
+`composerPickScreen` pages on Button2 and draws the pager icon only when a second
+page exists, so the row is reachable; §11.5 pins both the count and the
+reachability. That `No hash lock` is the row an operator reaches for to UNDO a
+lock makes this worth a follow-up rather than a redesign: it is measured,
+reachable, and non-gating.
 
 **Derivation is LAZY (ruling B).** A `phrase:` row derives on PICK, behind the
 existing `Deriving` countdown (H2 §4.4), and the result is entered into
@@ -561,6 +726,22 @@ assigning the digest and entering the material into `hashlockHeld` with
 `provenance = hashlockFromPayload`. The provenance distinction §10 needs is then
 a property of WHICH PATH RAN, not a runtime test.
 
+**A payload PREIMAGE record takes the same shape WITHOUT the KDF, and it needs a
+CONFIRM BODY OF ITS OWN -- NORMATIVE** (plan round, gate fix F3). A preimage
+record carries X directly, so there is no countdown, no phrase and no method.
+`composerCopyHashlockConfirm` is phrase-shaped: it prints `method: <m>` and
+`chars: <n>` and tells the operator to write down the phrase and the method, and
+a preimage record has none of the three -- reusing it draws
+`method: hardened   chars: 0` on the screen that gates funds, which is a
+measurement of nothing wearing the clothes of one. The preimage route draws
+`composerCopyHashlockPreimageConfirm` instead: the digest, that it came from a
+preimage record in this payload, the same two relation lines, and -- in place of
+the write-down instruction -- the thing that is actually true here, that the
+preimage is in the payload and a plate is how it leaves. MEASURED through
+`confirmWarningBody` wrapped in `composerConfirmBody`, longest variant (both
+relation lines present): **274 drawn / headroom 186**, the tightest body this
+stage adds and still 106 characters clear of the 80-character margin.
+
 **When a `hash:` digest and a preimage or `phrase:` record in the same payload
 carry the SAME digest, the `hash:` row says so** (round-0 journey M-4). Packed at
 full fidelity -- `hash:` from `ms hashlock`'s stdout, the preimage from its
@@ -571,11 +752,20 @@ NO material, so no plate is offered at Done and §5.3 item 4 will not list it
 either; band 2 cuts a plate). The `hash:` row is annotated
 `hash <i>  <first8>..<last8>  (in payload)`.
 
-MEASURED at `sh2DisplaySize` in `composerPageLines`' 411 px band (23 px per
-line), on the longest two-digit form: **41 characters, 343 px, ONE line.** The
-longer wording the round-0 finding suggested, `(preimage in payload)`, is 50
-characters and **348 px over two lines**, so it is not taken -- a two-line row in
-a picker band is what `composerPickScreenMaxRows` budgets against.
+MEASURED at `sh2DisplaySize` in `composerPageLines`' 411 px band, on the longest
+two-digit form: **41 characters, 343 px, ONE line.** The longer wording the
+round-0 finding suggested, `(preimage in payload)`, is 50 characters and **348 px
+over two lines**, so it is not taken -- a two-line row in a picker band is what
+`composerPickScreenMaxRows` budgets against.
+
+**AN UNDERIVED `phrase:` RECORD CANNOT BE COUNTED HERE, and that is a property of
+this section rather than an omission** (plan round, gate fix F5). Its digest is
+not knowable without the KDF that lazy derivation forbids at row-build time. So
+the annotation is EXACT for a preimage record, and becomes true for a `phrase:`
+record the moment that record is derived -- `composerHashEdit` rebuilds the row
+set on every pass of its loop (`gui/composer_hash.go:184-224`), so the `hash:`
+row gains its `(in payload)` on the next draw. Nothing is derived to decide
+whether to draw an annotation.
 
 `taking` (`gui/composer_hash.go:194`), which fires the §8i rule modal, extends to
 the two new bands. `composerPickScreenMaxRows` (`gui/composer_paged.go:243`) is
@@ -585,10 +775,20 @@ checked against the longest row set.
 
 A fourth route on the Wallet Policy door, after "Scan cards", "From payload" and
 "Build a new policy" (`composerDoorFlow`, `gui/composer_door.go:98-119`). It is
-**conditional**, gated by a predicate of the same shape as
-`composerDoorHasConsumablePolicy` (`:93-97`): offered only when the loaded
-payload holds at least one `ClassPreimage` or `ClassPhrase` record. A door row
-that names a route it cannot take is the F-437 defect the door exists to remove.
+**conditional**, gated by `composerDoorHasPreimage(s *syswSession)` -- the same
+shape and the same argument as `composerDoorHasConsumablePolicy`
+(`gui/composer_door.go:86-90`; the first draft's `:93-97` is
+`composerDoorFlow`'s own comment and is corrected here): offered only when the
+loaded payload holds at least one `ClassPreimage` or `ClassPhrase` record. A door
+row that names a route it cannot take is the F-437 defect the door exists to
+remove. **It takes the SESSION and not the `Context`**, which is what makes the
+predicate testable without a running flow (plan round, gate fix F15).
+
+**AND THE DOOR'S ONE CALLER MUST DISPATCH IT -- NORMATIVE, same fix.** The door
+only REPORTS a route; `gui/wallet_policy.go:46-58` is the loop that takes one,
+and a fourth route nothing dispatches is the F-437 defect one level in -- a row
+the operator can highlight and select that returns them to the door. The route
+is a member of that loop, so Back from the flow lands on the door.
 
 The flow: list the payload's preimage and phrase records; the operator picks;
 per record it offers form and QR (§5.3 item 3); then it cuts. It builds no
@@ -662,8 +862,10 @@ So the review is TWO steps, both inside `composerEngraveStep`
 (`gui/composer_paged.go:278`) per held digest, before the census. That primitive
 already has what this needs and nothing else does: a tap on a row selects it,
 Button3 takes the highlighted row, Button1 declines, Button2 pages, and
-`composerPickScreenMaxRows = 24` (`:243`) bounds the hit areas. Its rows, MEASURED
-at `sh2DisplaySize` in the 411 px band (23 px per line), each ONE line:
+`composerPickScreenMaxRows = 24` (`:243`) bounds the hit areas -- **but the page,
+not that constant, is what binds** (§5.1's F6 measurement): the label is 23 px and
+the ROW PITCH is 29 px. Its rows, MEASURED at `sh2DisplaySize` in the 411 px
+band, each ONE line:
 
 | row | chars | px |
 | --- | --- | --- |
@@ -679,9 +881,41 @@ decline arm; backing out of the STEP (the first screen's Back) returns to the
 engrave step's entry and thence round `composerFlow`'s loop with the state
 intact, which is §2.2 item 4 unchanged.
 
-**(B) The census**, `confirmReviewScreen(ctx, th, "Plates To Cut",
-composerCensusLines(...))` (`:389-390`), which REPORTS the choices already made
-and stays read-only -- its contract, honoured rather than stretched.
+**THE MASKED LEAD IS TWO LINES, AND THE NUMBER IS NORMATIVE** (plan round, gate
+fix F13). `composerPickScreen` draws the lead as a per-page header THROUGH
+`composerPageLines`, so every line the lead spends is a ROW lost from page 1.
+MEASURED at `sh2DisplaySize`: a two-line lead -- `hash  <first8>..<last8>`
+optionally with `   path <n>`, then `phrase: <n> characters   method: <m>` --
+puts **all four rows on page 1**; a four-line lead, with the digest, the path,
+the character count and the method each on their own line, leaves **three**, and
+the row it displaces to page 2 is `do not cut this preimage`, the row an operator
+reaches for to UNDO. §11.5 pins the four-on-page-1 count.
+
+**THE PLATE ORDER IS DETERMINISTIC -- NORMATIVE** (plan round, gate fix F14).
+The list of held plates may NOT be produced by ranging `hashlockHeld`: Go
+randomises map iteration, so the same composition would list its plates in a
+different order on every frame, on the screen whose job is to be read against
+the bench. The order is: the hashed PATHS first, in path order, deduplicated by
+digest; then every held digest no path carries, in digest order. §11.5 pins it
+over repeated builds of the same state.
+
+**(B) The census**, drawn at `gui/composer_flow.go:389-390` -- where
+`confirmReviewScreen(ctx, th, "Plates To Cut", composerCensusLines(...))` stands
+today -- which REPORTS the choices already made and stays read-only: its
+contract, honoured rather than stretched.
+
+**BUT THE CALL BECOMES `composerReadScreen`, NOT `confirmReviewScreen` --
+NORMATIVE** (plan round, gate fix F10). Item 2 below requires the block to be
+drawn in `composerPageLines`' 411 px band, and `confirmReviewScreen`
+(`gui/multisig_build.go:1895`) wraps at 464 px and centres on the whole panel, so
+naming it here contradicted the requirement two paragraphs down.
+`composerReadScreen` (`gui/composer_paged.go:173`) has `confirmReviewScreen`'s
+exact contract -- Button1 backs, Button2 pages, Button3 continues -- inside the
+band that keeps ink off the buttons. **The two are indistinguishable from
+outside**: both draw a paged read-only body of the same shape, `ExtractText`
+collects a glyph's rune wherever it lands, and the real frame draws the nav
+buttons over it -- so §11.5's row is an AST assertion on `composerEngraveStep`'s
+call set, not a raster probe.
 
 Normative:
 
@@ -703,15 +937,28 @@ Normative:
 
    **These rows are drawn through `composerPageLines`' 411 px band, not
    `confirmReviewScreen`'s own wrap** (round-0 fidelity M-7). MEASURED at
-   `sh2DisplaySize`: `confirmReviewScreen` wraps at `dims.X - 2*8 = 464` px and
-   centres on the whole panel, while the navigation column starts at 427 px, so
-   any row wider than **374 px** has its right edge under a button. Every new row
-   is over it -- 405, 423, 441, 447, 448 px -- and so is the SHIPPED completeness
-   line (*"Each plate takes minutes to cut ... a set is only a backup when all of
-   it exists"*, **459 px**), which is why this is named as a pre-existing property
-   rather than something H6 invents. H6 still may not add five more rows to it:
-   this is the W-3 class the composer's paged screens were rebuilt to remove, and
-   `composerPageLines` is the surface that already solves it.
+   `sh2DisplaySize`: the panel is 480 px, `confirmReviewScreen` wraps at
+   `dims.X - 2*8 = 464` px and centres on the whole panel, the navigation column
+   starts at **427 px**, so any row wider than **374 px** has its right edge
+   under a button. The SHIPPED completeness line (*"Each plate takes minutes to
+   cut ... a set is only a backup when all of it exists"*) is **459 px**, which
+   is why this is named as a pre-existing property rather than something H6
+   invents. H6 still may not add five more rows to it: this is the W-3 class the
+   composer's paged screens were rebuilt to remove, and `composerPageLines` is
+   the surface that already solves it. The census also joins
+   `composerPagedScreens` (`gui/composer_paged_geometry_test.go:141-142`) so the
+   shipped W-3 gate covers every page of it.
+
+   **THE FIVE NEW ROWS' WIDTHS ARE DIGEST-DEPENDENT AND ARE NOT PINNED AS
+   LITERALS** (plan round, gate fix F11). Two of them carry a
+   `first8..last8` whose glyph widths differ per digest, so the first draft's
+   405 / 423 / 441 / 447 / 448 px are not reproducible as written and are
+   WITHDRAWN. The normative property is digest-INDEPENDENT: **every new row is
+   over the 374 px threshold, and none of them draws under a button in the
+   411 px band.** On the gate's fixture they measure, at the 464 px wrap,
+   419 / 385 / 434 / 442 / 441 px -- all over 374 -- and in the band
+   387 / 385 / 404 / 383 / 387 px, none under the column. §11.5 asserts the
+   property and logs the fixture's values rather than asserting them.
 3. **Form and QR are chosen PER PLATE**, on step (A), because two preimages in
    one policy may want different forms. The QR is offered only on the phrase form
    (decision 1) and only when the device holds the phrase. The census (B) then
@@ -772,6 +1019,16 @@ journey I-7). The order creates two distinct aborts, not one:
 | --- | --- | --- |
 | a preimage plate's own `Engrave` returns false, none cut yet | no plate of any kind; the phrase held only by this composition | §8.4a |
 | at least one preimage plate cut, then the run ends | a BEARER plate on the bench and no usable policy set | §8.4b |
+
+**THE MECHANISM IS A COUNTER, AND WITHOUT IT §8.4b CAN NEVER FIRE -- NORMATIVE**
+(plan round, gate fix F9). A loop that returns `composerAbortNoPreimage`
+unconditionally on a failed engrave makes the second arm unreachable, and a
+`bundleEngrave` whose result is never read back makes it unreachable a second
+way. So `composerEngraveStep` keeps a count of plates actually cut: inside the
+loop, a failure with `cut > 0` draws §8.4b and `cut == 0` draws §8.4a; after
+`bundleEngrave`, `!done && cut > 0` draws §8.4b. Both arms are then reachable and
+§11.5 drives each of them, including the row that neither fires on a completed
+run.
 
 The second is the one the new order creates -- before §5.4 the preimage plate did
 not exist, and this decision is what puts it on the bench first. Its danger is
@@ -963,10 +1220,33 @@ main content at all.
 
 The vertical budget for the centred group is **65 mm** (85 − 2 × `innerMargin`),
 the span `passphraseLayoutFor` centres inside while the bands hold the title and
-footer. Worst-case bodies -- header `path 2` + `hash  <first8>..<last8>` +
-`mk1 stub (template): <8 hex>`, a blank, the 73-character hardened method line, a
-blank, and a 100-character phrase; or the same header, a blank and the
-75-character ms1 string:
+footer.
+
+**THE BODY-ROW ORDER IS ONE ORDER, AND IT IS §§6.2's AND 6.3's** (plan round,
+finding 8). The first draft of this table listed the worst case as *"header ... a
+blank, the ... method line, a blank, and a 100-character phrase"* -- locator
+FIRST -- while §6.2 makes the method line *"the first body row, directly beneath
+the title band"* and §6.3 puts the locator *"immediately after the method
+line"*. The normative sections win, and this table is corrected to match them so
+there is nothing left to reconcile. MEASURED on the gated layout, the phrase
+form's worst case at 3.0 mm draws, in this order:
+
+| # | rows at 3.0 mm | what |
+| --- | --- | --- |
+| 1 | 2 | the 73-character hardened method line |
+| 2 | 1 | a blank |
+| 3 | 3 | `path 2`, `hash  <first8>..<last8>`, `mk1 stub (template): <8 hex>` |
+| 4 | 1 | a blank |
+| 5 | 3 | the 100-character phrase |
+
+**2 + 1 + 3 + 1 + 3 = 10 rows = 30.00 mm.** The total is 10 either way, so **no
+measurement in the table below moves** -- which is why this is a consistency fix
+and not a re-measurement. The string form is the same shape without rows 1 and 2.
+
+Worst-case bodies -- the 73-character hardened method line, a blank, header
+`path 2` + `hash  <first8>..<last8>` + `mk1 stub (template): <8 hex>`, a blank,
+and a 100-character phrase; or the same header, a blank and the 75-character ms1
+string:
 
 | form | rung | text | + gap + QR | total | 65 mm |
 | --- | --- | --- | --- | --- | --- |
@@ -1133,6 +1413,22 @@ cannot be transcribed wrong):
    - **Zero `findPath` failures in 864,000 payloads** -- no "QR modules spaced too
      far for constant time engraving" at any raised version. That is evidence the
      path-finder scales, not proof; §11.3 keeps it as a row.
+
+   **THE CAMPAIGN RAN AT PLAN TIME AND THE FOUR ENTRIES ARE SETTLED** (plan
+   round). Four 32-minute runs on 24 cores over §8.6-shaped payloads,
+   43,458,059 payloads in total with ZERO `findPath` failures, are recorded with
+   their sample counts, ratios and last-improvement samples in
+   `design/IMPLEMENTATION_PLAN_hashlock_H6_preimage_plates.md` Task 4 Step 3 and
+   `design/agent-reports/hashlock-H6-plan-author-report.md` §2. Every observed
+   maximum CLEARS the floor above -- **823 / 960 / 1179 / 1379** against
+   813 / 945 / 1161 / 1369, by +10 / +15 / +18 / +10 -- which is the checkable
+   gate this item asks for, and
+   v7 is the entry whose ratio (0.4741 against a 0.4905 mean) and 2.8 minutes of
+   quiet mark it as the under-converged one, so its buffer is widened to 53
+   rather than left at 20. **MEASURED in the gated tree, the four arms return
+   `constantTimeQRModules(41) = 843`, `(45) = 1013`, `(49) = 1199`,
+   `(53) = 1399`, and the five shipped entries 171 / 266 / 391 / 547 / 684 are
+   untouched.** §11.3 carries both the fuzzed row and the pin.
 
 5. **The constant-time argument is re-earned, not inherited -- and the first
    draft's test could not earn it.** It asked for a test that *"the emitted move
@@ -1337,7 +1633,7 @@ container it names):
 > the passphrase above before it can reach it. `me seal` — the Sealed Payload
 > container — refuses a preimage plate outright; this one does not.
 
-### §8.3 The census block (device rows, paged by `confirmReviewScreen`)
+### §8.3 The census block (device rows, paged by `composerReadScreen`)
 
 Heading, then one row per plate, then the apart-storage line:
 
@@ -1353,11 +1649,21 @@ The third field is the choice made on §5.3's step (A), reported here read-only.
 
 > Keep each preimage plate apart from the policy plates and from the others.
 
-MEASURED at `sh2DisplaySize`, these rows are 405-448 px wide and every one of
-them is over `confirmReviewScreen`'s 374 px centred-safe width -- as is the
-SHIPPED completeness line at 459 px, which is why §5.3 item 2 routes the block
-through `composerPageLines`' 411 px band instead of adding five more rows to a
-pre-existing W-3 overlap.
+MEASURED at `sh2DisplaySize`, every one of these rows is over
+`confirmReviewScreen`'s 374 px centred-safe width -- as is the SHIPPED
+completeness line at 459 px -- which is why §5.3 item 2 routes the block through
+`composerPageLines`' 411 px band instead of adding five more rows to a
+pre-existing W-3 overlap. **The individual widths are digest-dependent and the
+first draft's 405-448 px are withdrawn**; §5.3 item 2 carries the property that
+is pinned and the fixture values that are only logged (plan round, gate fix
+F11).
+
+**`plate(s)` is kept VERBATIM, against this file's own house style, and it is
+filed rather than fixed.** `composerSlotWord` renders "slot @3" or "slots @3 and
+@4" precisely so a refusal never reads "slots @3", and the heading above breaks
+that rule. Changing spec copy while the shipped string is being diffed against
+it puts the two out of step in the middle of a gate, so the wording is a records
+follow-up owned by the stage's last task, not an edit made here.
 
 The stand-alone notice form of the fourth row, for a review whose only entry is
 an unused preimage, measured **107 drawn / headroom 455**:
@@ -1475,6 +1781,19 @@ Rules:
    100-character phrase (§6.5, §7.1). It is pinned by corpus rows in the
    `ms hashlock` corpus (§11.2), because `ms hashlock` learning to parse it is a
    follow-on and the text must be fixed before the parser exists.
+4a. **THE DEVICE NEEDS BOTH LINES AS FUNCTIONS, AND NOTHING IN THE FIRST DRAFT
+   PRODUCED THEM -- NORMATIVE** (plan round, gate fix F8). §6.1's plate carries
+   `Method` and `QRText` as fields the CALLER fills, and the caller is the
+   composer (§5.3) or the Hashlock plates flow (§5.2) -- so a plate built from
+   production had nothing to put in either. `hashlock.MethodLine(hardened bool)`
+   and `hashlock.QRText(hardened bool, phrase string)` are deliverables of this
+   stage: the Go twins of `ms_codec::hashlock::qr_text`, built from
+   `hashlock.Iterations`, `hashlock.Salt` and `hashlock.PreimageLen`
+   (`hashlock/hashlock.go:21,24,27`) and never from a literal, so a parameter
+   change cannot leave the plate lying -- which is rule 2 above, enforced instead
+   of stated. They are DOWNSTREAM of the Rust primary and are pinned against the
+   vendored `qr_text` rows (§11.2), not against themselves. MEASURED: the
+   hardened line is **73 characters**, which is §6.5's own pin.
 5. **The plate names the ALGORITHM and not the `--method` selector, and that is
    declined here with a reason rather than foreclosed by arithmetic** (round-0
    journey M-2). A year-later operator scanning the QR reads
@@ -1539,6 +1858,35 @@ payload holds a `ClassPhrase` record and no `ClassPassphrase` record:**
 
 MEASURED on `errorScreenBody`: **165 drawn / headroom 397.**
 
+### §8.9 The bodies this section does NOT blockquote, measured -- NORMATIVE
+
+**MEASURED: this stage adds twenty `composerCopy*` bodies; thirteen are
+blockquoted in §8 or §10.1 and SEVEN are not, and that is recorded here rather
+than left for a reader to discover** (plan round, the gate's second deliberate
+non-change). Each is a `composerCopy*` function with a row in
+`composerCopyTable`, which is what carries §12 item 5's four gates -- the glyph
+check, the raster floor, the `assertModalBodyFits` measurement and a
+fires-on-its-condition test -- so none of them ships unmeasured. What they lack
+is a blockquote in this document to be diffed against, and closing that gap is a
+records follow-up owned by the stage's last task, not an edit made inside a build
+gate.
+
+| body | where it is drawn | renderer | drawn / headroom |
+| --- | --- | --- | --- |
+| the payload preimage-record confirm, longest variant | §5.1 | `confirmWarningBody` + `composerConfirmBody` | **274 / 186** |
+| the masked pick lead (two lines) | §5.3 step (A) | `composerPickScreen` header | see §5.3 -- a lead, not a modal |
+| the preimage-plate refusal (built or fit failed) | §5.3, §5.2 | `errorScreenBody` | **99 / 455** |
+| the Hashlock plates flow's list lead | §5.2 | `composerPickScreen` header | a lead, not a modal |
+| the Hashlock plates flow's own abort | §5.2 | `errorScreenBody` | **80 / 476** |
+| the Hashlock plates flow's empty-payload refusal | §5.2 | `errorScreenBody` | **46 / 513** |
+| the door's preimage/phrase count line (§5.2's lead fix) | §5.2 | `composerDoorLines` | a lead, not a modal |
+
+Every modal figure is a measurement of the text as written, taken with
+`assertModalBodyFits` on the renderer production uses; the margin is 80
+characters and the tightest of them clears it by 106. The three leads are
+measured as ROWS instead -- a lead is drawn through `composerPageLines` and its
+budget is the page's, which is what §5.3 step (A) and §5.1 pin.
+
 ---
 
 ## §9. The free-text and passphrase warning (ruling A8)
@@ -1589,7 +1937,7 @@ third arm, chosen when EVERY hashed path's digest has material in
 > holds the preimage for each one and can cut a plate for it at Done. Store those
 > plates apart from these, and apart from each other.
 
-and, when at least one of those digests came from a phrase typed here:
+and, when EVERY one of those paths' material carries a phrase:
 
 > HASH ON EVERY PATH
 > Every way to spend this wallet needs a hashlock preimage. This composition
@@ -1597,6 +1945,20 @@ and, when at least one of those digests came from a phrase typed here:
 > those plates apart from these, and apart from each other.
 
 MEASURED on `errorScreenBody`: **185 drawn / headroom 360** and **186 / 360.**
+
+**THE FOURTH ARM'S PREDICATE IS `every`, NOT `at least one`, AND THE BODY IS WHAT
+FORCES IT -- NORMATIVE** (plan round, gate fix F12). The first draft chose this
+arm when *"at least one of those digests came from a phrase typed here"*, and its
+own body says the composition *"holds the phrase and method **for each one**"*.
+On a mixed policy where one path's material is a payload PREIMAGE record -- which
+carries X and no phrase at all (§5.1) -- "for each one" is then FALSE, on the
+banner whose whole job is to say what spending needs. The first draft's wording
+also excluded a payload-delivered PHRASE the device does hold, whose backup
+burden is identical to a typed one. So the predicate is: every hashed path has
+material in `hashlockHeld`, AND every one of those materials carries a phrase.
+MEASURED, with the predicate mutated to `at least one`: the mixed row fails with
+*"a mixed composition claims to hold the phrase for each path"* against the
+held-phrase body. §11.5 carries a mixed row and a partial row for this reason.
 
 **Both are in the PRESENT TENSE of what is HELD, not the future tense of what
 will be cut, and that is a correction** (round-0 fidelity I-4). The first draft
@@ -1739,6 +2101,20 @@ currently tells that a preimage exists.
   expect the shipped text, not §8.1.2. **The first row is the funds-relevant
   one**: without it a plain BIP-93 33-byte secret beginning `0x03` -- roughly 1 in
   256 of them -- reaches a plate flow.
+- **`preimage_plate_admissible`'s OTHER TWO conjuncts (§4.3), each with the
+  SHIPPED row that already carries it.** The rows live in
+  `a_preimage_plate_is_named_not_misdiagnosed`: a kind-`0x03` single under the id
+  `hash` whose X is 16 bytes stays `Unclassifiable(PreimagePlate)`, and so does
+  the UPPERCASE spelling of a plate. Both are named a preimage plate by the
+  DIAGNOSTIC and admitted by neither predicate.
+  MUTATION: drop the `33 bytes beginning 0x03` conjunct → the malformed row
+  becomes `PreimageNotAdmitted(0, Preimage)` -- MEASURED, `left:
+  Err(PreimageNotAdmitted(0, Preimage))` against `right: Err(Unclassifiable(0,
+  PreimagePlate))` -- and `--pack-preimage` then admits a 50-character string
+  `DecodeMS1Preimage` refuses into a flow that engraves.
+  MUTATION: compare the id with `eq_ignore_ascii_case` → the uppercase row gives
+  the same failure, and the two sides stop agreeing: `codex32.IsPreimagePlate`
+  compares `Split()`'s id to the literal `"hash"`.
 - **§8.1.1's final sentence is emitted only for id `hash`.** MUTATION: emit it
   unconditionally → the wrong-id row sends the operator to a flag that will
   refuse them.
@@ -1786,13 +2162,30 @@ MUTATION: put `phrase:` before `method:` → every row fails.
 - `ConstantQR` accepts 41/45/49/53 and refuses 57. MUTATION: raise the bound to
   57 without the table → `bitmapForQRStatic` panics, which the test asserts it
   no longer does.
-- **THE ROW THAT CAN ACTUALLY FAIL: `len(modules) <= constantTimeQRModules(dim)`
-  for N fuzzed §8.6 payloads at each of v6..v9**, and `findPath` returns no
-  error on any of them. This is the budget proof, and it is stated separately
-  because the move-count row below cannot substitute for it. MUTATION: set any
-  of the four `constantTimeQRModules` arms to the round-0 fold's observed maximum
-  MINUS ONE (812 / 944 / 1160 / 1368) → that version's row reds, which is also
-  the check that the entry was derived rather than guessed.
+- **THE ROW THAT CAN ACTUALLY FAIL AT RUNTIME: `len(modules) <=
+  constantTimeQRModules(dim)` for N fuzzed §8.6 payloads at each of v6..v9**, and
+  `findPath` returns no error on any of them. This is the budget proof against
+  FRESH content, and it is stated separately because the move-count row below
+  cannot substitute for it.
+- **A SECOND ROW, A PIN, BECAUSE THE MUTATION THIS SECTION FIRST NAMED CANNOT
+  FIRE FROM ANY IN-SUITE SAMPLE** (plan round, finding 3). The first draft said:
+  *"set any of the four arms to the observed maximum MINUS ONE → that version's
+  row reds, which is also the check that the entry was derived rather than
+  guessed."* MEASURED, with the plan-time campaign's maxima minus one
+  (822 / 959 / 1178 / 1378), **the fuzzed row still PASSES** -- its 400 payloads
+  per dimension observe far below the altered budgets, and reaching a true
+  maximum took between 7 and 14 MILLION payloads, which a suite cannot spend.
+  So the mutation is retired and the property it was reaching for gets its own
+  test: `TestConstantTimeQRBudgetEntriesAreTheFuzzedOnes` PINS the four entries
+  as `<observed> + <buffer>` together with the campaign that produced each, and
+  asserts the five SHIPPED entries are untouched. It is not a weaker test but a
+  different one -- **the fuzzed row proves the entry BOUNDS fresh content, the
+  pin proves the entry is the one that was DERIVED** -- and changing an entry now
+  means changing the table, which means saying where the new number came from.
+  MUTATION: change any of the four arms (measured at v9, `1379 + 20` → `1378`) →
+  `constantTimeQRModules(53) = 1378, want 1399 (1379 observed + 20 buffer)`,
+  naming the dimension, both values and the campaign. The same edit leaves the
+  fuzzed row GREEN, which is the finding stated as two tests.
 - **THE REGRESSION GUARD, labelled as one: for each of v6..v9, two different
   payloads of the same version emit the SAME move count.** MUTATION: make the
   move list depend on a module's colour → the two payloads differ.
@@ -1820,8 +2213,19 @@ MUTATION: put `phrase:` before `method:` → every row fails.
 - The §6.5 fit gate: the worst-case phrase plate (100-character phrase, hardened
   method line, three header rows, QR) lays out at 3.0 mm and REFUSES at any
   larger rung, measured on the real render rather than on arithmetic.
-  MUTATION: add one character to the method line → the worst case no longer
-  fits and the gate reds. MUTATION: set the QR scale to 3 → it reds.
+  MUTATION: grow the method line to **79 characters** → it wraps to 3 rows at
+  3.0 mm instead of 2, the body is 11 rows, and `EngraveHashlock` refuses with
+  `11 rows at 3.0mm need 427520 units against a budget of 416000` (66.80 mm
+  against 65.00 mm). MUTATION: set the QR scale to 3 → the envelope is 47.70 mm,
+  3.0 mm needs 510080 units (79.70 mm), and every rung reds.
+
+  **SEVENTY-NINE, AND THE FIRST DRAFT'S "ADD ONE CHARACTER" CANNOT FAIL** (plan
+  round, finding 2). At 39 characters per line a 73-character line wraps to 2
+  rows anywhere from 40 to 78 characters, so a 74th changes nothing. MEASURED,
+  all five: 74, 75, 76, 77 and 78 characters ALL still fit and the gate stays
+  green; 79 reds with the tail above. §6.5 consequence 3's own number -- *"a 79th
+  character would make it 3"* -- is the threshold, and the mutation is written to
+  it so that it is one that fires.
 - Band budget: the three band literals are within `MaxTitleLen`; every locator
   row is a BODY row and **no locator ink lands in a screw-hole band**.
   MUTATION: draw any locator row at `l.topY` or `l.bottomY` → the ink-in-band
@@ -1880,9 +2284,31 @@ MUTATION: put `phrase:` before `method:` → every row fails.
   and not cut; the plan's remaining plates are unchanged. MUTATION: drop the
   declined plate silently → the census row assertion fails.
 - **The census block is drawn through `composerPageLines`' band**, and no census
-  row's ink lands under a navigation button. MUTATION: draw the block through
-  `confirmReviewScreen`'s own wrap → the ink-under-nav scanner
-  (`inkUnderNavOps`) finds the 405-448 px rows under the column.
+  row's ink lands under a navigation button, on EVERY page and not only the
+  first. **The instrument is an AST assertion on `composerEngraveStep`'s call
+  set, not a raster probe** (plan round, gate fix F10): `composerReadScreen` and
+  `confirmReviewScreen` both draw a paged read-only body of the same shape,
+  `ExtractText` collects a glyph's rune wherever it lands, and the real frame
+  draws the nav buttons over it, so no text or raster assertion on the live
+  screen can tell the two apart. MUTATION: draw the block through
+  `confirmReviewScreen` → MEASURED, *"composerEngraveStep draws through
+  confirmReviewScreen, which wraps at dims.X-2*8 and centres on the whole panel:
+  every census row over 374 px has its right edge under a navigation button
+  (W-3)"*.
+- **`Which hash?`'s first page holds FIVE rows** (§5.1): a payload with a
+  `hash:`, a preimage and a `phrase:` record draws six, page 1 draws five touch
+  targets, and `No hash lock` is reachable by paging. MUTATION: assert six →
+  the count row fails; MUTATION: drop the paging assertion → a row that has
+  moved off page 1 forever still passes.
+- **The pick step's lead is TWO lines and all four rows are on page 1** (§5.3
+  step A). MUTATION: give the lead four lines (the digest, the path, the count
+  and the method each on their own) → MEASURED, *"page 1 draws 3 of the four
+  rows; the lead is spending them"*, and the row displaced to page 2 is
+  `do not cut this preimage`.
+- **The plate list is in a deterministic order** (§5.3): paths first in path
+  order, deduplicated by digest, then unused digests in digest order, over
+  repeated builds of the same state. MUTATION: range `hashlockHeld` directly →
+  the order changes between builds, on the screen read against the bench.
 - Cut order: the preimage plates are engraved before `bundleEngrave` is called.
   MUTATION: move the loop after it → an order assertion on the engrave hook
   fails.
@@ -1901,6 +2327,12 @@ MUTATION: put `phrase:` before `method:` → every row fails.
   step (A) leaves the §8h body true. MUTATION: restore the future-tense wording
   ("This run cuts a preimage plate for each one") → the decline row asserts a
   body that is false about what the run did.
+- **§10.1's FOURTH form takes a MIXED row and a PARTIAL row** (plan round, gate
+  fix F12): a composition where one path's material is a payload preimage record
+  with no phrase must draw the third arm, not the fourth, and a composition
+  holding material for only one of two hashed paths must draw neither held arm.
+  MUTATION: choose the fourth arm on "at least one" phrase rather than every →
+  MEASURED, *"a mixed composition claims to hold the phrase for each path"*.
 - **§10.2 gets no test**, because it gets no guard: the reconcile screen has one
   call site, inside `hashlockPhraseRoute`, which a payload phrase never enters
   (§5.1). The existing
@@ -1937,16 +2369,56 @@ MUTATION: put `phrase:` before `method:` → every row fails.
 
 Four packages; the 24 `gui` shards (`scripts/gui-shard-test.sh <pkg> 24`);
 `gofmt`; `go vet`; `cargo nextest run --locked` on the Rust side; the firmware
-size stated for the STAGE against a named baseline, re-measured at `fb0dd04`
-(H5's plan-round fold recorded 1,599,208 B shipped against 1,597,404 B at
-`b9a9a30`; H6 adds a plate layout, a QR version table and two record classes, so
-the delta is not expected to be small).
+size stated for the STAGE against a named baseline, re-measured at `fb0dd04`.
+
+**THE DELTA IS NOW A NUMBER** (plan round). MEASURED with
+`nix develop -c tinygo build -size short -o /dev/null -target pico-plus2
+-stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller`, on a
+`git ls-files | tar` copy of `fb0dd04` and on the fully wired gate tree:
+
+| tree | flash | ram |
+| --- | --- | --- |
+| pristine `fb0dd04` | 1,599,208 B | 62,856 B |
+| the whole stage, wired | **1,643,580 B** | **63,272 B** |
+| delta | **+44,372 B** | **+416 B** |
+
+Nothing here is over a ceiling; the estimate above had no number behind it and
+now does. The SHAPE is worth recording because it is not what a reader would
+guess: stubbing `backup.EngraveHashlock` out of `composerHashlockPlateFor` --
+production's only reference to §6's whole plate layout -- measures
+**1,639,020 B**, so making the layout REACHABLE costs **4,560 B**, about a tenth
+of the stage. The rest is the screens, the flow and the copy bodies. The
+corollary binds any partial measurement of this stage: a tree that wires the
+codec half without a production caller has TinyGo drop it, so its delta is not
+the codec half's cost either.
+
+**AND THE `gui` PACKAGE GATE IS PART OF §2.2 ITEM 6.** A tree carrying the
+retention field without §5.1's routes reds `TestComposerEveryScreenFunctionHasA
+ProductionCaller` on one shard, deterministically; the whole-package run is only
+green once the consumer lands. That is the gate working, not a flake, and the
+exemption table is not the way past it.
 
 ### §11.7 The walk
 
 `cmd/emu/walk_hashlock_phrase.js` gains an H6 arm: type the anchor phrase, HOLD,
 reach the census, accept a preimage plate, and assert the census row carries the
-same `first8..last8` the confirm modal carried. H5 §4.1's doctrine binds -- *"a
+same `first8..last8` the confirm modal carried.
+
+**THE WALK'S COMPOSITION NEEDS A SECOND, KEYED PATH -- NORMATIVE** (plan round).
+`md.Compose` refuses a wholly key-less composition (*"every path is key-less; at
+least one path must hold a key"*), so a composition of ONE hashed key-less path
+cannot reach Done at all: it stops at a refusal, not at a census, and the arm
+would assert against a screen that never draws. The arm adds a 2-of-3 path and
+leaves it UNSEATED -- which is §12 item 3's own shape.
+
+**And §8.3's block does not fit on the census's first page, so the walk PAGES to
+reach it.** MEASURED on the gate's own fixture -- one accepted phrase+QR plate,
+one declined and one unused, over a one-card md1 template -- the census is
+**11 lines over 3 pages**: page 1 is the shipped supply block, §8.3's heading and
+its first three rows are on page 2, and the apart-storage line is on page 3.
+`composerReadScreen` withholds the continue affordance until the last page has
+been laid out once, which is the shipped contract rather than a new one, so a
+walk that asserted only the first frame would assert against the wrong screen. H5 §4.1's doctrine binds -- *"a
 walk may READ state only to assert that what the screen shows equals what is
 stored; it never drives through a hook"* -- so the walk asserts the SCREEN and
 the goldens assert the plate; no third hook carrying a preimage is added.
@@ -1957,14 +2429,27 @@ the goldens assert the plate; no third hook carrying a preimage is added.
 
 H6 is done when, on the flashed device:
 
+0. **`ms-codec` 0.9.0 is PUBLISHED and `me` depends on it** (§3.1). The phrase
+   rule, `looks_like_ms1` and §8.6's `qr_text` are in the codec, `ms-cli`
+   delegates with its refusal sentences unchanged, the CHANGELOG entry records
+   the corpus sha `4f1819cd...aba21d4`, `crates/me-cli/Cargo.toml:53` reads
+   `ms-codec = "0.9"`, and no `[patch.crates-io]` remains in either workspace.
+   **This item is FIRST in fact and not only in the list**: nothing else in §3
+   builds until it lands.
+
 1. The operator types the anchor phrase, reaches Done, accepts a preimage plate
    in the phrase form with a QR, and the plate is cut; a phone scan of the QR
    returns §8.6's text byte for byte, and `ms hashlock --hashlock-phrase-stdin`
    over the phrase on that plate reproduces the digest the composer showed.
 2. The same composition's md1 plates carry `PREIMAGE REQUIRED`.
-3. `ms hashlock --out X.txt` **plus its `hash:` record**,
-   `me sysw pack --pack-preimage --no-passphrase`, a tap, the Hashlock plates
-   flow, and a cut plate whose ms1 string round-trips through `ms hashlock --in`.
+3. `ms hashlock --out X.txt` **plus its `hash:` record**, then
+   `me sysw pack --pack-preimage --no-passphrase --in <records file>`, a tap, the
+   Hashlock plates flow, and a cut plate whose ms1 string round-trips through
+   `ms hashlock --in`. **`--in` is required, not stylistic** (§3.6): the two
+   classes are BEARER, so `argv_secret_guard` refuses the record on the command
+   line before the parser runs, and this item's earlier invocation --
+   `me sysw pack --pack-preimage --no-passphrase <ms1>` -- could never have been
+   walked.
    The `hash:` record is in the invocation deliberately: `ms hashlock` writes only
    the ms1 string to `--out` and prints `hash:` to stdout, so the minimal
    invocation packs a payload with no `hash:` record at all and the acceptance
@@ -2031,9 +2516,30 @@ Added by round 0, so each is a decision rather than an omission:
   this stage does not give it a way to find out; §8.4b tells the operator a
   bearer plate exists so that they can, which is the honest half.
 
+Added by the plan round, each measured and each non-gating:
+
+- **`Which hash?`'s first page holds FIVE rows** (§5.1), so a payload carrying a
+  `hash:`, a preimage and a `phrase:` record puts `No hash lock` -- the row an
+  operator reaches for to UNDO a lock -- on page 2. Reachable by paging and
+  pinned by §11.5; a layout that gave it more room is a later device cycle.
+- **§8.3's `plate(s)`** is the spelling this package's own house rule refuses
+  (§8.3). A records fix, not a copy change made inside a gate.
+- **The SEVEN bodies §8.9 lists have no blockquote in §8** (measured: the stage
+  adds twenty `composerCopy*` bodies and thirteen are blockquoted). They are
+  measured and gated through `composerCopyTable`; what is missing is a document
+  to diff the shipped string against.
+- **A CLI producer for `phrase:` records** is already above, and the plan round
+  confirms it: nothing in this stage emits one, so §3.3's orphan warning is the
+  whole of the mitigation.
+
 ---
 
 ## §14. Citations -- measured at fork `fb0dd04`, engrave `a0f832d0`, ms `504ff46`
+
+**The rows the plan round added were re-grepped at fork `fb0dd04`, mnemonic-secret
+`504ff46` and engrave `75f00b56`** (the plan's me baseline; identical at engrave
+master `55950604`), which is what `scripts/plan-staleness-check.sh` compares
+against.
 
 | claim | where |
 | --- | --- |
@@ -2080,6 +2586,17 @@ Added by round 0, so each is a decision rather than an omission:
 | `engraveModule`'s scale switch and its panic; `centerOf` | `engrave/engrave.go:689-709`, `:628-631` |
 | `ConstantQRCmd.Engrave`'s `for range nmod` and `DelayMove` padding | `engrave/engrave.go:633-687` |
 | the fork's own "a raise needs a fuzzed entry" record | `engrave/engrave_test.go:696-707` |
+| **the two SHIPPED tests the raise falsifies** (plan round, finding 6), both rewritten at v10 (dim 57) rather than deleted -- the fail-closed property and the beyond-reach property are unchanged and only the version each is asserted at moves | `engrave/engrave_test.go:544-568` (`TestConstantQRLargeVersionsFailClosed`, which asserts dim 41 is REFUSED and whose payload is 120 bytes); `backup/passphrase_test.go:774-791` (`TestPassphraseQRTooLong`, whose 200-character passphrase is dim 53) |
+| the third record the raise falsifies: the boundary comment calling dim 41 *"deliberately unsupported"*, rewritten with them so a 100-character PASSPHRASE still never reaches it and the passphrase plate's scale-3 goldens do not move | `engrave/engrave_test.go:696-707` |
+| the row pitch that decides how many picker rows a page holds -- 29 px, not the 23 px label | `gui/composer_paged.go:147` |
+| `composerReadScreen`, the band-correct twin of `confirmReviewScreen`; the shipped W-3 gate the census joins | `gui/composer_paged.go:173`; `gui/composer_paged_geometry_test.go:141-142` |
+| the door's ONE caller, where the fourth route must be dispatched | `gui/wallet_policy.go:46-58` |
+| the join guard and its exemption table (§2.2 item 6) | `gui/composer_join_test.go:35`, `:87-90` |
+| `md.Compose`'s refusal of a wholly key-less composition, which is why §11.7's walk adds a second path | `md/compose.go:93` (`ErrComposeNoKeyedPath`) |
+| the phrase rule and the ms1 shape test as `ms-cli` owns them TODAY, before §3.1 moves them into the codec | `crates/ms-cli/src/hashlock_phrase.rs:118`; `crates/ms-cli/src/argv_guard.rs:148` |
+| the `ms-codec` dependency §3.1 bumps; the release checklist and the H1 precedent it follows | `crates/me-cli/Cargo.toml:53`; `mnemonic-secret/design/RELEASE_PROCESS.md` items 1, 2, 3, 7, 8; `mnemonic-secret/CHANGELOG.md` `## ms-codec [0.8.0]` |
+| the argv guard, its bearer arm and the predicate that routes the two classes into it (§3.6) | `crates/me-cli/src/main.rs:551`, `:566`; `crates/me-cli/src/sysw/record.rs:102-104`, `:118-120` |
+| the corpus pins the plan round moves, each carried IDENTICALLY on both sides | `crates/me-cli/tests/sysw_composer_records.rs:399` and `sysw/testdata/record_class_vectors.provenance.json` (the class corpus); `hashlock/hashlock_test.go:13` (the ms corpus); `crates/me-cli/tests/codex32_seam.rs:25` and `sysw/codex32_seam_test.go:30` (the seam corpus, which does NOT move -- see §4.2's note) |
 | machine parameters | `internal/sh2/params.go:43-53` |
 | the fit gate: per-body render, headroom search, margin 80, "no capacity constant" | `gui/modal_fits_test.go:202`, `:183`, `:52`, `:33-35` |
 | the composer confirm surface and its HOLD | `gui/composer_shape.go:77`; `gui/composer_copy.go:36-38` |
@@ -2179,9 +2696,10 @@ M-2 (with I-2), M-4 (the character-wrap rule stated, with its reason and a
 `composer_engrave.go:80`, `composer_door.go:86-90`, `composer_flow.go:381`,
 `TitleString` at `backup/backup.go:111`), M-6 (the warning site and the F-246
 ordering), M-7 (the census block routed through `composerPageLines`, with the
-measurement: new rows 405-448 px, the SHIPPED completeness line **459 px**,
-against a 374 px centred-safe width -- so the overlap is pre-existing and H6 does
-not join it), N-1 (**three** distinct band literals, not four), N-2 (the
+measurement: new rows 405-448 px -- **WITHDRAWN by the plan round, because those
+widths are digest-dependent; §5.3 item 2 carries what replaces them** -- the
+SHIPPED completeness line **459 px**, which still reproduces, against a 374 px
+centred-safe width, so the overlap is pre-existing and H6 does not join it), N-1 (**three** distinct band literals, not four), N-2 (the
 inventory of **six** live `IsPreimage` call sites in §14), N-3
 (`composerCensusLines`' signature must gain the plate list).
 Journey M-1 (the string form's rendering decided and measured), M-2 (the
@@ -2229,13 +2747,110 @@ lens's closing note is folded as the **fourth** falsified shipped record in §0.
 
 ### Not consistent, and named
 
-- **The four `constantTimeQRModules` values are NOT settled by this spec.** The
-  fold's 216,000-payload floor is a lower bound and demonstrably not converged: an
-  independent 4,000-payload sample the same round saw 785 and 1281 where 216,000
-  saw **813** and **1369**. The four fuzzing runs are plan-time work with a stated
-  protocol and a checkable floor, not a number to paste.
+- ~~**The four `constantTimeQRModules` values are NOT settled by this spec.**~~
+  **CLOSED by the plan round.** The floor stood, the four 32-minute campaigns ran
+  (43,458,059 payloads, zero `findPath` failures), every observed maximum cleared
+  the floor, and the entries are §7.2 item 4's `843 / 1013 / 1199 / 1399` --
+  measured in the gated tree, not pasted. What the round ALSO found is that the
+  mutation this spec paired with them could not fire, which §11.3 now replaces
+  with a pin.
 - **§12 item 8's scan is unrun.** 53 modules at 0.6 mm on steel has no precedent
   in this tree and the SH2 has no camera, so nothing before a physical test plate
   can settle it. The spec states the fallback (text-only phrase form) so a
   negative result is a decision rather than a re-plan.
 
+
+---
+
+## Plan-round fold
+
+**Written by the plan-gate fold author (opus).** The R0 gate closed this spec
+0C/0I under four lenses; the PLAN round then built it. Nine things the plan
+author could not implement as this spec wrote them
+(`design/agent-reports/hashlock-H6-plan-author-report.md` §4) and seventeen the
+build gate had to change to make Tasks 8b-12 compile and run
+(`design/agent-reports/hashlock-H6-plan-gate-8b-12.md` §6) are folded below.
+**Every number in this section is this author's own measurement**, re-taken in
+private copies of the three gated trees
+(`/scratch/code/shibboleth/.tmp/h6-gate`, `-ms`, `-me`) rather than carried from
+either report: modal bodies through `assertModalBodyFits` on the renderer
+production uses, row widths through `widget.Labelw` in `composerTextBand`, plate
+geometry through `backup.CharsPerLine` / `hashlockLayoutFor`, budgets through
+`constantTimeQRModules`, corpora through `sha256sum`, and firmware through
+`tinygo build -size short`. Each replaced mutation was RUN against the tree it
+names, and its failure is quoted.
+
+### The plan author's nine
+
+| # | change | measurement |
+| --- | --- | --- |
+| 1 | §1 item 3b, §3.1 and §12 item 0: the phrase rule, `looks_like_ms1` and §8.6's `qr_text` move into `ms-codec`; a PUBLISHED **0.9.0** is the stage's first deliverable, through `RELEASE_PROCESS.md`; `me-cli`'s dependency is bumped after it | `validate_phrase` is `crates/ms-cli/src/hashlock_phrase.rs:118`, `looks_like_ms1` is `crates/ms-cli/src/argv_guard.rs:148`, and `crates/me-cli/Cargo.toml:53` depends on `ms-codec = "0.8"` and nothing of `ms-cli` -- **`me` cannot reach either**. The version is forced by checklist item 1 (a corpus sha change is `0.X+1.0`): the corpus moves to `4f1819cdd0862b101afd48d0478e8f0b218f933dd3da449915fa3c5eaaba21d4`, measured on both copies, where H1's `## ms-codec [0.8.0]` entry recorded `a46c197a…11d30` |
+| 2 | §11.4's method-line mutation replaced by the **79-character** threshold | 74, 75, 76, 77 and 78 characters ALL still fit -- five runs, five passes, the gate green each time; **79** reds with `11 rows at 3.0mm need 427520 units against a budget of 416000` (66.80 mm against 65.00 mm). §6.5 consequence 3's own number was already the threshold |
+| 3 | §11.3's budget mutation replaced by a **PIN** of the four entries and their campaigns | with the arms at each campaign maximum minus one, the fuzzed row **still passes**; the pin reds with `constantTimeQRModules(53) = 1378, want 1399 (1379 observed + 20 buffer)`. The entries measured in the gated tree: **843 / 1013 / 1199 / 1399**, the five shipped ones 171 / 266 / 391 / 547 / 684 untouched |
+| 4 | §4.3 and §11.1: `preimage_plate_admissible` takes **three** conjuncts -- `preimage_plate`, the id `hash` compared CASE-SENSITIVELY, and a payload of exactly 33 bytes beginning `0x03` | both extra conjuncts run as mutations against the SHIPPED `a_preimage_plate_is_named_not_misdiagnosed`: dropping the well-formedness conjunct AND comparing the id with `eq_ignore_ascii_case` each give `left: Err(PreimageNotAdmitted(0, Preimage))` / `right: Err(Unclassifiable(0, PreimagePlate))`. Go was already right (`len(d) == 33 && d[0] == 0x03`); the Rust needed narrowing, which is the Rust-primary rule in reverse |
+| 5 | New §3.6, and §12 item 3 -- the one acceptance item that packs a record -- rewritten to `--in`: the classes are BEARER, so `argv_secret_guard` refuses either carrier on the command line, and the guard's message named the wrong material | `is_bearer` (`crates/me-cli/src/sysw/record.rs:102-104`) gains both classes and `is_argv_forbidden` (`:118-120`) is the OR of `is_secret()` and `is_bearer()`; the guard is `crates/me-cli/src/main.rs:551` and the false bearer arm is `:566`. §12 item 3's own invocation could never have been walked |
+| 6 | §14 lists the **two shipped tests the raise falsifies**, with their new expectations at v10 (dim 57), plus the third record rewritten with them | `engrave/engrave_test.go:544-568` asserts dim 41 is REFUSED (its payload is 120 bytes); `backup/passphrase_test.go:774-791` uses a 200-character passphrase, which is dim 53. Both properties survive; only the version moves. Ranges re-grepped at `fb0dd04` |
+| 7 | §2.2 item 6: the retention field and its consumer land in ONE commit, and the exemption table is not the instrument | the retention-only red was measured twice (plan author, then build gate), each naming `[composerHoldHashlockMaterial]` from one shard; MEASURED here, the guard PASSES on the fully wired tree with only the pre-existing exemption logged. The guard is `gui/composer_join_test.go:35`; its exemption table (`:87-90`) is for a consumer DEFERRED with a follow-up number, and this consumer is in this stage |
+| 8 | §6.5 states ONE body-row order, the one the gated layout draws: method line, blank, locator, blank, secret | the layout's own segment list, measured: method (2 rows at 3.0 mm), blank, `path 2` + `hash  …` + `mk1 stub (template): …` (3), blank, phrase (3) = **2 + 1 + 3 + 1 + 3 = 10 rows = 30.00 mm**, total 63.80 mm against a 65.00 mm budget, **1.20 mm spare**. The count is 10 either way, so **no measurement in §6.5 moved** |
+| 9 | §4.2: exactly one corpus row moves (`preimage-plate-0x03`, `Unknown` -> `Preimage`), its `entr` sibling stays, and the corpora H6 touches are tabulated with their pins on both sides | class corpus `3575ccb0…a1c4abaf`, 68 rows, identical in `crates/me-cli/tests/sysw_composer_records.rs:399` and the fork's provenance pin; ms corpus `4f1819cd…aba21d4`, identical in both copies. **MEASURED and stated so nobody edits it: the two-repo `codex32_seam_vectors.json` does NOT move** -- its `device_admits` column is `Classify(s) == ClassCodex32Secret`, and `ClassPreimage` is not that, so both columns stay `false` and its sha `2c2fbb3f…6bd541b` stands |
+
+### The build gate's seventeen
+
+Five are corrections to the PLAN's own blocks and touch nothing normative (F1
+`sysw.Record` did not exist, F2 an uncompilable sketch, F7 two signatures, F16
+three test paths that do not exist, F17 an annotation inside a cited fragment);
+they are recorded in the plan. The twelve that changed what this spec says:
+
+| # | where | change and measurement |
+| --- | --- | --- |
+| F3 | §5.1 | a payload PREIMAGE record gets its OWN confirm body -- `composerCopyHashlockConfirm` would draw `method: hardened   chars: 0` on the screen that gates funds. **274 drawn / headroom 186** through `confirmWarningBody` + `composerConfirmBody`, longest variant: the tightest body this stage adds, 106 characters clear of the margin |
+| F4 | §5.1 | `composerHashRows` gains `st *composerState` (nil-safe); band 3's row form depends on what THIS composition derived, answered out of `hashlockHeld` rather than a second map |
+| F5 | §5.1 | the `(in payload)` annotation is EXACT for a preimage record and becomes true for a `phrase:` record once derived -- an underived one's digest needs the KDF that lazy derivation forbids at row-build time |
+| F6 | §5.1, §11.5, §13 | **the first page holds FIVE rows, not six.** 23 px is the LABEL height; the PITCH is 29 px (`gui/composer_paged.go:147`), the content box 224 px. Measured on a six-row payload: page 1 draws **5** touch targets and `No hash lock` is on page 2, reachable by paging. Filed |
+| F8 | §8.6 rule 4a | `hashlock.MethodLine` and `hashlock.QRText` are deliverables -- §6.1's plate has `Method`/`QRText` as caller-filled fields and nothing produced them. Built from `hashlock.Iterations` / `Salt` / `PreimageLen`, pinned against the vendored `qr_text` rows. Measured: the hardened line is **73 characters** |
+| F9 | §5.4 | §8.4b's mechanism is a CUT COUNTER: without it the arm can never fire, because an unconditional `composerAbortNoPreimage` and an unread `bundleEngrave` result each make it unreachable |
+| F10 | §5.3 (B), §11.5 | the census is drawn by `composerReadScreen` (`gui/composer_paged.go:173`), not `confirmReviewScreen` -- the first draft named a screen that contradicted its own band requirement. The gate is an AST assertion; MUTATION run: *"composerEngraveStep draws through confirmReviewScreen, which wraps at dims.X-2*8 … every census row over 374 px has its right edge under a navigation button (W-3)"* |
+| F11 | §5.3 item 2, §8.3 | the five census-row widths are DIGEST-DEPENDENT; 405/423/441/447/448 px are withdrawn. Measured: panel **480**, nav column **427**, `confirmReviewScreen` wrap **464**, centred-safe **374**, band **411**, the SHIPPED completeness line **459**; the new rows on the gate's fixture are **419 / 385 / 434 / 442 / 441** px at the wrap and **387 / 385 / 404 / 383 / 387** in the band. The pinned property is digest-independent |
+| F12 | §10.1, §11.5 | §10.1's fourth arm is chosen on `every` held path having a phrase, not `at least one` -- its body says *"for each one"*. MUTATION run: *"a mixed composition claims to hold the phrase for each path"* |
+| F13 | §5.3 step (A), §11.5 | the masked lead is TWO lines. MUTATION run at four lines: *"page 1 draws 3 of the four rows; the lead is spending them"*, and the row displaced is `do not cut this preimage` |
+| F14 | §5.3, §11.5 | the plate order is deterministic -- paths in path order deduplicated by digest, then unused digests in digest order. Ranging `hashlockHeld` would reorder the screen on every frame |
+| F15 | §5.2 | `composerDoorHasPreimage` takes the SESSION (`composerDoorHasConsumablePolicy`'s own shape, `gui/composer_door.go:86-90`; the first draft's `:93-97` is corrected), and the door's ONE caller `gui/wallet_policy.go:46-58` must dispatch the fourth route |
+
+**The gate's two deliberate non-changes are folded as records, not fixes.**
+§8.3's `plate(s)` stays verbatim and §13 files it; the bodies with no §8
+blockquote are tabulated with their measurements in the new **§8.9** -- MEASURED
+as SEVEN of the twenty this stage adds: four modals (**274/186**, **99/455**,
+**80/476**, **46/513**) and three leads -- and filed the same way. Changing
+shipped copy inside a build gate puts the string and the document it is diffed
+against out of step, which is the one thing a gate must not do.
+
+### Also folded from the round
+
+- **§7.2 item 4 and §16:** the four fuzzing campaigns RAN at plan time and every
+  observed maximum cleared this spec's floor, so §16's "not settled" item is
+  closed. **The campaign itself is the plan author's measurement, cited rather
+  than re-run** -- 43M payloads is 128 minutes of wall clock and re-running it
+  would not make it more true. What THIS round measured is the outcome the spec
+  now states: `constantTimeQRModules` returns 843 / 1013 / 1199 / 1399 in the
+  gated tree, the five shipped entries are untouched, and the in-suite fuzzed row
+  passes against fresh content.
+- **§11.6:** the stage's firmware delta is **+44,372 B flash / +416 B RAM**
+  (1,599,208 -> 1,643,580 B; 62,856 -> 63,272 B), both ends built here from a
+  `git ls-files` copy of `fb0dd04` and from the wired tree. The plate layout is
+  **4,560 B** of it, measured by stubbing its one production caller
+  (1,639,020 B).
+- **§11.7:** the walk's composition needs a SECOND, keyed path, because
+  `md.Compose` refuses a wholly key-less one (`md/compose.go:93`); and the census
+  measures **11 lines over 3 pages** on the gate's fixture, with §8.3's heading on
+  page 2 and its last row on page 3, so the walk pages to reach the block it
+  asserts against.
+- **§5.2's citation** of `composerDoorHasConsumablePolicy` corrected from
+  `:93-97` to `:86-90`, re-grepped at `fb0dd04`.
+
+### Nothing folded here was declined
+
+Every one of the twenty-six items above is either normative spec text now or a
+recorded non-change with its reason. The two items the round could not settle
+are unchanged and still named in §16: **§12 item 8's physical QR scan**, which
+needs a test plate and a phone, and the emulator walk, which §11.7 specifies and
+Task 12 has run four times but which is not acceptance on hardware.
