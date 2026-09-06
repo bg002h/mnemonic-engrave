@@ -1,0 +1,9 @@
+You are the INDEPENDENT fold-verification reviewer (sonnet tier, narrowly scoped) for the PLAN-ROUND fold of `design/SPEC_hashlock_H6_preimage_plates.md` (engrave master `a2a031fa`, over the R0 GREEN spec `a67a3924`) in mnemonic-engrave (`/scratch/code/shibboleth/mnemonic-engrave`). The fold's inputs: the plan author's nine findings (`design/agent-reports/hashlock-H6-plan-author-report.md` §4) and the gate agent's 17 fixes (`hashlock-H6-plan-gate-8b-12.md`); the fold author's report `hashlock-H6-plan-gate-fold-report.md` maps each; the spec's `## Plan-round fold` paragraph lists the changes; the controller's decisions are in the brief `design/agent-briefs/hashlock-H6-plan-gate-fold-brief.md`.
+
+ONE QUESTION: does the spec fold apply each of the 26 items as the decisions say (or record a true reason where measurement refined a decision -- e.g. finding 9), with every new number true when YOU measure it in your own copies of the gated trees (`.tmp/h6-ms`, `.tmp/h6-me`, `.tmp/h6-gate` -- `cp -a`, never modify), no contradiction inside the spec or with the plan at `e6d84d9c` (copy strings byte-identical; the seam corpus claim; the corpus re-pins), and no superseded phrasing left live?
+
+Read-only; Go `/scratch/code/shibboleth/.toolchain/go/bin/go`; Cargo env under `/scratch/code/shibboleth/.tmp`; commit nothing; no sub-agents; never read any `.jsonl`.
+
+Severity: an item not applied and not truly refined, a new false number, a spec/plan contradiction = Important. Wording = Minor/Nit. A clean round returns the spec to R0 GREEN.
+
+Report (final action): write `/scratch/code/shibboleth/mnemonic-engrave/design/agent-reports/hashlock-H6-spec-plan-round-verification.md` (create; must not exist): a 26-row table (item, change, verdict), executed checks with outputs, closing counts, GREEN / NOT GREEN. Return a two-line summary plus the path.
