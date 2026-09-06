@@ -2224,6 +2224,13 @@ fn print_composer_confirmation(records: &[String]) {
                     &hx[56..]
                 );
             }
+            ComposerRecord::Phrase(_) => {
+                // The record is SECRET and BEARER. `show` names the class and
+                // the method and NEVER the phrase, the derived preimage or its
+                // digest: a confirmation line is printed to a terminal whose
+                // scrollback outlives the run.
+                println!("secret record {i}: hashlock phrase (phrase:) — not shown");
+            }
             ComposerRecord::Now { seconds, height } => {
                 // `show` cannot tell an auto-appended pack time from an
                 // operator-supplied bound, so it names neither provenance.
@@ -2426,6 +2433,8 @@ fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
         C::Key => "cosigner key (key:)",
         C::Hash => "sha256 hashlock (hash:)",
         C::Now => "pack time (now:)",
+        C::Preimage => "hashlock preimage plate",
+        C::Phrase => "hashlock phrase (phrase:)",
         C::Unknown => "unrecognised record",
     }
 }

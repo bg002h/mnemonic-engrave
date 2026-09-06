@@ -618,9 +618,9 @@ dependencies = [
 
 [[package]]
 name = "ms-codec"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bc0881b6f03b59ce8055db2ad8a2851fc622efaeea365f4b3d0057ed22b9002"
+checksum = "6a7836a85212f27fb1b4a261cd1ac2c2c8a6f0654504d3061e88cff008ebd5a3"
 dependencies = [
  "getrandom 0.3.4",
  "pbkdf2",

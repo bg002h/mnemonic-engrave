@@ -287,6 +287,7 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
             Ok(composer_records::ComposerRecord::Key(_)) => Class::Key,
             Ok(composer_records::ComposerRecord::Hash(_)) => Class::Hash,
             Ok(composer_records::ComposerRecord::Now { .. }) => Class::Now,
+            Ok(composer_records::ComposerRecord::Phrase(_)) => Class::Phrase,
             Err(_) => Class::Unknown,
         };
     }
@@ -297,6 +298,20 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
     // the strict check is self-contained.
     if mt::valid_mt(record) {
         return Class::Mt;
+    }
+    // H6 §3.2 item 1: CLASSIFICATION IS UNCONDITIONAL. A preimage plate is a
+    // preimage plate whatever the admission, exactly as a `key:` record is a
+    // key record — the flag is not a parameter of what a record IS. That is
+    // what lets `decide_sealing` stay byte-unchanged on the strict classifier
+    // and still seal a payload holding one, and what keeps ONE truth per
+    // corpus row for the device's lockstep test.
+    //
+    // The predicate is `preimage_plate_admissible`, not `preimage_plate`: the
+    // wider one stays the DIAGNOSTIC behind the refusal message, so a kind-0x03
+    // single under an id outside {entr, hash} is still NAMED a preimage plate
+    // when it is refused and is still not admitted.
+    if crate::seal::record::preimage_plate_admissible(record) {
+        return Class::Preimage;
     }
     match crate::seal::record::validate_record(record) {
         Ok(crate::seal::record::RecordKind::Ms) => Class::Codex32Secret,

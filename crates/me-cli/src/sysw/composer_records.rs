@@ -30,6 +30,14 @@ pub const KEY_PREFIX: &str = "key:";
 pub const HASH_PREFIX: &str = "hash:";
 /// `now:<hex of "<seconds>[,<height>]">`.
 pub const NOW_PREFIX: &str = "now:";
+/// `phrase:<hex of "<method>,<phrase>">` — a hashlock PHRASE and its method
+/// selector (SPEC_hashlock_H6 §3.1). The `now:` idiom exactly: hex of a UTF-8
+/// text, one comma, cut on the FIRST comma so the phrase may contain commas.
+///
+/// RESERVED like the other three, so a `phrase:` record whose body fails any
+/// rule is `Class::Unknown` and refused with its own line rather than treated
+/// as free text.
+pub const PHRASE_PREFIX: &str = "phrase:";
 
 /// BIP-65: absolute locktimes below this are heights; `now:`'s height band.
 const MAX_HEIGHT: u32 = 499_999_999;
@@ -49,7 +57,49 @@ pub struct KeyRecord {
     pub text: String,
 }
 
-/// A parsed record of one of the three classes.
+/// The method SELECTOR a `phrase:` record carries.
+///
+/// The WIRE carries a selector and the PLATE carries the method DEFINITION
+/// (H6 §8.6), and the difference is deliberate: a wire record is read by a tool
+/// that already knows the parameter set, while a plate is read by a person who
+/// may have neither the tool nor this firmware.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HashlockMethod {
+    /// `hardened` — PBKDF2-HMAC-SHA256, the `ms hashlock` default.
+    Hardened,
+    /// `sha256` — one SHA-256 of the phrase bytes.
+    Sha256,
+}
+
+impl HashlockMethod {
+    /// The selector spelling, which is `ms hashlock --method`'s and the
+    /// device's `hashlockMethod.String()`.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HashlockMethod::Hardened => "hardened",
+            HashlockMethod::Sha256 => "sha256",
+        }
+    }
+
+    /// X from the phrase under this method.
+    pub fn preimage(self, phrase: &[u8]) -> zeroize::Zeroizing<[u8; 32]> {
+        match self {
+            HashlockMethod::Hardened => ms_codec::hashlock::preimage_hardened(phrase),
+            HashlockMethod::Sha256 => ms_codec::hashlock::preimage_sha256(phrase),
+        }
+    }
+}
+
+/// A parsed `phrase:` record. `phrase` is SECRET.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhraseRecord {
+    /// The method selector the record names.
+    pub method: HashlockMethod,
+    /// The phrase, verbatim, everything after the FIRST comma.
+    pub phrase: String,
+}
+
+/// A parsed record of one of the four classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComposerRecord {
     /// `key:`
@@ -63,6 +113,8 @@ pub enum ComposerRecord {
         /// Block height, 1..=499999999, when the packer knew one.
         height: Option<u32>,
     },
+    /// `phrase:` — a hashlock phrase and its method.
+    Phrase(PhraseRecord),
 }
 
 /// Why a prefixed record is `Class::Unknown` (spec §8n has one line per class).
@@ -74,6 +126,11 @@ pub enum ComposerRecordError {
     Hash,
     /// `now:` is not `<seconds>[,<height>]` in range.
     Now,
+    /// `phrase:` is not `<method>,<phrase>` with a known method and a phrase
+    /// the rule admits. ONE variant, not five: the §8n line is fixed per class,
+    /// and a refusal that named WHICH rule the phrase failed would print a
+    /// property of a secret the operator did not ask to have described.
+    Phrase,
 }
 
 impl ComposerRecordError {
@@ -86,6 +143,9 @@ impl ComposerRecordError {
             ),
             ComposerRecordError::Hash => format!("record {index}: hash: must be exactly 64 hex characters"),
             ComposerRecordError::Now => format!("record {index}: now: must be <seconds>[,<height>] in range"),
+            ComposerRecordError::Phrase => format!(
+                "record {index}: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256"
+            ),
         }
     }
 
@@ -95,6 +155,9 @@ impl ComposerRecordError {
             ComposerRecordError::Key(d) => d,
             ComposerRecordError::Hash => "not exactly 64 lowercase hex characters",
             ComposerRecordError::Now => "not <seconds>[,<height>] in range",
+            ComposerRecordError::Phrase => {
+                "not <method>,<phrase> with a known method and an admissible phrase"
+            }
         }
     }
 }
@@ -138,6 +201,16 @@ pub fn hash_record(digest: &[u8; 32]) -> String {
     format!("{HASH_PREFIX}{}", hex_lower(digest))
 }
 
+/// `phrase:` + hex of `<method>,<phrase>`. The text is NOT validated here;
+/// `parse` is the gate, so a test can build a malformed record on purpose.
+/// The returned string is SECRET.
+pub fn phrase_record(method: HashlockMethod, phrase: &str) -> String {
+    format!(
+        "{PHRASE_PREFIX}{}",
+        hex_lower(format!("{},{phrase}", method.as_str()).as_bytes())
+    )
+}
+
 /// `now:` + hex of `<seconds>[,<height>]`.
 pub fn now_record(seconds: u32, height: Option<u32>) -> String {
     let text = match height {
@@ -171,7 +244,37 @@ pub fn parse(record: &str) -> Option<Result<ComposerRecord, ComposerRecordError>
     if let Some(body) = record.strip_prefix(NOW_PREFIX) {
         return Some(parse_now(body));
     }
+    if let Some(body) = record.strip_prefix(PHRASE_PREFIX) {
+        return Some(parse_phrase(body));
+    }
     None
+}
+
+/// `phrase:` — hex of `<method>,<phrase>`, CUT ON THE FIRST COMMA.
+///
+/// Never the last: a phrase may contain commas, and cutting on the last would
+/// take everything after the final comma as the phrase and derive a DIFFERENT
+/// preimage from the one the packer meant.
+///
+/// The phrase itself must pass `ms_codec::hashlock::validate_phrase` — the one
+/// implementation of SPEC_ms_hashlock §4.3, which `ms hashlock` and the
+/// device's `hashlock.ValidatePhrase` also apply — so the record parser and
+/// the keyboard cannot disagree about what a phrase is.
+fn parse_phrase(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
+    use ComposerRecordError::Phrase as P;
+    let bytes = unhex_lower(body).ok_or(P)?;
+    let text = std::str::from_utf8(&bytes).map_err(|_| P)?;
+    let (method_text, phrase) = text.split_once(',').ok_or(P)?;
+    let method = match method_text {
+        "hardened" => HashlockMethod::Hardened,
+        "sha256" => HashlockMethod::Sha256,
+        _ => return Err(P),
+    };
+    ms_codec::hashlock::validate_phrase(phrase.as_bytes()).map_err(|_| P)?;
+    Ok(ComposerRecord::Phrase(PhraseRecord {
+        method,
+        phrase: phrase.to_owned(),
+    }))
 }
 
 fn parse_hash(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
@@ -363,6 +466,31 @@ pub const CASES: &[Case] = &[
     // component is refused on both sides now (the host used to admit it through u32::from_str).
     Case { name: "key-origin-component-unhardened-2^31", record: "key:5b37336335646130612f323134373438333634382f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-origin-component-plus-sign", record: "key:5b37336335646130612f2b3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    // ---- H6 §3.1: the `phrase:` record, one row per rule (SPEC_hashlock_H6 §11.1).
+    // `phrase-space-after-the-comma` is ADMITTED and is the hand-build error §8.2.3's
+    // orphan warning exists to catch: a leading 0x20 is printable ASCII, so the record
+    // is valid and derives a DIFFERENT preimage from the same words without it.
+    Case { name: "phrase-hardened", record: "phrase:68617264656e65642c636f727265637420686f727365206261747465727920737461706c65", class: "Phrase", host_line: None },
+    Case { name: "phrase-sha256", record: "phrase:7368613235362c636f727265637420686f727365206261747465727920737461706c65", class: "Phrase", host_line: None },
+    Case { name: "phrase-containing-a-comma", record: "phrase:68617264656e65642c6f6e652c2074776f2c207468726565", class: "Phrase", host_line: None },
+    Case { name: "phrase-space-after-the-comma", record: "phrase:68617264656e65642c20636f727265637420686f727365206261747465727920737461706c65", class: "Phrase", host_line: None },
+    Case { name: "phrase-containing-a-colon", record: "phrase:68617264656e65642c6e6f74653a20756e64657220746865206d6174", class: "Phrase", host_line: None },
+    Case { name: "phrase-one-character", record: "phrase:68617264656e65642c78", class: "Phrase", host_line: None },
+    Case { name: "phrase-100-characters", record: "phrase:68617264656e65642c30303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030", class: "Phrase", host_line: None },
+    Case { name: "phrase-101-characters", record: "phrase:68617264656e65642c3030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-empty", record: "phrase:68617264656e65642c", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-64-hex", record: "phrase:68617264656e65642c61626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162616261626162", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-ms1-shaped", record: "phrase:68617264656e65642c6d7331306861736873717734366832617434773436683261743477343668326174347734366832617434773436683261743477343668326174347734366b7a76326e6379363075377a3963", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-ms1-shaped-grouped", record: "phrase:68617264656e65642c6d7331306861736873712077343668326174347734203668326174347734366820326174347734366832612074347734366832617434207734366832617434773420366b7a76326e637936302075377a3963", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-unknown-method", record: "phrase:7363727970742c636f727265637420686f727365206261747465727920737461706c65", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-uppercase-method", record: "phrase:48415244454e45442c636f727265637420686f727365206261747465727920737461706c65", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-no-comma", record: "phrase:68617264656e6564", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-body-not-hex", record: "phrase:zz", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-body-uppercase-hex", record: "phrase:68617264656E65642C78", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-body-odd-length", record: "phrase:686", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-body-not-utf8", record: "phrase:ff", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-body-empty", record: "phrase:", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
+    Case { name: "phrase-non-printable-tab", record: "phrase:68617264656e65642c6f6e650974776f", class: "Unknown", host_line: Some("record 0: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256") },
 ];
 
 /// One JSON row of `testdata/record_class_vectors.json`.

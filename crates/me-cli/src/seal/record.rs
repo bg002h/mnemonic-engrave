@@ -320,6 +320,52 @@ pub fn preimage_plate(s: &str) -> bool {
         }
 }
 
+/// `preimage_plate` PLUS the id `hash` — the ADMISSION predicate (H6 §4.3,
+/// ruling A7), and the Rust half of the device's `codex32.IsPreimagePlate`.
+///
+/// `preimage_plate` above stays the DIAGNOSTIC predicate behind the refusal
+/// message, so a mistagged plate is still NAMED a preimage plate when it is
+/// refused. This narrower one decides what `--pack-preimage` lets INTO a
+/// payload the device will engrave from, and the id is the whole difference:
+/// H0 could afford the wide kind-byte rule because a false positive was a
+/// REFUSAL, while here a false positive routes a string into a flow that cuts
+/// it onto steel under a band reading NOT A SEED. A plain BIP-93 33-byte
+/// secret beginning `0x03` — roughly 1 in 256 of them — must not arrive.
+pub fn preimage_plate_admissible(s: &str) -> bool {
+    let s = s.trim();
+    if !preimage_plate(s) {
+        return false;
+    }
+    // BIP-93 layout: `ms1` + threshold char + 4-char id + share index.
+    //
+    // CASE-SENSITIVE, and that is the device's answer rather than a choice made
+    // here: `codex32.IsPreimagePlate` reads the id out of `String.Split()` and
+    // compares it to the literal `"hash"`, so the UPPERCASE spelling of a plate
+    // -- the QR-alphanumeric form, which `preimage_plate` DOES name as a plate --
+    // is refused on both sides. Section 5.3 hashes a record in its canonical
+    // lowercase form, so an uppercase one is not the record it looks like.
+    if s.as_bytes().get(4..8) != Some(b"hash".as_slice()) {
+        return false;
+    }
+    // AND the payload must be a WELL-FORMED preimage: exactly 33 bytes
+    // beginning 0x03. `preimage_plate` deliberately answers `true` for a
+    // kind-0x03 single whose X is the wrong length (the codec's
+    // `PreimageLengthMismatch`) so the DIAGNOSTIC names it, and the shipped
+    // test `a_preimage_plate_is_named_not_misdiagnosed` carries such a row
+    // under the id `hash`. Admitting it would put a 50-character string that
+    // `DecodeMS1Preimage` refuses into a flow that engraves, so the ADMISSION
+    // predicate asks the narrower question -- and this is the same shape the
+    // device's `codex32.IsPreimage` already tests (`len(d) == 33 && d[0] ==
+    // 0x03`), so the two sides agree by construction rather than by review.
+    match ms_codec::codex32::Codex32String::from_string(s.to_string()) {
+        Ok(c) => {
+            let d = c.parts().data();
+            d.len() == 33 && d[0] == 0x03
+        }
+        Err(_) => false,
+    }
+}
+
 /// §6.3: every public record must belong to a card set that REASSEMBLES AND
 /// DECODES. Records are chunks, so this is necessarily a whole-set operation —
 /// a per-record decode rejects every legitimate payload.

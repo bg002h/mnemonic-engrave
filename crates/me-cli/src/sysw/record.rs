@@ -72,6 +72,12 @@ pub enum Class {
     /// `now:` — the pack time (and optional height), a lower bound the device
     /// echoes. Not secret.
     Now,
+    /// A hashlock PREIMAGE plate: the `ms1` kind-`0x03` string under the id
+    /// `hash` (SPEC_ms_hashlock §1 rule 2). SECRET and BEARER.
+    Preimage,
+    /// `phrase:` — a hashlock phrase and its method selector (H6 §3.1).
+    /// SECRET and BEARER.
+    Phrase,
     Unknown,
 }
 
@@ -86,7 +92,11 @@ impl Class {
     pub fn is_secret(self) -> bool {
         matches!(
             self,
-            Class::Mnemonic | Class::Codex32Secret | Class::Passphrase
+            Class::Mnemonic
+                | Class::Codex32Secret
+                | Class::Passphrase
+                | Class::Preimage
+                | Class::Phrase
         )
     }
 
@@ -99,8 +109,14 @@ impl Class {
     /// `MdMk`, `Descriptor` and `Address` are deliberately NOT bearer: they are
     /// watch-only, a leak costs privacy rather than funds, and the sibling CLIs
     /// take them positionally by design (`md verify <STRINGS>…`).
+    /// H6: a hashlock preimage and a hashlock phrase are BOTH — key material
+    /// AND, for a key-less hashlock path, everything spending needs. They are
+    /// secret and bearer, and the argv gate follows from either.
     pub fn is_bearer(self) -> bool {
-        matches!(self, Class::Mt | Class::Tx)
+        matches!(
+            self,
+            Class::Mt | Class::Tx | Class::Preimage | Class::Phrase
+        )
     }
 
     /// What must never cross a public channel — `/proc/<pid>/cmdline`, `ps`, or

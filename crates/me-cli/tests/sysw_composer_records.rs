@@ -396,7 +396,7 @@ use sha2::Digest as _;
 /// (Stage 2). Changing a row means changing this in both repos — the point.
 /// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
 /// build-gate scratch copy; the regenerate test prints it again on every run.
-const FIXTURE_SHA256: &str = "5b3960cad7f924f6f1e7f19ef49599814733cee4874d0f5eb48c28af4cd8b312";
+const FIXTURE_SHA256: &str = "3575ccb0e12d12646c45dde583380199170cff815ea5e8d86d4d37d4a1c4abaf";
 const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
 
 fn fixture_path() -> std::path::PathBuf {
