@@ -2836,3 +2836,15 @@ Command to resume: /resume-composer
   seam-corpus class change re-pinned) + the 17 gate fixes into spec AND plan.
   NEXT: fold -> checker -> three plan lenses (briefs pre-written) -> fold ->
   verification -> ms-codec 0.9.0 release -> implementers by file group.
+- **H6 GATE-ROUND FOLD COMMITTED (spec `a2a031fa`, plan `e6d84d9c`, report
+  0fdd2777).** 26/26 items folded (21 normative spec changes incl. new §3.6
+  phrase-rule-into-ms-codec + published minor release first, §8.9 the seven
+  un-blockquoted bodies, §2.2 item 6, §12 item 0; five plan block fixes).
+  Finding 9 refined by measurement: the seam corpus does NOT move (its
+  device_admits keys on ClassCodex32Secret); the class corpus (47 -> 68 rows)
+  and the ms corpus are re-pinned. Six mutations re-run RED; firmware
+  1,599,208 -> 1,643,580 B (+416 RAM), plate layout 4,560 B. Controller
+  re-run: checker 86/0. **FOUR AGENTS DISPATCHED**: spec plan-round
+  verification (sonnet) + plan R0 r0 lenses fidelity (opus), tests (sonnet),
+  journey (opus), briefs 9f9d2a0f. NEXT: persist -> fold -> r1 verification
+  -> GREEN -> ms-codec 0.9.0 release (Task 1) -> implementers by file group.
