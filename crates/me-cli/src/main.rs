@@ -3086,44 +3086,81 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      field (SPEC_ms_hashlock §1 rule 2). A damaged or forged plate — \
                      re-encode it from the source rather than editing the string."
                 ),
-                // H6 §8.1.2, and F-503: this arm covers THREE shapes, not
-                // one. A kind-0x03 single under the id `hash` with a
-                // well-formed 33-byte payload is a CLASS and reaches
-                // PreimageNotAdmitted instead, so what lands here is (a) an id
-                // outside {entr, hash} with a well-formed payload -- the §4.3
-                // collision case, and the ONLY one the 1-in-256 sentence is
-                // true of; (b) the id `hash` with an X that is not 32 bytes --
-                // a damaged or hand-built plate, which the text used to
-                // misdiagnose as a wrong id (F-503); (c) a wrong id AND a wrong
-                // length. The reason carries the diagnosis; the text says only
-                // what is true of the record in hand.
-                U::PreimagePlate { id_is_hash, x_len } => match (id_is_hash, x_len) {
-                    (true, Some(n)) => format!(
+                // H6 §8.1.2, F-503 and F-504. This arm covers a FAMILY, not a
+                // shape: a kind-0x03 record that `--pack-preimage` would not
+                // admit, for any combination of two independent faults — the
+                // id (not `hash`, or `hash` in another case) and the payload
+                // width (an X that is not 32 bytes). A well-formed plate under
+                // the canonical id is admissible and reaches
+                // PreimageNotAdmitted instead, so at least one fault always
+                // holds here.
+                //
+                // THE BODY IS COMPOSED FROM THE FAULTS ACTUALLY FOUND rather
+                // than chosen from fixed combinations, because both earlier
+                // spellings told operators something false: F-503, a record
+                // whose id WAS `hash` was told its id was not; F-504, the
+                // UPPERCASE spelling was told the same and then handed the
+                // 1-in-256 collision sentence, which is true only of a 33-byte
+                // payload under a FOREIGN id — the one case where a plate and a
+                // BIP-93 seed backup are genuinely indistinguishable.
+                U::PreimagePlate { id, x_len } => {
+                    use mnemonic_engrave::sysw::PreimageId as P;
+                    // The id clause is a MODIFIER when the id is right and a
+                    // FAULT otherwise, which is why the two are not joined with
+                    // a bare "and": "under the id `hash` and whose X is …" is
+                    // not English, and the sentence an operator reads has to be.
+                    let id_clause = match id {
+                        P::Hash => "under the id `hash`",
+                        P::HashOtherCase => {
+                            "whose id is `hash` written in another case — the uppercase, \
+                             QR-alphanumeric spelling"
+                        }
+                        P::Other => "whose 4-character id is not `hash`",
+                    };
+                    let x_clause = match (id, x_len) {
+                        (_, None) => String::new(),
+                        (P::Hash, Some(n)) => format!(" whose X is {n} bytes, not 32"),
+                        (_, Some(n)) => format!(" and whose X is {n} bytes, not 32"),
+                    };
+                    // The lowercase remedy only when case is the ONLY fault:
+                    // lowercasing a record whose X is the wrong width fixes
+                    // nothing, and offering it would send the operator around a
+                    // loop.
+                    let remedy = match (id, x_len) {
+                        // Case is the ONLY fault: lowercasing fixes it, and
+                        // lowercasing a record whose X is the wrong width fixes
+                        // nothing, so the hint is offered here and nowhere else.
+                        (P::HashOtherCase, None) => {
+                            "A record is hashed in its canonical lowercase form (§5.3), so \
+                             lowercase the string rather than editing it — or re-encode it \
+                             with `ms hashlock`."
+                        }
+                        // The id is right and the width is not: the string is a
+                        // damaged or hand-built plate, and the source it should
+                        // come from is named.
+                        (P::Hash, Some(_)) => {
+                            "This string is a damaged or hand-built plate: re-encode it with \
+                             `ms hashlock` from the phrase or the 32-byte preimage rather than \
+                             editing the string."
+                        }
+                        _ => "Re-encode it with `ms hashlock` rather than editing the string.",
+                    };
+                    // Only a well-formed 33-byte payload under a foreign id can
+                    // actually be a seed backup; anything else cannot be, and
+                    // the sentence would be noise pointing at a wrong cause.
+                    let collision = if *id == P::Other && x_len.is_none() {
+                        " If this string is a 33-byte seed backup that happens to begin 0x03, \
+                         it is not a preimage: roughly 1 in 256 of them look like this."
+                    } else {
+                        ""
+                    };
+                    format!(
                         "record {i} (records count from 0) is a kind-0x03 preimage payload \
-                         under the id `hash` whose X is {n} bytes, not 32. A preimage plate \
-                         is kind 0x03 followed by exactly 32 bytes (SPEC_ms_hashlock §1), \
-                         and --pack-preimage admits only that. This string is a damaged or \
-                         hand-built plate: re-encode it with `ms hashlock` from the phrase or \
-                         the 32-byte preimage rather than editing the string."
-                    ),
-                    (false, Some(n)) => format!(
-                        "record {i} (records count from 0) is a kind-0x03 preimage payload \
-                         whose 4-character id is not `hash` and whose X is {n} bytes, not 32. \
-                         A preimage plate is kind 0x03 under the id `hash` followed by exactly \
-                         32 bytes (SPEC_ms_hashlock §1 rule 2), and --pack-preimage admits \
-                         only that. Re-encode it with `ms hashlock` rather than editing the \
-                         string."
-                    ),
-                    (_, None) => format!(
-                        "record {i} (records count from 0) is a kind-0x03 preimage payload \
-                         whose 4-character id is not `hash`. A preimage plate is kind 0x03 \
-                         under the id `hash` (SPEC_ms_hashlock rule 2), and --pack-preimage \
-                         admits only that. Re-encode it with `ms hashlock` rather than editing \
-                         the string. If this string is a 33-byte seed backup that happens to \
-                         begin 0x03, it is not a preimage: roughly 1 in 256 of them look like \
-                         this."
-                    ),
-                },
+                         {id_clause}{x_clause}. A preimage plate is kind 0x03 under the id \
+                         `hash` followed by exactly 32 bytes (SPEC_ms_hashlock §1 rule 2), and \
+                         --pack-preimage admits only that. {remedy}{collision}"
+                    )
+                }
                 U::Bip93OutsideTheProfile(len) => format!(
                     "record {i} (records count from 0) is a VALID BIP-93 codex32 string — the \
                      checksum is good — but not a constellation `ms1` record, so this \

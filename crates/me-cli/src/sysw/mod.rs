@@ -102,6 +102,25 @@ pub enum SyswError {
     PreimageNotAdmitted(usize, record::Class),
 }
 
+/// The 4-character id of a kind-`0x03` record, as far as admission cares.
+///
+/// Three states rather than a boolean because the refusal must distinguish two
+/// different mistakes: an id that is not `hash` at all (the §4.3 collision
+/// case, where a 33-byte BIP-93 seed backup can look exactly like a plate), and
+/// `hash` written in another case — the QR-alphanumeric spelling, which is the
+/// SAME string to bech32 but not the canonical lowercase form §5.3 hashes. Told
+/// the first thing, the second operator re-encodes a string they only needed to
+/// lowercase (F-504).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreimageId {
+    /// Exactly `hash`, the canonical spelling.
+    Hash,
+    /// `hash` in another case, e.g. `HASH`.
+    HashOtherCase,
+    /// Any other 4 characters.
+    Other,
+}
+
 /// Why [`classify`] could not place a record.
 ///
 /// Carries NO operator data, and that is load-bearing rather than tidy: the
@@ -156,17 +175,20 @@ pub enum UnknownReason {
     /// string is a constellation record, just not one this container places
     /// yet (H0, §9).
     ///
-    /// Carries WHICH conjunct of the admission shape failed, so the refusal
-    /// can say what to fix (F-503: the text used to claim the id was not
-    /// `hash` for a string whose id WAS `hash` and whose X was 16 bytes).
-    /// `id_is_hash` is the id read from bytes 4..8 of the trimmed record;
-    /// `x_len` is `Some(n)` when the codec refused the payload as
-    /// `PreimageLengthMismatch { got: n }` (an X of `n` bytes, not 32) and
-    /// `None` when the payload is a well-formed 33-byte kind under a wrong id.
-    /// Both false-shaped (`id_is_hash: true, x_len: None`) cannot occur: that
-    /// string is admissible and never reaches here.
+    /// Carries WHICH conjuncts of the admission shape failed, so the refusal
+    /// can state each fault it actually found (F-503: the text claimed the id
+    /// was not `hash` for a string whose id WAS `hash` and whose X was 16
+    /// bytes; F-504: and it said the same of the UPPERCASE spelling, whose id
+    /// is `hash` in another case, while offering a collision sentence true only
+    /// of a 33-byte payload).
+    ///
+    /// `id` is read from bytes 4..8 of the trimmed record; `x_len` is `Some(n)`
+    /// when the codec refused the payload as `PreimageLengthMismatch { got: n }`
+    /// (an X of `n` bytes, not 32) and `None` when the payload is a well-formed
+    /// 33-byte kind. `PreimageId::Hash` with `x_len: None` cannot occur here:
+    /// that string is admissible and never reaches this reason.
     PreimagePlate {
-        id_is_hash: bool,
+        id: PreimageId,
         x_len: Option<usize>,
     },
     /// An ms1 string whose 4-character id and kind byte disagree (SPEC_ms_hashlock
@@ -220,12 +242,16 @@ fn unknown_reason(record: &str) -> UnknownReason {
     }
     if crate::seal::record::preimage_plate(record) {
         let trimmed = record.trim();
-        let id_is_hash = trimmed.as_bytes().get(4..8) == Some(b"hash".as_slice());
+        let id = match trimmed.as_bytes().get(4..8) {
+            Some(b"hash") => PreimageId::Hash,
+            Some(b) if b.eq_ignore_ascii_case(b"hash") => PreimageId::HashOtherCase,
+            _ => PreimageId::Other,
+        };
         let x_len = match ms_codec::decode(trimmed) {
             Err(ms_codec::Error::PreimageLengthMismatch { got }) => Some(got),
             _ => None,
         };
-        return UnknownReason::PreimagePlate { id_is_hash, x_len };
+        return UnknownReason::PreimagePlate { id, x_len };
     }
     if crate::seal::record::bip93_outside_the_profile(record) {
         return UnknownReason::Bip93OutsideTheProfile(record.trim().chars().count());
@@ -962,7 +988,7 @@ mod tests {
             Err(SyswError::Unclassifiable(
                 0,
                 UnknownReason::PreimagePlate {
-                    id_is_hash: false,
+                    id: PreimageId::Other,
                     x_len: None
                 }
             )),
@@ -990,7 +1016,7 @@ mod tests {
             Err(SyswError::Unclassifiable(
                 0,
                 UnknownReason::PreimagePlate {
-                    id_is_hash: true,
+                    id: PreimageId::Hash,
                     x_len: Some(16)
                 }
             )),
@@ -1019,7 +1045,7 @@ mod tests {
             Err(SyswError::Unclassifiable(
                 0,
                 UnknownReason::PreimagePlate {
-                    id_is_hash: false,
+                    id: PreimageId::Other,
                     x_len: None
                 }
             )),
@@ -1049,7 +1075,7 @@ mod tests {
             Err(SyswError::Unclassifiable(
                 0,
                 UnknownReason::PreimagePlate {
-                    id_is_hash: false,
+                    id: PreimageId::HashOtherCase,
                     x_len: None
                 }
             )),
