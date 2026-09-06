@@ -3280,3 +3280,34 @@ Command to resume: /resume-composer
   the fork's baseline-red `go vet`, whose fix raises the go directive to 1.26
   and therefore wants a TinyGo check before anyone does it.
   Operator-owned and unchanged: flash, the H4 walk, ACCEPTANCE item 8.
+- **F-496 + F-497 SHIPPED (fork main 62d2faeb, 2026-09-06) -- the small
+  hashlock stage the operator asked for after H6.** There was no H7 and there
+  is still no arc: these were the two ruled items, and the fork main tip now
+  carries them. F-496: `hashlockPayloadRoute` draws the reconciliation screen
+  only when `payloadStatesDigest` is false; §10.2's "true by construction"
+  scoping is retired with its argument (the no-op claim held only for the
+  matching-hash case), both comments rewritten, the test split across both
+  branches with the second fixture built because a `hash:` record would be a
+  sixth row on a five-row page. F-497: `composerCopyPreimageCensusScope` with
+  the rows and nowhere else.
+  **The independent check (report 385a1645) returned NOT GREEN on a Critical
+  that was mine, and of the class this session keeps naming: the F-497 commit
+  message claimed a mutation reds and it did not.** Every fixture held ONE
+  unassigned preimage, so the stand-alone notice returned before the mutated
+  path ran; the mutation was dead on arrival and all 1290 tests were green
+  under it. The reachable case (two held, both unassigned, zero accepted) is
+  now the block's third and reds it. Folded at 4f1d06bc as a NEW commit rather
+  than an amend, so the branch records the claim, the falsification and the
+  fix; delta review GREEN, production code byte-identical to the first review.
+  Second thing measured on the way: composer_copy.go's table proves a body
+  exists, is spelled right and fits, and proves NOTHING about anything drawing
+  it -- the copy shipped with no test that it reached the screen.
+  Gates at the tip: gui 1290/24 shards; every non-gui package ok; gofmt clean;
+  the emulator walk ran in a browser, `ok: true`, its census frame carrying
+  the new line with `censusPages` unmoved at 2. Image rebuilt:
+  `seedhammerii-v0.0.0-bg62d2fae.signed.uf2`, sha256 af152602...1690a5.
+  **Open follow-ups now: F-492, F-493, F-494 only** (toolkit manual section;
+  me's plain-String record text awaiting the F-483-shaped ruling; the fork's
+  baseline-red `go vet`, whose fix raises the go directive to 1.26 and wants a
+  TinyGo check). Operator-owned: flash bg62d2fae, the H4 walk, ACCEPTANCE
+  item 8.
