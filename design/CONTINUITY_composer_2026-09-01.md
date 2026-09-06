@@ -3014,3 +3014,21 @@ Command to resume: /resume-composer
   firmware size) -> post-impl review (FORK_TIP, ME_TIP 8cf2a7f9, ME_BASE
   f82b8c11) -> fold -> ship (fork main, engrave master = h6-b + h6-records,
   toolkit, ms report commit) -> signed image -> physical QR-scan gate.
+- **H6 IMPLEMENTER F LANDED; ALL SIX GROUPS DONE; POST-IMPL REVIEW DISPATCHED.**
+  F (report 056da367): fork `h6-f` (Task 12 walk arm 72b5a757; Task 13 fork
+  records + sysw provenance re-pin to engrave 4d00fbbf) e089a539 -> MERGED ff
+  into `hashlock-h6` (tip e089a539); engrave `h6-records` 32a46860 (spec
+  statements, F-495..F-502, closures, ACCEPTANCE doc); toolkit `h6-manual`
+  4fc30009 (`[lint] OK`). Controller re-ran at e089a539: gofmt clean; every
+  non-gui package ok; gui 1287/24; `go build ./cmd/emu` ok; checker 97/0
+  against (fork e089a539, ms h6-a, me h6-b). F-501 (ms engraving card "it is
+  on no plate") folded by the controller on ms master (wording; ms-cli tests
+  green) -- close F-501 with that SHA at ship. F's re-measurements: gofmt
+  baseline five (F-499); go vet ./engrave/ 3 not 6; history_purge trio fails
+  for want of /usr/bin/zsh (F-500). **POST-IMPL OPUS REVIEW DISPATCHED**
+  (brief 7039156f; carries the delegated three-run walk discipline). NEXT:
+  review report -> persist -> fold (if any) -> re-review if non-trivial ->
+  SHIP: fork main ff from hashlock-h6 + push; engrave master = h6-b ff +
+  h6-records (merge; FOLLOWUPS conflicts possible) + staging push; toolkit
+  h6-manual staging-PR; ms master push (report commit + F-501 fold) ->
+  signed image via ~/bin/sh/sh2-flash -b -> physical QR-scan gate (operator).
