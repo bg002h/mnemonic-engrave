@@ -2785,3 +2785,11 @@ Command to resume: /resume-composer
   24d4d7f6). NEXT: GREEN -> plan author (brief hashlock-H6-plan-author-brief.md,
   fill SPEC_GREEN_SHA) -> per-task gate -> lenses -> implementers by file
   groups.
+- **H6 SPEC R0 GREEN (`a67a3924`).** r1 sonnet verification GREEN (482eb1ff): all 22
+  C/I fixed, every claim re-derived from scratch; the v8 budget fuzz found +7
+  over the stated floor (confirms "floor, not converged"). **PLAN AUTHOR
+  DISPATCHED** (opus, brief 1f429ca7: three repos Rust-first, per-task-boundary
+  gate, disjoint file groups, checker). Plan R0 briefs pre-written (PLAN_SHA
+  pending). NEXT: plan lands -> commit + persist -> three lenses -> fold ->
+  verification -> implementers by file groups (A..D) -> merge -> gates + walk
+  + the three-run discipline -> post-impl -> merge fork main -> push -> image.
