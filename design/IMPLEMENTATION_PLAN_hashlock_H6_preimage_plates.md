@@ -1,6 +1,6 @@
 # Hashlock H6 — Preimage Plates Implementation Plan (three repos)
 
-**STATUS: R0 GREEN — round 0 folded at 7021ea43; round 1 fold verification GREEN (0C/0I) at 49abc5ca; its two Minors folded inline.** Written by the plan author
+**STATUS: R0 GREEN — round 0 folded at 7021ea43; round 1 fold verification GREEN (0C/0I) at 49abc5ca; its two Minors folded inline; pre-publish review of implementer A (1b469f3d) GREEN, its M-1/M-2 folded on `h6-a` (1a4f4aa8: `qr_text` returns `Zeroizing<String>`) and into the two blocks here.** Written by the plan author
 (opus) from `design/SPEC_hashlock_H6_preimage_plates.md`, which was R0 GREEN at
 engrave `a67a3924` and has since taken this round's own fold (its
 `## Plan-round fold` section). The build gate below was run BY THE AUTHOR at
@@ -394,7 +394,25 @@ have to compare against something:
 ///
 /// `hashlock v1` is the VERSION TAG of this TEXT, not of the derivation. A
 /// future parameter set gets `hashlock v2`.
-pub fn qr_text(hardened: bool, phrase: &str) -> String {
+///
+/// IT RETURNS `Zeroizing<String>` BECAUSE THE PHRASE IS IN IT. Every other
+/// phrase-bearing value in this workspace is protected -- `read_phrase_from`
+/// and `read_phrase_stdin` return `Zeroizing<Vec<u8>>`, `preimage_hardened`
+/// and `preimage_sha256` return `Zeroizing<[u8; 32]>`, and the kind carries
+/// `Payload::Preimage(Zeroizing<[u8; 32]>)` -- and a plain `String` here would
+/// have been the one hole in that surface, holding the phrase in the clear on
+/// the heap until the allocator happened to reuse the page.
+///
+/// **The buffer is `Zeroizing` from the FIRST byte, and it is allocated once.**
+/// Wrapping a finished `format!` would be no protection at all: the `format!`
+/// would build an unprotected `String` containing the phrase and the wrap would
+/// only guard the copy. The exact capacity is reserved up front so no `push_str`
+/// can reallocate and abandon an unwiped buffer part-way through. The `method`
+/// line is deliberately NOT protected -- it is three compile-time constants and
+/// carries nothing of the phrase.
+pub fn qr_text(hardened: bool, phrase: &str) -> Zeroizing<String> {
+    const HEAD: &str = "hashlock v1\n";
+    const LABEL: &str = "\nphrase: ";
     let method = if hardened {
         format!(
             "method: pbkdf2-hmac-sha256 iterations={HASHLOCK_ITERATIONS} salt={} dklen={HASHLOCK_DKLEN}",
@@ -403,7 +421,14 @@ pub fn qr_text(hardened: bool, phrase: &str) -> String {
     } else {
         "method: sha256".to_string()
     };
-    format!("hashlock v1\n{method}\nphrase: {phrase}")
+    let mut out: Zeroizing<String> = Zeroizing::new(String::with_capacity(
+        HEAD.len() + method.len() + LABEL.len() + phrase.len(),
+    ));
+    out.push_str(HEAD);
+    out.push_str(&method);
+    out.push_str(LABEL);
+    out.push_str(phrase);
+    out
 }
 ```
 
@@ -491,7 +516,7 @@ file is in the gated tree; the load-bearing assertions are:
 
 ```rust file=ms/crates/ms-codec/tests/hashlock_qr_text.rs mode=fragment
         let got = qr_text(hardened, &row.phrase);
-        assert_eq!(got, row.qr_text, "row {}", row.name);
+        assert_eq!(*got, row.qr_text, "row {}", row.name);
         assert_eq!(got.len(), row.bytes, "row {}: byte count", row.name);
         assert!(
             !got.ends_with('\n'),
