@@ -608,3 +608,162 @@ publish rather than after, because the fix is a breaking signature change.
 *Written by the reviewer as its final action. Read-only on the branch and on
 master; nothing committed; both review worktrees and their target dirs removed;
 the implementer's branch worktree left clean at `ca71516511db0b608a14c7dc3f82376424b107a8`.*
+
+---
+
+## Delta review — fold `1a4f4aa8`
+
+**Verdict: GREEN. Both findings fixed as claimed; no new defect. 0 Critical, 0
+Important, 1 Nit (N-3, new).**
+
+Scope: `git diff ca715165..1a4f4aa8` only — 3 files, 43 insertions, 10 deletions.
+Nothing else re-audited. Read-only on the branch; built and mutated in a fresh
+detached worktree at `1a4f4aa8`, since removed.
+
+```
+CHANGELOG.md                              | 18 +++++++++++-------
+crates/ms-codec/src/hashlock.rs           | 29 +++++++++++++++++++++++++++--
+crates/ms-codec/tests/hashlock_qr_text.rs |  6 +++++-
+```
+
+The corpus is **not in the delta at all**, and its sha is unmoved:
+
+```
+$ git show 1a4f4aa8:crates/ms-codec/tests/vectors/hashlock-v0.8.json | sha256sum
+4f1819cdd0862b101afd48d0478e8f0b218f933dd3da449915fa3c5eaaba21d4
+```
+
+### Q1 — does the fold fix M-1 and M-2 as claimed?
+
+**M-1 — YES.** `CHANGELOG.md:7` is now `## ms-codec [0.9.0] — 2026-09-05`,
+matching the H1 precedent's shape exactly (`## ms-codec [0.8.0] — 2026-09-05`).
+The word `unreleased` is gone from the file. One line, nothing else in the header
+touched.
+
+**M-2 — YES, on all four sub-claims, each checked separately.**
+
+| claim | evidence | verdict |
+| --- | --- | --- |
+| `qr_text` → `Zeroizing<String>` | probe bound it as `let _: fn(bool, &str) -> Zeroizing<String> = qr_text;` — a signature mismatch would be a compile error. Compiles and passes | **holds** |
+| buffer `Zeroizing` **from the first byte** | `Zeroizing::new(String::with_capacity(…))` is constructed EMPTY and wrapped *before* any `push_str`. The phrase is pushed into an already-protected buffer; it never exists in an unprotected `String`. This is the substantive difference from wrapping a finished `format!`, which would have protected only the copy | **holds** |
+| no unwiped intermediate copy | the reserved capacity is `HEAD.len() + method.len() + LABEL.len() + phrase.len()` and the final string is exactly `HEAD + method + LABEL + phrase`, so no `push_str` can reallocate and abandon a buffer holding a phrase prefix. Computed for the anchor row: reserved 122, final 122. Measured across 9 shapes (both methods, empty phrase, the 100-character cap, `:`-bearing, trailing-space, comma-bearing, multibyte): `capacity() == len()` on every one | **holds** |
+| the sole caller adjusted | `grep -rn qr_text crates/ --include=*.rs` outside the codec module and its test returns **nothing** — the test is the only caller, and it was adjusted | **holds** |
+
+Compilation is itself the proof of the load-bearing bound: `Zeroizing<Z>`'s
+`Drop` requires `Z: Zeroize`, so `Zeroizing<String>` only builds because
+`zeroize` implements `Zeroize for String` (which wipes the `Vec<u8>`'s capacity
+region, not merely the length). The build is green, so the wipe is real and not a
+type that silently does nothing.
+
+The doc comment's one exclusion is correct on inspection: `method` is left an
+unprotected `String` because it is rendered from three compile-time constants and
+carries no phrase bytes.
+
+### Q2 — does the delta introduce any new defect?
+
+**No.** The three named risks were each tested rather than reasoned about.
+
+**(a) A changed assertion that no longer asserts.** The delta changes exactly one
+assertion, `assert_eq!(got, row.qr_text)` → `assert_eq!(*got, row.qr_text)`
+(needed because `Zeroizing<String>: PartialEq<String>` does not hold; the deref
+compares the `String` inside). **Control run:** change one byte of the output
+(`hashlock v1` → `hashlock v2`) and the row assertion still fires —
+
+```
+test qr_text_matches_every_corpus_row ... FAILED
+thread 'qr_text_matches_every_corpus_row' panicked at crates/ms-codec/tests/hashlock_qr_text.rs:55:9:
+  left: "hashlock v2\nmethod: pbkdf2-hmac-sha256 iterations=100000 salt=ms-hashlock-v1 dklen=32\nphrase: correct horse battery staple"
+ right: "hashlock v1\nmethod: pbkdf2-hmac-sha256 iterations=100000 salt=ms-hashlock-v1 dklen=32\nphrase: correct horse battery staple"
+```
+
+so it is a full byte-for-byte comparison, not weakened to a length or prefix
+test. The file's other five assertions are untouched and reach `str`'s inherent
+methods through the same `Deref` — the implementer's comment says so and the
+diff confirms only the one line changed.
+
+**(b) A `format!` of the phrase.** The `format!("hashlock v1\n{method}\nphrase:
+{phrase}")` is **removed**; the surviving `format!` renders the method line from
+the three constants only and never sees the phrase. No `format!`, `to_string`,
+`println!` or other unprotected materialisation of the phrase remains in the
+function.
+
+**(c) A behaviour change to the seven corpus rows.** Recomputed all seven
+independently at the new tip from `HASHLOCK_SALT` / `HASHLOCK_ITERATIONS` /
+`HASHLOCK_DKLEN` and §8.6's template, then compared the corpus, the
+recomputation and the implementation three ways:
+
+```
+REV delta: 7 rows byte-identical; capacity==len on every shape
+test the_seven_rows_are_byte_identical_to_the_independent_recomputation ... ok
+test one_allocation_sized_exactly_so_no_push_can_realloc ... ok
+test the_return_type_is_zeroizing_string ... ok
+```
+
+The output string is `HEAD + method + LABEL + phrase` = `"hashlock v1\n"` +
+method + `"\nphrase: "` + phrase, which is character-for-character the string the
+removed `format!` produced. Byte counts 122/63/194/135/119/102/109 unchanged.
+
+**Gates at `1a4f4aa8`**, all re-run in the review worktree under the repo's
+`rust-toolchain.toml` pin (`1.85.0-x86_64-unknown-linux-gnu`, honoured by rustup
+in the worktree):
+
+| gate | result |
+| --- | --- |
+| `cargo build -p ms-codec --locked` | exit 0 |
+| `cargo fmt --all -- --check` | exit 0 |
+| `cargo clippy --all-targets --locked -- -D warnings` | exit 0, zero warnings |
+| `cargo nextest run --locked` | **562 tests run: 562 passed, 11 skipped** — unchanged from `ca715165` |
+
+The test count is unchanged, which is the right outcome: the fold changed a
+signature and an assertion, and added no test.
+
+### N-3 (new, Nit) — the no-realloc property has no regression guard
+
+The fold's most substantive claim — the buffer is sized so no `push_str` can
+reallocate and abandon an unwiped copy of a phrase prefix — is **true today and
+guarded by nothing that ships**. Measured: shortening `with_capacity` by
+`phrase.len()` makes the buffer reallocate, and
+
+```
+one_allocation_sized_exactly_so_no_push_can_realloc ... FAILED
+  capacity 188 != len 122 -- the buffer was resized, so an unwiped copy of a
+  phrase prefix was abandoned
+```
+
+fires only in **my** probe, which is removed. The shipped suite does not notice:
+
+```
+--- and does the SHIPPED corpus test notice? (it should NOT: content is unchanged) ---
+test result: ok. 3 passed; 0 failed
+```
+
+The content is identical either way, so `hashlock_qr_text.rs` cannot see it. A
+later edit to the method line or the labels that forgets the capacity arithmetic
+would reintroduce the exact defect M-2 was raised about, silently and green.
+
+A four-line `assert_eq!(got.capacity(), got.len())` in
+`the_worst_case_is_194_bytes` would close it. **Not blocking**: this is a
+secret-handling property, which by the operator ruling of 2026-08-27 is never
+Critical and never Important — logged for future optimization, exactly as that
+ruling directs. Recording it because the ruling is a severity rule, not a
+discovery rule, and because the fold's own doc comment asserts the property in
+prose that no test defends.
+
+### Delta counts
+
+| severity | count |
+| --- | --- |
+| Critical | **0** |
+| Important | **0** |
+| Minor | 0 |
+| Nit | 1 (N-3, no regression guard on the no-realloc property) |
+
+**M-1 and M-2 are CLOSED.** The fold does what it claims, changes nothing about
+the seven rows or the corpus sha, weakens no assertion, and leaves every gate
+green. Combined with the base review, the branch stands at **0 Critical / 0
+Important** and nothing blocks the publish of `ms-codec` 0.9.0 at
+`1a4f4aa8a3b4b29e5e6f7a479b4c57bc0e073fea`.
+
+*Delta review written as the reviewer's final action. Read-only on the branch;
+nothing committed; the review worktree `h6-a-review2` and its target dir removed;
+the implementer's branch worktree left clean at `1a4f4aa8`.*
