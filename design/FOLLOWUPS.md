@@ -16191,6 +16191,32 @@ Filed 2026-09-05 by the controller at the H6 pre-publish gate; B (Tasks 2-3) imp
 
 Filed 2026-09-05 by the controller from the H6 group-C gate re-run on fork `hashlock-h6` at `872ba06c` (`.tmp/h6-ctl-c-check/vet.txt`); measured red at `fb0dd04` too, so not C's.
 
+
+**CLOSED 2026-09-06 (fork `main`, merge of `f494-probe`), and THE SUGGESTED FIX
+WAS WRONG.** This entry told a future implementer to raise the `go` directive to
+1.26. Measured on a probe worktree before doing it:
+
+```
+$ sed -i 's/^go 1.25.10$/go 1.26.0/' go.mod
+$ nix develop -c tinygo build -size short -target pico-plus2 ... ./cmd/controller
+cannot compile with Go toolchain version go1.26
+(TinyGo was built using toolchain version go1.25.10)
+```
+
+TinyGo 0.41.1 in this flake is built against go1.25.10 and the directive is
+exactly what it checks, so that remedy would have made the FIRMWARE
+unbuildable — a device-breaking change filed as hygiene. The gap closes when the
+pinned TinyGo moves, not before; until then the ten `testing.ArtifactDir` tests
+run because the HOST toolchain is 1.26, which is legal by luck rather than by
+declaration and is worth knowing rather than worth breaking the build to fix.
+
+What WAS done: the 33 `bezier.Point` unkeyed-field warnings (all in
+`bspline/bspline_test.go`) are keyed, leaving ten, and
+`mnemonic-engrave/scripts/fork-vet-gate.sh` pins that shape — it runs vet,
+reports the known count and exits non-zero on anything else, so the next real
+finding cannot hide in noise nobody reads. Proven both ways: exit 0 on the
+merged tree, exit 1 on a probe finding (`fmt.Sprintf format %d has arg of wrong
+type string`). Gates: every non-gui package ok; gui 1290 across 24 shards.
 ### F-495 — `no-verb-emits-a-phrase-record`: H6 §3.1 gives the `phrase:` wire form a Rust constructor and §3.2 a `--pack-preimage` flag to admit it, but NO CLI verb writes one — the operator hand-builds the hex every time (owning phase: **the next `me`/`ms` cycle after H6**) `#hashlock` `#seedhammer` `#me` `#records`
 
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (`IMPLEMENTATION_PLAN_hashlock_H6_preimage_plates.md`). **A wire form with no writer is worth its own follow-up.** §3.1 lands `phrase_record(method, phrase) -> String` and its parser, §4.2 classifies the record on the device, §5.1 draws it as `phrase record N (derive to see the digest)` and H6 Task 10 derives it on pick — an entire consumption chain over a record nothing in the constellation PRODUCES. §3.3's orphan warning (the payload holds a preimage and no matching `hash:` record) is therefore a mitigation for hand-assembly errors rather than a fix for them.
