@@ -464,3 +464,156 @@ Two acceptance gates remain outside code review and are unaffected by the above:
 8 (the 53-module scale-2 QR must be cut and scanned before the QR toggle is relied on)
 and §12 items 1/3 (the phone read-back and the NFC tap). The acceptance doc states both
 honestly.
+
+---
+
+## Delta review — fold `eb914a62`
+
+**Scope: the two questions asked, and nothing else.** Reviewed
+`git diff e089a539..eb914a62` — one commit, three hunks: a `strings` import, one
+`strings.TrimSpace` in `hashlockPlatesRecords`, and
+`TestHashlockPlatesListsAPaddedPreimageRecordLikeTheDoorDoes`. Re-created a detached
+worktree at `eb914a62` (`/scratch/code/shibboleth/.tmp/seedhammer-h6-delta`), ran
+everything below in it, reverted every mutation, and removed it. Controller-measured
+facts (the new test RED before / GREEN after, gofmt, 1288 tests over 24 shards) taken as
+given and not re-derived.
+
+### (1) Does the fold fix I-1 as I reproduced it? — **YES**
+
+The same reproduction, at the new tip, through the real binaries. Repacked with the same
+`me` build:
+
+```sh
+$ printf 'hash:3cf5d421…b70a4c12\nms10hashsqw46h2at4w46…kzv2ncy60u7z9c \n' > recs.txt   # note the trailing space
+$ me sysw pack --pack-preimage --no-passphrase --in recs.txt --out ws.bin   # exit 0
+me: WARNING — record 1 … is a preimage whose digest 9a2db2e2..821af885 matches no `hash:` record …
+```
+
+Opened by the firmware's own `sysw.Open` and driven through the three predicates
+(temporary test in `gui/`, since removed):
+
+```
+record "ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c " class=13
+door offers=true count=1  hashlockPlatesRows=1
+row = "preimage 1  9a2db2e2..821af885"  digest=9a2db2e23f1504cd056606553ac049c5e718e8f9ce9233876df1a7a1821af885
+```
+
+The digest the flow lists is the digest `me` warned about. Against `e089a539`'s
+`hashlockPlatesRows=0`, the route is now takeable.
+
+**Six padding shapes, not the three the fold's test carries** — I added the two my
+original probe used beyond the test's list:
+
+| record | class | door count | `hashlockPlatesRecords` | `Which hash?` band 2 |
+| --- | --- | --- | --- | --- |
+| bare | 13 | 1 | **1** | 1 |
+| trailing space | 13 | 1 | **1** | 1 |
+| leading space | 13 | 1 | **1** | 1 |
+| trailing CR | 13 | 1 | **1** | 1 |
+| leading TAB *(not in the fold's test)* | 13 | 1 | **1** | 1 |
+| `"  " + plate + "  "` *(not in the fold's test)* | 13 | 1 | **1** | 1 |
+
+Every one derives `9a2db2e2…821af885` and yields a locator whose first row is
+`hash  …`. **And the padding never reaches steel:** `composerBuildHashlockPlate`
+re-encodes X through `codex32.EncodeMS1Preimage`, so all four cases cut the byte-identical
+canonical string `ms10hashsqw46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46h2at4w46kzv2ncy60u7z9c`.
+
+**The fold's test discriminates.** Dropping the `strings.TrimSpace` again:
+
+```
+composer_hashlock_plates_test.go:507: trailing space: the Hashlock plates list holds 0 records but the door counts 1 -- the door offers a route the flow refuses
+composer_hashlock_plates_test.go:507: leading space: …
+composer_hashlock_plates_test.go:507: trailing CR: …
+--- FAIL: TestHashlockPlatesListsAPaddedPreimageRecordLikeTheDoorDoes
+```
+
+Exactly the three padded rows fail and the `bare` row does not, so the control row is
+doing its job rather than passing along with the others. Its fixture is
+`composerSessionWith`, which runs the production `syswSession.load` — the class is
+classified, not hand-set, which is stronger than the hand-built `syswRecord` my own probe
+used. Its `preimages != 1` guard is a `Fatalf`, so a fixture that stopped classifying
+would stop the test rather than pass it vacuously.
+
+**I-1 is CLOSED.**
+
+### (2) Does the delta introduce a new defect? — **NO.** But the question it asks surfaces one remaining instance of the same class, which the fold did not introduce and did not fix
+
+**The change itself is inert beyond its purpose.** `strings.TrimSpace` here can only widen
+what `codex32.New` accepts, and the record has already passed `sysw.Classify` →
+`isPreimagePlateRecord` → `codex32.IsPreimagePlate` **on the trimmed string**, so the fold
+cannot admit anything the classifier did not already call `ClassPreimage`. It removes a
+disagreement; it creates no new admission. `strings` is used, `gofmt -l` over the changed
+files is empty, and `go test ./gui/` at the tip with my probes removed is `ok` (169.3 s).
+
+**Every other reader of a record body in the two hashlock flows, enumerated and
+measured.** `grep -rn "\.body" gui/*.go` (non-test) gives five payload readers:
+
+| reader | reads | verdict |
+| --- | --- | --- |
+| `composer_hash.go:216` `composerPayloadPreimages` | `codex32.New(strings.TrimSpace(r.body))` | agrees ✔ |
+| `composer_hashlock_plates.go:62` `hashlockPlatesRecords` (preimage) | `codex32.New(strings.TrimSpace(r.body))` | **the fold** ✔ |
+| `composer_hash.go:66` band 1 / `:240` band 3 / `composer_state.go:142` / `composer_hashlock_plates.go:75` | `sysw.ParseHashRecord` / `ParsePhraseRecord` / `ParseNowRecord` on the raw body | **safe, MEASURED:** these are PREFIX-gated, and a padded `hash:` / `now:` / `phrase:` record classifies `ClassUnknown` on both sides, so no reader can ever be handed one with a class. Every padded case measured `class=0` against `11 / 12 / 14` bare |
+| `composer_hashlock_plates.go:166-167` `hashlockPlatesStub` | `codex32.ValidMD(r.body)` and `chunks = append(chunks, r.body)`, **untrimmed** | **DISAGREES — M-3 below** |
+
+#### M-3 — `hashlockPlatesStub` reads md1 record bodies untrimmed, so a padded md1 silently costs the plate its `mk1 stub` locator row
+
+Same shape as I-1, one row down the same function file, **present in the original H6 diff
+(Task 10) and untouched by the fold** — so it is a finding of this delta review, not a
+regression from it. Measured at `eb914a62` over the shipped stub fixture
+(`composerH6PlateState` → `composerTemplateChunksFor`, two md1 chunks):
+
+```
+bare            ClassMDMK=2 ValidMD(raw)=2 stubRow="mk1 stub (template): 4f6a5e39"
+trailing space  ClassMDMK=2 ValidMD(raw)=0 stubRow=""
+leading space   ClassMDMK=2 ValidMD(raw)=0 stubRow=""
+trailing CR     ClassMDMK=2 ValidMD(raw)=0 stubRow=""
+```
+
+`sysw.Classify` trims, so the md1 records are `ClassMDMK` and the door counts them;
+`codex32.ValidMD(r.body)` does not, so `hashlockPlatesStub` collects zero chunks, returns
+`("", false)`, and §6.3's `mk1 stub` row is omitted from the plate.
+
+**Minor, and it does not gate**, for three reasons that I checked rather than assumed:
+the row is CONDITIONAL by design (§6.3 omits it when no md1 is in the payload); the
+failure direction is omission, which the function's own comment calls the safe one
+(*"a wrong stub on a plate is worse than none, because it names a policy the plate does
+not unlock"*); and the row that must never be blank — `hash  <first8>..<last8>` — is
+unaffected, as is `matches hash <i> in the payload`. Nothing is mis-derived and no plate
+is wrong; one optional locator line goes missing on a payload whose md1 arrived with
+stray whitespace.
+
+**Fix, if taken:** `codex32.ValidMD(strings.TrimSpace(r.body))` and append the trimmed
+body, matching the two readers beside it — and a row in the existing
+`TestHashlockPlatesLocatorAlwaysCarriesTheHashRow` subtest *"an md1 record supplies the
+stub"* with a padded chunk. **Recommended as a follow-up beside F-503..F-505, not as a
+gate.** `composerHashlockLocator` — the composer-native path — is unaffected: it takes
+`template, keyed` from the composition, not from payload records.
+
+### Verdict
+
+| | |
+| --- | --- |
+| (1) does the fold fix I-1 | **YES**, reproduced end to end at `eb914a62`, six padding shapes, digest and cut string both canonical |
+| (2) does the delta introduce a new defect | **NO.** One pre-existing instance of the same class found while answering it: **M-3**, Minor, non-gating |
+
+### Closing — the whole stage
+
+| severity | count | disposition |
+| --- | --- | --- |
+| **Critical** | **0** | — |
+| **Important** | **0** | I-1 folded at `eb914a62` and verified closed |
+| Minor | 2 (M-1, **M-3**) | follow-ups; M-1 is F-503, M-3 is new |
+| Nit | 2 (N-1, N-2) | F-504 / F-505 |
+
+**GREEN (0 Critical / 0 Important).** The lens this review was dispatched with — *"can you
+construct an input for which the plate and the host disagree, or a hashlock plate reaches
+steel without its band or on a seed layout"* — is closed: 22 (phrase, method) pairs
+identical on both sides, the whole ms1 string path agreeing, 26 mutations of which 25 red
+on the guard they name and the 26th an equivalent mutant, four walk runs
+(PASS / REJECTED / REJECTED / PASS), and now the one route-availability defect it found
+fixed and re-verified.
+
+**Two acceptance gates remain open by design and are unchanged by this fold**: §12 item 8
+(the 53-module scale-2 QR must be cut and scanned before the QR toggle is relied on — it
+fails OPEN, and the phrase form is complete without it) and §12 items 1/3 (the phone
+read-back and the NFC tap). Nothing in this review substitutes for either.
