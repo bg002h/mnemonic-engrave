@@ -16564,6 +16564,26 @@ Nothing is wrong with the card; what is missing is the sentence telling an opera
 expand it, and which Core versions need that. The restore path is where a person meets this,
 and the manual's restore chapter says nothing about it today.
 
+
+**RESOLVED AGAINST CURRENT CORE 2026-09-12 — and the entry as filed was too broad.**
+Downloaded Bitcoin Core **31.1** (`bitcoin-31.1-x86_64-linux-gnu.tar.gz`, sha256
+`b80d9c3e…03f9e`, verified against the published `SHA256SUMS`) and put the SAME descriptor
+to it on a throwaway regtest datadir. It takes the multipath form directly and expands it
+itself:
+
+```
+$ bitcoin-cli getdescriptorinfo "wsh(or_i(pkh([…]tpub…/<0;1>/*),…))"
+  solvable : True          checksum : 4m0t3nc3
+  multipath_expansion: 2 descriptors
+```
+
+So nothing about the card or the `<0;1>` spelling is wrong, and no splitting is owed. What
+is true is narrower: **a Core older than BIP-389 support refuses it**, and the box's own
+node is such a build (Bitcoin Satellite v0.2.4, Core v25 vintage). The documentation item
+therefore shrinks from "expand the multipath" to "these descriptors need Core with multipath
+support; older nodes want the branches separately", which is a version note rather than a
+restore step. Core 31.1 binaries deleted after the test, as the operator asked.
+
 ### F-509 — `taproot-miniscript-policies-cannot-be-imported-into-a-core-of-this-vintage`: the composer builds `tr()` policies whose leaves are miniscript, and Core answers `Miniscript expressions can only be used in wsh` — so a device-built taproot timelock or hashlock policy is un-importable there, while its wsh twin imports and funds (repo: **seedhammer fork** docs + **mnemonic-toolkit** manual; owning phase: **the restore-documentation pass, with F-508**) `#composer` `#taproot` `#core` `#docs`
 
 Filed 2026-09-12 from the same experiment. Measured, same node, same three keys, receive
@@ -16579,6 +16599,28 @@ The device is not wrong — tapscript miniscript is legal and later Core version
 but an operator choosing Taproot in the composer gets a policy their node may refuse, and
 learns it only at import. Worth a compatibility line in the manual beside F-508's, naming
 the wrapper, the Core version that accepts it, and the wsh fallback.
+
+
+**RESOLVED AGAINST CURRENT CORE 2026-09-12 — NOT a defect, a version floor.** Same Core
+31.1, same three keys, same taproot policy the composer builds. It parses, imports into a
+watch-only wallet, derives a bech32m address, and the wallet tracks a funded output:
+
+```
+$ importdescriptors '[{"desc":"tr([…]tpub…/<0;1>/*,{and_v(v:pk(…),older(144)),
+                        and_v(v:pk(…),and_v(v:sha256(b867db87…),after(800000)))})#l9l335vn",…}]'
+[ { "success": true } ]
+$ getnewaddress "" bech32m
+bcrt1pu9hj4pwhxh680udkdq2muwhxpcw2z3dduw5qqfwtz34dceecrfrqfq52tv
+$ generatetoaddress 101 <that address>; getbalances
+trusted: 50.0 | immature: 5000.0        # the wallet sees the output
+```
+
+The `Miniscript expressions can only be used in wsh` refusal belongs to the v25-vintage
+build alone; tapscript miniscript landed in Core after it. **The device is not emitting
+anything a current node rejects** — so what survives is the same version note as F-508 and
+nothing else. One incidental measurement worth keeping: `getnewaddress` on a `tr` wallet
+must be asked for `bech32m`, because the default address type yields *No bech32 addresses
+available* and reads like an import failure when it is not.
 
 ### F-510 — `shTargets-reports-one-region-per-keyboard-row-so-walks-must-hardcode-key-coordinates`: on any `Keyboard` screen the emulator's `shTargets()` returns ONE region per row, all at the row's centre, so a walk cannot address a key by index and has to compute or measure x itself (repo: **seedhammer fork**; owning phase: **the next walk-harness pass**) `#emulator` `#walks` `#tests`
 
