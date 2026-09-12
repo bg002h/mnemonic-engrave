@@ -16506,3 +16506,96 @@ false claim is rewritten in the same fork commit.
 uppercase string still reads *"whose 4-character id is not `hash`"* — measured
 at me `f503` after this fold — which is now at odds with a device that reads the
 id in either case. That is F-504, and it is the next item.
+
+### F-507 — `composer-hashlocks-are-sha256-only-while-md1-carries-four-hash-fragments`: the Wallet Policy composer's spend path holds ONE 32-byte hash and lowers it to `sha256()` unconditionally, so `hash160()`, `ripemd160()` and `hash256()` policies cannot be built on the device or by `md compose` — while the md1 WIRE FORMAT carries all four and round-trips them today (repo: **seedhammer fork** + **descriptor-mnemonic**; owning phase: **the next composer cycle**) `#composer` `#md` `#miniscript`
+
+Filed 2026-09-12 from the operator's timelock+hashlock experiment, and filed only after the
+controller's first attribution was measured WRONG. The claim made in conversation was that a
+20-byte image "has nowhere to live in the wire format". It has:
+
+```
+md-codec tag.rs   0x1D sha256 (32B) | 0x1E hash160 (20B) | 0x1F hash256 (32B) | 0x20 ripemd160 (20B)
+                  0x21 RawPkH (20B) — a key hash, not a hashlock
+```
+
+and the round trip runs:
+
+```
+$ md encode "wsh(and_v(v:pkh(@0/<0;1>/*),ripemd160(5e708aa85ae8b0d080837c50bd63634d584edc00)))"
+md1yqpqqxpye5hqtecg42z6azcdpqyr03gt6cmrf4vyahqqu784qnpyrj45g
+$ md decode md1yqpqq…rj45g
+wsh(and_v(v:pkh(@0/<0;1>/*),ripemd160(5e708aa85ae8b0d080837c50bd63634d584edc00)))
+```
+
+So the gap is in the COMPOSER, one layer above the codec: `md::SpendPath.Hash` is
+`*[32]byte` (fork `md/compose.go`) and `pathBody` writes `node{tag: tagSha256}` with no
+alternative. A ripemd160 policy can be encoded, engraved and restored from an md1 card; it
+simply cannot be COMPOSED.
+
+**The four tags are four functions, not two spellings of two.** `ripemd160` emits
+`OP_RIPEMD160` and `hash160` emits `OP_HASH160`, which is RIPEMD-160 of SHA-256 — the same
+20-byte width and a different preimage relation, so for one image `h` a preimage satisfying
+one will not satisfy the other. `sha256`/`hash256` pair off the same way at 32 bytes. The
+shared `Hash160Body([u8; 20])` is storage, and the tag is the semantics.
+
+What a fix costs, and why it is worth filing rather than doing: the hash field widens to a
+20-or-32-byte value plus a fragment choice, the lowering gains three arms, the §8i rule
+screen ("the hash must be SHA-256 of a 32-byte value") becomes fragment-dependent, and the
+hashlock phrase route — which derives `sha256(sha256(phrase))` — needs an answer for what a
+phrase means under `ripemd160`. That is a composer design question, not a patch. Narrows
+[[F-150]] item 4, which predates the composer and is now wrong in the other direction: `tr`,
+`after`, `older` and `sha256` all ship.
+
+### F-508 — `the-device-emits-multipath-descriptors-bitcoin-core-v25-refuses`: md1 templates carry `<0;1>` and a Core of this vintage rejects the descriptor outright — `tr(): Key path value '<0;1>' is not a valid uint32` — so a restored policy cannot be imported until it is split into receive and change (repo: **descriptor-mnemonic** + **mnemonic-toolkit** docs; owning phase: **the restore-documentation pass**) `#md` `#core` `#restore` `#docs`
+
+Filed 2026-09-12, measured against the node on this box (`bitcoin-cli -version` reports
+Bitcoin Core RPC client v25.0.0; the daemon is Bitcoin Satellite v0.2.4). BIP-389 multipath
+is a later Core feature, and until a user is on a build that has it, EVERY md1-restored
+descriptor needs the `<0;1>` expanded by hand:
+
+```
+$ bitcoin-cli getdescriptorinfo "wsh(or_i(pkh([…]tpub…/<0;1>/*),…))"
+error code: -5 ... 'A function is needed within P2WSH'        # wsh, with <0;1> present
+$ sed 's|<0;1>|0|' …                                          # receive branch only
+{ "descriptor": "wsh(or_i(pkh(…/0/*),…))#70n4e9l8", "issolvable": true }
+```
+
+Nothing is wrong with the card; what is missing is the sentence telling an operator to
+expand it, and which Core versions need that. The restore path is where a person meets this,
+and the manual's restore chapter says nothing about it today.
+
+### F-509 — `taproot-miniscript-policies-cannot-be-imported-into-a-core-of-this-vintage`: the composer builds `tr()` policies whose leaves are miniscript, and Core answers `Miniscript expressions can only be used in wsh` — so a device-built taproot timelock or hashlock policy is un-importable there, while its wsh twin imports and funds (repo: **seedhammer fork** docs + **mnemonic-toolkit** manual; owning phase: **the restore-documentation pass, with F-508**) `#composer` `#taproot` `#core` `#docs`
+
+Filed 2026-09-12 from the same experiment. Measured, same node, same three keys, receive
+branch expanded:
+
+```
+wsh  → { "issolvable": true, "checksum": "70n4e9l8" }   imported, 101 blocks mined to it,
+                                                        wallet sees the output
+tr   → error code: -5, "Miniscript expressions can only be used in wsh"
+```
+
+The device is not wrong — tapscript miniscript is legal and later Core versions take it —
+but an operator choosing Taproot in the composer gets a policy their node may refuse, and
+learns it only at import. Worth a compatibility line in the manual beside F-508's, naming
+the wrapper, the Core version that accepts it, and the wsh fallback.
+
+### F-510 — `shTargets-reports-one-region-per-keyboard-row-so-walks-must-hardcode-key-coordinates`: on any `Keyboard` screen the emulator's `shTargets()` returns ONE region per row, all at the row's centre, so a walk cannot address a key by index and has to compute or measure x itself (repo: **seedhammer fork**; owning phase: **the next walk-harness pass**) `#emulator` `#walks` `#tests`
+
+Filed 2026-09-12 from writing `cmd/emu/walk_timelock_hashlock.js`. Measured on the composer's
+digit pad (`composerDigitKeys = "123\n456\n789\n0"`):
+
+```
+shTargets() → 4 regions, all cx=240, cy = 152 / 198 / 244 / 290
+tapping them types  2, 5, 8, <nothing>      — the middle column, and a gap
+```
+
+`chooseRow(i)`, the idiom every other walk uses, therefore types a different digit than it
+names: an early draft of that walk typed "20" for "144" and only the echo check caught it.
+The keys are reachable by coordinate — rows 0-2 are centred on x=239 at a 34-pixel pitch —
+except the last row, where `0` sits at 239 and backspace at 273 rather than being centred as
+a two-key row, which had to be found by probing x across it.
+
+Either the drawer should record a region per KEY, or `shTargets` should say that a keyboard
+is not a list. Until then any walk that types is carrying hardcoded geometry, and the
+hashlock walk's `ppKeyPoint` is the same workaround written twice.
