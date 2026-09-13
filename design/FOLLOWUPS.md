@@ -17139,3 +17139,37 @@ fails loudly rather than silently losing the coverage — that is the guard, and
 it is worth keeping.
 
 Owning phase: none (cross-repo; blocks nothing until someone re-vendors).
+
+### F-530 — the `expandOK` address route shows addresses without the duplicate-key warning
+
+Filed 2026-09-13 from the F-514 review's C-1, which named two surfaces. One is
+fixed at fork `22bace1`; this is the other, left open deliberately rather than
+half-done.
+
+`descriptorFlow` → `DescriptorScreen.Confirm` → `descriptorAddressFlow`
+(`gui/gui.go`) lists derived addresses and carries no duplicate-key warning. It
+has **three callers**, and they do not share an input:
+
+| caller | has md1 chunks? |
+| --- | --- |
+| `gatheredDescriptorFlow` (`md1_gather.go:175`) | yes |
+| `walletPolicyFlow` (`wallet_policy.go:122`) | yes |
+| a SCANNED descriptor (`gui.go:2599`) | **no** |
+
+That third one is why this is not a one-line fix. The predicate shipped for
+F-514 reads md1 chunks; a scanned descriptor never had any. Covering the route
+properly needs the same rule expressed over a `*bip380.Descriptor` — and that
+version would be the more valuable one, because it also catches a descriptor an
+operator pasted in from somewhere else.
+
+Threading chunks into the two callers that have them would close two thirds of
+it and leave the third silent under a test suite that then looks complete, which
+is the worse outcome: a partial guard is how the third surface stayed silent
+through the first round.
+
+**Severity.** The same as F-514's: the device shows a fundable mainnet address
+for a descriptor Bitcoin Core refuses to import, with nothing said. Not urgent
+only because the two consent surfaces an operator passes on the way to engraving
+now do warn.
+
+Owning phase: none (fork, `gui/`).
