@@ -16723,14 +16723,27 @@ So one repo holds three different answers for the same shape:
 | `md decode` | warns: *"forbidden by BIP-388"*, continues |
 | `md address` | hard refusal, exit non-zero |
 
-Not a funds-safety defect: refusing to derive is the safe direction, and the
-addresses the other two produce are right (three-way confirmed). It is an
-inconsistency that will read as a bug to anyone who meets it, because the
-corpus ships the answer that the CLI declines to compute. Decide which of the
-three behaviours is intended and make the other two match — the ruling in
-`key-reuse-is-bip-forbidden-not-invalid` says refuse as *unsupported*, never
-*invalid*, which `md address` already does correctly; the question is whether
-the generator should be writing those vectors at all.
+**Bitcoin Core splits the trio, so they are not one class and must not be ruled
+on together.** Established by the differential driver and reproduced
+independently by the controller on a throwaway regtest datadir, Core 31.1
+`getdescriptorinfo`, keys version-swapped to `tpub` and the stale BIP-380
+checksum stripped:
+
+| vector | Core 31.1 | reading |
+| --- | --- | --- |
+| `keyed_tr_multi_a` | **accepts** | `md address`'s refusal is a guard |
+| `keyed_tr_sortedmulti_a` | **accepts** | `md address`'s refusal is a guard |
+| `keyed_wsh_timelock_hashlock` | **refuses**: `is not sane: contains duplicate public keys` | the refusal has independent support |
+
+The mechanism: a taproot internal key sits **outside** the miniscript, so
+`tr(K,multi_a(2,K,K2))` holds no duplicate inside any one expression. In the
+`wsh` vector `@1` really is repeated within **one** miniscript, across both arms
+of the `or_i`.
+
+So `md address` is right to refuse one of the three and over-broad on the other
+two. The fix is not "pick one of the three behaviours" — it is to make the guard
+ask Core's question (duplicate keys *within a miniscript expression*) rather than
+BIP-388's disjointness question, which is about a different layer.
 
 Owning phase: none (host-side, `descriptor-mnemonic`).
 
@@ -16750,9 +16763,42 @@ device is the screen they read immediately before engraving a plate. A card
 minted from such a policy is a card whose shape the standard forbids, and the
 only place that fact is stated is a CLI they may never run.
 
-Not proposed as a refusal: refusing on-device would strand a card that is
-already engraved, which is worse than telling the operator nothing. A warning
-line on the policy screen is the right size of answer. Journey-walk
-classification: **warning**.
+**Upgraded after Core adjudicated it.** For `keyed_wsh_timelock_hashlock` this
+is not a cosmetic gap. Bitcoin Core 31.1 refuses the descriptor outright —
+`is not sane: contains duplicate public keys`, reproduced independently by the
+controller on a throwaway regtest datadir — while the device derives a
+**fundable receive address** for it and shows that address with no warning at
+all. An operator can be shown the address, engrave the plate, send to it, and
+then find that a coordinator running Core will not accept the descriptor the
+funds are locked to.
+
+The two taproot vectors carry no such risk: Core accepts both, and the dispute
+there is purely at the BIP-388 wallet-policy layer.
+
+Still not proposed as an on-device refusal — refusing would strand a card that
+is already engraved, which is worse than telling the operator nothing — but the
+warning is no longer a nicety. It should name the condition Core names
+(duplicate keys inside one miniscript), because that is the one that predicts a
+rejected descriptor rather than a style violation. Journey-walk classification:
+**warning**, and the strongest one in the queue.
 
 Owning phase: none yet (fork, `gui/`).
+
+### F-515 — `the-64-chunk-wire-cap-is-not-implied-by-ComposeMaxSlots`
+
+Filed 2026-09-13 from the differential driver's 1000-policy run: 10 of the 80
+`md`-side refusals were policies that hit the **64-chunk wire cap**, a bound the
+composer's own `ComposeMaxSlots = 32` does not imply and does not mention.
+
+A policy inside every documented composer limit can still be unmintable, and
+the operator learns this only at `md encode`, after choosing the keys and the
+shape. The two bounds live in different layers and neither cites the other, so
+nothing in the composer's admission rules predicts which of the shapes it
+admits will survive encoding.
+
+At minimum the composer's limits should say that passing them is necessary and
+not sufficient. Better: admission should reject at compose time what cannot be
+encoded, so a refusal arrives while the operator is still choosing rather than
+after they have finished.
+
+Owning phase: none (host-side, `descriptor-mnemonic`).
