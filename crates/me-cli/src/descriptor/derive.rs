@@ -45,7 +45,15 @@ use super::cascade::{Derivation, Key, Multi, Parsed, Script};
 
 /// One key's path to ITS receive address 0, or `None` for a use-site outside
 /// §4.7 conjunct 7's closed set (unreachable after admission).
-fn receive_path(k: &Key) -> Option<Vec<u32>> {
+///
+/// `pub(crate)` so that conjunct 8(b) compares use sites by their MEANING
+/// rather than by the spelling of `children`. That check read
+/// `a.children == b.children`, and an absent path is the device's `<0;1>/*` --
+/// stated four lines below, in this function, in the same crate -- so
+/// `wsh(sortedmulti(2,A,A/<0;1>/*,B))` was admitted as two distinct keys while
+/// deriving one key twice. Sharing THIS function rather than restating the
+/// normalisation is the point: a second copy is what drifted (F-530 review C-2).
+pub(crate) fn receive_path(k: &Key) -> Option<Vec<u32>> {
     use Derivation::*;
     let plain = Wildcard { hardened: false };
     Some(match k.children.as_slice() {

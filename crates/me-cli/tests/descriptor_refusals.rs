@@ -552,16 +552,30 @@ fn row_key_identity() {
 /// the file describes.
 #[test]
 fn row_key_identity_duplicate() {
-    assert_row(
-        "key-identity-duplicate",
-        &vector_input("gate/duplicate-key-same-use-site"),
-        &[],
-        3,
-        "keys 0 and 1 are the same key at the same derivation -- a threshold that needs \
-         the same key twice is not the multisig this file describes, and it lets one \
-         holder produce two of the required signatures. Remove the duplicate line, or \
-         supply the missing cosigner's key.",
-    );
+    // BOTH SPELLINGS OF ONE WALLET, in one test because the file's own gate
+    // (the_file_carries_one_named_test_per_section_6_row) requires exactly one
+    // named test per §6 row, and these are the same row -- the same wallet,
+    // written two ways.
+    //
+    // The implicit row is F-530 review C-2. `derive::receive_path` states in
+    // this crate that an absent path IS the device's `<0;1>/*`, while conjunct
+    // 8(b) compared `a.children == b.children` -- so `me` admitted the second
+    // form as a two-key wallet and derived one key at both seats.
+    for vector in [
+        "gate/duplicate-key-same-use-site",
+        "gate/duplicate-key-implicit-use-site",
+    ] {
+        assert_row(
+            "key-identity-duplicate",
+            &vector_input(vector),
+            &[],
+            3,
+            "keys 0 and 1 are the same key at the same derivation -- a threshold that needs \
+             the same key twice is not the multisig this file describes, and it lets one \
+             holder produce two of the required signatures. Remove the duplicate line, or \
+             supply the missing cosigner's key.",
+        );
+    }
 }
 
 #[test]

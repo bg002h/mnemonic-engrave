@@ -289,11 +289,35 @@ fn conjunct_8_key_identity(d: &Parsed) -> Result<(), Refusal> {
         }
     }
     // (b) No two slots carry the same (xpub, use-site path).
+    //
+    // COMPARED BY MEANING, NOT SPELLING (F-530 review C-2). This read
+    // `a.children == b.children`, and `derive::receive_path` in this same crate
+    // states that an absent path IS `<0;1>/*` -- so `A` and `A/<0;1>/*` are one
+    // key written two ways, and `wsh(sortedmulti(2,A,A/<0;1>/*,B))` was admitted
+    // as a two-key wallet while deriving one key at two seats. Reusing
+    // receive_path rather than restating its normalisation here is deliberate:
+    // the defect WAS a second copy of a rule.
+    //
+    // RECEIVE ADDRESS 0 IS THE COMPARISON, because that is the first address
+    // anyone funds and the one `address_0` prints. Two use sites that agree
+    // there hold the same key where it matters, whatever they do further along
+    // the chain.
+    //
+    // A `None` path is a use-site conjunct 7 refuses; it is not evidence of
+    // sameness, so both must resolve before this fires.
     for i in 0..d.keys.len() {
         for j in (i + 1)..d.keys.len() {
             let (a, b) = (&d.keys[i], &d.keys[j]);
-            if a.identity() == b.identity() && a.children == b.children {
-                return Err(refusal::key_identity_duplicate(i, j));
+            if a.identity() != b.identity() {
+                continue;
+            }
+            if let (Some(pa), Some(pb)) = (
+                super::derive::receive_path(a),
+                super::derive::receive_path(b),
+            ) {
+                if pa == pb {
+                    return Err(refusal::key_identity_duplicate(i, j));
+                }
             }
         }
     }

@@ -43,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "e7a4160ce064a6cb7ca31dc530e079c861cf2c8a075d75f793ef0d935f583758";
+    "6352aa45592d0f328c2293eda146327f6ebe60ecba08d3ae833f872c2d9e4323";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -67,7 +67,7 @@ const MANIFEST: &[(&str, usize)] = &[
     ("gate", 37),
 ];
 /// The minima sum to 89 tag-slots.
-const TAG_SLOTS: usize = 89;
+const TAG_SLOTS: usize = 90;
 /// 89 − 17 overlap slots = the physical-row floor.
 const ROW_FLOOR: usize = 72;
 /// The fifteen §4.5 rows carry `gate` as a second tag …
@@ -133,11 +133,18 @@ struct Pop {
     /// the same value — §5.3(a′)'s materialisation claim at the address layer.
     both_routes_address_0: usize,
 }
+// +1 ON EVERY COUNT THE NEW ROW TOUCHES (F-530 review C-2). The row is
+// gate/duplicate-key-implicit-use-site: the same wallet as
+// duplicate-key-same-use-site with the second use site left implicit, which
+// conjunct 8(b) admitted while deriving one key at two seats. It is
+// device_admits (the PARSER takes it), gate_open, and carries a refusal_row and
+// one coverage tag -- so rows, device_admits_true, gate_fields, refusal_row,
+// TAG_SLOTS and SINGLE_LINE_ROWS each move by one and nothing else does.
 const POP: Pop = Pop {
-    rows: 72,
+    rows: 73,
     host_admits_true: 19,
     md1_admits_true: 15,
-    device_admits_true: 38,
+    device_admits_true: 39,
     device_admits_false: 34,
     // ZERO since S2: the one `panic:parse` row's parse panic is fixed (P3.1's
     // `!= 4` fingerprint guard), so its `device_admits` is measurable and no row
@@ -152,8 +159,8 @@ const POP: Pop = Pop {
     // derived rule below, which is exhaustive over every row in the file.
     sysw_class: 0,
     device_probe: 2,
-    gate_fields: 37,
-    refusal_row: 18,
+    gate_fields: 38,
+    refusal_row: 19,
     both_routes_address_0: 11,
 };
 
@@ -623,7 +630,7 @@ fn the_host_column_matches_the_admission_predicate() {
 /// Rows whose `input` is a single line — the only rows that can BE a record:
 /// the public section is split on LF (`sysw/open.go:67-74`), so a record
 /// cannot contain one. Measured from the file, not read off it.
-const SINGLE_LINE_ROWS: usize = 59;
+const SINGLE_LINE_ROWS: usize = 60;
 /// … of which this many are `host_admits: true`, so the derived rule is
 /// satisfiable in BOTH directions rather than vacuously one-sided.
 const SINGLE_LINE_ADMITTED: usize = 15;
