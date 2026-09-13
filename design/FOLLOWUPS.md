@@ -16860,7 +16860,7 @@ phrase the device cannot show again**. Gate the last `←` out of a non-empty
 composition with the same hold used elsewhere, naming what goes. Owning phase:
 none yet (fork, `gui/`).
 
-### F-520 — journey I-5: "the shape changed, so this id changed" fires when nothing changed — CLASS FIXED, fork `1dab84a`; the leg is still open
+### F-520 — journey I-5: "the shape changed, so this id changed" fires when nothing changed — CLOSED, fork `c1f7e3a`; the leg was found and the first fix was wrong
 
 The Template screen claims the id changed and that cards minted with the old
 stub will not seat — while printing, two lines below, an id byte-identical to
@@ -16876,16 +16876,37 @@ ever do carry one id, the cards *do* seat and there was nothing to warn about.
 An unreadable id is reported as changed, because on a screen about to become
 steel a spurious warning is the survivable mistake.
 
-**STILL OPEN, and the reason this entry is not closed:** the leg that produced
-differing chunks for an unchanged shape has not been identified.
-`composerTemplateChunksFor` is deterministic — measured, called twice over one
-state, byte-identical — so something in the walk changes state in a way that
-moves the chunks without moving the id. The fix removes the class, not that leg,
-and the leg may still matter somewhere that compares chunk sets for another
-reason. Reproducing it needs an emulator walk.
+**THE LEG WAS FOUND, and it makes the first fix wrong in direction.** Identified
+by the adversarial review of that very commit: the Template-ID is
+**origin-invariant by construction** — `md/template_id.go` hashes the use-site
+path and the tree, with no keys, fingerprints or origins in the preimage — while
+**seating declares origins**, and the codec hands the still-unseated slots the
+lowest free accounts. So seating slot `@0` at an unusual account shifts what
+`@1` and `@2` advertise, under an id that cannot move. That is why the chunks
+differed with the id fixed, and `composerTemplateChunksFor` is deterministic at
+the same time: it is deterministic *per seating*, and the walk changed the
+seating.
 
-Gates: gui 1296/1296 across 24 shards, partition verified exhaustive; three
-mutations RED; firmware +688 bytes flash, RAM unchanged.
+Which means the banner was **right to fire**. Only its sentence was wrong. The
+first fix silenced it, and the commit justified that with *"if two chunk sets
+really do carry one id, the cards DO seat and there was nothing to warn about"*
+— **false by measurement**: a card minted against the old origin passes layer 1,
+because the stub is the top four bytes of an unchanged id, and is refused at
+layer 2 by `slotMatchesCard` with `errSeatNoSlot`.
+
+Closed properly at `c1f7e3a`: the predicate is a three-way
+`composerStubChange`, comparing the id (with its `WalletIdKind`) *and* the
+per-slot advertised origins, and the screen says which of the two moved. Two
+failures at two layers get two sentences, or the operator is sent to look in the
+wrong place.
+
+**The lesson worth keeping**: the first fix narrowed a predicate to make a
+sentence true, without checking what the old, wider predicate had been catching.
+Removing a false positive removed a true positive sitting behind it.
+
+Gates: gui 1299/1299 across 24 shards, partition verified exhaustive; the
+reviewer's own revert mutation now RED; firmware +896 bytes flash, RAM
+unchanged.
 
 ### F-521 — journey I-4: under `tr`, every offered key violates the slot's stated origin, silently
 
