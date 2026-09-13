@@ -337,3 +337,203 @@ choose, and the new test fails on the defect it names by a mutation independent 
 two already settled. The Important is that the fix's central claim to the operator —
 *the highlighted row is the script in force* — is carried by an unasserted parallel
 table whose label half no test in the package can see break.
+
+---
+
+# Addendum — fold re-review at b23f6cf
+
+Scope: `git diff 1dab84a..b23f6cf`, one commit, three files (+157 / -8). Did the
+fold close each finding, and did it introduce a new defect? Nothing wider; nothing
+from the first pass re-derived. `c4d8527` and `1dab84a` are taken as given, read only
+where the fold touches them (`composerScriptLine` and the two shared tables).
+
+Fresh worktree at `b23f6cf`, same toolchain. Eight mutations and two probes, all
+reverted; tree verified pristine at `b23f6cf` and `gofmt` clean on the three files as
+the last act.
+
+## Verdicts
+
+### I-1 — **CLOSED**
+
+`TestWrapperLabelsNameTheirOwnWrapper` (`composer_gates_test.go:1575-1644`) closes it,
+and the counterexample that carried the finding is now the *only* thing in the package
+that fails on it:
+
+```
+$ # swap composerWrapperLabels[1] <-> [2], leave composerWrapperOrder alone
+$ scripts/gui-shard-test.sh ./gui/ 24
+    partition verified exhaustive: 1297 == 1297
+RESULT: FAIL
+--- FAIL: TestWrapperLabelsNameTheirOwnWrapper (0.00s)
+    composer_gates_test.go:1633: row 1 reads "Nested (sh-wsh)" but its wrapper encodes
+        wsh(...), not the sh(wsh(...)) that "sh-wsh" names.
+        The operator opens this screen to read the script in force and would read the wrong one.
+    composer_gates_test.go:1633: row 2 reads "Segwit (wsh)" but its wrapper encodes
+        sh(wsh(...)), not the wsh(...) that "wsh" names.
+```
+
+Both rows named, in the operator's terms. `composerWrapperOrder[1]<->[2]` also reds it
+(2 rows), as does `[0]<->[3]` on either table — so the doc comment's "swap any two
+entries of either table and this fails naming the row" is measured, not asserted.
+
+**Your first question: is the binding independent, or a second circle?** It is
+independent, and I have two measurements rather than an opinion.
+
+- **MU-14 — mutate the test's OWN oracle.** Swap the `roots` map's `"wsh"` and
+  `"sh-wsh"` entries and leave both production tables correct:
+  `--- FAIL ... row 1 reads "Segwit (wsh)" but its wrapper encodes wsh(...), not the
+  sh(wsh(...)) that "wsh" names.` The oracle is load-bearing. A test that had closed
+  a circle through `composerWrapperOrder` would not have noticed its own map change.
+- **MU-13 — swap BOTH tables together**, preserving the pairing and changing only the
+  display order: the label test correctly stays **green**, while
+  `TestComposerChangeTheScriptRow...` and `TestComposerBackLegWrapperChange...` red.
+  The two properties are cleanly separated — this test owns *pairing*, the index-walk
+  tests own *order* — and the new test is not over-broad.
+
+Structurally the two sides share only the loop index `i`: the expectation is
+`composerWrapperLabels[i]` → parenthesised token → `roots` → `md.ScriptKind`, and the
+actual is `composerWrapperOrder[i]` → `md.Compose` → `Chunks` →
+`ExpandWalletPolicyChunks` → `tpl.Root`. A circle would need `roots` to be derived
+from `composerWrapperOrder`; it is keyed by the descriptor-function token, which is a
+statement about the codec that a reader can check against BIP-380 without opening
+`composer_shape.go`. Declining `composerScriptLine` was the right call — I confirmed
+it maps a root back through the same two tables (`composer_shape.go:145-169`), and
+`composer_flow_test.go:516-519` asserts its output against `composerWrapperLabels[i]`
+by the same index, so that pair would have passed happily with the labels swapped.
+
+**Your second question: is there a wrapper or root the roots table has no rule for,
+where the test would skip rather than fail?** No skip path exists. There is no
+`t.Skip` in the test; every unhandled case is `t.Errorf` followed by `continue`, which
+fails the test and keeps reporting:
+
+- label with no `(token)` → *"carries no (token): the operator reads the script off
+  this row"*;
+- token absent from `roots` → *"names %q, which this test has no rule for. A new
+  wrapper needs its root added here, not a rule removed"* — the case you were worried
+  about, and it is a failure;
+- a `tpl.Root` outside `{Tr, Wsh, Sh}` → falls to the `tpl.Root != rule.root` arm and
+  `rootName` prints `ScriptKind(%d)` rather than a confident wrong name;
+- `md.Compose` / `Chunks` / decode errors → each its own `t.Errorf`.
+
+And it is not vacuous per row — instrumented, all four rows reach the codec
+comparison: `PROBE-E rows compared against the codec: 4`.
+
+The one residue is recorded as N-3 below.
+
+**Second face of I-1 (the silent row-0 fallback) — carried, not blocking.** `initial
+:= 0` still resolves any wrapper absent from `composerWrapperOrder` to row 0, and the
+new test iterates the labels table so it cannot see a wrapper missing from it.
+`md/compose.go:31-36` still defines exactly four `ComposeWrapper` values and all four
+are listed, so this remains what I called it originally — latent rather than live. I
+am not holding the gate on it; it belongs with F-527 as a follow-up if you want it
+written down.
+
+### M-1 — **CLOSED**, and I agree the behaviour is right
+
+To answer plainly, since you asked for it plainly: **the behaviour is correct and the
+wording was the defect.** Back preserving the operator's own last pick is the rule
+every other picker in this flow follows, and reversing it on this one screen would
+discard a deliberate answer — the mirror of C-1, as the new comment says. My finding
+was always that `composerWrapperPick`'s comment stated *"opens on the script CURRENTLY
+IN FORCE"* without qualification while one of its two callers does not satisfy that.
+The new text names both callers and what each passes, which is exactly the fix.
+
+One Nit on the new wording, N-4 below.
+
+### M-3 — **CLOSED**, re-run rather than taken from you
+
+```
+$ # hoist `if prior { cs.Initial = 1 }` out of the unsized branch (MU-10, verbatim from my first pass)
+$ go test ./gui/ -run 'TestSizeProofQRStepReturnsFalseOverAStaleOptIn|TestQRStepStillOffersBothAnswersOffTheLadder|TestSizeProofDropsTheQRTheOperatorChose' -count=1
+--- FAIL: TestSizeProofQRStepReturnsFalseOverAStaleOptIn/sized (0.00s)
+    freetext_sizeproof_test.go:798: the sized step opens on row 1 with a prior opt-in
+        behind it; carrying it in is the thing this screen exists to stop
+```
+
+Red, in the `sized` subtest, on the new `cs.Initial != 0` line. The mutation that was
+green in my first pass now fails. Worth noting for the record that the pre-existing
+`cs.choice != 0` assertion at `:785` did **not** fire under the same mutation — the
+clamp still absorbs it — which is precisely why the assertion had to be on the field,
+and confirms the comment's "leaves cs.choice at 0" claim by measurement.
+
+Your note about the first placement is the more valuable half of this. A guard placed
+where `prior` is already false is a guard that cannot fail; that it was caught by
+re-running the mutation rather than by reading the new test is the argument for
+re-running every fold's mutation at the fold, not just at the finding.
+
+### N-2 — **CLOSED**
+
+```
+$ # composerApplyShapeEdit loses its no-op guard
+$ go test ./gui/ -run TestComposerScriptPickerShowsTheScriptInForce -count=1
+    composer_gates_test.go:1525: the no-op confirm discarded the seated key: nothing
+        changed, so nothing should have been cleared
+    composer_gates_test.go:1529: the no-op confirm released the seated source, so it
+        would be offered again as though it had never been used
+```
+
+Both new assertions fire. The test now names the whole of C-1's harm, not half of it.
+
+### N-1 — **CLOSED** (no action, as recommended).
+
+### M-2 — **not folded, and I agree.** Your reading is right
+
+Those four sites (`ftSpeedChoiceFlow`, `ftPassChoiceFlow`, `ftFaceChoiceFlow`,
+`ftSizeChoiceFlow`) poked the private `choice` field before this change and were
+uncovered then by the same measurement that shows them uncovered now — my MU-8 reverts
+the *whole* migration and still reds only the three sites that had tests before.
+Nothing in this diff made them less covered, and a preselect fix is the wrong cycle to
+carry a pre-existing free-text coverage gap. F-527 is the right home. No push-back.
+
+## New findings from the fold
+
+### N-3 — the label test passes vacuously if both tables are emptied
+
+```
+$ # composerWrapperLabels = []string{} and composerWrapperOrder = []md.ComposeWrapper{}
+$ go test ./gui/ -run TestWrapperLabelsNameTheirOwnWrapper -count=1
+ok  	seedhammer.com/gui	0.002s
+```
+
+The length check passes (`0 == 0`) and the loop body never runs. Not reachable with a
+green suite — the same mutation immediately reds
+`TestComposerChangeTheScriptRowRewrapsAndDiscards`,
+`TestComposerBackLegWrapperChangeAsksBeforeDiscardingSeats` and
+`TestComposerNoPayloadWalkEngravesAKeylessTemplate` — so this is a Nit, not a false-PASS
+path anyone can land. A `if len(composerWrapperLabels) != 4` in the existing Fatalf
+would close it in the same line that is already there. Your call; it does not gate.
+
+### N-4 — "and then by §4e" is legacy-only
+
+`composer_shape.go:189-190` now says a no-op confirm on the Back leg "is still gated by
+§8j and then by §4e, so it proposes rather than commits." §4e is legacy-scoped —
+`md/compose.go:332` is `if list.Wrapper.isLegacy() {`, and `isLegacy()` is
+`ComposeSh || ComposeShWsh` — so a second-pass pick of tr or wsh is gated by §8j
+alone. §8j is a hold-to-confirm and is the gate that carries the argument, so the
+sentence's conclusion holds; it is the enumeration that is wider than the mechanism. My
+own first-pass reproduction happened to pick sh-wsh, which is how both gates appeared
+in one trace. A future reader grepping for §4e as a general backstop would be wrong.
+Wording, not behaviour.
+
+## Closing
+
+| Finding | Verdict |
+| --- | --- |
+| I-1 (label↔wrapper binding unasserted) | **CLOSED** — independent of the GUI tables, proven by MU-13 + MU-14; no skip path |
+| I-1 second face (silent row-0 fallback, latent) | carried — not blocking, latent as originally filed |
+| M-1 (absolute wording vs. two callers) | **CLOSED** — doc fix, behaviour agreed correct |
+| M-2 (four migrated pokes uncovered) | **not folded, agreed pre-existing** → F-527 |
+| M-3 (clamp hid the sized-branch guard) | **CLOSED** — MU-10 re-run by me, now red at `:798` |
+| N-1 (inert cancel path) | **CLOSED** — no action |
+| N-2 (test asserted half the guarantee) | **CLOSED** — mutation fires both assertions |
+| N-3 (vacuous if both tables emptied) | new Nit |
+| N-4 (§4e is legacy-only) | new Nit |
+
+**0 Critical / 0 Important / 0 Minor / 2 Nit — GREEN.**
+
+The Important is closed on evidence rather than on the fold's say-so: the mutation that
+was green across 1294 tests is now the single failure across 1297, the new test's
+oracle is load-bearing under mutation, and its independence is demonstrated by the one
+mutation that should *not* red it not reding it. Both remaining items are wording and
+neither gates. Nothing in the fold introduced a behaviour change: of the three files,
+one is comments only, and the other two add assertions and a test.
