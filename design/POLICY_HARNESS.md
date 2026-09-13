@@ -57,6 +57,32 @@ for every case: a finding that cannot be reproduced by hand is a rumour.
 Bitcoin Core is **not installed**. `policy-differential.py` prints how to fetch
 and verify it, and refuses a datadir outside `/scratch/code/shibboleth/.tmp`.
 
+## Measured so far
+
+Generated policies, every one through compose → encode → decode → derive, and
+most through `me bundle` as well:
+
+| run | policies | agree | disagree | round-trip broken |
+| --- | --- | --- | --- | --- |
+| seed 2026 | 2000 | 2000 | 0 | 0 |
+| seed 909, boundary locks | 1500 | 1500 | 0 | 0 |
+| seed 4711, boundary locks + engrave | 1200 | 1200 | 0 | 0 |
+| seed 11 | 400 | 400 | 0 | 0 |
+| seed 31337, three-way driver, `--no-core` | 600 | 548 | 0 | — |
+| the driver's 1000 across 5 seeds, with Core | 1000 | 814 | 0 | — |
+
+Plus the 67 vendored vectors: 45 the device derives, 42 of which the Rust
+primary also derives, and all 42 agree.
+
+**Zero disagreements anywhere.** The refusals in the driver's rows are `md`
+declining before a card is minted — 22 of them the 64-chunk cap (F-515), the
+rest miniscript malleability on keyless paths under `--experimental`.
+
+A long run of agreement is worth stating carefully: it is evidence that the two
+implementations agree on the policies the composer can express, which is not the
+same as evidence that either is correct. Bitcoin Core is the only leg that can
+speak to the second, and it is the leg that needs a download.
+
 ## What it has found
 
 | | |
