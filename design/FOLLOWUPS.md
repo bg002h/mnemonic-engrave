@@ -16704,7 +16704,7 @@ and the pin test proving "the wrapper is the device function" passed, because it
 pinned the wrong function. A test that the export equals what it wraps cannot
 see that what it wraps is a branch.
 
-### F-513 — `md-address-refuses-policies-its-own-corpus-has-addresses-for`: the key-reuse guard is in `md address` alone
+### F-513 — `md-address-refuses-policies-its-own-corpus-has-addresses-for` — CLOSED: already fixed upstream; the inconsistency lives only in the fork's stale copy (see F-529)
 
 Filed 2026-09-13 from the first three-way corpus differential (42 agree, 0
 disagree, 3 declined by the Rust primary alone).
@@ -16780,7 +16780,26 @@ reader who meets it concludes the tool is broken.
    the CLI derive shapes it currently refuses. **That is a funds-safety
    loosening and it needs the operator's ruling, not mine.**
 
-Owning phase: none (host-side, `descriptor-mnemonic`).
+**RESOLVED, 2026-09-13, by looking at the primary's corpus instead of the
+fork's.** The primary has already replaced all three key-reuse vectors with
+reuse-free versions — each use site given its own placeholder, which is exactly
+what the guard's own message advises:
+
+| vector | fork (vendored) | primary (current) |
+| --- | --- | --- |
+| `keyed_tr_multi_a` | 2 keys, tid `f15f2969` | 3 keys, tid `8c1c0566` |
+| `keyed_tr_sortedmulti_a` | 2 keys, tid `87212fb6` | 3 keys, tid `09903620` |
+| `keyed_wsh_timelock_hashlock` | 3 keys, tid `ffe0f314` | 5 keys, tid `71ff3b74` |
+
+So `descriptor-mnemonic` has no inconsistency left: nothing in its corpus is a
+shape its own CLI refuses. The three-behaviour split this entry described exists
+only in the fork's **stale vendored copy**, and that is a different and larger
+problem — filed as F-529.
+
+Nothing to do here. The narrowing question raised above is moot for the corpus
+and remains open only as a design question nobody currently needs answered.
+
+Owning phase: none.
 
 ### F-514 — `the-device-derives-a-bip-388-forbidden-policy-in-silence`
 
@@ -17036,3 +17055,47 @@ stub"* for a stub nobody saw.
 Every outcome is safe-side (the banner over-warns rather than under-warns), which
 is why it is not blocking. The fix is to distinguish the two returns so a render
 failure does not update `shown`. Owning phase: none (fork, `gui/`).
+
+
+### F-529 — the fork's vendored vector corpus has DIVERGED from the primary under identical names
+
+Filed 2026-09-13, found while trying to close F-513 by marking the primary's
+corpus and discovering the primary had nothing to mark.
+
+Three vectors are **different policies with the same name** in the two repos,
+and they are precisely the three that carry key reuse:
+
+| vector | fork (vendored) | primary (current) |
+| --- | --- | --- |
+| `keyed_tr_multi_a` | 2 keys, tid `f15f2969` | 3 keys, tid `8c1c0566` |
+| `keyed_tr_sortedmulti_a` | 2 keys, tid `87212fb6` | 3 keys, tid `09903620` |
+| `keyed_wsh_timelock_hashlock` | 3 keys, tid `ffe0f314` | 5 keys, tid `71ff3b74` |
+
+43 of the fork's 46 conformance vectors match the primary byte for byte; 3 do
+not; 3 more exist only in the fork.
+
+**This is F-511 having actually shipped.** `md vectors` regenerates by NAME and
+silently replaces, and the primary's corpus was later corrected by giving each
+reused use site its own placeholder. The fork was never re-vendored, so it still
+holds the pre-correction policies — under names that now mean something else
+upstream.
+
+**Why it matters more than a stale pin usually would.** Those three fork vectors
+are the *only* key-reuse shapes the device has, and they are the ground truth
+for F-514's duplicate-key warning and for the Core adjudication behind it. A
+routine re-vendor would swap all three for reuse-free policies and quietly
+remove the device's only fixtures for a funds-safety warning. The `md`
+Template-IDs differ, so anything comparing ids across the two repos is already
+comparing different wallets while the names agree.
+
+Not urgent and not dangerous today: the device conforms against its own vendored
+copy, and every address in it is correct for the policy it actually carries.
+
+**Before any re-vendor**, decide what happens to the three: they cannot simply
+come across, because the upstream versions no longer exercise key reuse. Either
+keep them under fork-local names, or add reuse fixtures upstream deliberately.
+F-514's tests assert the reuse property before relying on it, so a re-vendor
+fails loudly rather than silently losing the coverage — that is the guard, and
+it is worth keeping.
+
+Owning phase: none (cross-repo; blocks nothing until someone re-vendors).
