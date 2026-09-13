@@ -16826,14 +16826,23 @@ documented way to set the opening row.
 Gates: gui 1294/1294 across 24 shards, partition verified exhaustive; vet clean;
 both halves mutated and RED; firmware +464 bytes flash, RAM unchanged.
 
-### F-517 — journey I-7: the Review never names the script wrapper
+### F-517 — journey I-7: the Review never names the script wrapper — FIXED, fork `c4d8527`
 
 All four Review pages under `wsh` — paths, Template-ID, the hash rule, the
 keyless notice — never say `wsh`, `Segwit`, `tr` or `Taproot`. **This is what
 made F-516 undetectable**, and it outlives the fix: the path list is also
 byte-identical under every wrapper, so the Review is the only place the choice
-could be confirmed before a plate is cut. Put the wrapper on Review page 1, in
-the words the operator chose it with. Owning phase: none yet (fork, `gui/`).
+could be confirmed before a plate is cut.
+
+Fixed: the consent lines now open with `Script: <label>`, read from the DECODED
+template rather than the composer's own path list — asking the composition
+reports what the operator asked for, asking the card reports what they are about
+to cut. The label comes from `composerWrapperLabels`, now shared with the picker
+so the two cannot drift into separate vocabularies, and `sh(wsh(…))` is never
+collapsed into bare `sh(…)` since they hash to different addresses.
+
+Gates: gui 1295/1295 across 24 shards, partition verified exhaustive; two
+mutations RED; firmware +240 bytes flash, +32 RAM.
 
 ### F-518 — journey I-8: an illegal wrapper is accepted, and refused only after the seats are gone
 
