@@ -1,76 +1,109 @@
-# Continuity — F-531 and F-530, before the flash
+# Continuity — F-531 DONE, F-530 next, before the flash
 
-**Written 2026-09-13 at the operator's direction.** Both must be fixed before
-the device is flashed. Everything below is measured, not recalled.
+**Updated 2026-09-13.** Everything below is measured, not recalled.
+Supersedes the pre-F-531 version of this file (see `git log` on this path).
 
 ## Where the repos are
 
 | repo | branch | tip | state |
 | --- | --- | --- | --- |
-| `mnemonic-engrave` | `master` | `e1c67a0e` | pushed, check earned |
-| `seedhammer` (fork) | `main` | `3bb9f91` | pushed |
-| `descriptor-mnemonic` | `main` | `40c400de` | pushed, both contexts earned |
+| `mnemonic-engrave` | `master` | `7ea49ac3` | see push status below |
+| `seedhammer` (fork) | `main` | `9b36ed7` | see push status below |
+| `descriptor-mnemonic` | `main` | `40c400de` | pushed, unchanged this session |
 
-All three clean, nothing in flight, no agents running.
+## F-531 — CLOSED, GREEN
 
-## F-531 — funds-critical, do this one first
+Two address routes returned different addresses for a repeated-slot multisig.
+**The device now derives no address for a policy that repeats a key slot inside
+one script expression**, on either route.
 
-Two address routes in one binary return DIFFERENT addresses for a repeated-slot
-multisig. `expandedToDescriptor` projects the policy to **one key per slot**
-while keeping `tpl.K`, so for `wsh(sortedmulti(1,@0,@0,@1))`:
+**Measured before deciding.** Bitcoin Core 25.0.0, throwaway regtest datadir,
+`getdescriptorinfo` + `deriveaddresses`, keys version-swapped to tpub, datadir
+deleted after. Core ACCEPTS all four — the shape imports and funds:
 
-| route | address |
-| --- | --- |
-| flat (`expandedToDescriptor` → `address.Receive`) | `bc1qvcrd8s7…hw9yuw` |
-| the emitter | `bc1qxdqrua3…d7vp5p` |
+| descriptor | address | which route |
+| --- | --- | --- |
+| `wsh(sortedmulti(1,A,A,B))` | `bcrt1qvljqpug…qqqkckr` | the emitter |
+| `wsh(sortedmulti(1,A,B))` | `bcrt1q2gu6t4m…s0ufenu` | **the flat route showed this** |
+| `wsh(sortedmulti(2,A,A,B))` | `bcrt1qaej2r8z…qs9h244` | the emitter |
+| `wsh(sortedmulti(2,A,B))` | `bcrt1qsl0stsx…qqz65am` | **the flat route showed this** |
 
-The screen says **1-of-3** and shows a **1-of-2's** address. Found by the F-514
-reviewer; full detail in `design/agent-reports/duplicate-key-warning-review.md`
-under `C-2`.
+So the flat route was not approximately wrong — it was answering the two-seat
+question. A faithful flat descriptor **was** measured to work (repeat the key in
+`Keys`, Core's address comes back) and was deliberately not shipped: the
+operator's ruling is that md does not serve BIP-388-forbidden wallets.
 
-**Decide before coding**: dropping a repeated slot changes the script and so the
-address, so "project to one key per slot" and "keep K" cannot both stay. The
-emitter's answer is the one the plates reconstruct, which makes it the candidate
-for correct — **measure it against Bitcoin Core rather than assuming.** Core
-25.0.0 is on this box at `/usr/local/bin` (reports `/Satoshi:25.0.0/`); boot a
-throwaway regtest datadir under `/scratch/code/shibboleth/.tmp`, use
-`getdescriptorinfo` / `deriveaddresses`, and delete the datadir after.
+**The primary already agreed** — `md address` refuses, `md decode` reads and
+warns. The corpus gate recorded the convergence itself, moving
+`keyed_wsh_timelock_hashlock` from `{device: ok, rust: refused}` to
+`{device: source}`.
 
-## F-530 — the address route still silent
+Commits, in order: fork `a4760e1` (fix) → engrave `a832433b` (spec + baseline)
+→ `584051f0` (follow-ups) → `cea4a63b` (review, verbatim, NOT GREEN 0C/3I) →
+fork `9b36ed7` (fold) → engrave `9db77cf5` (records fold) → `81ca436d`
+(verification, verbatim, GREEN) → `7ea49ac3` (M-5 residue).
+
+**The two findings worth remembering**, both from the adversarial review:
+
+- **I-2 would have reached steel.** The reuse warning was an *arm* of
+  `noAddressLines` placed after the keyless ones, so a KEYLESS repeated-seat
+  template — which `TemplateEngraveShapeGuardChunks` admits — reached the
+  Engrave consent saying "Template has no keys - no addresses." and nothing
+  about the reuse, under a "1-of-3" label with two slots beneath it. Reuse is a
+  fact about the CARD; keylessness is a fact about what can be derived from it.
+  The warning is a PREFIX now, and the inspect announcement is hoisted above the
+  routing because `expandTemplateOnly` had no modal at all.
+- **I-1: the fix made its own gate unfailable.** All three F-514 warning blocks
+  became unreachable (`expandOK ⟹ DuplicateNone`), while the comment written in
+  the same commit asserted they were covered. Deleting all three left 1312/1312
+  green. They are gone, each site noting that F-533's remedy would make them
+  live again with no coverage.
+
+## F-530 — next, and smaller than it looked
 
 `descriptorFlow` → `DescriptorScreen.Confirm` → `descriptorAddressFlow` shows
-addresses with no duplicate-key warning. Three callers, and they do not share an
-input: two have md1 chunks, one is a **scanned descriptor with none**. So it
-needs the rule over a `*bip380.Descriptor`, not over chunks — which is the more
-valuable version anyway, since it also catches a pasted descriptor.
+addresses with no duplicate-key warning.
 
-Do not thread chunks into the two callers that have them: that closes two thirds
-and leaves the third silent under a suite that then looks complete, which is
-exactly how the first surface stayed hidden through a whole review round.
+**Measured this session** (read-only, no code written yet):
 
-**The argument that this is a gap rather than a hole is already written down**,
-in `scriptForTemplate` (`gui/md1_expand.go`), with
-`TestScriptForTemplateAdmitsOnlyTwo` to fail the day it stops holding. Read it
-first — F-531 may change it, because that argument rests on
-`expandedToDescriptor` behaving as it currently does.
+- **Three callers, and TWO of them carry no md1** — not one, as the earlier
+  version of this file said. `gui/gui.go:2599` (a scanned `*bip380.Descriptor`),
+  `gui/wallet_policy.go:122` (`nonstandard.OutputDescriptor` over a payload
+  record), and `gui/md1_gather.go:177` (the only chunk-bearing one, and already
+  covered by F-531's gates). So the rule must be over a `*bip380.Descriptor`.
+- **`bip380.Parse` has no duplicate check** (`bip380/bip380.go:295-350`); nor do
+  the BlueWallet / JSON / bare-key arms of `nonstandard.OutputDescriptor`.
+- **One choke point**: `supported := address.Supported(s.Descriptor)` at
+  `gui/gui.go:3238` gates the Addresses button for all three callers.
 
-## What this session established that you will need
+**Proposed shape** (not yet reviewed): a predicate over `*bip380.Descriptor` —
+two `Keys` entries equal in `KeyData` + `ChainCode` + `Children`. Origin metadata
+(`MasterFingerprint`, `DerivationPath`) is deliberately EXCLUDED: only the
+derived pubkey reaches the script. Including `Children` is what keeps a BIP-388
+-legal disjoint multipath (`/0/*` vs `/1/*`) from being called a duplicate.
 
-- `md.DuplicateKeySlot` (`md/duplicate_keys.go`) returns a `DuplicateKind`:
-  `DuplicateRefusedByCore` (wsh/sh miniscript) or `DuplicateFewerKeys`
-  (top-level multi/sortedmulti, and **every** taproot shape). Taproot is
-  fewer-keys because **Core 25.0.0 has no tapscript miniscript at all** —
-  `tr(A,and_v(…))` returns *"Miniscript expressions can only be used in wsh"* —
-  so a tapleaf `multi_a` never reaches `CheckDuplicateKey`. That constant's doc
-  says what would falsify it on a newer Core.
-- The warning is on three surfaces: `composerConsentLinesFor`,
-  `walletPolicyAddressLines`, `policyIDHeader`. One test asserts all three.
-- **Assert against `composerCopyDuplicateKeys`, never a literal.** Three tests
-  broke on copy edits this session because they hardcoded the words.
-- The policy harness: `scripts/policy-generate.py --corpus` is the standing
-  gate (67 vectors against `design/policy-corpus-baseline.json`), and
-  `--edges` generates boundary-lock policies. `design/POLICY_HARNESS.md`
-  explains all four programs.
+**One thing to settle first**: `verifyAddressFlow` (`gui/gui.go:3251`) is a
+second consumer of the same descriptor. Left alone it would confirm an address
+the device has just declined to derive.
+
+`scriptForTemplate`'s doc comment already states what F-531 left of F-530 —
+read it before starting.
+
+## Also open
+
+- **F-533** (new this session): `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a`
+  still derive on-device while the primary refuses them — the corpus gate's
+  remaining `ok/refused 2`. They survive because the refusal rides
+  `md.DuplicateKeySlot`, which answers CORE's question by design. The operator's
+  stated reason for refusing fits these HARDER than the shape F-531 fixed: both
+  seats of a repeated-seat multisig sign the same sighash, whereas a key that is
+  both internal key and leaf key signs a key-path sighash and a script-path
+  sighash. Closing it needs a SECOND predicate for BIP 388's rule, not a wider
+  read of the Core one.
+- **F-529**, **F-532** (M-7 and M-4 remain; M-3 and the in-file half of M-8 were
+  taken during F-531 because they sat inside the comment block it rewrote).
+
+Operator-owned and unchanged: the flash, the H4 walk, ACCEPTANCE item 8.
 
 ## Gates to run
 
@@ -82,19 +115,10 @@ scripts/fork-vet-gate.sh
 nix develop -c tinygo build -size short -o /dev/null -target pico-plus2 \
   -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller
 
-# derivation is untouched
 python3 scripts/policy-generate.py --corpus
 ```
 
-Last measured at fork `3bb9f91`: gui **1307/1307** across 24 shards (partition
+Last measured at fork `9b36ed7`: gui **1314/1314** across 24 shards (partition
 verified exhaustive), all 75 non-gui packages, vet clean beyond the known TinyGo
-gap, tinygo **1,650,652 flash / 63,304 ram**, corpus gate all 67 matching.
-
-## Also open, not blocking the flash
-
-F-529 (the fork's vendored corpus has diverged from the primary under identical
-names — on exactly the three key-reuse vectors this work depends on; a re-vendor
-would remove them), F-532 (the review's Minors; **M-7** is a sentence false at
-k = 1, **M-4** is a test comparing a string against itself).
-
-Operator-owned and unchanged: the flash, the H4 walk, ACCEPTANCE item 8.
+gap, tinygo **1,651,004 flash / 63,304 ram**, corpus 67/67 matching, `gofmt -l`
+the known five-file baseline.
