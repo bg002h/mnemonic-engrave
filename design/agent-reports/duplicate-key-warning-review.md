@@ -1031,3 +1031,258 @@ two of this fold's three answers rest on a claim about Core that Core, now that
 it is installed, does not make (I-6), and the trip-wire written to protect the
 one deferral checks the three policy kinds that cannot break it and skips the
 three that can (I-7).
+
+---
+
+# Addendum 3 — third fold at c60c050
+
+Range `git diff 19630dd..c60c050`, seven files (+100/−51). Fresh detached
+worktree, all mutations reverted, tree clean, worktree removed. Core 25.0.0 was
+booted again on a throwaway regtest datadir (isolated RPC port), used, stopped
+and deleted; the pre-existing `bitcoind` was left alone.
+
+## Verdicts
+
+| finding | verdict |
+|---|---|
+| I-6 tr arm claimed a refusal Core does not make | **CLOSED** — and pinned by three named rows |
+| I-7 trip-wire enumerated 3 of 6 `PolicyKind`s | **CLOSED** — my Complex+MultiA mutation now names both |
+| I-8 warning's instruction below the fold | **CLOSED in substance** — page one now carries a complete, actionable sentence for both kinds; one residual line, see M-9 |
+| the rename | **no behaviour change beyond the tr arm** — proved mechanically |
+
+**0 Critical / 0 Important on this fold — GREEN.**
+
+## (3) The rename changed exactly six rows, and they are the six it should have
+
+You did it with sed across six files, so I checked it the way a sed should be
+checked: I ran the same 23-shape matrix plus all 51 corpus vectors through
+`DuplicateKeySlot` at `19630dd` and at `c60c050`, printing `int(kind)` so one
+probe compiles on both revisions, and diffed.
+
+```
+14,19c14,19
+< tr(@0,{multi_a(2,@0,@0),pk(@1)})            kind=1      > kind=2
+< tr(NUMS,sortedmulti_a(2,@0,@0)) sole        kind=1      > kind=2
+< tr(NUMS,multi_a(2,@0,@0)) sole              kind=1      > kind=2
+< tr(NUMS,and_v(v:pk@0,pk@0)) miniscript leaf kind=1      > kind=2
+< tr(NUMS,{and_v(v:pk@0,pk@0),pk(@1)})        kind=1      > kind=2
+< tr(NUMS,{thresh(2,pk@0,pk@1,pk@0),pk@1})    kind=1      > kind=2
+```
+
+Six `tr` rows, nothing else. Every `wsh`/`sh` shape and every corpus vector is
+byte-identical across the rename, the iota values are unchanged, and
+`grep -rn "DuplicateInMiniscript\|DuplicateInMultisig"` returns nothing. No call
+site slipped. (One prose artifact did — N-5.)
+
+`TestDuplicateKindSplitsByWhatCoreDoes` now pins it: reverting the tr arm to
+`DuplicateRefusedByCore` reds three named rows —
+`tr(multi_a_with_a_repeat_in_one_leaf)`,
+`tr(sortedmulti_a_with_a_repeat_in_one_leaf)`, `tr(and_v(pk,pk)_in_one_leaf)`.
+The gui suite stays green under that mutation, so the pin lives in `md` only;
+that is the right place for it, but worth knowing the gui half is
+presence-bound, not kind-bound.
+
+## (1) `DuplicateRefusedByCore` — measured on all nine shapes that carry it
+
+Booted Core 25.0.0 and ran `getdescriptorinfo` on every shape the predicate now
+labels `kind=1`, including your three unchecked ones:
+
+| shape | Core 25.0.0 | claim right |
+|---|---|---|
+| `wsh(and_v(v:multi(2,A,A),pk(B)))` — **`v:multi` one wrapper deep** | `multi(2,K,K) is not sane: contains duplicate public keys` | yes |
+| `wsh(and_v(v:pk(A),pk(A)))` | same refusal | yes |
+| `wsh(thresh(2,pk(A),s:pk(B),s:pk(A)))` | same refusal | yes |
+| `wsh(or_i(and_v(v:pk(A),pk(B)),pk(A)))` | same refusal | yes |
+| **`sh(wsh(and_v(v:pk(A),pk(A))))`** — miniscript under sh(wsh) | same refusal | yes |
+| **`sh(wsh(and_v(v:multi(2,A,A),pk(B))))`** | same refusal | yes |
+| corpus `keyed_wsh_timelock_hashlock` | same refusal | yes |
+| `sh(and_v(v:pk(A),pk(A)))` — **bare sh miniscript** | `Miniscript expressions can only be used in wsh` | refuses, wrong reason — N-6 |
+
+And the `kind=2` side, confirming no missed refusal:
+
+| shape | Core 25.0.0 |
+|---|---|
+| **`sh(multi(2,A,A,B))` bare** | ACCEPTED |
+| **`sh(sortedmulti(2,A,A,B))` bare** | ACCEPTED |
+| `sh(wsh(sortedmulti(2,A,A,B)))` | ACCEPTED |
+| `tr(A,multi_a(2,B,B))`, `tr(A,sortedmulti_a(2,B,B))` | ACCEPTED |
+| `wsh(multi_a(2,A,A,B))` | `Can only have multi_a/sortedmulti_a inside tr()` |
+
+All three shapes you flagged as un-rechecked are right: `sh(multi)` bare is
+`FewerKeys` and Core imports it; `v:multi` one wrapper deep and a miniscript leaf
+under `sh(wsh(...))` are `RefusedByCore` and Core refuses both with exactly the
+sentence the copy quotes. **No `kind=2` shape is refused for duplicate keys, and
+no `kind=1` shape is imported.** The only imperfect row is bare `sh(miniscript)`,
+which is unreachable (N-6).
+
+### Do the new names carry an assumption? One of them does.
+
+You asked, and the answer is asymmetric, which is the useful part.
+
+`DuplicateFewerKeys` names a property of the **policy**: a slot filling more than
+one seat means fewer distinct keys can satisfy it. That is true under every Core
+version, every coordinator, and every future BIP. It cannot go stale.
+
+`DuplicateRefusedByCore` names a verdict of **an unversioned "Core"**, and the
+code has no version in it. You already know the concrete flip: Core 26 added
+tapscript miniscript, so on 26+ a tapleaf `multi_a(2,B,B)` plausibly starts
+failing `IsSane` — and the tr arm you just corrected would become wrong in the
+other direction, silently, because nothing here reads a version. The comments now
+say "Core 25.0.0" in four places, but the *name* and the *shipped sentence* say
+"Core".
+
+So the rename fixed the assumption that broke and left the one that can. That is
+still a strict improvement — "where the repeat sits" was unfixable, while "which
+Core" is at least dated in the comments — and I am not proposing a change. It is
+worth one sentence in the constant's doc saying the kind is a claim about Core
+25.0.0 specifically and what would falsify it, so the next person who reads
+`RefusedByCore` knows it has an expiry rather than inferring it is a law.
+
+## (2) Page one, measured rather than counted — and it splits by kind
+
+Page one holds **7 wrapped lines** on `sh2DisplaySize` (224 px viewport, width-20
+pre-wrap). Rendering through `md1PolicyFlow`'s own arithmetic:
+
+**`DuplicateFewerKeys` — 115 chars, 7 lines, the whole sentence is on page one:**
+
+```
+|Check before|
+|funding: slot @1|
+|fills more than one|
+|seat, so fewer|
+|separate keys can|
+|spend this than its|
+|k-of-n says.|
+```
+
+**`DuplicateRefusedByCore` — 122 chars, 8 lines, page one shows 7:**
+
+```
+|Check before|
+|funding: slot @1|
+|repeats in one|
+|script, and Bitcoin|
+|Core refuses such a|
+|descriptor|
+|("duplicate public|      <- page one ends here
+```
+
+`keys").` is on page two. So: **you did not trade a truncated tail for a
+truncated middle.** The instruction leads and is complete, the substance
+("slot @1 repeats in one script, and Bitcoin Core refuses such a descriptor") is
+complete, and what falls off is the parenthetical quotation — the least
+load-bearing clause in the sentence, where before it was the only actionable one.
+I-8 is closed.
+
+The residue is M-9: it overflows by one line for **every slot 0..31**, not just
+some, so it is systematic rather than an edge case, and page one ends on a
+dangling `("duplicate public`. Measured budget, if you want to close it:
+
+| candidate | chars | lines | fits |
+|---|---|---|---|
+| shipped | 122 | 8 | no |
+| `…and Bitcoin Core refuses such a descriptor.` | 96 | 6 | yes |
+| `…; Bitcoin Core refuses duplicate keys.` | 89 | 6 | yes |
+| `…, which Bitcoin Core refuses.` | 80 | 6 | yes |
+
+The general budget is ~123 chars of prose, but it is line count that decides, not
+length — 122 chars still lands on 8 lines because of where the words break — so
+measure the candidate rather than counting it. `DuplicateFewerKeys` fits for
+every slot 0..31 with no margin to spare at 7 lines, which is worth knowing
+before anyone lengthens it.
+
+---
+
+## M-9 — the fewer-keys sentence says "seat" and "its k-of-n" to a policy that has neither
+
+The tr arm now returns `DuplicateFewerKeys` for **every** taproot duplicate,
+including a leaf that is plain miniscript with no threshold in it. Built
+`tr(@0, and_v(v:pk(@1), pk(@1)))` from `gap_tr_leaf_and_v`
+(`complexAddressSource` ok, real mainnet taproot addresses):
+
+```
+Policy-ID: 55addc57146fca7dd13c41fb09f4bd6b
+Complex policy - cannot display safely.
+Keys: 2
+@0 - m/48h/0h/0h/2h <0;1>/*
+@1 - m/48h/0h/0h/2h <0;1>/*
+
+Check before funding: slot @1 fills more than one seat, so fewer separate keys can spend this than its k-of-n says.
+
+Receive 0:
+bc1p7z2xczafkw0tvn4zqepkkm0ryc9f2e5qcly6sa6yvw7g2ph6jruqyfujyj
+```
+
+There is no k-of-n in this policy and none on the screen — the line above says
+"Complex policy - cannot display safely." The substantive claim is **true**
+(@1 signs twice where two distinct keys would otherwise be needed), so this is
+vocabulary, not a false safety claim: "seat" and "k-of-n" are multisig words
+applied to an `and_v`. It compounds M-1 (the `@N` with no referent) on the same
+screen. Minor.
+
+For context, not as a finding: Core 25 refuses that descriptor outright
+("Miniscript expressions can only be used in wsh"), so the device shows addresses
+for a policy no Core-25 coordinator will import — but that is true of every
+`tr`-with-a-miniscript-leaf policy, duplicate or not, and is not this warning's
+job.
+
+## N-5 — the sed rewrote the historical name inside the comment that explains the rename
+
+`md/duplicate_keys.go`, in `DuplicateFewerKeys`'s own doc:
+
+> NAMED FOR THE HARM, NOT THE PLACE. **It was DuplicateFewerKeys**, and that name
+> encoded an assumption that turned out to be false…
+
+It was `DuplicateInMultisig`. The rename caught the old name in prose and made
+the sentence say the constant was renamed from itself, which reads as a typo and
+erases the one piece of history the comment exists to carry. This is the artifact
+class you asked me to hunt in (3) — it just hid in a comment rather than at a
+call site, which is why the behaviour diff could not see it.
+
+## N-6 — bare `sh(miniscript)` gets the right verdict for the wrong reason, unreachably
+
+`sh(and_v(v:pk(A),pk(A)))` is `kind=1`, and Core 25 does refuse it — but with
+`Miniscript expressions can only be used in wsh`, not for duplicate keys, so the
+copy's parenthetical is wrong there. Unreachable: `EmitWitnessScriptChunks`
+requires a `tagWsh` root (`md/script_emit.go:105`), so `complexAddressSource`
+probes, fails, and the screen shows "Complex policy - display only" with no
+address and no warning. Nit only.
+
+---
+
+## Mutation table
+
+| # | mutation | result | verdict |
+|---|---|---|---|
+| MG5 | `PolicyComplex` + `PolicyMultiA` arms in `scriptForTemplate` | `TestScriptForTemplateAdmitsOnlyTwo` red, naming **both** (as ints — N-4) | **I-7 closed** |
+| MG2 | `h = h[len(h)-1:]` in `gatheredDescriptorFlow` | `…/inspect descriptor` red | I-4 still held across the rename |
+| MT1 | tr arm back to `DuplicateRefusedByCore` | `TestDuplicateKindSplitsByWhatCoreDoes` red on 3 named tr rows; gui green | **I-6 closed and pinned** |
+| M5check | `kindForRoot` always `DuplicateRefusedByCore` | md red; **gui `TestDuplicateWarningNamesTheRightHarm` green** | M-5 unchanged, note still false |
+
+Housekeeping at `c60c050`: `go build ./...` clean, `go test ./md/` ok,
+`gofmt -l` clean on all seven fold files.
+
+## Open items going back to you
+
+Nothing blocking. In the order I would take them:
+
+| id | round | one line |
+|---|---|---|
+| **M-3** | 1 | `composerCopyOriginsChanged` still has **no doc comment** — the block above it belongs to `composerCopyDuplicateKeys`, four folds on |
+| **M-4** | 1 | the shipped copy is in no `SPEC_*.md`, so `TestComposerCopyIsVerbatimFromTheSpec` compares both rows against literals written in the same commits — confirmed again at `c60c050` |
+| M-5 | 2 | `gui/composer_flow_test.go:713` still claims a `kindForRoot` mutation reds a test that never calls it — measured green again this round |
+| M-8 | 2 | the retracted "can meet the threshold alone" is still asserted as current doctrine at `gui/composer_copy.go:341`, `gui/composer_flow_test.go:710`, `md/duplicate_keys_test.go:177` |
+| M-9 | 3 | "seat" / "its k-of-n" on a policy with neither |
+| M-1, M-2 | 1 | `@N` has no referent on the composer consent screen; only the lowest duplicated slot is named |
+| N-4 | 2 | `md.PolicyKind` has no `String()`, so the trip-wire says "now admits 3" and "now admits 5" |
+| N-5, N-6, N-1..N-3 | 1–3 | as above |
+| **F-531** | — | your filing of C-2; still the most severe open item, and not this fold's |
+
+## Counts
+
+**0 Critical / 0 Important / 1 Minor (M-9) / 2 Nits (N-5, N-6) — GREEN.**
+
+I-6, I-7 and I-8 are all closed, the rename is provably behaviour-neutral outside
+the six rows it was meant to change, and every shape that now claims "Core
+refuses" was measured against Core and does. The loop closes here; what remains
+is the Minor/Nit queue above, none of which gates.
