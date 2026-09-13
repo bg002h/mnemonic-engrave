@@ -16985,3 +16985,19 @@ one.
 A test per site is the obvious answer, and the cheaper one is a single table test
 over the free-text size flows that asserts each picker opens on the loaded value.
 Owning phase: none (fork, `gui/`).
+
+### F-528 — review N-1: `shown` records a template the operator was never shown when the stub screen fails to render
+
+Filed 2026-09-13 from the follow-ons review; **pre-existing**, not introduced by
+the diff that surfaced it.
+
+`composerStubFlow` returns false for two different reasons — the operator pressed
+Back, and `composerStubLines` returned an error so an error screen was drawn
+instead — and `composer_flow.go` records `shown = template` on that branch either
+way. After a render failure the device therefore believes it displayed a stub it
+never drew, and a later §8s banner can speak of *"cards minted with the old
+stub"* for a stub nobody saw.
+
+Every outcome is safe-side (the banner over-warns rather than under-warns), which
+is why it is not blocking. The fix is to distinguish the two returns so a render
+failure does not update `shown`. Owning phase: none (fork, `gui/`).
