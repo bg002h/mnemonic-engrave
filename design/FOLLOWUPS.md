@@ -16641,3 +16641,27 @@ a two-key row, which had to be found by probing x across it.
 Either the drawer should record a region per KEY, or `shTargets` should say that a keyboard
 is not a list. Until then any walk that types is carrying hardcoded geometry, and the
 hashlock walk's `ppKeyPoint` is the same workaround written twice.
+
+### F-511 — `md-vectors-overwrites-a-vector-whose-name-is-reused`: `md vectors` regenerates the corpus by NAME and silently replaces the five files of any existing vector whose name a new `Vector {}` entry repeats — no refusal, no warning, five files rewritten in place (repo: **descriptor-mnemonic**; owning phase: **the next md-codec cycle**) `#md` `#vectors` `#tooling`
+
+Filed 2026-09-13 after hitting it TWICE in one sitting while adding
+`keyed_compose_wsh_timelock_hashlock`. Both `keyed_wsh_timelock_hashlock` and
+`keyed_compose_wsh_three_paths` are already taken by different policies, and each
+time the generator overwrote that vector's `.template`, `.phrase.txt`,
+`.bytes.hex`, `.descriptor.json` and `.conformance.json` with the new policy's.
+
+**What caught it was `git status`, not a test**: the new files showed as
+*modified* rather than *untracked*. `compose_vectors.rs`'s manifest test catches
+the compose family on a later pass, but a duplicate outside that family (the
+first collision) is caught by nothing at all — the corpus would simply have
+shipped a vector whose name says one policy and whose bytes are another, and the
+fork would have vendored it.
+
+Fix: `MANIFEST` gains a uniqueness assertion over `Vector.name` (a test, so it
+fails at `cargo test` rather than at review), and `md vectors` refuses to write a
+file it did not just generate from a manifest entry it recognises. Related, and
+the reason the second collision happened at all: the fork's
+`scripts/vendor-compose-vectors.sh` vendors only names matching
+`^(keyed_)?compose_`, so a vector outside that prefix is invisible to the device
+— worth stating in the generator's own docs, since the name is load-bearing in
+two directions at once.
