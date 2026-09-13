@@ -16942,3 +16942,25 @@ to N-6 are notation and wording.
 findings: whether the census ✓ is withheld until the last page on a first visit
 (bears on M-2), whether the preimage plate is really cut first (no engrave run
 was made), and the hardened KDF's timing on real hardware. Owning phase: none.
+
+### F-527 — review M-2: four of the six `ChoiceScreen` initial-selection call sites are covered by nothing
+
+Filed 2026-09-13 from the adversarial review of the script-picker preselect fix.
+
+Making `ChoiceScreen.Choose` ignore `Initial` entirely — which reverts all six
+migrated call sites at once — reds only **two** tests across the whole 1294-test
+suite: `TestBackPreservesEnteredValues` (the passphrase QR step) and
+`TestComposerScriptPickerShowsTheScriptInForce` (the composer's script picker).
+The four free-text size pickers at `freetext_flow.go` 774, 827, 898 and 917 are
+asserted by nothing.
+
+**Pre-existing, not introduced.** Those sites poked the unexported `choice` field
+directly before the migration and were equally uncovered then; the migration made
+the gap visible by giving all six one mechanism to break at once. Each opens a
+picker on a value the operator already chose, so the failure mode is the same
+class as journey C-1: a screen that proposes a setting while appearing to show
+one.
+
+A test per site is the obvious answer, and the cheaper one is a single table test
+over the free-text size flows that asserts each picker opens on the loaded value.
+Owning phase: none (fork, `gui/`).
