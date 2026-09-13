@@ -17173,3 +17173,39 @@ only because the two consent surfaces an operator passes on the way to engraving
 now do warn.
 
 Owning phase: none (fork, `gui/`).
+
+### F-531 — two address routes in one binary disagree for a repeated-slot multisig — PRE-EXISTING, funds-critical
+
+Found 2026-09-13 by the F-514 review, flagged as outside that fold's scope and
+correctly so: nothing in the duplicate-key work introduced it.
+
+`expandedToDescriptor` projects a repeated-slot multisig to **one key per slot**
+while keeping `tpl.K`. So for `wsh(sortedmulti(1,@0,@0,@1))` the two address
+routes in the same binary return different addresses:
+
+| route | address |
+| --- | --- |
+| flat (`expandedToDescriptor` → `address.Receive`) | `bc1qvcrd8s7…hw9yuw` |
+| the emitter | `bc1qxdqrua3…d7vp5p` |
+
+The screen is labelled **1-of-3** and shows a **1-of-2's** address.
+
+**Why this is the worst shape of defect on this device.** Every other finding in
+this cycle was a screen that said too little or said something false about a
+*correct* address. This one is a wrong address — an operator who funds it has
+sent to a script the plates do not reconstruct. The device's whole promise is
+that what it engraves restores.
+
+The duplicate-key warning (F-514) fires on exactly this shape, so an operator is
+now told something is wrong before funding — but it tells them the wallet needs
+fewer keys than its label says, not that the address above it may be the wrong
+address. It is a coincidental guard, not a fix.
+
+**Before fixing, decide which route is right.** Dropping a repeated slot changes
+the script and therefore the address, so "project to one key per slot" cannot be
+reconciled with keeping `K` — one of the two has to go. The emitter's answer is
+the one the plates reconstruct, which makes it the candidate for correct, but
+that should be measured against Bitcoin Core rather than assumed.
+
+Owning phase: none, and it should get one — this is the highest-severity open
+item in the queue.
