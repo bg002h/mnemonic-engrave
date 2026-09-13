@@ -3357,3 +3357,36 @@ Command to resume: /resume-composer
   count above comes from a parser that reads each entry's body for a CLOSED
   marker. Measure before claiming, including when the claim is about your own
   work.
+- **POLICY DIFFERENTIAL HARNESS + JOURNEY PHASE OPENED (2026-09-13, operator:
+  "proceed with harness, journeys, and harness improvements as journey results
+  may suggest").** The case for it, measured before starting: the md1 decoder
+  is fuzzed FOUR ways and the codec has property tests on its primitives, but
+  NOTHING generates random POLICIES and pushes them through compose -> encode
+  -> decode -> seat -> address. Every finding of the 2026-09-12 experiment came
+  from that seam (F-507..F-511). The oracle is the point, not the agent count:
+  three implementations that share no code -- `md` (Rust primary), the device's
+  Go, and Bitcoin Core, the last being the only one that can catch the two
+  constellation halves agreeing and both being wrong.
+  **Three agents (opus), disjoint repos and files:**
+  (1) device leg, brief 77f3aa7e -- `cmd/policyprobe` in the fork, JSONL in/out,
+      deriving through `complexAddressSource` via a thin exported wrapper (NOT a
+      copy: a copy would make the harness measure a copy). Mainnet-only by the
+      device's own design (D1).
+  (2) driver, brief dd61d5e5 -- `scripts/policy-differential.py` in engrave: a
+      seeded generator bounded by the composer's own limits (8 paths, 9 keys,
+      32 slots, read from the fork not guessed), the Rust and Core legs, the
+      three-way comparison, and a SHRINKER, because a finding nobody can reduce
+      to a two-line policy does not get fixed. Core 31.1 re-downloaded and
+      checksum-verified per run, throwaway regtest datadir, never ~/.bitcoin.
+  (3) journey, brief 92a0361a -- the composer's own screens under wsh and tr,
+      three questions at every step, with the eleven screen-order facts the
+      controller paid for HANDED OVER so its turns go to judgement instead of
+      rediscovery.
+  Hypotheses worth the run: a composed policy whose witnessScript exceeds the
+  520-byte consensus limit (8 paths are allowed -- does anything check it is
+  spendable?); restoring a card carrying hash160/ripemd160, which the codec
+  supports and the composer cannot build, so the device's restore path has
+  likely never seen one; divergent origins plus seating (the F-411/F-412
+  family); taproot internal-key selection when path 0 carries a lock.
+  NEXT: triage the three reports, fold what the journey suggests back into the
+  harness, file findings, and gate what earns it.
