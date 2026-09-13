@@ -16802,3 +16802,115 @@ encoded, so a refusal arrives while the operator is still choosing rather than
 after they have finished.
 
 Owning phase: none (host-side, `descriptor-mnemonic`).
+
+### F-516 — journey C-1: `Change the script` defaulted to Taproot — FIXED, fork `6728c22`
+
+Critical, from the composer policy journey walk at fork main `812ff06`. The
+script picker built a fresh `ChoiceScreen` with no selection, so its highlight
+sat on row 0, Taproot, not on the wrapper in force. Opening it to **see** which
+script was set and leaving by the forward button committed row 0 and rebuilt the
+wallet as Taproot. Measured: a `wsh` composition with Template-ID
+`730513330db452b8e831426938b4f3d2` became `4f5306f9c6b23da7569b31f1e6039801`.
+`←` was already safe.
+
+Fixed by giving `ChoiceScreen` an `Initial` field whose zero value is row 0, so
+all 85 call sites are unaffected by construction. The **Back leg carried the
+same defect** and the same change closes it.
+
+Two things only the full suite caught, both folded into the design: seeding on
+every `Choose` discarded the operator's own selection when they stepped Back
+(five tests), so `Initial` is seeded once per screen value; and six call sites
+were poking the unexported field directly, now migrated so there is one
+documented way to set the opening row.
+
+Gates: gui 1294/1294 across 24 shards, partition verified exhaustive; vet clean;
+both halves mutated and RED; firmware +464 bytes flash, RAM unchanged.
+
+### F-517 — journey I-7: the Review never names the script wrapper
+
+All four Review pages under `wsh` — paths, Template-ID, the hash rule, the
+keyless notice — never say `wsh`, `Segwit`, `tr` or `Taproot`. **This is what
+made F-516 undetectable**, and it outlives the fix: the path list is also
+byte-identical under every wrapper, so the Review is the only place the choice
+could be confirmed before a plate is cut. Put the wrapper on Review page 1, in
+the words the operator chose it with. Owning phase: none yet (fork, `gui/`).
+
+### F-518 — journey I-8: an illegal wrapper is accepted, and refused only after the seats are gone
+
+Choosing a wrapper the composition cannot legally take is accepted silently, and
+the hold gate that precedes the change has **already cleared the seated keys**.
+The path list returns looking exactly as before. Only at `Done` does the machine
+refuse. Refuse or annotate the incompatible rows on `Which script?` instead, so
+the refusal arrives before the damage. Owning phase: none yet (fork, `gui/`).
+
+### F-519 — journey I-6: leaving the composer destroys the composition and the hashlock phrase, unwarned
+
+Four `←` taps from the path list reach the carousel with no confirmation at any
+point, and re-entering gives `slots: 0`. What is lost includes **a hashlock
+phrase the device cannot show again**. Gate the last `←` out of a non-empty
+composition with the same hold used elsewhere, naming what goes. Owning phase:
+none yet (fork, `gui/`).
+
+### F-520 — journey I-5: "the shape changed, so this id changed" fires when nothing changed
+
+The Template screen claims the id changed and that cards minted with the old
+stub will not seat — while printing, two lines below, an id byte-identical to
+the previous one. A false claim about card validity on the screen that governs
+card minting. Compare the ids and show the banner only when they differ; better,
+show both. Owning phase: none yet (fork, `gui/`).
+
+### F-521 — journey I-4: under `tr`, every offered key violates the slot's stated origin, silently
+
+The only seating candidates are P2WSH-script-type keys (`…/2'`), and seating one
+under taproot is accepted without a word; `Key mapping` then prints the origin
+with no mark. Refusing would make taproot unusable with the payload, so the
+remedy is a warning at seat time and on `Key mapping`, naming the expected
+origin. Owning phase: none yet (fork, `gui/`).
+
+### F-522 — journey I-10: the final gate asks for a check the keyless artefact cannot support
+
+The gate says to restore the plates in a coordinator and compare the first
+receive address. A keyless template **has no addresses** — the Review says so
+itself. Give the keyless arm its own sentence: compare the Template-ID against
+`mk encode`'s. A gate that asks for an impossible check is one the operator
+learns to tap through. Owning phase: none yet (fork, `gui/`).
+
+### F-523 — journey I-1: a leading zero silently costs a digit in the wait field
+
+The field holds three characters and ignores the rest, so `0365` becomes `036`
+and reads back as `36 days`. Confirmed with `12345` → `123`. Don't append `0` to
+an empty buffer, and give feedback when a keypress is discarded. Owning phase:
+none yet (fork, `gui/`).
+
+### F-524 — journey I-2: `Build my own paths` does not clear a template's paths
+
+The row promises a blank start and leaves the template's spend paths in place.
+Either clear the composition or rename the row to what it does. Owning phase:
+none yet (fork, `gui/`).
+
+### F-525 — journey I-3 and I-9: two refusals of the wrong shape
+
+**I-3**: the past-date refusal is a full-screen modal whose only forward control
+dismisses the operator to the path's own menu with no timelock set and the eight
+typed digits gone. The other two refusals on that screen are inline; this one
+should be too. **I-9**: the consent page says "stamp BOTH stubs" and the command
+on the next page stamps one. Make the command carry both once a Policy-ID
+exists. Owning phase: none yet (fork, `gui/`).
+
+### F-526 — journey Minors and Nits: 10 Minor, 6 Nit from the composer walk
+
+Recorded as a batch; the detail is verbatim in
+`design/agent-reports/composer-policy-journey.md`. M-1 what the relative wait is
+measured from; M-2 the blanks instruction sits with a count that excludes the
+preimage plate; M-3 §8i says "passphrase" and never says the flow hashes; M-4
+the past-date refusal does not name the date; M-5 `Key mapping` does not mark
+the taproot internal key; M-6 entering `0` shows the maximum-range message; M-7
+"write down this phrase" on a screen that does not show it; M-8 the engrave
+prompt never says which plate is being cut; M-9 under `tr` Review page 1 starts
+at "Path 2"; M-10 the path list clips `Done` with no "more" indicator. Nits N-1
+to N-6 are notation and wording.
+
+**Three claims the walk could not close**, and which are therefore not filed as
+findings: whether the census ✓ is withheld until the last page on a first visit
+(bears on M-2), whether the preimage plate is really cut first (no engrave run
+was made), and the hardened KDF's timing on real hardware. Owning phase: none.
