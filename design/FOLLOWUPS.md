@@ -16838,7 +16838,7 @@ rejected descriptor rather than a style violation. Journey-walk classification:
 
 Owning phase: none yet (fork, `gui/`).
 
-### F-515 — `the-64-chunk-wire-cap-is-not-implied-by-ComposeMaxSlots`
+### F-515 — `the-64-chunk-wire-cap-is-not-implied-by-ComposeMaxSlots` — CLOSED, `descriptor-mnemonic` `40c400de`
 
 Filed 2026-09-13 from the differential driver's 1000-policy run: 10 of the 80
 `md`-side refusals were policies that hit the **64-chunk wire cap**, a bound the
@@ -16850,12 +16850,32 @@ shape. The two bounds live in different layers and neither cites the other, so
 nothing in the composer's admission rules predicts which of the shapes it
 admits will survive encoding.
 
-At minimum the composer's limits should say that passing them is necessary and
-not sufficient. Better: admission should reject at compose time what cannot be
-encoded, so a refusal arrives while the operator is still choosing rather than
-after they have finished.
+**Compose-time rejection turns out to be impossible, which settles the choice.**
+The chunk cap is a function of the encoded SIZE — the keys, their origins and
+every lock operand — and `md compose` takes no keys at all. It cannot predict
+the count, so the honest fix is the documentation one.
 
-Owning phase: none (host-side, `descriptor-mnemonic`).
+Closed by making the limits say what they are and the refusal say what to do:
+
+- `MAX_PATHS`, `MAX_KEYS_PER_PATH` and `MAX_SLOTS` each carry "necessary, not
+  sufficient" and point at the wire cap, with a note saying explicitly **not**
+  to fix this by lowering `MAX_SLOTS` — the two ceilings are independent, and a
+  slot limit low enough to guarantee 64 chunks would refuse most policies that
+  fit.
+- `TooManyChunks` names the levers: fewer keys, shorter origin paths, or one
+  less spend path. "Too big" alone left the operator guessing which of three
+  things to change.
+
+Verified end to end rather than by reading: a driver run at seed 31337 produced
+real over-cap policies and the new text came back on them, verbatim —
+*"encoding requires 66 chunks; max is 64 per spec §9.8. This ceiling is on the
+encoded SIZE, not the slot count, so it is not implied by the composer's limits:
+reduce the number of keys, shorten their origin paths, or drop a spend path"*.
+
+Gates: cargo nextest 1304/1304, fmt and clippy clean. No test pinned the old
+message.
+
+Owning phase: none.
 
 ### F-516 — journey C-1: `Change the script` defaulted to Taproot — FIXED, fork `6728c22`
 
