@@ -106,7 +106,17 @@ DEFAULT_RPC_PORT = 18988
 SCRATCH_ROOT = "/scratch/code/shibboleth/.tmp"
 
 # Candidate locations for the device leg, built by the other implementer.
+#
+# The FIXED build (fork branch policyprobe-fix, tip b12c32a) comes first on
+# purpose. The earlier build exported only complexAddressSource -- the second of
+# the two routes gui.policyAddressAt tries -- so it answered "the device declined
+# this policy shape" for every single-key and plain-multisig shape, and reported
+# a codec failure for single-string keyless cards. Both are F-512. A run against
+# that build produces three device divergences that are entirely artefacts of it,
+# so the ordering here is what stops a stale binary on the path from silently
+# re-manufacturing them.
 POLICYPROBE_CANDIDATES = [
+    "/scratch/code/shibboleth/.tmp/policyprobe-fixed",
     "/scratch/code/shibboleth/seedhammer/policyprobe",
     "/scratch/code/shibboleth/seedhammer/cmd/policyprobe/policyprobe",
     "/scratch/code/shibboleth/.tmp/policyprobe",

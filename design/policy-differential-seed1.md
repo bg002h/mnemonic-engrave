@@ -2,16 +2,16 @@
 
 - **Seed**: `1`  (`--seed 1 --count 200 --indices 3` reproduces this run exactly)
 - Generated: **200**   (minted a card: 184)
-- Agreed — every available leg identical on every index: **116**
-- Disagreed: **50** cases, in **3** distinct divergences
+- Agreed — every available leg identical on every index: **166**
+- Disagreed: **0** cases, in **0** distinct divergences
 - Documented divergences only: **18** cases, in **1** class
 - Refused before a card was minted: **16** (compose 0, encode 16)
-- Wall clock: 33.7s; `md` invocations: 1555; Core RPCs: 720
+- Wall clock: 12.8s; `md` invocations: 1544; Core RPCs: 716
 
 ## Legs
 - **Rust** `/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md` — mainnet and regtest
 - **Bitcoin Core** `/scratch/code/shibboleth/.tmp/bitcoin-31.1/bin` — regtest, datadir `/scratch/code/shibboleth/.tmp/policy-diff-regtest`, RPC port 18988
-- **Device** `/scratch/code/shibboleth/.tmp/policyprobe` — mainnet only
+- **Device** `/scratch/code/shibboleth/.tmp/policyprobe-fixed` — mainnet only
 
 ### Which comparisons are on which network
 The device is mainnet-only; Core here is on a throwaway regtest datadir and will not parse a mainnet `xpub`. So:
@@ -39,105 +39,7 @@ Wrapper distribution this run: `sh` 26, `sh-wsh` 21, `tr` 74, `wsh` 79
 
 Occurrences are collapsed by **signature** — the same divergence hit by several generated policies is one entry with a count, not N copies. Each entry carries the smallest policy that still reproduces it.
 
-### F1. ACCEPTANCE_MISMATCH — md derived addresses, the device refused
-
-- Occurrences: **26** across 26 generated policies (1-0018, 1-0024, 1-0026, 1-0037, 1-0038, 1-0052, 1-0064, 1-0072, …)
-- Signature: `ACCEPTANCE_MISMATCH|rust>device|sh|source|the device declined this policy shape: an unsupported use-site, or its index-<n> derive probe failed`
-- **Smallest still-failing policy**: `--wrapper sh --path 1of2`
-- Template: `sh(sortedmulti(1,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))`
-
-```json
-{
-  "accepted_by": [
-    "rust"
-  ],
-  "refused_by": [
-    "device"
-  ],
-  "device_refusal": {
-    "stage": "source",
-    "error": "the device declined this policy shape: an unsupported use-site, or its index-0 derive probe failed"
-  }
-}
-```
-
-Replay:
-
-```sh
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md compose --wrapper sh --path 1of2 --json
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md encode "sh(sortedmulti(1,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))" --key '@0=xpub6EwnWH978Gvtbq5R4bBupC8nn2A3vPRCCx2t7Bqr63zQh6DaHUFAjGN3hcfFb9wXhWZAgs5NVjSDpiEXh925LE2djvBXmni2jWUeYSQq65P' --fingerprint '@0=4cbd2c68' --key '@1=xpub6FAqvqr18BDqgNbbSGDSNCrwBHGAYUC9CdQmqZWJCTSoU4uz2hm9hLiPi5L5TZSsvWTfBXAY7fhz4TuLq7rQJFY3DBNUfouUb4biFBGr132' --fingerprint '@1=b039be94' --network mainnet --group-size 0
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md address md1f52f0ps9q2tvyyy5jmpprj5qqcx8qpgtcgn9a935ds8xlfg9wpyjn6qdl7aqyf2nthgt3vlc3hs68rmyj0t8h md1f52f0psw2fsed8c4fskgdn3az72rzy39t8uj0eq9mrfp0ua638xq4s0ksqe2n7w7cuttqwughgd4xdnf2aexw md1f52f0psjdnp8q60h7a7zlay675h6d29ymclzwmrf7v2g9pxe8z0ap027gsralp7ye0mlgnsc2nj705z6xlp2u md1f52f0pscwyh8l9szt4v5r43ugyya3w0te5t5k8zknppah45nvwdmtxugatfqsunae87qqcmy3vmxmfmz7x --network mainnet --count 3
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md address md1f52f0ps9q2tvyyy5jmpprj5qqcx8qpgtcgn9a935ds8xlfg9wpyjn6qdl7aqyf2nthgt3vlc3hs68rmyj0t8h md1f52f0psw2fsed8c4fskgdn3az72rzy39t8uj0eq9mrfp0ua638xq4s0ksqe2n7w7cuttqwughgd4xdnf2aexw md1f52f0psjdnp8q60h7a7zlay675h6d29ymclzwmrf7v2g9pxe8z0ap027gsralp7ye0mlgnsc2nj705z6xlp2u md1f52f0pscwyh8l9szt4v5r43ugyya3w0te5t5k8zknppah45nvwdmtxugatfqsunae87qqcmy3vmxmfmz7x --network mainnet --count 3 --change
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md descriptor md1f52f0ps9q2tvyyy5jmpprj5qqcx8qpgtcgn9a935ds8xlfg9wpyjn6qdl7aqyf2nthgt3vlc3hs68rmyj0t8h md1f52f0psw2fsed8c4fskgdn3az72rzy39t8uj0eq9mrfp0ua638xq4s0ksqe2n7w7cuttqwughgd4xdnf2aexw md1f52f0psjdnp8q60h7a7zlay675h6d29ymclzwmrf7v2g9pxe8z0ap027gsralp7ye0mlgnsc2nj705z6xlp2u md1f52f0pscwyh8l9szt4v5r43ugyya3w0te5t5k8zknppah45nvwdmtxugatfqsunae87qqcmy3vmxmfmz7x --network mainnet --chain 0
-echo '{"id": "1-0131", "chunks": ["md1f52f0ps9q2tvyyy5jmpprj5qqcx8qpgtcgn9a935ds8xlfg9wpyjn6qdl7aqyf2nthgt3vlc3hs68rmyj0t8h", "md1f52f0psw2fsed8c4fskgdn3az72rzy39t8uj0eq9mrfp0ua638xq4s0ksqe2n7w7cuttqwughgd4xdnf2aexw", "md1f52f0psjdnp8q60h7a7zlay675h6d29ymclzwmrf7v2g9pxe8z0ap027gsralp7ye0mlgnsc2nj705z6xlp2u", "md1f52f0pscwyh8l9szt4v5r43ugyya3w0te5t5k8zknppah45nvwdmtxugatfqsunae87qqcmy3vmxmfmz7x"], "indices": [0, 1, 2]}' | /scratch/code/shibboleth/.tmp/policyprobe
-```
-
-### F2. ACCEPTANCE_MISMATCH — md derived addresses, the device refused
-
-- Occurrences: **21** across 21 generated policies (1-0010, 1-0017, 1-0027, 1-0032, 1-0039, 1-0042, 1-0044, 1-0055, …)
-- Signature: `ACCEPTANCE_MISMATCH|rust>device|sh-wsh|source|the device declined this policy shape: an unsupported use-site, or its index-<n> derive probe failed`
-- **Smallest still-failing policy**: `--wrapper sh-wsh --path 1of2`
-- Template: `sh(wsh(sortedmulti(1,@0/48'/0'/0'/1'/<0;1>/*,@1/48'/0'/1'/1'/<0;1>/*)))`
-
-```json
-{
-  "accepted_by": [
-    "rust"
-  ],
-  "refused_by": [
-    "device"
-  ],
-  "device_refusal": {
-    "stage": "source",
-    "error": "the device declined this policy shape: an unsupported use-site, or its index-0 derive probe failed"
-  }
-}
-```
-
-Replay:
-
-```sh
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md compose --wrapper sh-wsh --path 1of2 --json
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md encode "sh(wsh(sortedmulti(1,@0/48'/0'/0'/1'/<0;1>/*,@1/48'/0'/1'/1'/<0;1>/*)))" --key '@0=xpub6EwnWH978GvtZMzDhP9fumjkHb3JZxUBskzwUFGj8kqogFZibS7HRgPtP1sAEPojZgrwXq7HbAytbKNDJ2uWhwucpptQNWvdr1sfMGTtpjQ' --fingerprint '@0=4cbd2c68' --key '@1=xpub6FAqvqr18BDqds2dSBbmqBxpXsVHdURwJpfohVy8e9tbm86UT6fsnx4fFB9LMzSmsRiBvJonc17VUvCLSbEg8XNHf7tSSiGvRDeADwMGXng' --fingerprint '@1=b039be94' --network mainnet --group-size 0
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md address md1f2h0lps9q2tvyyyd9kzz8rsqrqcgwqzshs3xt6trgmqwd7js2uzf8fg2dqelcuwq4pkgex6q0t6cmxd3xeny3 md1f2h0lps0q9cjmuq29rncp36dulksgz8qfm8agadqd00cqgv3j5enel5vrwrps5qdk3fqzhjqvmz2usa26e4u3 md1f2h0lpss6kywmgruj24qxdvcyhxf42fqv79qnygnpgrajhpucdzedm5cp2xg9zsswqnakrdqe503xq03nwejz md1f2h0lps7njszcqlq9qsru244a3m2239scr60cuf8un92a7a87hlpdgagexn8rq75km4aqhnwfm9v6mepua --network mainnet --count 3
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md address md1f2h0lps9q2tvyyyd9kzz8rsqrqcgwqzshs3xt6trgmqwd7js2uzf8fg2dqelcuwq4pkgex6q0t6cmxd3xeny3 md1f2h0lps0q9cjmuq29rncp36dulksgz8qfm8agadqd00cqgv3j5enel5vrwrps5qdk3fqzhjqvmz2usa26e4u3 md1f2h0lpss6kywmgruj24qxdvcyhxf42fqv79qnygnpgrajhpucdzedm5cp2xg9zsswqnakrdqe503xq03nwejz md1f2h0lps7njszcqlq9qsru244a3m2239scr60cuf8un92a7a87hlpdgagexn8rq75km4aqhnwfm9v6mepua --network mainnet --count 3 --change
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md descriptor md1f2h0lps9q2tvyyyd9kzz8rsqrqcgwqzshs3xt6trgmqwd7js2uzf8fg2dqelcuwq4pkgex6q0t6cmxd3xeny3 md1f2h0lps0q9cjmuq29rncp36dulksgz8qfm8agadqd00cqgv3j5enel5vrwrps5qdk3fqzhjqvmz2usa26e4u3 md1f2h0lpss6kywmgruj24qxdvcyhxf42fqv79qnygnpgrajhpucdzedm5cp2xg9zsswqnakrdqe503xq03nwejz md1f2h0lps7njszcqlq9qsru244a3m2239scr60cuf8un92a7a87hlpdgagexn8rq75km4aqhnwfm9v6mepua --network mainnet --chain 0
-echo '{"id": "1-0010-shrink2", "chunks": ["md1f2h0lps9q2tvyyyd9kzz8rsqrqcgwqzshs3xt6trgmqwd7js2uzf8fg2dqelcuwq4pkgex6q0t6cmxd3xeny3", "md1f2h0lps0q9cjmuq29rncp36dulksgz8qfm8agadqd00cqgv3j5enel5vrwrps5qdk3fqzhjqvmz2usa26e4u3", "md1f2h0lpss6kywmgruj24qxdvcyhxf42fqv79qnygnpgrajhpucdzedm5cp2xg9zsswqnakrdqe503xq03nwejz", "md1f2h0lps7njszcqlq9qsru244a3m2239scr60cuf8un92a7a87hlpdgagexn8rq75km4aqhnwfm9v6mepua"], "indices": [0, 1, 2]}' | /scratch/code/shibboleth/.tmp/policyprobe
-```
-
-### F3. ACCEPTANCE_MISMATCH — md derived addresses, the device refused
-
-- Occurrences: **3** across 3 generated policies (1-0016, 1-0113, 1-0126)
-- Signature: `ACCEPTANCE_MISMATCH|rust>device|tr|source|the device declined this policy shape: an unsupported use-site, or its index-<n> derive probe failed`
-- **Smallest still-failing policy**: `--wrapper tr --path 1of1`
-- Template: `tr(@0/48'/0'/0'/3'/<0;1>/*)`
-
-```json
-{
-  "accepted_by": [
-    "rust"
-  ],
-  "refused_by": [
-    "device"
-  ],
-  "device_refusal": {
-    "stage": "source",
-    "error": "the device declined this policy shape: an unsupported use-site, or its index-0 derive probe failed"
-  }
-}
-```
-
-Replay:
-
-```sh
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md compose --wrapper tr --path 1of1 --json
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md encode "tr(@0/48'/0'/0'/3'/<0;1>/*)" --key '@0=xpub6EwnWH978GvtfNmZmVcPrdHDPmHn1r8yRuFf3FqRHmJPsv51Wd6LFHrESXkKh4Abg7eGbstaSTdUvwT4NehakugMqFkxvfBvoD4wBJ4nJHA' --fingerprint '@0=4cbd2c68' --network mainnet --group-size 0
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md address md1fj3lhpqpqztvyyyhqqxqs95pxt6trgz4q37ffgmp24khg30ttphwqkl9t0s2mag0wd md1fj3lhpq0qwdlhk9v62svv76jc8usu34u9u0cmtzvs87c3mtt9kytq6gufenl3rzxg4 md1fj3lhpq4tgglpd2tv7kmdmw8sdh07ylxswu9guavf7seyufsq4hzrglkk77mpa --network mainnet --count 3
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md address md1fj3lhpqpqztvyyyhqqxqs95pxt6trgz4q37ffgmp24khg30ttphwqkl9t0s2mag0wd md1fj3lhpq0qwdlhk9v62svv76jc8usu34u9u0cmtzvs87c3mtt9kytq6gufenl3rzxg4 md1fj3lhpq4tgglpd2tv7kmdmw8sdh07ylxswu9guavf7seyufsq4hzrglkk77mpa --network mainnet --count 3 --change
-/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md descriptor md1fj3lhpqpqztvyyyhqqxqs95pxt6trgz4q37ffgmp24khg30ttphwqkl9t0s2mag0wd md1fj3lhpq0qwdlhk9v62svv76jc8usu34u9u0cmtzvs87c3mtt9kytq6gufenl3rzxg4 md1fj3lhpq4tgglpd2tv7kmdmw8sdh07ylxswu9guavf7seyufsq4hzrglkk77mpa --network mainnet --chain 0
-echo '{"id": "1-0016", "chunks": ["md1fj3lhpqpqztvyyyhqqxqs95pxt6trgz4q37ffgmp24khg30ttphwqkl9t0s2mag0wd", "md1fj3lhpq0qwdlhk9v62svv76jc8usu34u9u0cmtzvs87c3mtt9kytq6gufenl3rzxg4", "md1fj3lhpq4tgglpd2tv7kmdmw8sdh07ylxswu9guavf7seyufsq4hzrglkk77mpa"], "indices": [0, 1, 2]}' | /scratch/code/shibboleth/.tmp/policyprobe
-```
-
+**No unexpected divergence.** Every case that minted a card produced identical scripts on every available leg, for all requested receive and change indices, except for the documented classes listed below.
 
 ## Documented divergences (not defects)
 
