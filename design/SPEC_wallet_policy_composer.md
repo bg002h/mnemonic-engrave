@@ -862,10 +862,18 @@ hashed path's material, and two H6 §10.1 added, for one that does.
 > Slot @0, key path (spends alone): choose a key
 
 The last body is F-531. The device declines to derive an address for a policy
-that seats one key slot more than once -- BIP 388 forbids the shape, and its
-pairwise-distinctness rule cites miniscript pubkey-reuse insecurity -- so the
-screens that would have shown an address show this instead, under the F-514
-warning that names the reuse.
+that repeats a key slot INSIDE ONE SCRIPT EXPRESSION, so the screens that would
+have shown an address show this instead, under the F-514 warning that names the
+reuse.
+
+The ground for refusing is BIP 388, whose pairwise-distinctness rule cites
+miniscript pubkey-reuse insecurity: a key filling two seats signs two messages.
+**What ships is narrower than that ground**, and the gap is F-533. The predicate
+is `md.DuplicateKeySlot`, which answers Bitcoin CORE's question by design and
+scopes to a single expression, so `tr(@0, multi_a(2,@0,@1))` -- the same slot at
+the internal key and inside a leaf -- still derives, while BIP 388 forbids it
+and the Rust primary refuses it. Two corpus vectors sit in that gap today. Read
+this section as the rule that is implemented, not the rule that is intended.
 
 > No addresses: this device does not derive them
 > for a wallet that reuses a key.
