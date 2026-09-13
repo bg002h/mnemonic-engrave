@@ -16860,13 +16860,32 @@ phrase the device cannot show again**. Gate the last `←` out of a non-empty
 composition with the same hold used elsewhere, naming what goes. Owning phase:
 none yet (fork, `gui/`).
 
-### F-520 — journey I-5: "the shape changed, so this id changed" fires when nothing changed
+### F-520 — journey I-5: "the shape changed, so this id changed" fires when nothing changed — CLASS FIXED, fork `1dab84a`; the leg is still open
 
 The Template screen claims the id changed and that cards minted with the old
 stub will not seat — while printing, two lines below, an id byte-identical to
 the previous one. A false claim about card validity on the screen that governs
-card minting. Compare the ids and show the banner only when they differ; better,
-show both. Owning phase: none yet (fork, `gui/`).
+card minting.
+
+Fixed by comparing the IDS. The line says *"this id changed"* and *"cards minted
+with the old stub will not seat here"*, and both are propositions about the id;
+the predicate compared chunk strings. This is the third form of one defect — an
+`edited` flag once, then a chunk-set comparison, now the id itself — and
+comparing the thing the sentence is about ends the sequence: if two chunk sets
+ever do carry one id, the cards *do* seat and there was nothing to warn about.
+An unreadable id is reported as changed, because on a screen about to become
+steel a spurious warning is the survivable mistake.
+
+**STILL OPEN, and the reason this entry is not closed:** the leg that produced
+differing chunks for an unchanged shape has not been identified.
+`composerTemplateChunksFor` is deterministic — measured, called twice over one
+state, byte-identical — so something in the walk changes state in a way that
+moves the chunks without moving the id. The fix removes the class, not that leg,
+and the leg may still matter somewhere that compares chunk sets for another
+reason. Reproducing it needs an emulator walk.
+
+Gates: gui 1296/1296 across 24 shards, partition verified exhaustive; three
+mutations RED; firmware +688 bytes flash, RAM unchanged.
 
 ### F-521 — journey I-4: under `tr`, every offered key violates the slot's stated origin, silently
 
