@@ -817,3 +817,102 @@ already wrong.
 *Re-reviewed read-only in a detached worktree at `c1f7e3a`; no commits made;
 every probe file deleted and every mutation reverted; worktree removed;
 `git status --porcelain` empty in `/scratch/code/shibboleth/seedhammer` on exit.*
+
+---
+
+## Addendum 2 — intersection rule at `aa93c71`
+
+**Range:** `git diff c1f7e3a..aa93c71`, two files, both `gui/`. Scope: the origin
+comparison rule only. Everything previously CLOSED stays closed. Suite, vet and
+tinygo numbers taken as given, not re-run.
+
+**Verdict: NOT GREEN — one Important.** The intersection rule is silent on a
+reachable walk that leaves the operator holding a card that will not seat. This
+is I-2's defect class returning through a different gap, which is the direction
+you asked me to push on.
+
+### I-4 — a slot that leaves the advertising set carries no history, so drift across that gap is never reported
+
+The loop iterates `wasOrigins` and requires the slot to be present in both:
+
+```go
+for idx, was := range wasOrigins {
+    if now, ok := nowOrigins[idx]; ok && now != was {
+```
+
+`shown` holds only the immediately-previous reading, so a slot absent from
+*either* side is dropped. Two consequences, the second unconditional: a slot that
+is seated in one reading and unseated in a later one is never compared across
+that gap, and **a fully-seated reading has an empty advertised set, which makes
+the next comparison silent no matter what moves.**
+
+Counterexample, measured — one 2-of-3 `wsh`, one id throughout, no shape edit:
+
+```
+ISECT | E1   id=b02b4403 advertised=map[0:m/48h/0h/0h/2h 1:m/48h/0h/1h/2h 2:m/48h/0h/2h/2h]
+ISECT |        Slot @2 expects a key at m/48h/0h/2h/2h
+ISECT | E2   id=b02b4403 advertised=map[]
+ISECT |        Slot @0: bbbbbbbb m/48h/0h/2h/2h
+ISECT |        Slot @2: aaaaaaaa m/48h/0h/5h/2h
+ISECT | E3   id=b02b4403 advertised=map[2:m/48h/0h/0h/2h]
+ISECT |        Slot @0: bbbbbbbb m/48h/0h/2h/2h
+ISECT |        Slot @2 expects a key at m/48h/0h/0h/2h
+ISECT5 | E1->E2 = 0 | E2->E3 = 0 | (net) E1->E3 = 2
+ISECT5 |   card for m/48h/0h/2h/2h matches slot index -1 at E3 (-1 = no slot => errSeatNoSlot)
+```
+
+E1 instructs the operator to mint against `m/48h/0h/2h/2h`; they send it to a
+cosigner. They seat every slot (E2, empty set, silent), then release @2 (E3,
+silent because `wasOrigins` was empty). @2 now advertises `m/48h/0h/0h/2h`, and
+`m/48h/0h/2h/2h` is held by seated @0 under fingerprint `bbbbbbbb`. Run through
+the real `slotMatchesCard`, the cosigner's card matches **no slot** —
+`errSeatNoSlot`. The net delta is `OriginsMoved`; every step of it was silent.
+
+Both legs are ordinary composer traffic: the stub screen is drawn once per loop
+iteration and `shown` updated there, seating accumulates between iterations, and
+`composerReleaseLastSeat` is the Back leg out of the mapping review. A three-
+reading variant (seat @2, then release it while seating @0 and @1) is silent the
+same way; the previous equality rule fired on both steps of it —
+`ISECT2 | equality rule: R1->R2 fires=true R2->R3 fires=true` — so the silence is
+new with this revision, not inherited.
+
+**Direction, not a prescription:** compare against the last origin each slot was
+*seen advertising*, not against the previous reading — a per-slot map in
+`composerFlow` updated at each showing, entries never removed. Verified it would
+fire here: net E1→E3 is `OriginsMoved`. That keeps the departure exclusion you
+wanted (a slot seated and never re-advertised is still never compared) while
+restoring history across the gap.
+
+### The departure exclusion itself is right
+
+Seating @1 at the account it already advertised is silent
+(`ISECT3 | delta = 0`) and should be: the card that stops seating is one the
+operator personally made unnecessary, and the screen shows the slot filled. That
+is the N-3 false positive, correctly removed. My finding is only about slots that
+come *back*.
+
+### The two secondary items
+
+**The I-2 fixture guard did not become weaker.** It now reimplements the
+intersection inline and counts `moved`, then asserts
+`composerStubDelta == composerStubOriginsMoved`. The guard is independent code
+from the production loop, so a mutation to the rule still reds the assertion; and
+requiring an *intersecting* slot to move is what the rule needs to fire, where
+list inequality could have been satisfied by a departure alone. Correctly
+tightened. The I-2 case still fires: there @1 and @2 advertise in both readings
+and both move (`1h -> 0h`, `2h -> 1h`).
+
+**`OriginsMoved` on an unreadable expansion is right, not merely different.**
+Those two legs run after `wasID == nowID` is proved, so `IdMoved` would print
+"this id changed" above a byte-identical Template-ID — journey I-5's shape via
+its own fix's error path. `OriginsMoved` warns about the fact that could not be
+checked without asserting a falsehood, and it is the weaker of the two warnings,
+which is correct for "unknown". Still unreachable (`ExpandWalletPolicy` has no
+error returns; this diff touches only `gui/`).
+
+### Counts
+
+**1 Important (I-4), 0 Critical.** Nothing else in scope changed status.
+
+*Read-only in a detached worktree at `aa93c71`; no commits; probes deleted;
+worktree removed; `git status --porcelain` empty in the fork on exit.*
