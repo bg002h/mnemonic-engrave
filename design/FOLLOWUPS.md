@@ -17038,7 +17038,7 @@ findings: whether the census ✓ is withheld until the last page on a first visi
 (bears on M-2), whether the preimage plate is really cut first (no engrave run
 was made), and the hardened KDF's timing on real hardware. Owning phase: none.
 
-### F-527 — review M-2: four of the six `ChoiceScreen` initial-selection call sites are covered by nothing
+### F-527 — review M-2: four of the six `ChoiceScreen` initial-selection call sites are covered by nothing — PARTLY CLOSED, fork `0e6ade8`
 
 Filed 2026-09-13 from the adversarial review of the script-picker preselect fix.
 
@@ -17056,11 +17056,22 @@ picker on a value the operator already chose, so the failure mode is the same
 class as journey C-1: a screen that proposes a setting while appearing to show
 one.
 
-A test per site is the obvious answer, and the cheaper one is a single table test
-over the free-text size flows that asserts each picker opens on the loaded value.
-Owning phase: none (fork, `gui/`).
+**Speed and Passes are now covered**, driven directly through their flows with a
+non-zero prior. Mutation run: removing both `cs.Initial = i` lines reds both
+sub-tests.
 
-### F-528 — review N-1: `shown` records a template the operator was never shown when the stub screen fails to render
+**Font and Size are NOT, and that is a finding rather than a gap.** Over a loaded
+size ladder — the only path on which either appears at all — each offers exactly
+**one** option, measured on all three trigger/QR combinations the harness can
+reach (`sh+constant+sh+constant+sh+constant`, `4.4+3.4+3.0mm`). Their `i > 0`
+branch is unreachable from any state a test can construct, so a test for it would
+skip forever or assert nothing, and a skipping test is a gate that never runs.
+
+Left open for someone who can answer the question that raises: is the preserve at
+those two sites dead code, or is there a path the harness cannot build? Owning
+phase: none (fork, `gui/`).
+
+### F-528 — review N-1: `shown` records a template the operator was never shown when the stub screen fails to render — CLOSED, fork `0e6ade8`
 
 Filed 2026-09-13 from the follow-ons review; **pre-existing**, not introduced by
 the diff that surfaced it.
@@ -17073,8 +17084,17 @@ never drew, and a later §8s banner can speak of *"cards minted with the old
 stub"* for a stub nobody saw.
 
 Every outcome is safe-side (the banner over-warns rather than under-warns), which
-is why it is not blocking. The fix is to distinguish the two returns so a render
-failure does not update `shown`. Owning phase: none (fork, `gui/`).
+is why it was not blocking.
+
+Closed: `composerStubFlow` returns `(forward, shown)`, and the caller records the
+chunk set and the origin memory only when the screen actually drew.
+
+**Worth recording about the test.** My first version could not fail: it read both
+returns while the flow goroutine was still blocked on the error screen, so it was
+asserting zero values, and mutating the error path to `return false, true` left
+it green. It dismisses the screen and lets the call return before asserting now.
+The mutation is what caught it — a test written for a fix in the same sitting is
+exactly where this class hides. Owning phase: none.
 
 
 ### F-529 — the fork's vendored vector corpus has DIVERGED from the primary under identical names
