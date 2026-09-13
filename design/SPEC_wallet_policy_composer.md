@@ -552,7 +552,15 @@ and value in operator units (§6b echo form), its digest (first 8 and last 8 hex
 and the EXPERIMENTAL marks; then the key-path line ("Key-path: A KEY CAN SPEND
 ALONE" for an extracted internal key, §8f's NUMS note otherwise); then the id
 NAMED by kind with both stubs (§7c); then receive and change addresses 0..1 when
-seated, or "Keyless template - no addresses" (D4). Before the screen is shown the
+seated, or, when there are none, the sentence naming WHICH of the four reasons
+applies (D4, `noAddressLines`): "Keyless template - no addresses" for a template
+declaring no slots at all, "Template has no keys - no addresses" for one
+declaring slots with a key for none of them -- which is what this composer
+builds, so it is the arm this screen shows -- §8s's refusal sentence for a
+policy that repeats a key slot, and "This device can't derive addresses for this
+policy" otherwise. A repeated slot also puts §8s's warning ABOVE whichever of
+those fires, because the reuse is a fact about the card and not about what can
+be derived from it (F-531, review I-2). Before the screen is shown the
 device asserts that the decoded shape, the slot assignment, every slot's origin
 and fingerprint (against the mapping review), the fixed use-site, and §4f's
 pairwise-distinguishability invariant all hold on the DECODED md1, and REFUSES to
@@ -1011,7 +1019,11 @@ table, so the glyph and modal-fits gates cover it.
    slots carry distinct-account origins.
    **EXECUTED 2026-09-03**: the keyless arm of the same capture (`--arm
    keyless`): the C26 door line, tr 2-of-3, the stub screen with per-slot
-   origins at accounts 0', 1', 2', consent "Keyless template - no addresses.",
+   origins at accounts 0', 1', 2', consent "Keyless template - no addresses."
+   (the sentence AS CAPTURED on 2026-09-03; F-531 later routed this branch
+   through `noAddressLines`, and a slot-declaring template now reads "Template
+   has no keys - no addresses." -- the capture is a record of that date, not a
+   claim about the current build),
    the form choice collapsed, one plate whose string is
    `md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3` (the device's
    chunk form; `md decode` prints the three distinct-account origins). The
