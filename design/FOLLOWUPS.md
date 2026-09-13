@@ -17172,6 +17172,65 @@ for a descriptor Bitcoin Core refuses to import, with nothing said. Not urgent
 only because the two consent surfaces an operator passes on the way to engraving
 now do warn.
 
+**CLOSED 2026-09-13**, GREEN at fork `0562e81` / engrave `3fbc4a02`. The device
+derives no address for a descriptor whose key list puts the same public key at
+two seats, on all three `descriptorFlow` callers and both branches of the
+Addresses button -- and the screen says why rather than silently withholding.
+
+**Measured, not assumed, at three points.** `bip380.Parse` has no duplicate
+check; `address.Supported` returns true for the shape (asserted as the block's
+own premise, so the gate cannot later pass because the capability went away);
+and TWO of the three callers carry no md1, not one as the earlier note here
+said -- a scanned descriptor and a payload record both arrive as a bare
+`*bip380.Descriptor`. That is why the rule is over the descriptor.
+
+**The rule**: two key expressions collide when they put the same public key at
+every index on at least one chain. `Children` IS compared (X/0/* and X/1/* are
+one xpub deriving two keys, and BIP 388 permits exactly that -- refusing a legal
+wallet is the expensive direction); origin metadata is NOT (it never reaches the
+script, and two seats labelled with different origins still push identical
+bytes, which is what a coordinator bug would plausibly do).
+
+**Three review rounds, and they found one defect class three times: a rule kept
+as a SECOND COPY.**
+
+- C-1: the predicate compared the *spelling* of `Children` while
+  `derivePubKey` normalises before deriving. Four spellings of one key walked
+  the refusal, and the reviewer drove the first to the screen -- the Addresses
+  choice opened and paid out the byte-identical address the refused fixture
+  produces, on a one-token edit to the input.
+- C-2: `sysw`'s admission had the same syntactic comparison, so on the payload
+  route the new gate fired only on descriptors admission had ALREADY rejected
+  and was silent on both that arrive. The primary carried it too, so it was
+  fixed in Rust first with a vector, and the Go change is the convergence port.
+- NEW-1: the two languages then implemented two *different* well-reasoned rules
+  -- receive-only in Rust, either-chain in Go -- diverging on a key that
+  collides only on the change chain. Change addresses hold funds, so either-chain
+  is the rule, widened in the primary first and pinned by a shared vector that
+  reds four named assertions if the halves drift apart.
+
+Each fix moved the question to where the knowledge lives instead of restating
+it. `address.DerivesSameKey` and `derive::derives_same_key` are now the same
+function in two languages, verified by a 324-pair property cross-check against
+ground-truth CKDpub derivation.
+
+**Two of the round's findings were about the screen, not the rule**, and both
+are the silence class: an unbounded SCANNED title pushed the warning off a
+screen that does not scroll (at 200 characters the funds sentence was cut
+mid-clause, leaving an empty button and a fragment -- the exact silent refusal
+the code cites F-531 to justify preventing, restored by an attacker-supplied
+field), and the fit gate that was supposed to catch that measured in narrow
+non-wrapping glyphs and certified 44 characters of slack while a real
+25-character title overflowed. The warning is drawn FIRST now, above everything
+the artefact controls, which is a guarantee no length budget can give.
+
+Reports: `design/agent-reports/f530-descriptor-rule-review.md`,
+`f530-fold-verification.md`, `f530-parity-verification.md`.
+
+Owning phase: closed.
+
+### F-530 (historical) — what F-531 had already narrowed
+
 **NARROWED 2026-09-13 by F-531**, and the narrowing is the useful part. The
 `expandOK` route can no longer be handed a duplicate of any kind: `scriptForTemplate`
 admits only `PolicySingle` (one slot, cannot repeat) and `PolicySortedMulti`, and
