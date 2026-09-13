@@ -17172,6 +17172,20 @@ for a descriptor Bitcoin Core refuses to import, with nothing said. Not urgent
 only because the two consent surfaces an operator passes on the way to engraving
 now do warn.
 
+**NARROWED 2026-09-13 by F-531**, and the narrowing is the useful part. The
+`expandOK` route can no longer be handed a duplicate of any kind: `scriptForTemplate`
+admits only `PolicySingle` (one slot, cannot repeat) and `PolicySortedMulti`, and
+`expandedToDescriptor` now refuses a repeated seat outright. So the two md1-bearing
+callers are covered by construction.
+
+What is left is exactly the third: **the caller that arrives with a scanned
+descriptor and no md1 behind it.** No `md.Template`, so `repeatsASeat` never runs,
+and a rule expressed over chunks cannot reach it either. That is why the remedy
+still has to be the rule over a `*bip380.Descriptor` — and why closing the two
+md1 callers instead would have left the one that matters silent under a suite
+that then looks complete. The argument is restated in `scriptForTemplate`'s doc
+comment, which F-531 updated rather than leaving to assert the superseded version.
+
 Owning phase: none (fork, `gui/`).
 
 ### F-531 — two address routes in one binary disagree for a repeated-slot multisig — PRE-EXISTING, funds-critical
@@ -17201,14 +17215,48 @@ now told something is wrong before funding — but it tells them the wallet need
 fewer keys than its label says, not that the address above it may be the wrong
 address. It is a coincidental guard, not a fix.
 
-**Before fixing, decide which route is right.** Dropping a repeated slot changes
-the script and therefore the address, so "project to one key per slot" cannot be
-reconciled with keeping `K` — one of the two has to go. The emitter's answer is
-the one the plates reconstruct, which makes it the candidate for correct, but
-that should be measured against Bitcoin Core rather than assumed.
+**CLOSED 2026-09-13** at fork `a4760e1` / engrave `a832433b`. The device now
+derives NO address for a policy that reuses a key slot, on either route.
 
-Owning phase: none, and it should get one — this is the highest-severity open
-item in the queue.
+**Measured first, decided second.** Bitcoin Core 25.0.0 on a throwaway regtest
+datadir (`getdescriptorinfo` + `deriveaddresses`, keys version-swapped to tpub,
+datadir deleted after) ACCEPTS all four descriptors below — the shape imports
+and funds, which is what made the wrong address dangerous rather than academic:
+
+| descriptor | address | which route |
+| --- | --- | --- |
+| `wsh(sortedmulti(1,A,A,B))` | `bcrt1qvljqpug…qqqkckr` | the emitter |
+| `wsh(sortedmulti(1,A,B))` | `bcrt1q2gu6t4m…s0ufenu` | **what the flat route showed** |
+| `wsh(sortedmulti(2,A,A,B))` | `bcrt1qaej2r8z…qs9h244` | the emitter |
+| `wsh(sortedmulti(2,A,B))` | `bcrt1qsl0stsx…qqz65am` | **what the flat route showed** |
+
+So the emitter was right and the flat route was not approximately wrong — it was
+answering the two-seat question.
+
+**The fix is a refusal, not a repair**, on the operator's standing ruling of
+2026-08-30 (*"bad ideas can be valid, but we don't want to support BIP forbidden
+wallets"*), reaffirmed 2026-09-13 with the reason: one key filling two seats
+signs two messages, which BIP 388's pairwise-distinctness footnote names as
+miniscript pubkey-reuse insecurity — a key-recovery hazard, not merely the
+redundancy the k-of-n label overstates. A faithful flat descriptor **was**
+measured to work (repeat the key in `Keys` and Core's address comes back) and
+was deliberately not shipped.
+
+**The primary already agreed.** `md address` refuses the shape while `md decode`
+reads the card and warns (`crates/md-cli/src/parse/reuse.rs`). The corpus gate
+recorded the convergence as `keyed_wsh_timelock_hashlock` moving from
+`{device: ok, rust: refused}` to `{device: source}` — a Go port catching up to
+already-correct Rust, the exempt direction of the Rust-primary rule.
+
+What shipped: `repeatsASeat` refuses the flat projection; `complexAddressSource`
+gates above its deriver (which stays callable, so the Core and Rust measurements
+keep running beneath the refusal); `noAddressLines` keeps the F-514 warning on
+every surface that no longer shows an address, because the warning had lived on
+the branch that HAS addresses and refusing would have reintroduced F-514's own
+silence. Fixture is fork-native at `md/testdata/forkbuilt/`, with its generator
+committed beside it.
+
+Owning phase: closed.
 
 ### F-532 — duplicate-key warning: the Minors the GREEN round left standing
 
@@ -17249,3 +17297,55 @@ M-4 is the one that is a gate rather than a wart: a test comparing a string
 against itself passes forever.
 
 Owning phase: none (fork, `gui/` and `md/`).
+
+### F-533 — two taproot key-reuse policies still derive on-device where the primary refuses
+
+Filed 2026-09-13, measured while closing F-531. Not introduced by it; F-531
+narrowed the divergence from three vectors to two and made the remaining two
+visible.
+
+`scripts/policy-generate.py --corpus` reports, at fork `a4760e1`:
+
+```
+  ok/refused       2
+```
+
+which is two vectors the **device derives an address for and the Rust primary
+refuses**: `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a`. Both are
+`tr(K, multi_a(…K…))` — one key at the taproot internal key AND inside a leaf.
+
+**Why they survived F-531's refusal.** The refusal is built on
+`md.DuplicateKeySlot`, and that predicate answers **Core's** question on
+purpose: its own doc says so, and it scopes to "one expression", under which an
+internal key sits outside every leaf and so repeats nothing. Core 25.0.0
+ACCEPTS both, measured. BIP 388 asks a different question and forbids them, and
+the Rust CLI refuses them under it (`Finding::SamePathExpression` /
+`KeyAtDisjointUseSites`, `crates/md-cli/src/parse/reuse.rs`).
+
+So the device has **one predicate serving two rules**, and it is the wrong one
+for the refusal: a warning should say what Core will do, a refusal should say
+what BIP 388 permits.
+
+**The operator's own reason points at these harder than at the multisig case.**
+The 2026-09-13 wording was *"one key signing two different messages can
+sometimes leak private key material"*. In a repeated-seat multisig both seats
+sign the SAME sighash. A taproot key that is both the internal key and a leaf
+key signs a key-path sighash and a script-path sighash — two genuinely different
+messages. The shape F-531 refused is the weaker instance of the reason; these
+two are the stronger one.
+
+**Not a wrong address.** Both derive correctly for the policy they carry, and
+they match the vendored conformance data. The divergence is which wallets the
+device will serve at all — a policy question, not a correctness one, which is
+why it is filed rather than folded into F-531.
+
+**What closing it needs** (and why it is not a one-line widening): a second
+predicate in `md` expressing BIP 388's reuse rule rather than Core's sanity
+rule, ported from the primary's taxonomy — convergence, so exempt from
+Rust-first. Then the refusal moves onto it while the F-514 warning stays on
+`md.DuplicateKeySlot`, because the warning's two sentences are Core verdicts and
+would become false on the new predicate. Note `keyed_tr_multi_a` and
+`keyed_tr_sortedmulti_a` are two of the three key-reuse vectors F-529 says a
+re-vendor would delete.
+
+Owning phase: none (fork, `md/` and `gui/`).
