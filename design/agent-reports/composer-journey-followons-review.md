@@ -916,3 +916,113 @@ error returns; this diff touches only `gui/`).
 
 *Read-only in a detached worktree at `aa93c71`; no commits; probes deleted;
 worktree removed; `git status --porcelain` empty in the fork on exit.*
+
+---
+
+## Addendum 3 — per-slot memory at `a299218`
+
+**Range:** `git diff aa93c71..a299218`, three files. Scope: the origin comparison
+rule only. Suite/vet/tinygo taken as given. Read-only worktree, probes deleted,
+worktree removed, fork clean.
+
+**Verdict: GREEN.** I could not construct a counterexample in any of the three
+directions. I-4 is closed and the fix does not trade into its opposite.
+
+**I-4 closed, measured.** The walk that was silent at `aa93c71`:
+
+```
+MEM2 | E1 nothing seated   delta=0 advertised=map[0:…0h/2h 1:…1h/2h 2:…2h/2h]
+MEM2 | E2 all seated       delta=0 advertised=map[]
+MEM2 | E3 release @2       delta=2 advertised=map[2:m/48h/0h/0h/2h]
+```
+
+E2→E3 now returns `OriginsMoved` where the previous revision returned
+`Unchanged`, and the empty middle reading no longer erases history.
+
+### 1. Too loud? No — no false positive found
+
+Every fire requires that a slot advertising **now** differs from the last origin
+that slot was **seen** advertising, and recording happens only at a stub-screen
+showing — so the remembered origin was always on screen and always mintable. The
+rule cannot warn about an origin the operator was never shown.
+
+The memory is not sticky: `remember` overwrites, so it holds the *last* advertised
+origin, and a fire is followed by quiet rather than repeating. Depart-and-return
+to the same origin stays silent, which is the case you were right to want quiet:
+
+```
+MEM4 | Q2 seat @2 at its own 2'   delta=0
+MEM4 | Q3 release @2              delta=0     (@2 re-advertises m/48h/0h/2h/2h; a card for it still seats)
+```
+
+And the round trip stays correctly loud — R2 and R3 both fire because @1 and @2
+really do move under the operator's feet in both directions:
+
+```
+MEM3 | R1 nothing seated   delta=0 advertised=map[0:…0h 1:…1h 2:…2h]
+MEM3 | R2 seat @0 at 5'    delta=2 advertised=map[1:…0h 2:…1h]
+MEM3 | R3 release @0       delta=2 advertised=map[0:…0h 1:…1h 2:…2h]
+```
+
+### 2. Shape edits do not corrupt the memory — and it is an invariant, not luck
+
+The index-keyed memory is safe because **the only edits that preserve seats are
+exactly the edits that preserve slot numbering.** An edit that renumbers changes
+`composerShapeSignature`, so `composerApplyShapeEdit` discards every assignment;
+the next reading then has all slots advertising, and the whole memory is
+overwritten before any comparison can use a pre-edit entry. An edit that does not
+renumber keeps the seats — and cannot move an origin. Measured on the one edit
+class that changes the id while leaving the signature alone, a lock-value change
+under `wsh`, with a slot seated across it:
+
+```
+MEM1 | signature equal = true
+MEM1 | id equal        = false (30c7d8d1 vs d1f5fb83)
+MEM1 | advertised identical = true
+MEM1 | composerEditCanRenumber(lock) = false
+```
+
+Signature equal, id moved, advertised origins byte-identical. So a memory entry
+carried across such an edit is still about the same slot and the same origin. I
+could produce neither a cross-slot comparison nor a silence from an inherited
+value. (Belt and braces: a reading immediately after a renumbering edit returns
+`IdMoved` anyway, which is the louder verdict.)
+
+### 3. Both recording legs are right
+
+Recording on the Back leg as well as the forward one is correct — the operator
+read the screen either way, and which button they left by does not change what
+they were told.
+
+The keyed second call recording nothing is also right, and for a reason rather
+than by luck: it is reached only when seating is complete, and if the operator
+loops, the next iteration re-derives the identical template and records it, so no
+comparison is lost. With no next reading there is no later warning to miss.
+
+One narrow caveat worth knowing, inherited rather than introduced: a slot seated
+from an mk1 card whose `Fingerprint` field is missing or malformed gets
+`fpPresent = false` (`gui/composer_sources.go:115-124`), so the advertising split
+keeps it in the set and a fully-seated reading is not always empty —
+
+```
+MEM5 | every slot seated; advertised set = map[2:m/48h/0h/4h/2h] (len 1)
+MEM5 |   Slot @2 expects a key at m/48h/0h/4h/2h
+```
+
+The screen tells the operator to mint for a slot that is already filled. That text
+predates all four revisions of this predicate; for the **memory** it is the safe
+direction, since the slot stays compared and recorded.
+
+Also checked: `seen.remember` runs *before* `composerStubFlow` renders, so an
+unshown reading could in principle be recorded. It cannot in practice —
+`composerAdvertisedOrigins` and `composerStubLines` both go through `Reassemble`,
+so the failure that hides the screen also returns nil origins and `remember(nil)`
+is a no-op.
+
+### Counts
+
+**0 Critical, 0 Important, 0 Minor** in scope. Nothing else changed status.
+Ship it.
+
+*Read-only in a detached worktree at `a299218`; no commits; probes deleted;
+worktree removed; `git status --porcelain` empty in the fork on exit.*
