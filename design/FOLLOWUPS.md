@@ -16740,10 +16740,35 @@ The mechanism: a taproot internal key sits **outside** the miniscript, so
 `wsh` vector `@1` really is repeated within **one** miniscript, across both arms
 of the `or_i`.
 
-So `md address` is right to refuse one of the three and over-broad on the other
-two. The fix is not "pick one of the three behaviours" — it is to make the guard
-ask Core's question (duplicate keys *within a miniscript expression*) rather than
-BIP-388's disjointness question, which is about a different layer.
+**ROOT CAUSE, found 2026-09-13 by reading the guard rather than inferring from
+its output — and it corrects the paragraph this entry first carried.** The guard
+is not over-broad and does not need Core's question. It is deliberate, it cites
+BIP-388's disjointness rule and an operator ruling, and it already carries a
+`Disposition` parameter with an explicit design rule:
+
+> MINTING verbs only (`Disposition::Refuse`: encode). Reading verbs (`Warn`:
+> verify, inspect) must keep reading already-engraved plates whose shapes the
+> sanity rules reject.
+
+`md address` and `md descriptor` both reach the guard through
+`cmd/build.rs::build_descriptor`, which hardcodes `Disposition::Refuse` because
+it is shared with the minting path. **Neither verb mints anything.** Deriving an
+address is a reading operation, and the most load-bearing one there is: it is how
+an operator checks what a card they already engraved actually pays to. So the
+design's own rule is violated by its own plumbing, not by its logic.
+
+That also explains the three-way split cleanly. The generator derives because
+deriving is legal; `md decode` warns because it is a reading verb; `md address`
+refuses because it borrowed a minting verb's disposition.
+
+Core's verdict is a separate layer and does not bear on the fix: Core checks
+*script* sanity, BIP-388 disjointness is a *wallet-policy* rule, and the two
+disagree about the taproot vectors for a good reason — a taproot internal key
+sits outside the miniscript.
+
+**Fix**: `build_descriptor` takes a `Disposition`; `address` and `descriptor`
+pass `Warn`; `encode` keeps `Refuse`. Normative admission behaviour, so it earns
+a plan and an R0 gate before code.
 
 Owning phase: none (host-side, `descriptor-mnemonic`).
 
