@@ -1,4 +1,4 @@
-# Continuity — F-531 DONE, F-530 next, before the flash
+# Continuity — F-531 and F-530 both DONE; the flash is next
 
 **Updated 2026-09-13.** Everything below is measured, not recalled.
 Supersedes the pre-F-531 version of this file (see `git log` on this path).
@@ -7,8 +7,8 @@ Supersedes the pre-F-531 version of this file (see `git log` on this path).
 
 | repo | branch | tip | state |
 | --- | --- | --- | --- |
-| `mnemonic-engrave` | `master` | `7ea49ac3` | see push status below |
-| `seedhammer` (fork) | `main` | `9b36ed7` | see push status below |
+| `mnemonic-engrave` | `master` | `eb896ddb` | F-531 pushed at `ab1f9f10`; F-530 commits after it not yet pushed |
+| `seedhammer` (fork) | `main` | `0562e81` | F-531 pushed at `9b36ed7` (CI green); F-530 commits after it not yet pushed |
 | `descriptor-mnemonic` | `main` | `40c400de` | pushed, unchanged this session |
 
 ## F-531 — CLOSED, GREEN
@@ -59,35 +59,47 @@ fork `9b36ed7` (fold) → engrave `9db77cf5` (records fold) → `81ca436d`
   green. They are gone, each site noting that F-533's remedy would make them
   live again with no coverage.
 
-## F-530 — next, and smaller than it looked
+## F-530 — CLOSED, GREEN
 
-`descriptorFlow` → `DescriptorScreen.Confirm` → `descriptorAddressFlow` shows
-addresses with no duplicate-key warning.
+The device derives no address for a descriptor that puts the same public key at
+two seats. All three `descriptorFlow` callers, both branches of the Addresses
+button, and the screen says why rather than silently withholding.
 
-**Measured this session** (read-only, no code written yet):
+Fork `0562e81`, engrave `3fbc4a02`. Full detail is in FOLLOWUPS; the three
+reports are `design/agent-reports/f530-descriptor-rule-review.md`,
+`f530-fold-verification.md` and `f530-parity-verification.md`.
 
-- **Three callers, and TWO of them carry no md1** — not one, as the earlier
-  version of this file said. `gui/gui.go:2599` (a scanned `*bip380.Descriptor`),
-  `gui/wallet_policy.go:122` (`nonstandard.OutputDescriptor` over a payload
-  record), and `gui/md1_gather.go:177` (the only chunk-bearing one, and already
-  covered by F-531's gates). So the rule must be over a `*bip380.Descriptor`.
-- **`bip380.Parse` has no duplicate check** (`bip380/bip380.go:295-350`); nor do
-  the BlueWallet / JSON / bare-key arms of `nonstandard.OutputDescriptor`.
-- **One choke point**: `supported := address.Supported(s.Descriptor)` at
-  `gui/gui.go:3238` gates the Addresses button for all three callers.
+**What a future reader most needs from this one.** Three review rounds found the
+SAME defect class three times, and it was never arithmetic — it was a rule kept
+as a **second copy**:
 
-**Proposed shape** (not yet reviewed): a predicate over `*bip380.Descriptor` —
-two `Keys` entries equal in `KeyData` + `ChainCode` + `Children`. Origin metadata
-(`MasterFingerprint`, `DerivationPath`) is deliberately EXCLUDED: only the
-derived pubkey reaches the script. Including `Children` is what keeps a BIP-388
--legal disjoint multipath (`/0/*` vs `/1/*`) from being called a duplicate.
+1. `gui/` copied the deriver's normalisations, so the predicate compared the
+   *spelling* of a key expression. Four spellings of one key walked the
+   refusal; a one-token edit to the input opened the Addresses choice and paid
+   out the byte-identical address the refused fixture produces.
+2. `sysw/` copied the primary's admission, so on the payload route the new gate
+   fired only on descriptors admission had already rejected.
+3. The two languages then held two *different* well-reasoned versions of the
+   same sentence — receive-only in Rust, either-chain in Go — and disagreed
+   about a key that collides only on the change chain.
 
-**One thing to settle first**: `verifyAddressFlow` (`gui/gui.go:3251`) is a
-second consumer of the same descriptor. Left alone it would confirm an address
-the device has just declined to derive.
+`address.DerivesSameKey` and `derive::derives_same_key` are now one rule in two
+languages, cross-checked over 324 pairs against ground-truth CKDpub derivation
+and pinned by a shared vector (`gate/duplicate-key-change-chain-only`) that
+reds four named assertions if they drift.
 
-`scriptForTemplate`'s doc comment already states what F-531 left of F-530 —
-read it before starting.
+**And two findings were about the screen, not the rule** — both the silence
+class, both worth remembering before adding any warning to a device screen:
+
+- An unbounded **scanned** Title pushed the warning off a screen that does not
+  scroll. At 200 characters the funds sentence itself was cut mid-clause,
+  leaving "2-of-3 multisig", a fragment and an empty button — the exact silent
+  refusal the code cites F-531 to justify preventing, restored by a field the
+  artefact controls. The warning is drawn FIRST now; nothing can push it down
+  because nothing is above it, which is a guarantee no length budget gives.
+- The fit gate meant to catch that measured in narrow non-wrapping `x` glyphs
+  and certified 44 characters of slack while a real 25-character title
+  overflowed. Measure in the unit the thing is actually made of.
 
 ## Also open
 
