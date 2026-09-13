@@ -39,6 +39,10 @@ thousands, and the interesting ones are the shapes nobody thought to write down.
 ## Running it
 
 ```sh
+# the standing gate: every vendored vector, diffed against the recorded
+# per-vector baseline. Exits 1 and names any vector whose verdict moved.
+python3 scripts/policy-generate.py --corpus
+
 # two-way, fast, boundary locks, with the engrave leg
 python3 scripts/policy-generate.py --count 1200 --seed 4711 --edges
 
