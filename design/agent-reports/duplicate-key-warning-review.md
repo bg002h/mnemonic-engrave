@@ -411,3 +411,298 @@ needs one `getdescriptorinfo` call to settle or dismiss. I-2 and I-3 are gate
 defects rather than behaviour defects — one guarantee with no test, and two
 recorded mutations that do not red — and both would have been caught by running
 the notes rather than writing them.
+
+---
+
+# Addendum — fold re-review at 22bace1
+
+Range: `git diff ad64629..22bace1`. The branch moved, so I separated the two
+given commits from the fold and reviewed only the latter:
+`git diff 0e6ade8..22bace1` is exactly the eight files named
+(`gui/composer_consent.go`, `composer_copy.go`, `composer_copy_test.go`,
+`composer_flow_test.go`, `md1_gather.go`, `wallet_policy.go`,
+`md/duplicate_keys.go`, `duplicate_keys_test.go`, +330/−60);
+`git diff ad64629..0e6ade8` is F-527/F-528 only (`composer_flow.go`,
+`composer_stub.go`, `composer_stub_test.go`, `freetext_sizeproof_test.go`) and I
+treated it as given. Fresh detached worktree at `22bace1`, every mutation
+reverted, tree left clean, worktree removed.
+
+Scope was "did the fold close each finding, and did it introduce a new defect" —
+not a fresh audit. **Two new Importants, both introduced by the fold.**
+
+## Verdicts on the round-1 findings
+
+| finding | verdict |
+|---|---|
+| C-1 inspect surface silent | **CLOSED** (behaviour) — but the gate for it is in the wrong place, see I-4 |
+| I-1 false Core claim on a multisig | **CLOSED** in direction; the replacement sentence carries a new false claim, see I-5 |
+| I-2 untested `walletPolicyAddressLines` | **CLOSED** — verified by mutation on all three producers |
+| I-3 false mutation note | **CLOSED** in `md`; the same class reappears in `gui`, see M-5 |
+| M-1, M-2, M-3, M-4 | not folded, as stated; M-1 now applies to both sentences |
+
+**C-1 — the surface is the one I traced, and it is the only one of its kind.**
+`policyIDHeader` (`gui/md1_gather.go:207`) feeds `md1PolicyFlow`'s `header`
+parameter at `gui/md1_gather.go:188`, and `md1PolicyFlow` lays that header out
+above the Button2 address list (`gui/md1_inspect.go:123-130`, `:166`). There are
+exactly two callers of `md1PolicyFlow`: that one, and `md1DisplayFlow`
+(`gui/md1_inspect.go:107`), which passes `nil, nil` — no header **and** no
+address deriver, so it draws no address and needs no warning. There are two
+callers of `policyIDHeader` and both are tests plus that one site. No sibling
+entry was missed this time. Rendered for real, the header now returns:
+
+```
+Policy id: 799c164288c19c7f5ac03bdb5635d978
+Slot @1 is used twice in one script. Bitcoin Core refuses this descriptor ("duplicate public keys"), so a coordinator may not import it. Check before you fund it.
+```
+
+**I-2 — closed, verified.** Deleting the `DuplicateKeySlotChunks` block from each
+producer in turn reds exactly that producer's row (mutation table below). The
+whole-suite hole I measured last round is gone.
+
+**I-3 — closed in `md`, and the correction is accurate.** Re-ran the mutation on
+the fold: `duplicateInTapTree` → `duplicateInExpression` reds only
+`TestDuplicateKeySlotScopesPerTapLeaf/one_key_in_two_leaves_is_not_a_duplicate`;
+both tr rows in `TestDuplicateKeySlotMatchesBitcoinCore` and all four rows in
+`TestConsentWarnsOnDuplicateKeys` stay green — which is what
+`md/duplicate_keys_test.go:48-56` now says, including the "do not delete it as
+redundant" clause.
+
+---
+
+## I-4 — the C-1 gate asserts `policyIDHeader`, not the screen. Dropping the warning from `md1PolicyFlow` leaves 1306/1306 green.
+
+`TestEveryAddressSurfaceCarriesTheDuplicateWarning/inspect descriptor`
+(`gui/composer_flow_test.go:653-656`) asserts on `policyIDHeader(chunks)` — the
+producer's return value. Its own comment states the assumption:
+
+> policyIDHeader is what md1PolicyFlow lays out above the address button, so
+> this is the line set that screen actually draws.
+
+True at `22bace1`, and nothing asserts it. Mutation MF1b — one line in the
+consumer, keeping the policy id and silently discarding everything after it:
+
+```go
+// gui/md1_inspect.go:123
+	if len(header) > 1 { // MUTATION MF1b: only the id line survives
+		header = header[:1]
+	}
+```
+
+```
+$ scripts/gui-shard-test.sh ./gui/ 24
+=== wall: 24s ===
+RESULT: ok -- all 1306 tests ran across 24 shards
+```
+
+The Inspect-descriptor screen shows addresses for `keyed_wsh_timelock_hashlock`
+with no warning again — C-1 exactly — and every test passes. The coupling is
+only *partly* protected by accident: dropping the header **entirely** does red,
+but on a pre-existing test and for the wrong reason
+(`TestComplexPolicyScreenNamesWhichWalletID`, `policy_address_test.go:320`,
+*"the complex-policy screen does not name the wallet id it shows"*). Nothing
+anywhere asserts that the warning survives the consumer.
+
+This is I-2's defect moved down one layer. I-2 was "a surface with no test"; the
+fix asserted the producer for all three, and for two of them the producer *is*
+the line set the caller renders, while for the third there is a consumer in
+between that can drop it. The test that would close this is small — the three
+lines of `md1_inspect.go:123-130` are extractable, or assert on a drawn frame —
+and it would catch M-6 below at the same time.
+
+## I-5 — the replacement multisig sentence overstates, and contradicts a line on its own screen
+
+`composerCopyDuplicateKeys` for `DuplicateInMultisig`:
+
+> Slot @%d fills two seats of this multisig, so one key can **meet the threshold
+> alone**.
+
+That holds only when the repeated slot's multiplicity reaches `k`. It was
+measured on `sortedmulti(2,A,A,B)`, where two seats *are* the threshold, and then
+stated universally — which is the shape of I-1 reproduced inside its own fix.
+
+Counterexample, built by rewriting the real `keyed_wsh_sortedmulti_2of3` to
+`sortedmulti(3,@0,@0,@1,@2)` (k=3, four seats, @0 twice, `n` unchanged at 3; it
+re-encodes through `md.split` and re-decodes cleanly — `validatePlaceholderUsage`
+admits it) and run through the real `walletPolicyConsentLines`:
+
+```
+Policy-ID: 3bd80bfbe639910e8558eb076b61d65e
+Type: P2WSH 3-of-4 multisig (sorted)
+@0 73c5da0a m/48h/0h/0h/2h <0;1>/*
+@1 73c5da0a m/48h/0h/1h/2h <0;1>/*
+@2 73c5da0a m/48h/0h/2h/2h <0;1>/*
+
+Slot @0 fills two seats of this multisig, so one key can meet the threshold alone. Check this is what you meant before you fund it.
+```
+
+Two of three is not the threshold. @0 alone signs twice and is still one
+signature short; the policy needs @0 plus one other. The screen says "3-of-4" and
+"one key can meet the threshold alone" **five lines apart**, and one of them is
+wrong.
+
+The harm is real and worth stating — the wallet is satisfiable by two independent
+holders while its label says three — so the answer is not to drop the sentence.
+What the predicate actually knows is "this slot fills more than one seat"; what
+it does not know, without comparing multiplicity against `k`, is whether that is
+sufficient on its own. Either compare them and say the true thing in each case,
+or state only the part that is always true (fewer holders than the label names).
+`TestDuplicateWarningNamesTheRightHarm` pins the overstating clause verbatim
+(`says: "meet the threshold alone"`), so it cannot catch this.
+
+By the fold's own standard, in its own commit
+(`gui/composer_copy.go:333-336`): *"a false sentence on the screen that consents
+to steel is worse than no sentence."*
+
+## M-5 — the gui half of the I-3 correction reintroduces a false mutation note
+
+`gui/composer_flow_test.go:687-688`:
+
+> MUTATION: make `kindForRoot` always return `DuplicateInMiniscript` and the
+> multisig rows fail.
+
+`TestDuplicateWarningNamesTheRightHarm` (`:689`) never calls `kindForRoot`,
+never decodes a policy and never calls `DuplicateKeySlot` — it passes the kind in
+by hand (`composerCopyDuplicateKeys(0, tc.want)`). Measured:
+
+```
+--- MF3: kindForRoot always InMiniscript ---
+md:  FAIL TestDuplicateKindSplitsByWhatCoreDoes  (3 multisig rows)
+gui: ok   seedhammer.com/gui   0.068s
+```
+
+Minor rather than Important, and the difference from I-3 matters: the identical
+note on `md/duplicate_keys_test.go:180` is **true**, and
+`TestDuplicateKindSplitsByWhatCoreDoes` really does guard the discriminant. So
+the rule has coverage; only the gui note points at a test that cannot provide it.
+The gui test's real guarantee is "each kind gets its own sentence and neither
+carries the other's claim", which is worth having — the note should say that.
+
+## M-6 — the Inspect screen hard-chunks the warning at 20 bytes, mid-word
+
+`md1PolicyFlow` runs every header line through `chunkString(ln, 20)`
+(`gui/md1_inspect.go:126`), a blind byte cut with no word boundaries
+(`gui/mk1_inspect.go:21-31`). That convention suits the two things the screen
+carried before — a 32-hex policy id and `@N` origin rows — and the warning is the
+first prose ever put on it. What the operator reads:
+
+```
+ 3 |Slot @1 is used twic|
+ 4 |e in one script. Bit|
+ 5 |coin Core refuses th|
+ 6 |is descriptor ("dupl|
+ 7 |icate public keys"),|
+ 8 | so a coordinator ma|
+ 9 |y not import it. Che|
+10 |ck before you fund i|
+11 |t.|
+```
+
+Nine centred fragments, seven of them splitting a word. The same string
+word-wraps correctly on both consent surfaces, which pass whole lines to
+`widget.Labelw`. It also costs ~207 px of a 224 px viewport, so it very nearly
+fills the page on its own. No text is lost (paging is gap-free), which is why
+this is Minor and not more — but the warning that F-514 exists to deliver is the
+one line on the device rendered worse than any other, and the test in I-4 cannot
+see it because `strings.Contains` runs on the unchunked producer output.
+
+## N-3 — `kindForRoot` would misclassify `multi_a` under `wsh`/`sh`, which is unreachable
+
+`kindForRoot` (`md/duplicate_keys.go:119`) maps `tagMultiA`/`tagSortedMultiA` to
+`DuplicateInMultisig`. Under `tr` that never matters — the `tagTr` arm hardcodes
+`DuplicateInMiniscript` and never consults it, which is correct. Under `wsh`/`sh`
+it would be reached, and would be wrong twice over: Core cannot parse
+`wsh(multi_a(...))` at all, so neither sentence is true of it. Unreachable:
+`script_emit.go:520-527` refuses `tagMultiA`/`tagSortedMultiA` when `!e.tap`, so
+`complexAddressSource` probes, fails, and the device shows
+"Complex policy - display only" with no address and no warning. Nit only.
+
+---
+
+## The three questions, answered
+
+**(1) Is the discriminant right for the shapes you did not test? Yes, for every
+one you named.** Run through `DuplicateKeySlot` directly:
+
+| shape | kind | Core | right |
+|---|---|---|---|
+| `wsh(sortedmulti(2,@0,@0,@1))` | InMultisig | ACCEPTED (your measurement) | yes |
+| `wsh(multi(2,@0,@0,@1))` | InMultisig | ACCEPTED (your measurement) | yes |
+| `sh(wsh(sortedmulti(2,@0,@0,@1)))` | InMultisig | MultisigDescriptor | yes |
+| **`sh(multi(2,@0,@0,@1))` bare** | InMultisig | MultisigDescriptor | yes |
+| **`sh(sortedmulti(2,@0,@0,@1))` bare** | InMultisig | MultisigDescriptor | yes |
+| **`wsh(v:multi(2,@0,@0))`** one wrapper deep | InMiniscript | miniscript → IsSane | yes |
+| **`wsh(and_v(v:multi(2,@0,@0),pk(@1)))`** | InMiniscript | miniscript → IsSane | yes |
+| `wsh(thresh(2,pk@0,pk@1,pk@0))` | InMiniscript | miniscript → IsSane | yes |
+| `wsh(or_i(multi(2,@1,@2),multi(1,@1,@2)))` | InMiniscript | REFUSED (measured) | yes |
+| `wsh(and_v(pk(@0),pk(@0)))` | InMiniscript | REFUSED (measured) | yes |
+| **`tr(NUMS,{multi_a(2,@0,@0), pk(@1)})`** | InMiniscript | tapscript IS miniscript → refused | yes |
+| **`tr(NUMS,{sortedmulti_a(2,@0,@0), pk(@1)})`** | InMiniscript | same | yes |
+| `tr(NUMS,{sortedmulti_a(2,@0,@0)})` sole leaf | InMiniscript | same | yes |
+| `tr(NUMS,{and_v(v:pk@0,pk@0)})` sole leaf | InMiniscript | same | yes |
+| `wsh(multi_a(2,@0,@0,@1))` | InMultisig | unparseable | **no** — N-3, unreachable |
+
+The taproot cases are right for a reason worth writing down: the `tagTr` arm
+never calls `kindForRoot`, and it must not — `multi_a`/`sortedmulti_a` in a
+tapleaf *are* miniscript to Core (there is no MultisigDescriptor in tapscript),
+so hardcoding `DuplicateInMiniscript` there is the correct answer, not a
+shortcut. A future edit that "unifies" the two arms by routing tr through
+`kindForRoot` would silently start telling taproot operators Core imports a
+descriptor it refuses. Nothing pins that today.
+
+**(2) Does `policyIDHeader` reach every Inspect route? Yes — see C-1 above.** Two
+`md1PolicyFlow` callers, one passes the header and an address source, the other
+passes neither and shows no address. No sibling missed. But the assertion that
+keeps it that way is in the wrong place (I-4).
+
+**(3) Do the new tests fail on the guarantees they name?** Yes, except the one
+note in M-5. Full mutation table below.
+
+## Leaving the `expandOK` arm open is defensible, and here is the mechanism
+
+Not a judgement call — `scriptForTemplate` (`gui/md1_expand.go:102-141`) bounds
+it. `expandOK` requires `PolicySingle` (wpkh / pkh / tr key-path-only /
+sh(wpkh) — one key slot, so `duplicateInExpression` can never report a repeat) or
+`PolicySortedMulti` (wsh / sh(wsh) / bare sh — a **top-level sortedmulti**, which
+`kindForRoot` maps to `DuplicateInMultisig` by construction). Every other shape —
+unsorted `multi`, `multi_a`, `sortedmulti_a`, any taptree, any miniscript —
+returns `false` and routes to `md1PolicyFlow`, which now warns.
+
+So **the `expandOK` arm can only ever carry `DuplicateInMultisig`, never
+`DuplicateInMiniscript`.** It cannot reproduce C-1: there is no shape it can show
+an address for that Core refuses. What it withholds is the multisig warning, and
+the same policy carries that warning on the Engrave Wallet Policy consent screen
+— the surface that actually precedes cutting steel. Ship it and file it.
+
+One condition, worth putting in the follow-up so the deferral has a trip-wire
+rather than an expiry date: **this argument dies the moment `scriptForTemplate`
+grows an arm for plain `multi` or for any miniscript shape.** On that day a
+Core-refused descriptor reaches `descriptorFlow` unwarned and C-1 is back, on the
+one surface with no chunk set to run a predicate over. A line in
+`scriptForTemplate` saying so costs nothing now and is the only thing that will
+be read at the right moment.
+
+## Mutation table
+
+| # | mutation | result | matches the note |
+|---|---|---|---|
+| MF2a | delete the block in `composerConsentLinesFor` | `TestConsentWarnsOnDuplicateKeys/keyed_wsh_timelock_hashlock`, `…/composer consent` red | yes |
+| MF2b | delete the block in `walletPolicyAddressLines` | `…/wallet policy consent` red | yes |
+| MF2c | delete the block in `policyIDHeader` | `…/inspect descriptor` red | yes |
+| MF1 | `md1PolicyFlow` ignores `header` entirely | reds, but on a pre-existing test and for the id, not the warning | — |
+| **MF1b** | **`md1PolicyFlow` keeps only `header[:1]`** | **1306/1306 green** | **I-4** |
+| MF3 | `kindForRoot` always `DuplicateInMiniscript` | md `TestDuplicateKindSplitsByWhatCoreDoes` red ×3; **gui green** | md yes, **gui no (M-5)** |
+| M1 | `duplicateInTapTree` → whole taptree | only `…ScopesPerTapLeaf/one_key_in_two_leaves` red | yes — the corrected note is accurate |
+
+Housekeeping at `22bace1`, unmutated: `go build ./...` clean, `go test ./md/` ok,
+tracked tree clean after every revert.
+
+## Counts
+
+**0 Critical / 2 Important / 2 Minor / 1 Nit — NOT GREEN.**
+
+Nothing on the device is wrong today except I-5's sentence. I-4 is a gate in the
+wrong place, and it is the same gate that was missing last round, one layer
+further down — worth fixing now while the reason is in front of you rather than
+after the next consumer edit. I-5 is a false claim on a consent screen, held to
+the standard the fold's own commit sets. M-3 and M-4 from the first pass remain
+open as agreed, and M-1 now reads against both sentences.
