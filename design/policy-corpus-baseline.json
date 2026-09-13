@@ -191,8 +191,7 @@
   "rust": "agrees"
  },
  "keyed_wsh_timelock_hashlock": {
-  "device": "ok",
-  "rust": "refused"
+  "device": "source"
  },
  "keyless_tr_with_leaf": {
   "device": "source"

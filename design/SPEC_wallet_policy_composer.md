@@ -853,6 +853,15 @@ hashed path's material, and two H6 §10.1 added, for one that does.
 
 > Slot @0, key path (spends alone): choose a key
 
+The last body is F-531. The device declines to derive an address for a policy
+that seats one key slot more than once -- BIP 388 forbids the shape, and its
+pairwise-distinctness rule cites miniscript pubkey-reuse insecurity -- so the
+screens that would have shown an address show this instead, under the F-514
+warning that names the reuse.
+
+> No addresses: this device does not derive them
+> for a wallet that reuses a key.
+
 ### 8t. Date floor and ceiling (§6b)
 
 The CEILING body is F-456, folded in at composer S3's review r0 (M-3). §8t
