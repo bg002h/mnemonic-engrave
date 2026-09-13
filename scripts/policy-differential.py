@@ -308,7 +308,22 @@ def generate_policy(rng: random.Random, limits: Limits) -> Policy:
         if rng.random() < 0.55:
             kind = rng.choice(LOCK_KINDS)
             lo, hi = LOCK_RANGES[kind]
-            lock = (kind, rng.randint(lo, hi))
+            # Half the time, SNAP to a boundary instead of drawing uniformly.
+            #
+            # A uniform draw over after_height's 1..499,999,999 reaches either
+            # end with probability 2e-9, so a run of a thousand policies tests
+            # the middle of every range and never an edge -- and the edges are
+            # where the bugs are. after=499,999,999 is the largest value that
+            # reads as a HEIGHT and after=500,000,000 the smallest that reads as
+            # a TIME, one integer apart and meaning entirely different things;
+            # older=Nu sets BIP-68's type flag, so older=1u lowers to
+            # older(4194305) via a 22-bit shift that an independent
+            # reimplementation has every chance of getting wrong.
+            #
+            # Uniform draws are kept for the other half: a boundary-only
+            # generator stops being a fuzzer.
+            lock = (kind, rng.choice((lo, hi)) if rng.random() < 0.5
+                    else rng.randint(lo, hi))
 
         sha = None
         if keyless or rng.random() < 0.30:
