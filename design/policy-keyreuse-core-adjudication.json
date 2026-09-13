@@ -1,0 +1,126 @@
+[
+  {
+    "vector": "keyed_tr_multi_a",
+    "template": "tr(@0/48'/0'/0'/2'/<0;1>/*,multi_a(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))",
+    "chains": {
+      "0": {
+        "expected_device_and_vector": [
+          "bc1pf4aujydl48hah9qxvk4j0dcce737pl9svne7rmzcprrh7y92znsstul4rt",
+          "bc1pcnwrffqu4s92jzhcsmfa6umx4fy6etr5mypgd4wd7exz3ulzkfsqgxrx9e",
+          "bc1p9hq3fjyts3jrd459falj98mth3dfn0jlhhrmh0kz3lag2r0nqyhscsh630"
+        ],
+        "descriptor": "tr([73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/0/*,multi_a(2,[73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/0/*,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/0/*))#34e29cce",
+        "core": {
+          "ok": true,
+          "addresses": [
+            "bcrt1pf4aujydl48hah9qxvk4j0dcce737pl9svne7rmzcprrh7y92znss3druv7",
+            "bcrt1pcnwrffqu4s92jzhcsmfa6umx4fy6etr5mypgd4wd7exz3ulzkfsqjhl02v",
+            "bcrt1p9hq3fjyts3jrd459falj98mth3dfn0jlhhrmh0kz3lag2r0nqyhszptn76"
+          ]
+        },
+        "agree": true
+      },
+      "1": {
+        "expected_device_and_vector": [
+          "bc1pvjyetykk677lgwsjehc2vhutdgxk344mc8sfy80hqgr64zr5c38s8qpezm",
+          "bc1pxcs9x2tj6fq9cgtc4d3duwjsxlcr8f647cdrraz8cd8ppxaz6q4qu43tdc",
+          "bc1p5cudgxhx3ctqv28s4x7ul963pyfq74vjvgvg6wy2k6slf2als3kslxumz7"
+        ],
+        "descriptor": "tr([73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/1/*,multi_a(2,[73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/1/*,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/1/*))#lydz4695",
+        "core": {
+          "ok": true,
+          "addresses": [
+            "bcrt1pvjyetykk677lgwsjehc2vhutdgxk344mc8sfy80hqgr64zr5c38sa3asdw",
+            "bcrt1pxcs9x2tj6fq9cgtc4d3duwjsxlcr8f647cdrraz8cd8ppxaz6q4qxydzzd",
+            "bcrt1p5cudgxhx3ctqv28s4x7ul963pyfq74vjvgvg6wy2k6slf2als3ks9hqjdt"
+          ]
+        },
+        "agree": true
+      }
+    },
+    "md_rc": 1,
+    "md_stdout": "",
+    "md_stderr": "md: unsupported: @0 appears at 2 use sites in this template with the same path expression, so ONE key would fill every one of them. That is forbidden by BIP 388's disjointness rule (\"if two KEY are KP/<M;N>/* and KP/<P;Q>/* for the same key placeholder KP, then the sets {M, N} and {P, Q} must be disjoint\"), whose forbidden-example list names sh(multi(1,@0/**,@0/**)) \u2014 \"Repeated keys with the same path expression\". md declines to mint or compose this shape: give each distinct key its own placeholder.",
+    "verdict": "Core AGREES with the device and the vector on every index and both chains \u2192 md's refusal is a GUARD over a descriptor all three of Core, the device and the vector agree on."
+  },
+  {
+    "vector": "keyed_tr_sortedmulti_a",
+    "template": "tr(@0/48'/0'/0'/2'/<0;1>/*,sortedmulti_a(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*))",
+    "chains": {
+      "0": {
+        "expected_device_and_vector": [
+          "bc1p588jmtx4ptv76t9sclt6gt33eyydvsrea4njyayerqj2frw5m5aq5gzycw",
+          "bc1pcnwrffqu4s92jzhcsmfa6umx4fy6etr5mypgd4wd7exz3ulzkfsqgxrx9e",
+          "bc1p9hq3fjyts3jrd459falj98mth3dfn0jlhhrmh0kz3lag2r0nqyhscsh630"
+        ],
+        "descriptor": "tr([73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/0/*,sortedmulti_a(2,[73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/0/*,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/0/*))#aveqv6gq",
+        "core": {
+          "ok": true,
+          "addresses": [
+            "bcrt1p588jmtx4ptv76t9sclt6gt33eyydvsrea4njyayerqj2frw5m5aqwe7dhm",
+            "bcrt1pcnwrffqu4s92jzhcsmfa6umx4fy6etr5mypgd4wd7exz3ulzkfsqjhl02v",
+            "bcrt1p9hq3fjyts3jrd459falj98mth3dfn0jlhhrmh0kz3lag2r0nqyhszptn76"
+          ]
+        },
+        "agree": true
+      },
+      "1": {
+        "expected_device_and_vector": [
+          "bc1p6ynk908l3tegvsw3dxctw6z76sjw39k3p6c4udrwgqjw0rrc0fdqjcgxzz",
+          "bc1pxk4fpa4e92n27l0fzl4zcy7lynhjndqw9w7fqsevf9y9y5kfv0gqn5du5s",
+          "bc1p5cudgxhx3ctqv28s4x7ul963pyfq74vjvgvg6wy2k6slf2als3kslxumz7"
+        ],
+        "descriptor": "tr([73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/1/*,sortedmulti_a(2,[73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/1/*,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/1/*))#wz40cgjr",
+        "core": {
+          "ok": true,
+          "addresses": [
+            "bcrt1p6ynk908l3tegvsw3dxctw6z76sjw39k3p6c4udrwgqjw0rrc0fdqgf50dh",
+            "bcrt1pxk4fpa4e92n27l0fzl4zcy7lynhjndqw9w7fqsevf9y9y5kfv0gqf934m9",
+            "bcrt1p5cudgxhx3ctqv28s4x7ul963pyfq74vjvgvg6wy2k6slf2als3ks9hqjdt"
+          ]
+        },
+        "agree": true
+      }
+    },
+    "md_rc": 1,
+    "md_stdout": "",
+    "md_stderr": "md: unsupported: @0 appears at 2 use sites in this template with the same path expression, so ONE key would fill every one of them. That is forbidden by BIP 388's disjointness rule (\"if two KEY are KP/<M;N>/* and KP/<P;Q>/* for the same key placeholder KP, then the sets {M, N} and {P, Q} must be disjoint\"), whose forbidden-example list names sh(multi(1,@0/**,@0/**)) \u2014 \"Repeated keys with the same path expression\". md declines to mint or compose this shape: give each distinct key its own placeholder.",
+    "verdict": "Core AGREES with the device and the vector on every index and both chains \u2192 md's refusal is a GUARD over a descriptor all three of Core, the device and the vector agree on."
+  },
+  {
+    "vector": "keyed_wsh_timelock_hashlock",
+    "template": "wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))),and_v(v:older(65535),multi(1,@1/48'/0'/1'/2'/<0;1>/*,@2/48'/0'/2'/2'/<0;1>/*))))",
+    "chains": {
+      "0": {
+        "expected_device_and_vector": [
+          "bc1q6h9y4ngdfacaplw0qk67rugxs3vanv0jayk3n3xnhed7uke76zksfqt7py",
+          "bc1qxpr87hlr3p87ryhulq9pfv5tceuh84vya23k7qfnx3vlwnefu7fqlkln2u",
+          "bc1qs7e05hz6gvjw5h3539wk0f40hjz8h30ttkc04h57c7mxhv6mkntsckaad7"
+        ],
+        "descriptor": "wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,[73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/0/*,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/0/*,[73c5da0a/48'/0'/2'/2']xpub661MyMwAqRbcGS5QF7iox7vX4iVsg1dj9epBz8dhpHDRoJTCNYChFEZhZ26Fda2Bz3GyUAUPNGRn1zhwMZktL49GBdUAc1cPCMPNm3cGkqg/0/*))),and_v(v:older(65535),multi(1,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/0/*,[73c5da0a/48'/0'/2'/2']xpub661MyMwAqRbcGS5QF7iox7vX4iVsg1dj9epBz8dhpHDRoJTCNYChFEZhZ26Fda2Bz3GyUAUPNGRn1zhwMZktL49GBdUAc1cPCMPNm3cGkqg/0/*))))#gcw77kra",
+        "core": {
+          "ok": false,
+          "stage": "getdescriptorinfo",
+          "error": "error code: -5: or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,[73c5da0a/48'/0'/0'/2']tpubD6NzVbkrYhZ4YCy3bBLN9LwRZedxC52vWak3tSz9mSbnokHD6KF3SHYhvrBezZKJzKchkz8M6V65hrV13L8UNqCYnUkpW2DhMo9kkqKtPzA/0/*,[73c5da0a/48'/0'/1'/2']tpubD6NzVbkrYhZ4XsBwTmwvXrDUf5DBB2Zt4ZxfHEf5yaRFeDf6rk1DDuU775KgLjSPxTC41GCgMRw1aJU3hnvZVYgda6NFVLty8V5hLLFVrCC/0/*,[73c5da0a/48'/0'/2'/2']tpubD6NzVbkrYhZ4YEGFhJhuA3FtPqbXfQ8nhHQVLggrAByKYb7uSm3nPgEXo4B3A4yRmwot5jzFuNFpiBCYkRc8DVbZFEDUHYGcnJynX9T3Et9/0/*))),and_v(v:older(65535),multi(1,[73c5da0a/48'/0'/1'/2']tpubD6NzVbkrYhZ4XsBwTmwvXrDUf5DBB2Zt4ZxfHEf5yaRFeDf6rk1DDuU775KgLjSPxTC41GCgMRw1aJU3hnvZVYgda6NFVLty8V5hLLFVrCC/0/*,[73c5da0a/48'/0'/2'/2']tpubD6NzVbkrYhZ4YEGFhJhuA3FtPqbXfQ8nhHQVLggrAByKYb7uSm3nPgEXo4B3A4yRmwot5jzFuNFpiBCYkRc8DVbZFEDUHYGcnJynX9T3Et9/0/*))) is not sane: contains duplicate public keys"
+        }
+      },
+      "1": {
+        "expected_device_and_vector": [
+          "bc1q07uflsu9p3u726guelte2shtezn338xprnq2z9vd6zefj9d37wrqsh5hse",
+          "bc1qqylxadry89hxcs00cmmh8ze8648l0mnc8sg9ru62fjc2wz67kt9q8vvflx",
+          "bc1qleg8dc68caqz4cv7chrwn7tfdeate3zs3zzffr6atfdang67d8hsjlgs0m"
+        ],
+        "descriptor": "wsh(or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,[73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbcGQnC8zMGwRc4EXYJCgXrxx9kXtw1RXqu4TcW26PxHqssgp6sU4N5CR5o9QcUZPG31fzPeUHEVPkFit1WpVZTmqZLzpvZG2s/1/*,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/1/*,[73c5da0a/48'/0'/2'/2']xpub661MyMwAqRbcGS5QF7iox7vX4iVsg1dj9epBz8dhpHDRoJTCNYChFEZhZ26Fda2Bz3GyUAUPNGRn1zhwMZktL49GBdUAc1cPCMPNm3cGkqg/1/*))),and_v(v:older(65535),multi(1,[73c5da0a/48'/0'/1'/2']xpub661MyMwAqRbcG5161axqKvt7Kx7XBe4pWwNMvgbwdffMtvzPnXA85ToGs3EtpEVAAYf9PggopL6xt7ySJw5Kc7ELWVcwopEjYXVHaHy6tFz/1/*,[73c5da0a/48'/0'/2'/2']xpub661MyMwAqRbcGS5QF7iox7vX4iVsg1dj9epBz8dhpHDRoJTCNYChFEZhZ26Fda2Bz3GyUAUPNGRn1zhwMZktL49GBdUAc1cPCMPNm3cGkqg/1/*))))#5k94mva0",
+        "core": {
+          "ok": false,
+          "stage": "getdescriptorinfo",
+          "error": "error code: -5: or_i(and_v(v:after(1000000),and_v(v:sha256(a84dce40975727c398023cfbd50d5db3b9662375521d0f1ac62dbd829b9a08ad),multi(2,[73c5da0a/48'/0'/0'/2']tpubD6NzVbkrYhZ4YCy3bBLN9LwRZedxC52vWak3tSz9mSbnokHD6KF3SHYhvrBezZKJzKchkz8M6V65hrV13L8UNqCYnUkpW2DhMo9kkqKtPzA/1/*,[73c5da0a/48'/0'/1'/2']tpubD6NzVbkrYhZ4XsBwTmwvXrDUf5DBB2Zt4ZxfHEf5yaRFeDf6rk1DDuU775KgLjSPxTC41GCgMRw1aJU3hnvZVYgda6NFVLty8V5hLLFVrCC/1/*,[73c5da0a/48'/0'/2'/2']tpubD6NzVbkrYhZ4YEGFhJhuA3FtPqbXfQ8nhHQVLggrAByKYb7uSm3nPgEXo4B3A4yRmwot5jzFuNFpiBCYkRc8DVbZFEDUHYGcnJynX9T3Et9/1/*))),and_v(v:older(65535),multi(1,[73c5da0a/48'/0'/1'/2']tpubD6NzVbkrYhZ4XsBwTmwvXrDUf5DBB2Zt4ZxfHEf5yaRFeDf6rk1DDuU775KgLjSPxTC41GCgMRw1aJU3hnvZVYgda6NFVLty8V5hLLFVrCC/1/*,[73c5da0a/48'/0'/2'/2']tpubD6NzVbkrYhZ4YEGFhJhuA3FtPqbXfQ8nhHQVLggrAByKYb7uSm3nPgEXo4B3A4yRmwot5jzFuNFpiBCYkRc8DVbZFEDUHYGcnJynX9T3Et9/1/*))) is not sane: contains duplicate public keys"
+        }
+      }
+    },
+    "md_rc": 1,
+    "md_stdout": "",
+    "md_stderr": "md: unsupported: @1 appears at 2 use sites in this template with the same path expression, so ONE key would fill every one of them. That is forbidden by BIP 388's disjointness rule (\"if two KEY are KP/<M;N>/* and KP/<P;Q>/* for the same key placeholder KP, then the sets {M, N} and {P, Q} must be disjoint\"), whose forbidden-example list names sh(multi(1,@0/**,@0/**)) \u2014 \"Repeated keys with the same path expression\". md declines to mint or compose this shape: give each distinct key its own placeholder.",
+    "verdict": "Core REFUSES this descriptor \u2192 md's refusal has independent support; the device is the outlier."
+  }
+]
