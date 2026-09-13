@@ -358,6 +358,19 @@ def main():
                          "height/time split) instead of ordinary values")
     args = ap.parse_args()
 
+    # Check the tools BEFORE doing any work. A missing binary was a raw
+    # FileNotFoundError traceback out of subprocess, several hundred policies
+    # into a run, which reads like a harness bug rather than a setup one.
+    need = [("md", args.md), ("fork checkout", args.fork)]
+    if not args.no_bundle:
+        need.append(("me", args.me))
+    for label, path in need:
+        if not os.path.exists(path):
+            sys.exit("%s not found at %s\n"
+                     "  md is built with `cargo build` in descriptor-mnemonic,\n"
+                     "  me with `cargo build` in mnemonic-engrave (or pass --no-bundle),\n"
+                     "  and the fork checkout must hold cmd/policyprobe." % (label, path))
+
     vectors = os.path.join(args.fork, "md", "testdata", "vectors")
     xpubs = load_xpubs(vectors)
     if not xpubs:
