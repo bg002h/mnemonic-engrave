@@ -17209,3 +17209,43 @@ that should be measured against Bitcoin Core rather than assumed.
 
 Owning phase: none, and it should get one — this is the highest-severity open
 item in the queue.
+
+### F-532 — duplicate-key warning: the Minors the GREEN round left standing
+
+Filed 2026-09-13. The F-514 review closed GREEN at fork `8f9e4d8` with 0
+Critical and 0 Important; these are the recorded-not-gating residue, in the
+order the reviewer would take them. Detail is verbatim in
+`design/agent-reports/duplicate-key-warning-review.md`.
+
+**M-7 is the one with a false sentence in it, and it is worth taking first.**
+The fewer-keys wording is *"fewer separate keys can spend this than its k-of-n
+says"*, which is true for every k **except 1**: a `1-of-3` with one slot twice
+still needs one key, so the sentence claims a reduction that is not there. The
+warning is still warranted at k = 1 — the label overstates the redundancy, and
+F-531 shows the derived address is wrong for exactly that shape — but it needs a
+sentence true at k = 1 too.
+
+**M-8**: the I-5 retraction reached the string and not three of the four places
+that state the rule, so comments still describe the superseded claim. This is
+the `folds-fail-by-incomplete-propagation` shape: grep the old phrasing, not just
+the code.
+
+**M-9** (partly folded): the fewer-keys sentence says "seat" and "its k-of-n" to
+a policy that has neither when the root is not a threshold.
+
+**M-1**: `@N` has no referent on the composer consent screen — the operator is
+told a slot number the screen never shows. **M-2**: only the lowest duplicated
+slot is named, and the shipped vector duplicates two. **M-3**:
+`composerCopyOriginsChanged` lost its doc comment to the new function above it.
+**M-4**: the new copy row has no §8s spec entry, so the "verbatim from the spec"
+test compares it against itself — a gate that cannot fail. **M-5**: the gui half
+of the I-3 correction reintroduces a false mutation note.
+
+**N-4**: the trip-wire's failure message prints an integer. **N-1**, **N-3**,
+**N-6**: unreachable-today invariants, recorded so the day they become reachable
+is not a surprise.
+
+M-4 is the one that is a gate rather than a wart: a test comparing a string
+against itself passes forever.
+
+Owning phase: none (fork, `gui/` and `md/`).
