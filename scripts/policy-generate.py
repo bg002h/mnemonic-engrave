@@ -339,7 +339,7 @@ def main():
                     help="path to the `me` binary for the engrave leg")
     ap.add_argument("--no-bundle", action="store_true",
                     help="skip the engrave leg (`me bundle`)")
-    ap.add_argument("--fork", default="/scratch/code/shibboleth/.tmp/seedhammer-ppfix",
+    ap.add_argument("--fork", default="/scratch/code/shibboleth/seedhammer",
                     help="fork checkout holding cmd/policyprobe")
     ap.add_argument("--indices", type=int, default=2, help="addresses per chain to compare")
     ap.add_argument("--manifest", default=None, help="write every case's compose args here")
