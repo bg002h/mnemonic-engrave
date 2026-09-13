@@ -253,6 +253,82 @@ def rust_addresses(md, chunks, count):
     return [a["address"] if isinstance(a, dict) else a for a in addrs], None
 
 
+def probe_batch(fork, cases):
+    """Run the whole batch through one policyprobe process.
+
+    One process, not one per case: the tool is a co-process by design and flushes
+    each result as it is produced.
+    """
+    env = dict(os.environ)
+    env["PATH"] = "/scratch/code/shibboleth/.toolchain/go/bin:" + env.get("PATH", "")
+    env.setdefault("TMPDIR", "/scratch/code/shibboleth/.tmp")
+    proc = subprocess.run(["go", "run", "./cmd/policyprobe"],
+                          input="\n".join(json.dumps(c) for c in cases),
+                          capture_output=True, text=True, cwd=fork, env=env)
+    if proc.returncode != 0:
+        sys.exit("policyprobe failed: %s" % proc.stderr.strip()[:300])
+    out = {}
+    for line in proc.stdout.splitlines():
+        doc = json.loads(line)
+        out[doc["id"]] = doc
+    return out
+
+
+def corpus_cases(vectors_dir, indices):
+    """Every vendored vector, as probe cases, in a stable order."""
+    cases = []
+    for name in sorted(os.listdir(vectors_dir)):
+        if not name.endswith(".phrase.txt"):
+            continue
+        vid = name[: -len(".phrase.txt")]
+        chunks = []
+        with open(os.path.join(vectors_dir, name)) as fh:
+            for line in fh:
+                line = line.strip().replace(" ", "")
+                if line.startswith("md1"):
+                    chunks.append(line)
+        if chunks:
+            cases.append({"id": vid, "chunks": chunks,
+                          "indices": list(range(indices))})
+    return cases
+
+
+def run_corpus(args, probe_results, cases):
+    """Compare each vendored vector's verdict against the recorded baseline.
+
+    WHY A BASELINE AND NOT A COUNT. A run that only prints "45 derivable" passes
+    while one vector starts deriving and another stops, which is the drift most
+    worth catching -- the counts are equal and the device has changed its mind
+    about two policies. So the baseline is PER VECTOR, and the diff names which
+    ones moved and in which direction.
+
+    It is a file that must be edited deliberately, like a golden test, because
+    the alternative is a gate that rewrites its own expectations and therefore
+    cannot fail.
+    """
+    observed = {}
+    for case in cases:
+        cid = case["id"]
+        dev = probe_results.get(cid)
+        if dev is None:
+            observed[cid] = {"device": "MISSING"}
+            continue
+        if dev.get("panic"):
+            observed[cid] = {"device": "panic"}
+            continue
+        if not dev.get("ok"):
+            observed[cid] = {"device": dev.get("stage", "?")}
+            continue
+        rust, _ = rust_addresses(args.md, case["chunks"], args.indices)
+        if rust is None:
+            observed[cid] = {"device": "ok", "rust": "refused"}
+        elif rust == dev["receive"]:
+            observed[cid] = {"device": "ok", "rust": "agrees"}
+        else:
+            observed[cid] = {"device": "ok", "rust": "DISAGREES"}
+    return observed
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -267,6 +343,16 @@ def main():
                     help="fork checkout holding cmd/policyprobe")
     ap.add_argument("--indices", type=int, default=2, help="addresses per chain to compare")
     ap.add_argument("--manifest", default=None, help="write every case's compose args here")
+    ap.add_argument("--corpus", action="store_true",
+                    help="run the VENDORED vectors instead of generating, and diff "
+                         "each one's verdict against the recorded baseline")
+    ap.add_argument("--baseline",
+                    default="/scratch/code/shibboleth/mnemonic-engrave/design/policy-corpus-baseline.json",
+                    help="per-vector baseline for --corpus")
+    ap.add_argument("--write-baseline", action="store_true",
+                    help="with --corpus, OVERWRITE the baseline with what was observed. "
+                         "Deliberate, never automatic: a gate that rewrites its own "
+                         "expectations cannot fail.")
     ap.add_argument("--edges", action="store_true",
                     help="draw locks from the BOUNDARY set (BIP-68 type flag, BIP-65 "
                          "height/time split) instead of ordinary values")
@@ -277,6 +363,9 @@ def main():
     if not xpubs:
         sys.exit("no xpubs found in %s" % vectors)
     max_slots = len(xpubs)
+
+    if args.corpus:
+        return corpus_main(args, vectors)
 
     rng = random.Random(args.seed)
     cases, manifest = [], {}
@@ -305,19 +394,7 @@ def main():
     if not cases:
         sys.exit("every generated policy was refused before it reached a comparison")
 
-    # One policyprobe process for the whole batch: it is a co-process by design.
-    env = dict(os.environ)
-    env["PATH"] = "/scratch/code/shibboleth/.toolchain/go/bin:" + env.get("PATH", "")
-    env.setdefault("TMPDIR", "/scratch/code/shibboleth/.tmp")
-    proc = subprocess.run(["go", "run", "./cmd/policyprobe"],
-                          input="\n".join(json.dumps(c) for c in cases),
-                          capture_output=True, text=True, cwd=args.fork, env=env)
-    if proc.returncode != 0:
-        sys.exit("policyprobe failed: %s" % proc.stderr.strip()[:300])
-    device = {}
-    for line in proc.stdout.splitlines():
-        doc = json.loads(line)
-        device[doc["id"]] = doc
+    device = probe_batch(args.fork, cases)
 
     agree = disagree = roundtrip_broken = bundle_refused = 0
     tmpdir = os.environ.get("TMPDIR", "/tmp")
@@ -410,6 +487,60 @@ def main():
     # A disagreement or a panic is a failure of the SYSTEM, not of this script,
     # and the exit code says so, so a CI job can gate on it.
     return 1 if (disagree or panics or roundtrip_broken) else 0
+
+
+def corpus_main(args, vectors):
+    cases = corpus_cases(vectors, args.indices)
+    if not cases:
+        sys.exit("no vendored vectors under %s" % vectors)
+    results = probe_batch(args.fork, cases)
+    observed = run_corpus(args, results, cases)
+
+    if args.write_baseline:
+        with open(args.baseline, "w") as fh:
+            json.dump(observed, fh, indent=1, sort_keys=True)
+            fh.write("\n")
+        print("baseline written: %s (%d vectors)" % (args.baseline, len(observed)))
+        return 0
+
+    try:
+        with open(args.baseline) as fh:
+            expected = json.load(fh)
+    except OSError as exc:
+        sys.exit("no baseline at %s (%s). Create it with --write-baseline once you "
+                 "have checked the verdicts by hand." % (args.baseline, exc))
+
+    moved, gone, appeared = [], [], []
+    for cid, want in sorted(expected.items()):
+        got = observed.get(cid)
+        if got is None:
+            gone.append(cid)
+        elif got != want:
+            moved.append((cid, want, got))
+    for cid in sorted(observed):
+        if cid not in expected:
+            appeared.append(cid)
+
+    counts = {}
+    for v in observed.values():
+        key = v["device"] if v["device"] != "ok" else "ok/" + v.get("rust", "?")
+        counts[key] = counts.get(key, 0) + 1
+    print("corpus: %d vectors" % len(observed))
+    for key in sorted(counts):
+        print("  %-16s %d" % (key, counts[key]))
+
+    if not (moved or gone or appeared):
+        print("every vector matches the baseline")
+        return 0
+    for cid, want, got in moved:
+        print("  MOVED    %s: baseline %s, now %s" % (cid, want, got))
+    for cid in gone:
+        print("  GONE     %s: in the baseline, not in the corpus" % cid)
+    for cid in appeared:
+        print("  NEW      %s: in the corpus, not in the baseline" % cid)
+    print("A MOVED line is the device or the primary changing its mind about a "
+          "policy. Read it before rewriting the baseline.")
+    return 1
 
 
 if __name__ == "__main__":

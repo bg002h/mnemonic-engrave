@@ -1,0 +1,248 @@
+{
+ "compose_tr_seven_leaves": {
+  "device": "source"
+ },
+ "compose_tr_thirty_two_slots": {
+  "device": "source"
+ },
+ "compose_wsh_eight_paths": {
+  "device": "source"
+ },
+ "compose_wsh_thirty_two_slots": {
+  "device": "source"
+ },
+ "gap_tr_leaf_and_v": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "gap_tr_leaf_pkh": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "gap_wsh_andor": {
+  "device": "source"
+ },
+ "keyed_compose_preset_decaying_multisig": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_hashlock_gated": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_kofn_recovery": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_plain_multisig": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_simple_timelocked_inheritance": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_tiered_recovery": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_sh_sole": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_sh_two_of_four": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_sh_wsh_one_of_two": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_sh_wsh_sole": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_extracted_first": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_extracted_later_four_paths": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_hash_leaf": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_key_path_only": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_nums_three_leaves": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_sole_sortedmulti_a": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_three_paths_extracted_later": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_two_path_distinct_fingerprints": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_two_path_nums": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_tr_unsorted_sole_leaf": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_hash_and_time": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_locked_head_or_i": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_single_head_or_i": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_sole_sortedmulti": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_three_paths": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_timelock_hashlock": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_two_path_distinct_fingerprints": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_two_path_or_d": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_wsh_unsorted_sole": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_tr_depth2": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_tr_depth2_rightspine": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_tr_keyonly": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_tr_multi_a": {
+  "device": "ok",
+  "rust": "refused"
+ },
+ "keyed_tr_pathological": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_tr_sortedmulti_a": {
+  "device": "ok",
+  "rust": "refused"
+ },
+ "keyed_tr_with_leaf": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wpkh": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wsh_multi_2of3": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wsh_or_b": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wsh_or_d_degrading": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wsh_sortedmulti_2of3": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wsh_thresh": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_wsh_timelock_hashlock": {
+  "device": "ok",
+  "rust": "refused"
+ },
+ "keyless_tr_with_leaf": {
+  "device": "source"
+ },
+ "nums_taproot": {
+  "device": "source"
+ },
+ "pkh_basic": {
+  "device": "source"
+ },
+ "seat_same_origin_two_masters": {
+  "device": "source"
+ },
+ "sh_wpkh": {
+  "device": "expand"
+ },
+ "sh_wsh_multi": {
+  "device": "source"
+ },
+ "single_string_boundary": {
+  "device": "source"
+ },
+ "tr_keyonly": {
+  "device": "source"
+ },
+ "tr_with_leaf": {
+  "device": "source"
+ },
+ "wpkh_basic": {
+  "device": "source"
+ },
+ "wsh_divergent_paths": {
+  "device": "source"
+ },
+ "wsh_multi_2of2": {
+  "device": "source"
+ },
+ "wsh_multi_2of3": {
+  "device": "source"
+ },
+ "wsh_multi_chunked": {
+  "device": "source"
+ },
+ "wsh_sortedmulti": {
+  "device": "source"
+ },
+ "wsh_sortedmulti_2chunk": {
+  "device": "source"
+ },
+ "wsh_with_fingerprints": {
+  "device": "source"
+ }
+}
