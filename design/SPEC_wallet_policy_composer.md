@@ -878,6 +878,19 @@ this section as the rule that is implemented, not the rule that is intended.
 > No addresses: this device does not derive them
 > for a wallet that reuses a key.
 
+F-530 carries the same rule to a descriptor that arrived with NO md1 behind it
+-- scanned as a QR, or read from a payload record. Two of `descriptorFlow`'s
+three callers are that shape, so the rule there is expressed over a
+`*bip380.Descriptor` (two key expressions that derive the same pubkey) rather
+than over slots. It needs its own sentence because the one above names a slot
+the operator has never been shown, and because the screen it appears on states
+"2-of-3 multisig" counted from the key list -- a redundancy the wallet does not
+have.
+
+> Check before funding: one key fills more than
+> one seat of this wallet, so fewer separate keys
+> can spend it than its k-of-n says.
+
 ### 8t. Date floor and ceiling (§6b)
 
 The CEILING body is F-456, folded in at composer S3's review r0 (M-3). §8t
