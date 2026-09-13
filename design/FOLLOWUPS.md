@@ -16740,35 +16740,45 @@ The mechanism: a taproot internal key sits **outside** the miniscript, so
 `wsh` vector `@1` really is repeated within **one** miniscript, across both arms
 of the `or_i`.
 
-**ROOT CAUSE, found 2026-09-13 by reading the guard rather than inferring from
-its output — and it corrects the paragraph this entry first carried.** The guard
-is not over-broad and does not need Core's question. It is deliberate, it cites
-BIP-388's disjointness rule and an operator ruling, and it already carries a
-`Disposition` parameter with an explicit design rule:
+**CORRECTED TWICE. Read this paragraph and not the two it replaces.** I first
+called the guard over-broad, then called it a plumbing accident. Both were wrong,
+and both came from reading the guard's own comments without reading the tests
+that pin it.
 
-> MINTING verbs only (`Disposition::Refuse`: encode). Reading verbs (`Warn`:
-> verify, inspect) must keep reading already-engraved plates whose shapes the
-> sanity rules reject.
+`md address` and `md descriptor` refuse key reuse **deliberately**, and the
+refusal is a prior review's funds-safety finding (converter whole-diff r1 C1,
+2026-08-30). Verbatim from `crates/md-cli/tests/duplicate_key_slots.rs`:
 
-`md address` and `md descriptor` both reach the guard through
-`cmd/build.rs::build_descriptor`, which hardcodes `Disposition::Refuse` because
-it is shared with the minting path. **Neither verb mints anything.** Deriving an
-address is a reading operation, and the most load-bearing one there is: it is how
-an operator checks what a card they already engraved actually pays to. So the
-design's own rule is violated by its own plumbing, not by its logic.
+> `md descriptor` and `md address` build the same wallet through
+> `cmd::build::build_descriptor` and RENDER it without ever encoding, so the
+> guard never ran on that route: measured 2026-08-30,
+> `sortedmulti(2,X,X,Y)` shipped with exit 0 and no warning — a 2-of-3 one key
+> alone can spend
 
-That also explains the three-way split cleanly. The generator derives because
-deriving is legal; `md decode` warns because it is a reading verb; `md address`
-refuses because it borrowed a minting verb's disposition.
+The assertion that pins it reads *"md {verb} composed a wallet one key alone can
+spend"*. That is not a reading verb borrowing a minting verb's disposition; it is
+a guard placed on exactly these two verbs because they render a wallet without
+encoding one.
 
-Core's verdict is a separate layer and does not bear on the fix: Core checks
-*script* sanity, BIP-388 disjointness is a *wallet-policy* rule, and the two
-disagree about the taproot vectors for a good reason — a taproot internal key
-sits outside the miniscript.
+**So what is actually left of F-513** is much narrower: the corpus ships
+`.conformance.json` addresses for three shapes the CLI will not derive, because
+the vector generator does not go through that guard. Nobody is harmed by it —
+the addresses are correct and the CLI's refusal is the safe direction — but a
+reader who meets it concludes the tool is broken.
 
-**Fix**: `build_descriptor` takes a `Disposition`; `address` and `descriptor`
-pass `Warn`; `encode` keeps `Refuse`. Normative admission behaviour, so it earns
-a plan and an R0 gate before code.
+**Two ways to close it, and the second is not mine to choose:**
+
+1. **Make the corpus honest.** Either stop emitting conformance addresses for
+   shapes the CLI refuses, or mark those vectors as decode-only fixtures. This
+   is unambiguous, touches no refusal, and removes the confusion. It is the part
+   worth doing without asking.
+2. **Narrow the guard to the hazard.** BIP 388 disjointness is wider than the
+   danger the review measured: `sortedmulti(2,X,X,Y)` lets one key meet a
+   threshold alone, whereas `@1` appearing in two different `or_i` arms — the
+   shape in `keyed_wsh_timelock_hashlock` — is an ordinary recovery path, and
+   Bitcoin Core accepts two of the three corpus vectors. Narrowing would make
+   the CLI derive shapes it currently refuses. **That is a funds-safety
+   loosening and it needs the operator's ruling, not mine.**
 
 Owning phase: none (host-side, `descriptor-mnemonic`).
 
