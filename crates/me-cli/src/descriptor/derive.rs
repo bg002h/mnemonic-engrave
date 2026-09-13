@@ -43,6 +43,75 @@ use bitcoin::{Address, NetworkKind, ScriptBuf};
 
 use super::cascade::{Derivation, Key, Multi, Parsed, Script};
 
+/// The derivation `derive` applies to a key that carries none of its own:
+/// BIP-388's `<0;1>/*`. Stated ONCE, so that everything asking "is this the
+/// same key" applies the same default.
+const DEFAULT_CHILDREN: [Derivation; 2] = [
+    Derivation::Range { start: 0, end: 1 },
+    Derivation::Wildcard { hardened: false },
+];
+
+/// One element as `derive` resolves it for `change`: the child id, and whether
+/// this is the trailing wildcard (whose id is the address index, equal for
+/// equal indices).
+///
+/// `None` for an element derivation refuses, so a key that cannot derive is
+/// never reported as deriving the same thing as another.
+///
+/// HARDENED IS ABSENT ON PURPOSE, mirroring `derive`: `/0h/*` derives the
+/// unhardened child and `/*h` the plain wildcard, so two spellings differing
+/// only in hardening ARE one key.
+fn resolve_child(d: &Derivation, change: bool) -> Option<(u32, bool)> {
+    match d {
+        Derivation::Child { index, .. } => Some((*index, false)),
+        Derivation::Range { start, end } => {
+            if *end != start + 1 {
+                return None;
+            }
+            Some((if change { *end } else { *start }, false))
+        }
+        Derivation::Wildcard { .. } => Some((0, true)),
+    }
+}
+
+/// Whether two key expressions put the SAME public key at every address index,
+/// on at least one chain.
+///
+/// THE QUESTION CONJUNCT 8(b) ASKS, answered here rather than in `admit`,
+/// because the answer depends on the normalisations in this module. The check
+/// compared `a.children == b.children` and admitted four spellings of one key
+/// (F-530 review C-2); comparing `receive_path` alone then fixed that but left
+/// the Go port and this half disagreeing on a key that collides only on CHANGE
+/// (fold review NEW-1). Change addresses hold funds too, so EITHER chain is the
+/// rule, and it is now the same sentence on both sides -- `address.DerivesSameKey`
+/// in the fork is this function.
+pub(crate) fn derives_same_key(a: &Key, b: &Key) -> bool {
+    if a.identity() != b.identity() {
+        return false;
+    }
+    let ac: &[Derivation] = if a.children.is_empty() {
+        &DEFAULT_CHILDREN
+    } else {
+        &a.children
+    };
+    let bc: &[Derivation] = if b.children.is_empty() {
+        &DEFAULT_CHILDREN
+    } else {
+        &b.children
+    };
+    if ac.len() != bc.len() {
+        return false;
+    }
+    [false, true].iter().any(|&change| {
+        ac.iter().zip(bc.iter()).all(|(x, y)| {
+            match (resolve_child(x, change), resolve_child(y, change)) {
+                (Some(px), Some(py)) => px == py,
+                _ => false,
+            }
+        })
+    })
+}
+
 /// One key's path to ITS receive address 0, or `None` for a use-site outside
 /// §4.7 conjunct 7's closed set (unreachable after admission).
 ///
