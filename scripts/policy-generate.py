@@ -73,6 +73,30 @@ LOCKS = [
     "after=1000000",
 ]
 
+# The values a boundary lives on, all of which the composer ACCEPTS -- verified
+# by running each one. The ones it rejects (older=0, older=65536, after=0,
+# after=500000000 without the `t`, after=499999999t) are not here: a generator
+# that spends its run watching the composer refuse measures the composer's
+# argument parser, which has its own tests, and not the seam.
+#
+# The `u` and `t` suffixes are the interesting half. `older=Nu` sets BIP-68's
+# type flag, so older=1u lowers to older(4194305), not older(1) -- a 22-bit
+# shift that an independent reimplementation has every chance of getting wrong,
+# and that no vendored vector exercises. `after=Tt` crosses BIP-65's
+# height/time boundary at 500000000, where the same integer means two different
+# things depending on which side of it you are on.
+LOCKS_EDGE = [
+    None,
+    "older=1",            # the smallest relative height
+    "older=65535",        # the largest
+    "older=1u",           # -> older(4194305): type flag set, one unit
+    "older=65535u",       # -> older(4259839): type flag set, the largest
+    "after=1",            # the smallest absolute height
+    "after=499999999",    # the largest height before it reads as a time
+    "after=500000000t",   # the smallest time, the same integer the line above rejects
+    "after=2147483647t",  # the largest time
+]
+
 
 def run(cmd, stdin=None):
     """Run a command and return (rc, stdout, first line of stderr)."""
@@ -105,7 +129,7 @@ def load_xpubs(vectors_dir):
     return sorted(seen)
 
 
-def make_policy(rng, max_slots):
+def make_policy(rng, max_slots, locks=LOCKS, max_paths=8, max_n=6):
     """Draw one policy: a wrapper and an ordered list of spend paths.
 
     Slot budget is tracked across paths because the composer's limit is on the
@@ -124,14 +148,14 @@ def make_policy(rng, max_slots):
         return wrapper, ["%dof%d" % (rng.randint(1, n), n)], n
     paths = []
     slots = 0
-    for _ in range(rng.randint(1, 8)):
-        n = rng.randint(1, 6)
+    for _ in range(rng.randint(1, max_paths)):
+        n = rng.randint(1, max_n)
         if slots + n > max_slots:
             break
         k = rng.randint(1, n)
         slots += n
         spec = "%dof%d" % (k, n)
-        lock = rng.choice(LOCKS)
+        lock = rng.choice(locks)
         if lock:
             spec += "," + lock
         if rng.random() < 0.35:
@@ -220,6 +244,9 @@ def main():
                     help="fork checkout holding cmd/policyprobe")
     ap.add_argument("--indices", type=int, default=2, help="addresses per chain to compare")
     ap.add_argument("--manifest", default=None, help="write every case's compose args here")
+    ap.add_argument("--edges", action="store_true",
+                    help="draw locks from the BOUNDARY set (BIP-68 type flag, BIP-65 "
+                         "height/time split) instead of ordinary values")
     args = ap.parse_args()
 
     vectors = os.path.join(args.fork, "md", "testdata", "vectors")
@@ -233,7 +260,8 @@ def main():
     gen_refused = {}
     for i in range(args.count):
         cid = "gen-%05d" % i
-        wrapper, paths, slots = make_policy(rng, max_slots)
+        wrapper, paths, slots = make_policy(
+            rng, max_slots, locks=LOCKS_EDGE if args.edges else LOCKS)
         composed, err = compose(args.md, wrapper, paths)
         template = composed["template_with_origins"] if composed else None
         if composed is None:
@@ -313,7 +341,8 @@ def main():
         else:
             both_refused += 1
 
-    print("generated %d, compared %d (seed %d)" % (args.count, len(cases), args.seed))
+    print("generated %d, compared %d (seed %d%s)" % (
+        args.count, len(cases), args.seed, ", EDGES" if args.edges else ""))
     if gen_refused:
         print("refused before comparison:")
         for reason, n in sorted(gen_refused.items(), key=lambda kv: -kv[1]):
