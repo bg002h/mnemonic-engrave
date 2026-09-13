@@ -219,6 +219,25 @@ def encode(md, template, xpubs, slots):
     return chunks, None
 
 
+def bundle(me, chunks, tmpdir):
+    """Ask `me bundle` whether this card set can be ENGRAVED.
+
+    This is the leg between "the codec accepts it" and "a plate exists". A
+    policy can encode cleanly and still be unmintable -- the 64-chunk wire cap
+    (F-515) is exactly that shape -- and the operator meets that wall after
+    choosing the keys and the shape, which is the worst moment to meet it.
+
+    Exit codes are read from the process, never through a pipe: `me bundle`
+    returns 4 on an incomplete set and 0 on a good one, and a `| tail` between
+    them reports tail's 0 for both.
+    """
+    path = os.path.join(tmpdir, "bundle-in.txt")
+    with open(path, "w") as fh:
+        fh.write("\n".join(chunks) + "\n")
+    rc, _, err = run([me, "bundle", "--in", path])
+    return (rc == 0), err
+
+
 def rust_addresses(md, chunks, count):
     cmd = [md, "address"] + chunks + [
         "--network", "mainnet", "--index", "0", "--count", str(count), "--json",
@@ -240,6 +259,10 @@ def main():
     ap.add_argument("--count", type=int, default=200, help="policies to generate")
     ap.add_argument("--seed", type=int, default=1, help="RNG seed; a run is reproducible from it")
     ap.add_argument("--md", default="/scratch/code/shibboleth/descriptor-mnemonic/target/debug/md")
+    ap.add_argument("--me", default="/scratch/code/shibboleth/mnemonic-engrave/target/debug/me",
+                    help="path to the `me` binary for the engrave leg")
+    ap.add_argument("--no-bundle", action="store_true",
+                    help="skip the engrave leg (`me bundle`)")
     ap.add_argument("--fork", default="/scratch/code/shibboleth/.tmp/seedhammer-ppfix",
                     help="fork checkout holding cmd/policyprobe")
     ap.add_argument("--indices", type=int, default=2, help="addresses per chain to compare")
@@ -296,7 +319,8 @@ def main():
         doc = json.loads(line)
         device[doc["id"]] = doc
 
-    agree = disagree = roundtrip_broken = 0
+    agree = disagree = roundtrip_broken = bundle_refused = 0
+    tmpdir = os.environ.get("TMPDIR", "/tmp")
     device_only = rust_only = both_refused = 0
     findings = []
     for case in cases:
@@ -313,6 +337,12 @@ def main():
         # same address is much weaker evidence than two templates being equal,
         # and an encoder that dropped a lock would still produce an address
         # both sides agree on -- they would simply agree about the wrong wallet.
+        if not args.no_bundle:
+            ok, berr = bundle(args.me, case["chunks"], tmpdir)
+            if not ok:
+                bundle_refused += 1
+                findings.append((cid, "BUNDLE-REFUSED", berr))
+
         back, derr = decode_template(args.md, case["chunks"])
         want = manifest[cid]["template_origin_less"]
         if back is None:
@@ -353,6 +383,8 @@ def main():
     print("rust only        %d  (device refused)" % rust_only)
     print("both refused     %d" % both_refused)
     print("ROUNDTRIP broken %d  (card does not decode to what it encoded)" % roundtrip_broken)
+    if not args.no_bundle:
+        print("BUNDLE refused   %d  (encodes, but `me bundle` will not mint it)" % bundle_refused)
 
     panics = [f for f in findings if f[1] == "PANIC"]
     if panics:
