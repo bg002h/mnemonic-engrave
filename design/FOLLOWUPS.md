@@ -16507,7 +16507,24 @@ uppercase string still reads *"whose 4-character id is not `hash`"* — measured
 at me `f503` after this fold — which is now at odds with a device that reads the
 id in either case. That is F-504, and it is the next item.
 
-### F-507 — `composer-hashlocks-are-sha256-only-while-md1-carries-four-hash-fragments`: the Wallet Policy composer's spend path holds ONE 32-byte hash and lowers it to `sha256()` unconditionally, so `hash160()`, `ripemd160()` and `hash256()` policies cannot be built on the device or by `md compose` — while the md1 WIRE FORMAT carries all four and round-trips them today (repo: **seedhammer fork** + **descriptor-mnemonic**; owning phase: **the next composer cycle**) `#composer` `#md` `#miniscript`
+### F-507 — `composer-hashlocks-are-sha256-only-while-md1-carries-four-hash-fragments`
+
+**SPEC GREEN 2026-09-14** — `design/SPEC_hashlock_kinds.md` at `2a0da99f`, after
+three R0 rounds (1C/6I → 1C/2I → 0C/0I). The owning phase named below ("the next
+composer cycle") is that spec's cycle; implementation has not started, and no
+code may be written before the implementation plan passes its own gate.
+
+Four repos: descriptor-mnemonic (`md-codec` + `md-cli`), mnemonic-secret
+(`ms-codec`, the per-kind digest functions), mnemonic-engrave (`me-cli`, the
+record grammar), and the fork (Go ports + device UI as one phase). The reviews
+are at `design/agent-reports/spec-hashkinds-*.md`.
+
+The design question F-507 itself raised — *what does a phrase mean under
+`ripemd160`* — is answered: nothing changes, because miniscript requires a
+32-byte preimage for all four fragments, so the phrase → preimage step is
+kind-independent and only preimage → digest moves.
+
+: the Wallet Policy composer's spend path holds ONE 32-byte hash and lowers it to `sha256()` unconditionally, so `hash160()`, `ripemd160()` and `hash256()` policies cannot be built on the device or by `md compose` — while the md1 WIRE FORMAT carries all four and round-trips them today (repo: **seedhammer fork** + **descriptor-mnemonic**; owning phase: **the next composer cycle**) `#composer` `#md` `#miniscript`
 
 Filed 2026-09-12 from the operator's timelock+hashlock experiment, and filed only after the
 controller's first attribution was measured WRONG. The claim made in conversation was that a
