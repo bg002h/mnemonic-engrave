@@ -74,6 +74,14 @@ emits `OP_RIPEMD160`; `hash160` emits `OP_HASH160` = RIPEMD-160 of SHA-256. Same
 satisfying one will not satisfy the other. The width is a consequence; the kind
 is the semantics.
 
+**F4 applies to the 32-byte pair too, and there it is more dangerous.**
+`hash256` is `sha256d` — `sha256(sha256(X))`. An implementer one word short
+(`sha256(x)` where `sha256d(x)` was meant) produces a 32-byte value with **no
+structural signal whatever**: no truncation, no width change, it type-checks
+exactly, it passes `digest_len()*2`, it lowers cleanly, Core agrees with the
+address, and it locks the path to a preimage that does not exist. §10's per-kind
+digest KAT is the only thing that catches it.
+
 **F5 — the primitive is already on the device at zero marginal flash cost.**
 `golang.org/x/crypto/ripemd160` is already linked in (`address.Hash160`,
 `bip32.Fingerprint`). `me-cli` already carries `bitcoin = "0.32"`.
@@ -91,7 +99,7 @@ change** (§7.4). The wire format and lowering are untouched.
   **This is the boundary the design review found contradicted (C-2), so it is
   stated twice on purpose.** The phrase route IS in scope for the step that turns
   a preimage into a digest — that function is sha256-only today in both languages
-  and gains a kind (§9 phases 3 and 4). What is out of scope is everything
+  and gains a kind (§9 phases 2 and 4). What is out of scope is everything
   upstream of the preimage. An implementation that picks a kind and then computes
   `sha256(preimage)` anyway produces the first 20 bytes of a SHA-256 hash lowered
   under `Tag::Ripemd160`: a permanently unspendable path that no type check
@@ -171,8 +179,18 @@ shipped property that "an entry N characters long is N *valid* characters by
 construction". Rows default to sha256, seeded **once** per screen — this tree has
 been bitten by a picker that proposed a setting merely by opening on row zero.
 
-**Two of the six entry routes cannot reach the kind screen** (payload-`phrase:`
-and payload-preimage-plate records); they are sha256 by their record's kind.
+**Four of the six entry routes never reach the kind screen**, not two — an
+earlier draft undercounted and left one of them unnamed anywhere in the spec:
+
+| # | route | why it bypasses |
+| --- | --- | --- |
+| 1 | payload `hash:` record | the record carries its kind (§6) |
+| 4 | payload `phrase:` record | the record carries its kind |
+| 5 | payload preimage-plate record | the record carries its kind |
+| 6 | **the preset archetype** (`--preset` / a composer preset) | the preset supplies the hash; the kind comes from the preset's own grammar (§9 phase 1), not from a screen |
+
+Only the typed-hex and typed-phrase arms ask. Route 6 is the one that must not be
+forgotten: it reaches the same lowering by a path with no screen on it at all.
 
 ### 7.2 §8i splits in two
 
@@ -185,11 +203,23 @@ so that adding a band cannot leave the 32-byte rule unstated.
 
 ### 7.3 The emulator's window
 
-`ComposerPathHashes() []*[32]byte` is the emulator's only read access to a
-running composition. Left alone it would hand out the **padded raw array**, so a
-walk asserting "path 1 holds digest D" would pass identically for `sha256(D)` and
-for a 20-byte kind sharing its first 20 bytes — a gate that cannot fail. It
-becomes kind-aware in this cycle.
+`ComposerPathHashes() []*[32]byte` is the emulator's read access to a running
+composition. Left alone it would hand out the **padded raw array**, so a walk
+asserting "path 1 holds digest D" would pass identically for `sha256(D)` and for
+a 20-byte kind sharing its first 20 bytes — a gate that cannot fail.
+
+**Three layers, not one.** Repairing only the Go hook relocates the defect one
+layer out and leaves it there, because both layers above it hardcode 64 hex:
+
+| layer | file |
+| --- | --- |
+| the hook | `gui/composer_state_hook.go:81` |
+| the JS bridge, incl. its documented API contract | `cmd/emu/composer_js.go:15,35-37,53` |
+| the walk's own helper | `cmd/emu/walk_hashlock_phrase.js:71,333` |
+
+`hex.EncodeToString(h[:])` over a padded array still returns 64 characters for a
+20-byte kind — 40 real and 24 zeros — so the abbreviation the walk compares stays
+byte-identical between the two. All three become kind-aware together.
 
 ### 7.4 The decode-side change, and what it flips
 
@@ -199,20 +229,36 @@ becomes kind-aware in this cycle.
 
 `policy_shape.go` is the **decompose** direction and runs on payloads this device
 never composed, so this is a decode-side behaviour change and is declared as one.
-Both dependent predicates re-key off **`Hashlock`** — "does this path have a hash
-of any kind" — not off `len(Sha256Digests)`:
 
-- `composer_consent.go:96` — a `hash160`-locked sole unsorted path today prints
+**Four production consumers, not two.** An earlier draft said "both dependent
+predicates" and cited one of them a line off. All re-key off **`Hashlock`** —
+"does this path have a hash of any kind" — rather than `len(Sha256Digests)`:
+
+- `composer_consent.go:94` — the display loop that draws the digests.
+- `composer_consent.go:97` — a `hash160`-locked sole unsorted path today prints
   `UNSORTED (EXPERIMENTAL)` and after this change does not. **A regression if
   left implicit; announced and tested here.**
-- `composer_consent.go:198` — a decoded `ripemd160` policy today is consented to
+- `composer_consent.go:199` — a decoded `ripemd160` policy today is consented to
   **without** the 32-byte-preimage rule ever stated, and after this change states
   it. A fix.
+- **`composer_selfcheck.go:134,136,138` — the compose→decode round trip, and the
+  most important of the four.** It is the only place in the system where a
+  SAME-WIDTH kind divergence can be caught structurally: a `hash256` digest that
+  should have been `sha256`, or the reverse, changes no length and no type, so
+  the round trip comparing what was composed against what decodes back is the one
+  gate with a chance of noticing. It must compare the **kind** as well as the
+  digest, or it certifies the §3-F4 failure as correct.
 
 ### 7.5 Row geometry
 
-The kind-bearing row is **measured, not assumed**: only a ≤6-character token fits
-the 411 px band, with 2 px to spare.
+The kind-bearing row is **measured, not assumed** — and the first measurement was
+wrong in a way worth recording: **character count is not the constraint.** The
+face is proportional, so at six characters `rmd160` and `sha256` each measure
+409 px and draw on one line, while `mmmmmm` (369 px) and `wwwwww` (351 px) wrap to
+two. A token budget stated in characters would pass a review and fail on the
+device.
+
+The constraint is the rendered **width** of the whole row at the shipped band.
 
 **The wire tokens (§6) stay full and unambiguous.** The *display* token is a
 different string, and choosing it is delegated to the implementation plan under a
@@ -245,15 +291,26 @@ per-assignment provenance is a larger change than the warning is worth.
 
 ## 9. Phases
 
-Four repos. **Phases 1-3 are mutually independent** — a consequence of sharing no
-types across repo boundaries (§5) — and may land in any order or in parallel.
-Phase 4 depends on all three.
+Four repos, and the order is **not** free. An earlier draft claimed phases 1-3
+were mutually independent; that was false and is corrected here.
+
+`me-cli` computes every hashlock digest through `ms_codec::hashlock::digest`
+(`me-cli/src/main.rs:2636,2641`), and `ms-codec = "0.9"`
+(`me-cli/Cargo.toml:53`) resolves **from crates.io** with a lockfile checksum —
+no `[patch]`, no path dependency, no vendor directory. So the record work cannot
+compile against the new per-kind API until ms-codec is **released** and the
+dependency bumped. That is a publish gate, and it is named here rather than
+discovered mid-cycle.
+
+**Order:** phases 1 and 2 are genuinely independent of each other. Phase 3
+follows phase 2 across a crates.io release, carrying the `Cargo.lock` /
+`cargo vendor` freshness ritual with it. Phase 4 follows all three.
 
 | # | repo | what |
 | --- | --- | --- |
-| 1 | descriptor-mnemonic | `md-codec`: `HashKind`, `HashLock`, lowering arms. `md-cli`: sibling `ripemd160=` / `hash160=` / `hash256=` options for `md compose --path`. Vectors. |
-| 2 | mnemonic-engrave | `me-cli`: the §6 record grammar, both directions. Vectors. |
-| 3 | mnemonic-secret | `ms-codec`: one digest function per kind. `ms hashlock` learns the kind. Vectors. |
+| 1 | descriptor-mnemonic | `md-codec`: `HashKind`, `HashLock`, lowering arms, **and `presets::hashlock_gated`'s public `[u8; 32]` parameter** (§9.1). `md-cli`: sibling `ripemd160=` / `hash160=` / `hash256=` options on **both** `--path` and `--preset`, plus the `PresetParams` field, the `named_only` allow-list and the `--json` key. Vectors. |
+| 2 | mnemonic-secret | `ms-codec`: one digest function per kind, and the §10 per-kind KAT. `ms hashlock` learns the kind. |
+| 3 | mnemonic-engrave | `me-cli`: the §6 record grammar, both directions. **Requires a released ms-codec** (above). Vectors. |
 | 4 | seedhammer fork | Go ports of 1-3 **and** the device UI, as ONE phase. |
 
 **Phase 4 is one phase on purpose.** Changing `md.SpendPath.Hash` breaks 39
@@ -275,7 +332,26 @@ All net new (§1).
   **keyed-shape only**; the keyless shape for the three new kinds is unmeasured
   and must be measured before this closes.
 - **A 40-hex digest through every formatter.** The six hardcoded `[56:]` sites
-  panic rather than corrupt, so this test exists before the type changes.
+  panic rather than corrupt.
+
+  **Order matters and the obvious order is impossible.** All six take a fixed
+  array (`[32]byte` / `[u8; 32]`) and hex it internally, so the string they slice
+  is *always* 64 characters: a 40-hex value cannot reach them until the parameter
+  widens. A test written first does not go red, it fails to **compile**, which
+  takes the whole `gui` package and its ~1200 other tests with it. The order is
+  therefore: widen the parameter to a length-aware type (or add a `…Hex(string)`
+  seam), then the red test, then the arithmetic.
+
+- **A per-kind digest KAT — `preimage → digest`, all four kinds.** This is the
+  only gate that catches a wrong digest *function*, and without it the funds-loss
+  path §4 names is caught by nothing: Core's address vectors derive from the
+  descriptor **text** and are structurally blind to it, and checking `ms hashlock`
+  against the crate that computes the digest is self-consistency, not a KAT.
+
+  Rows are computed **independently of the implementation** (python3 `hashlib`,
+  `bitcoin::hashes`, or Core) and vendored under the existing
+  `hashlock-v0.8.json` pin, which `hashlock/hashlock_test.go` already
+  cross-checks. That file carries one digest column today; this adds three.
 - **Fail-closed**: an unknown kind token is `ClassUnknown` and inert.
 - **Cross-repo token agreement**, pinned by `record_class_vectors.provenance.json`
   and `compose_vectors.provenance.json`.
@@ -291,6 +367,10 @@ All net new (§1).
 | the literal `"Type 64 hex"`, in code **and** test | `gui/composer_hash.go:348`, `composer_hash_test.go:257` |
 | `TestWhichHashPageHoldsFiveRows` | `gui/composer_hashlock_test.go:1433` |
 | `composerHexEntry`'s three 64/32 constants | `gui/composer_hash.go:79-105` |
+| the JS bridge and its documented API contract | `cmd/emu/composer_js.go:15,35-37,53` |
+| the walk's 64-hex helper | `cmd/emu/walk_hashlock_phrase.js:71,333` |
+| the compose→decode self-check | `gui/composer_selfcheck.go:134,136,138` |
+| the cross-language digest KAT | `hashlock/testdata/hashlock-v0.8.json` + its ms-codec source |
 | both provenance pin files | — |
 
 One of `composerHexEntry`'s constants is **documented as unreachable**; that stops
@@ -305,11 +385,20 @@ choice means `Which hash?` gains no band.
 ## 12. Acceptance
 
 1. Each kind composes end to end and its address matches Core's measured value.
-2. An **emulator walk** composes a non-sha256 hashlock on the device — this repo's
-   rule is that a plan may not close while one of its own gates has never run.
+2. An **emulator walk** composes a non-sha256 hashlock on the device **and
+   asserts, through the kind-aware hook, that the composition stores that kind
+   and that digest**. The assertion is the acceptance, not the composing: a walk
+   that composes one and never asserts the kind satisfies the sentence and gates
+   nothing. This repo's rule is that a plan may not close while one of its own
+   gates has never run, and its corollary is that a gate which cannot fail is not
+   a gate.
 3. A 40-hex digest passes every formatter without panicking.
 4. An old parser meeting a new kind token fails closed (§6).
-5. `ms hashlock` reproduces a non-sha256 plate's digest.
+5. `ms hashlock` reproduces a non-sha256 plate's digest. **Not a KAT** — it and
+   the digest function are the same crate, so it checks self-consistency. Item 6
+   is the gate.
+6. **The per-kind digest KAT passes in both languages**, against rows computed
+   outside either implementation.
 
 ## 13. What would falsify this
 
