@@ -172,7 +172,8 @@ silently.
 **Colons, not spaces.** Records are line-based and this tree carries dedicated
 whitespace seam rows — `SPEC_descriptor_input.md` §4.6 (`:388`, `:529`), the
 whitespace/CRLF refusals. (Not `SPEC_hashlock_H2_device.md` §4.6, which is the
-Back contract; two documents in this directory have a §4.6.)
+Back contract. Several documents in this directory carry a §4.6, which is why
+the reference is qualified.)
 
 ## 7. Device
 
@@ -205,8 +206,10 @@ Only the typed-hex and typed-phrase arms ask. Route 6 is the one that must not b
 forgotten: it reaches the same lowering by a path with no screen on it at all.
 
 **A stated limitation, not an oversight.** §2 decision 5 puts all four kinds on
-the phrase route; routes 4 and 5 are *payload-supplied* phrase material, and
-their record grammars carry no kind, so a hashlock built from one is sha256.
+the phrase route. Routes 4 and 5 are payload-supplied **preimage material** —
+route 4 a `phrase:` record, route 5 a preimage-plate record decoding to
+`ms_codec::Payload::Preimage`, which is not phrase material at all — and neither
+grammar carries a kind, so a hashlock built from either is sha256.
 Every kind remains authorable (§2 decision 1) via the typed arms; extending those
 two record grammars is deliberately out of scope for this cycle.
 
@@ -331,8 +334,18 @@ anyway while `mt-codec` is a git rev. The publish belongs to whenever `me` is
 next released, which is operator-gated and outside this cycle.
 
 **Order:** phases 1 and 2 are independent of each other. Phase 3 follows phase 2
-and pins it by rev. Phase 4 follows all three. The `Cargo.lock` /
-`cargo vendor` freshness ritual applies to phase 3's dependency change.
+and pins it by rev. Phase 4 follows all three.
+
+**The vendor ritual belongs to phase 2, not phase 3.** mnemonic-engrave has no
+vendor tree and no vendor gate; mnemonic-secret has both (a committed `vendor/`,
+`ci/repro/vendor-freshness.sh`, and its workflow), and phase 2 is also the phase
+that necessarily moves a lockfile — `ms-codec` has no ripemd160 primitive today,
+so `ripemd160` and `hash160` add a dependency, whereas phase 3's change is a
+*source* swap on an edge that already exists. So: **phase 2 re-vendors
+mnemonic-secret; phase 3 carries only the `Cargo.lock` change**, which
+`cargo test --locked` and `cargo clippy --locked` already enforce in CI. Worth
+stating because the vendor-freshness check is not a required context, so a stale
+tree surfaces at tag time rather than at PR time.
 
 | # | repo | what |
 | --- | --- | --- |
@@ -391,6 +404,14 @@ All net new (§1).
   So each row is exercised **through the entry point the composer itself calls**,
   and **each caller's map gets its own row**. A KAT that only calls the four
   functions directly is green on exactly the failure §4 describes.
+
+  **"Caller" means a package, not a call site.** The map is **one named function
+  per package** — `DigestFor(kind, x)` or equivalent — and there are **no inline
+  kind switches at call sites**. Measured, `hashlock.Digest(` has five production
+  call sites in the fork's `gui/`, of which only the two on the phrase arm need a
+  kind (the other three are routes 4/5, §7.1). A scattered implementation with a
+  switch at each site would satisfy the letter of "its own row" and defeat its
+  intent.
 - **Fail-closed**: an unknown kind token is `ClassUnknown` and inert.
 - **Right kind, wrong length** — `hash:ripemd160:<64hex>`, `hash:sha256:<40hex>`,
   `hash:hash256:<40hex>`, `hash:hash160:<64hex>`. This is the class Core refuses
