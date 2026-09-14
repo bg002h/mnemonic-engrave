@@ -145,6 +145,16 @@ this constellation already uses for Rust↔Go. Go genuinely has one definition:
 `<hex>` is `kind.digest_len() * 2` lowercase hex characters. An absent kind means
 `sha256`. Tokens are the lowercase miniscript fragment names.
 
+**Case is rejected, never folded.** `HASH160` and `Hash160` are refused, exactly
+as the hex body already refuses uppercase (`composer_records.rs:178-192`,
+`sysw/composer_records.go:178-190`, pinned by the corpus's `hash-uppercase` row).
+Stated as a rule rather than left to "obviously lowercase", which is how two
+parsers come to disagree.
+
+**Naming.** This document's "kind" is always the *hashlock* kind of §5. The
+`phrase:` record's `method` field is a different axis — the preimage derivation —
+and the two share the token `sha256` without meaning the same thing (§7.1).
+
 **Producer rule.** The host emits the **bare** form for sha256 and the explicit
 form for the other three. Every payload that exists today, and every new sha256
 payload, is byte-identical to what is packed now.
@@ -160,7 +170,9 @@ reads a non-sha256 digest *as* sha256, which composes a wallet nobody can spend,
 silently.
 
 **Colons, not spaces.** Records are line-based and this tree carries dedicated
-whitespace seam rows (§4.6).
+whitespace seam rows — `SPEC_descriptor_input.md` §4.6 (`:388`, `:529`), the
+whitespace/CRLF refusals. (Not `SPEC_hashlock_H2_device.md` §4.6, which is the
+Back contract; two documents in this directory have a §4.6.)
 
 ## 7. Device
 
@@ -185,12 +197,18 @@ earlier draft undercounted and left one of them unnamed anywhere in the spec:
 | # | route | why it bypasses |
 | --- | --- | --- |
 | 1 | payload `hash:` record | the record carries its kind (§6) |
-| 4 | payload `phrase:` record | the record carries its kind |
-| 5 | payload preimage-plate record | the record carries its kind |
+| 4 | payload `phrase:` record | **carries no hash kind at all** — its `method` field selects the *preimage* derivation (§4, out of scope), which is a different axis that happens to share the word `sha256`. The hashlock is sha256. |
+| 5 | payload preimage-plate record | same: no hash kind in the grammar, so sha256. |
 | 6 | **the preset archetype** (`--preset` / a composer preset) | the preset supplies the hash; the kind comes from the preset's own grammar (§9 phase 1), not from a screen |
 
 Only the typed-hex and typed-phrase arms ask. Route 6 is the one that must not be
 forgotten: it reaches the same lowering by a path with no screen on it at all.
+
+**A stated limitation, not an oversight.** §2 decision 5 puts all four kinds on
+the phrase route; routes 4 and 5 are *payload-supplied* phrase material, and
+their record grammars carry no kind, so a hashlock built from one is sha256.
+Every kind remains authorable (§2 decision 1) via the typed arms; extending those
+two record grammars is deliberately out of scope for this cycle.
 
 ### 7.2 §8i splits in two
 
@@ -214,7 +232,7 @@ layer out and leaves it there, because both layers above it hardcode 64 hex:
 | layer | file |
 | --- | --- |
 | the hook | `gui/composer_state_hook.go:81` |
-| the JS bridge, incl. its documented API contract | `cmd/emu/composer_js.go:15,35-37,53` |
+| the JS bridge, incl. its documented API contract | `cmd/emu/composer_js.go:15,35-37,54` |
 | the walk's own helper | `cmd/emu/walk_hashlock_phrase.js:71,333` |
 
 `hex.EncodeToString(h[:])` over a padded array still returns 64 characters for a
@@ -296,21 +314,31 @@ were mutually independent; that was false and is corrected here.
 
 `me-cli` computes every hashlock digest through `ms_codec::hashlock::digest`
 (`me-cli/src/main.rs:2636,2641`), and `ms-codec = "0.9"`
-(`me-cli/Cargo.toml:53`) resolves **from crates.io** with a lockfile checksum —
-no `[patch]`, no path dependency, no vendor directory. So the record work cannot
-compile against the new per-kind API until ms-codec is **released** and the
-dependency bumped. That is a publish gate, and it is named here rather than
-discovered mid-cycle.
+(`me-cli/Cargo.toml:53`) resolves today from crates.io. So phase 3 has a real
+**code** dependency on phase 2's new API.
 
-**Order:** phases 1 and 2 are genuinely independent of each other. Phase 3
-follows phase 2 across a crates.io release, carrying the `Cargo.lock` /
-`cargo vendor` freshness ritual with it. Phase 4 follows all three.
+**It is not a publish gate, and an earlier draft wrongly said it was.** The
+absence of a `[patch]` or path dep is a fact about the file today, not a
+constraint on what phase 3 may write in it — and this very `Cargo.toml` already
+carries the counter-example twelve lines below, with its rationale written out
+(`me-cli/Cargo.toml:54-74`): `mt-codec` is an unpublished sibling consumed **by
+git rev pin**, precisely so that *"publishing is irreversible; pinning a rev is
+not"*. Phase 3 does the same for `ms-codec`.
+
+Scheduling `cargo publish ms-codec` mid-cycle would put an irreversible act
+before anything has been proven on a device, and `me` cannot be published today
+anyway while `mt-codec` is a git rev. The publish belongs to whenever `me` is
+next released, which is operator-gated and outside this cycle.
+
+**Order:** phases 1 and 2 are independent of each other. Phase 3 follows phase 2
+and pins it by rev. Phase 4 follows all three. The `Cargo.lock` /
+`cargo vendor` freshness ritual applies to phase 3's dependency change.
 
 | # | repo | what |
 | --- | --- | --- |
 | 1 | descriptor-mnemonic | `md-codec`: `HashKind`, `HashLock`, lowering arms, **and `presets::hashlock_gated`'s public `[u8; 32]` parameter** (§9.1). `md-cli`: sibling `ripemd160=` / `hash160=` / `hash256=` options on **both** `--path` and `--preset`, plus the `PresetParams` field, the `named_only` allow-list and the `--json` key. Vectors. |
 | 2 | mnemonic-secret | `ms-codec`: one digest function per kind, and the §10 per-kind KAT. `ms hashlock` learns the kind. |
-| 3 | mnemonic-engrave | `me-cli`: the §6 record grammar, both directions. **Requires a released ms-codec** (above). Vectors. |
+| 3 | mnemonic-engrave | `me-cli`: the §6 record grammar, both directions. Depends on phase 2's API, consumed **by git rev pin** (above). Vectors. |
 | 4 | seedhammer fork | Go ports of 1-3 **and** the device UI, as ONE phase. |
 
 **Phase 4 is one phase on purpose.** Changing `md.SpendPath.Hash` breaks 39
@@ -352,7 +380,25 @@ All net new (§1).
   `bitcoin::hashes`, or Core) and vendored under the existing
   `hashlock-v0.8.json` pin, which `hashlock/hashlock_test.go` already
   cross-checks. That file carries one digest column today; this adds three.
+
+  **THE KAT MUST COVER THE DISPATCH, NOT ONLY THE FOUR FUNCTIONS.** §5 puts one
+  function per kind in `ms-codec` and leaves each caller to map its own kind onto
+  one — a hand-written four-arm switch, outside the crate the KAT tests. Four
+  correct functions plus one mis-wired arm gives `OP_RIPEMD160 <hash160(X)>`, and
+  the confusables are named by this spec's own §3: two pairs share a width and the
+  four function names differ by one word.
+
+  So each row is exercised **through the entry point the composer itself calls**,
+  and **each caller's map gets its own row**. A KAT that only calls the four
+  functions directly is green on exactly the failure §4 describes.
 - **Fail-closed**: an unknown kind token is `ClassUnknown` and inert.
+- **Right kind, wrong length** — `hash:ripemd160:<64hex>`, `hash:sha256:<40hex>`,
+  `hash:hash256:<40hex>`, `hash:hash160:<64hex>`. This is the class Core refuses
+  most sharply and least helpfully: all four measured REFUSED behind the single
+  non-diagnostic `A function is needed within P2WSH` (F3), so the device's own
+  length rule is the only thing that can say anything useful.
+- **Both spellings of sha256** — `hash:<64hex>` and the accepted-but-never-emitted
+  `hash:sha256:<64hex>` (§6), which must parse to the same `HashLock`.
 - **Cross-repo token agreement**, pinned by `record_class_vectors.provenance.json`
   and `compose_vectors.provenance.json`.
 
@@ -367,17 +413,29 @@ All net new (§1).
 | the literal `"Type 64 hex"`, in code **and** test | `gui/composer_hash.go:348`, `composer_hash_test.go:257` |
 | `TestWhichHashPageHoldsFiveRows` | `gui/composer_hashlock_test.go:1433` |
 | `composerHexEntry`'s three 64/32 constants | `gui/composer_hash.go:79-105` |
-| the JS bridge and its documented API contract | `cmd/emu/composer_js.go:15,35-37,53` |
+| `hashlockFirst8Last8` — **invisible to the `[56:]` grep** the six-count came from; its arithmetic is already length-relative but its PARAMETER is `[32]byte` | `gui/composer_hashlock.go:247` |
+| five sha256-hardcoded operator-facing strings in `me-cli` | `main.rs:2275,2685,3196`, `sysw/composer_records.rs:144` |
+| the JS bridge and its documented API contract | `cmd/emu/composer_js.go:15,35-37,54` |
 | the walk's 64-hex helper | `cmd/emu/walk_hashlock_phrase.js:71,333` |
 | the compose→decode self-check | `gui/composer_selfcheck.go:134,136,138` |
 | the cross-language digest KAT | `hashlock/testdata/hashlock-v0.8.json` + its ms-codec source |
 | both provenance pin files | — |
 
-One of `composerHexEntry`'s constants is **documented as unreachable**; that stops
-being true. The compose-vector pin generator also prints a stale count in its own
-`_comment` (156 against 161). It is fixed in this cycle, in phase 1, as part of
-re-pinning that file — not filed, because the re-pin touches it anyway and a
-generator that prints a wrong count is how the next wrong count goes unnoticed.
+One of `composerHexEntry`'s constants is **documented as unreachable** — the
+belt-and-braces `len(raw) != 32`, unreachable only because the pad's own cap and
+the `len(frag) == 64` check make it so. Widening the pad to accept 40 characters
+removes that guarantee, so the comment must be re-derived rather than carried.
+
+`composer_records.rs:144` is pinned verbatim by `SPEC_wallet_policy_composer.md`
+§8n **and** by `host_line` rows in `record_class_vectors.json`, so editing that
+string is re-pin work in two places. The compose-vector pin generator also prints a stale count in its own
+`_comment` (156 against 161). Both the generator
+(`seedhammer/scripts/vendor-compose-vectors.sh:29`) and the file it writes
+(`seedhammer/md/testdata/compose_vectors.provenance.json:6`) live in the **fork**,
+and the re-pin is run from there — so this is a **phase 4** item, not phase 1 as
+an earlier draft said. It is fixed in this cycle rather than filed, because the
+re-pin touches it anyway and a generator that prints a wrong count is how the
+next wrong count goes unnoticed.
 
 `composerPickScreenMaxRows = 24` is **not** on this list: the separate-screen
 choice means `Which hash?` gains no band.
@@ -387,7 +445,11 @@ choice means `Which hash?` gains no band.
 1. Each kind composes end to end and its address matches Core's measured value.
 2. An **emulator walk** composes a non-sha256 hashlock on the device **and
    asserts, through the kind-aware hook, that the composition stores that kind
-   and that digest**. The assertion is the acceptance, not the composing: a walk
+   and the §10 KAT row's digest for that kind**. Naming the KAT row is the point:
+   "the digest it composed" is an expectation the device supplies to itself, and
+   `cmd/emu/walk_hashlock_phrase.js:339-345` already argues this exact
+   distinction for the sha256 case — *"Comparing short8(stored) against a
+   constant this file also compares the stored value against is a tautology."* The assertion is the acceptance, not the composing: a walk
    that composes one and never asserts the kind satisfies the sentence and gates
    nothing. This repo's rule is that a plan may not close while one of its own
    gates has never run, and its corollary is that a gate which cannot fail is not
