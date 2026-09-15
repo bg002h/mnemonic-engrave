@@ -17569,7 +17569,20 @@ is the same gap §13.1 closed for the QR text.
 
 Note the asymmetry worth resolving together: `qr_text` (the plate) gained
 `hash: <kind>` in phase 2, and the `phrase:` record (the wire form the plate is
-cut from) did not. Owning phase: **phase 3** (`me-cli`).
+cut from) did not.
+
+**Owning phase reassigned to 4, measured during phase 3 rather than assumed.**
+`grep -rn qr_text --include=*.rs crates/` in `mnemonic-engrave` finds **no call
+site** — only a doc reference. The host never renders plate text, so the
+record → plate path runs through the **device**, which is phase 4's half. A
+phase-3 change to the record would have added a field nothing in this repo reads.
+
+**And the gap is smaller than it looked**, which is why this stays a follow-up
+rather than becoming phase 3 scope: the kind travels in the `hash:` record in
+the same payload (§6, shipped in phase 3), `qr_text` puts `hash: <kind>` on the
+plate itself (§13.1, shipped in phase 2), and `ms hashlock`'s card tells the
+operator to write the hash line down beside the method line. What is missing is
+only the record→plate hand-off, and that hand-off lives on the device.
 
 ### F-534 — `ms decode`'s preimage route answers only for sha256, and does not say so
 
