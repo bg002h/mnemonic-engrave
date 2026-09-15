@@ -16509,8 +16509,24 @@ id in either case. That is F-504, and it is the next item.
 
 ### F-507 — `composer-hashlocks-are-sha256-only-while-md1-carries-four-hash-fragments`
 
-**SPEC GREEN 2026-09-14** — `design/SPEC_hashlock_kinds.md` at `2a0da99f`, after
-three R0 rounds (1C/6I → 1C/2I → 0C/0I). The owning phase named below ("the next
+**SPEC CLOSED 2026-09-14** — `design/SPEC_hashlock_kinds.md` at `ad1820a3`,
+after three R0 correctness rounds (1C/6I → 1C/2I → 0C/0I) **and then four more
+rounds under two operator-directed lenses**, which between them found 2 Critical
+and 15 Important that the GREEN could not reach:
+
+| round | found |
+| --- | --- |
+| design review (pre-spec) | 2C — the design contradicted itself on the phrase route; both readings broken |
+| R0 ×3 | 1C — the spec named a funds-loss path and listed no gate that could catch it |
+| restore lens | 0C/5I — the kind IS on the steel (proved by execution); but the whole engraved-plate surface had been closed on a fact about the preimage |
+| journey walk | 1C/5I — the device instructs a check that FAILS on a correct `hash256` wallet |
+| fold verification ×2 | 1C/5I — a QR measurement generalised onto the engraved text, where 2 of 3 placements blow the row budget |
+
+**The one defect class behind most of it:** `method` and `kind` are orthogonal
+axes sharing the token `sha256`. Four independent reviews each found a different
+defect caused by it, and the fourth was caught by the spec's own rule one fold
+after that rule was written. §5 now carries both axes as a table and a binding
+constraint. The owning phase named below ("the next
 composer cycle") is that spec's cycle; implementation has not started, and no
 code may be written before the implementation plan passes its own gate.
 
