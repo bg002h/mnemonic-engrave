@@ -17442,50 +17442,58 @@ re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
 
-### F-536 — five pre-existing card lines are hazard notices by the boundary's own rule
+### F-536 — six pre-existing card lines are hazard notices by the boundary's own rule
 
-Filed 2026-09-15 from the phase-2 R0 round 7 fold; **scope corrected at round 8
-(I-3), which found the original enumeration false.**
+Filed 2026-09-15 from the phase-2 R0 round 7 fold. **Scope corrected twice:
+round 8 (I-3) and round 9 (I-1).** The corrections are recorded because the
+entry's defect was the same both times, and it is the defect this entry exists
+to avoid: **an enumeration asserted instead of counted.**
+
+- v1 enumerated by grepping `WARNING:` rather than by the rule the fold had just
+  written, missed the two notices that do not carry that word — including the
+  sharpest, a data-loss line — then closed with *"these three are the remaining
+  instances of the class, already located."*
+- v2 said *"seventeen of them, eight are card content and five are notices."*
+  **8 + 5 = 13.** The stated total did not reconcile with itself, and one notice
+  was still missing.
+
+So the count is now a **command**, and what follows is its output pasted
+verbatim. Do not retype these numbers; re-run it.
+
+```
+$ scripts/hashlock-notice-classify.py
+   NOTICE 494: THIS RECORD CARRIES THE PHRASE. Feed it to `me sysw pack --pack-
+   NOTICE 510: One phrase per policy. Spending any path of a wsh wallet publish
+   NOTICE 513: WARNING: This is the brainwallet construction: anyone holding th
+   NOTICE 517: WARNING: a 20-character phrase falls in about 72 days on one GPU
+   NOTICE 523: WARNING: the first spend of this hash path publishes these 32 by
+   NOTICE 526: No phrase exists, so nothing can be guessed, and nothing can be 
+
+TOTAL 17   card 11   notices 6
+```
 
 `crates/ms-cli/src/cmd/hashlock.rs` carries an explicit boundary — *"above is
 THE CARD, which `--no-engraving-card` may suppress; below is a NOTICE about a
 hazard in what was just emitted, and suppressing the card is not consent to lose
-it."* This entry lists the lines still on the wrong side.
+it."* The six above are on the wrong side of it.
 
-**The first version of this entry said "three", and closed with "these three are
-the remaining instances of the class, already located."** That was false, and
-the way it got that way is the point: it enumerated by **grepping `WARNING:`**
-rather than by the rule the fold had just written. A follow-up that certifies a
-class handled while it is not is worse than one that admits it has not looked.
-Re-enumerated by classifying **every** `writeln!(stderr, …)` above the boundary
-— seventeen of them — eight are card content and **five are notices**:
-
-1. *"One phrase per policy. Spending any path of a wsh wallet publishes this
-   digest. **Never use this phrase as a passphrase or a password anywhere
-   else**"* — a hazard about the operator's other accounts.
-2. the brainwallet warning under `--method sha256` (*"anyone holding the digest
-   tests 10^10 phrases per second"*).
-3. the short-phrase warning (*"falls in about 72 days on one GPU"*).
-4. the `--hex` warning (*"the first spend … publishes these 32 bytes in the
-   clear, forever. If this value is also anything else's secret … every use of
-   that secret is public with it"*).
-5. **the sharpest, and a DATA-LOSS notice rather than a disclosure one:** under
-   `--random`, *"No phrase exists, so nothing can be guessed, and nothing can be
-   remembered. **The file you just wrote is the only copy until you cut the
-   plate.**"* It is suppressed by `SPEC_ms_hashlock.md:340`'s own documented
-   one-liner, `ms hashlock --random --json --no-engraving-card | jq -r` — so the
-   spec teaches an invocation that silently drops the warning that the operator
-   holds exactly one copy of an unrecoverable secret.
+**The sharpest is the last**, and it is a DATA-LOSS notice rather than a
+disclosure one: under `--random`, *"No phrase exists … the file you just wrote
+is the only copy until you cut the plate."* It is suppressed by
+`SPEC_ms_hashlock.md:340`'s own documented one-liner,
+`ms hashlock --random --json --no-engraving-card | jq -r` — the spec teaches an
+invocation that silently drops the warning that the operator holds exactly one
+copy of an unrecoverable secret.
 
 **Why still not folded.** Moving them changes behaviour on paths no review round
 or journey walk flagged, and this cycle's rule is that a divergence earns a
-change only when the wrong outcome is worse than saying nothing. Item 5 is the
-one most likely to clear that bar on its own.
+change only when the wrong outcome is worse than saying nothing. The `--random`
+one is most likely to clear that bar alone.
 
-**When it is folded, each moved line takes the second clause of the rule with
+**When it is folded, each moved line takes the SECOND clause of the rule with
 it:** `!(args.json && args.no_engraving_card)`, because that pair is pinned to
 exactly the PrivateKeyMaterial advisory. Dropping that clause is R0 round 8's
-I-1, which is how a notice put 485 bytes on a stream pinned to one line.
+I-1 — how a notice put 485 bytes on a stream pinned to one line.
 
 Owning phase: **this cycle's follow-up sweep.**
 
