@@ -19,7 +19,7 @@ script commits to) is not the preimage METHOD (`preimage_hardened` vs
 | phase | repo | state |
 | --- | --- | --- |
 | spec | mnemonic-engrave | `design/SPEC_hashlock_kinds.md` — GREEN, 7 rounds incl. a journey walk |
-| 1 | descriptor-mnemonic | **not started.** Recon done: `design/RECON_hashkinds_P1_descriptor_mnemonic.md` |
+| 1 | descriptor-mnemonic | **built, R0 GREEN, NOT PUSHED** — branch `hashkinds-p1`, 4 commits, 1314 tests |
 | 2 | mnemonic-secret | **SHIPPED** — `origin/master` `9dcd2e0`, ms-codec 0.10.0 / ms-cli 0.19.0 |
 | 3 | mnemonic-engrave | not started. Pins phase 2 **by git rev**, not by publish (spec §9) |
 | 4 | seedhammer fork | not started. One phase on purpose; re-pins the corpus SHA |
@@ -32,7 +32,33 @@ required contexts success and **no bypass line**.
 Corpus SHA phase 4 must re-pin to:
 `0a911f78f3cdc867dcc44483b7f4c0c1ac87b6d9b30b79f52094e8979bc3d8ce`.
 
-## Phase 1 is smaller than the spec's §9 table implies
+## Phase 1: built, reviewed GREEN, not pushed
+
+Branch `hashkinds-p1` in `/scratch/code/shibboleth/dm-worktrees/hashkinds-p1`,
+four commits off `40c400de`. md-codec 0.43.0 / md-cli 0.15.0. **1314 tests**
+(base 1304), clippy 0, fmt clean, `cargo metadata --locked` resolves at every
+commit.
+
+R0 round 1 (opus, adversarial) returned 0C/2I; round 2 (sonnet, verification)
+returned **GREEN**, having probed the hand-written `Eq`/`Hash`/`Ord` contract
+with its own negative control. A journey walk across the `ms` → `md` seam is the
+remaining lens.
+
+**DECISION — phase 1 has no transcript plan document, deliberately.** Phase 2's
+plan existed because it was the artifact under R0; here the **branch** was
+reviewed directly, which is the stronger check, and a plan written afterwards
+would only restate the commits, the spec and MIGRATION. The record phase 4's Go
+port needs is the spec plus the four commit messages, which carry the reasoning.
+If a later phase wants the plan shape back, `scripts/hashkinds-p2-reshape.sh` is
+the model.
+
+Both round-1 findings were mine and both were *claims contradicted by their own
+code*: `HashLock` derived `Eq`/`Hash`/`Ord` over the full `[u8; 32]` while its
+doc comment, MIGRATION and spec §5 all said the padding was unobservable; and
+three vectors were tagged `head:single` when they are `head:hashed`, where **the
+wrong tag is what kept the `SINGULAR_TAGS` gate quiet**.
+
+## Phase 1 was smaller than the spec's §9 table implies
 
 Measured against `descriptor-mnemonic` `40c400de`: **`md-codec` already decodes,
 renders and lowers all four kinds**, proptested. An `md1` carrying a `ripemd160`
@@ -81,6 +107,12 @@ Phase 1 is **independent of phase 2** (spec §9) and can start immediately.
 - **F-535** — the `phrase:` record carries the method axis, not the kind. Phase 3.
   Note the asymmetry: `qr_text` (the plate) gained `hash: <kind>`; the record it
   is cut from did not.
+- **F-537** — 16 dangling bare-path citations in SPEC_hashlock_kinds, measured
+  as pre-existing. Judgment per citation, not sed. Cycle sweep.
+- **F-538** — nothing in-tree closes §12 item 1's Core-measured addresses; the
+  corpus pins them from `rust-miniscript`, the library that derives them, so it
+  is self-consistency. Phase 2's KAT already closes the digest-*function* class.
+  The box's node answers `Work queue depth exceeded`. Phase 4 or the sweep.
 - **F-536** — six hazard notices still scoped to the engraving card. Sharpest is
   the `--random` data-loss line, suppressed by `mnemonic-secret/design/SPEC_ms_hashlock.md:340`'s own
   documented one-liner. Cycle sweep.
