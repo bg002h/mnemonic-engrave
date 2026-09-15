@@ -125,8 +125,15 @@ before its fix:
 | --- | --- |
 | `the_record_follows_the_producer_rule_for_every_kind` | a non-bare record under sha256, or a missing `hash:<kind>:` prefix |
 | `the_md_compose_line_names_the_chosen_kind` | **C-1** — the card's `sha256=` operand |
-| `without_a_kind_every_digest_is_listed_on_stderr` | **C-2** — the silent sha256 assumption |
+| `without_a_kind_every_digest_is_listed_on_stderr` | **C-2** — the silent sha256 assumption, on BOTH argv shapes |
 | `an_uppercase_kind_is_refused` | case folded instead of rejected |
+| `under_json_the_object_carries_every_kind_when_none_was_named` | §13.4 silently dropped when it changed channel into `--json` |
+| `under_json_with_the_card_the_human_still_gets_the_listing` | the `--json`-with-card cell, where the human reads `sha256=` off the card |
+
+**Six, and the last three were each added by a review round that found the
+defect first.** That is the measurement, not a rhetorical point: the file went
+4 → 5 → 6 as rounds 4 and 5 each found a path the existing tests could not see.
+Every one was a flag combination nobody had passed.
 
 And in `hashlock_qr_text.rs`, a floor is not coverage — assert that a row exists
 **for each of the four kinds by name**, not that the array is at least N long.
@@ -138,7 +145,7 @@ Transcribed from the completed branch, not predicted:
 | gate | result |
 | --- | --- |
 | test suites | **101 ok, 0 failed** |
-| `cargo nextest run --locked --all-targets` | **577 run, 577 passed**, 11 skipped |
+| `cargo nextest run --locked --all-targets` | **578 run, 578 passed**, 11 skipped |
 | `clippy -p ms-codec --all-targets -- -D warnings` | **0** |
 | `clippy -p ms-cli --all-targets -- -D warnings` | **0** |
 | `cargo fmt --all -- --check` | clean |
@@ -316,7 +323,7 @@ Expected: FAIL to compile — `cannot find function digest_sha256`, `cannot find
 
 In `crates/ms-codec/Cargo.toml`, under `[dependencies]`, after the `sha2` line:
 
-```toml
+```toml file=crates/ms-codec/Cargo.toml mode=fragment
 # ripemd160: the bare primitive for the `ripemd160` fragment. `hash160` is
 # ripemd160(sha256(x)) and needs the same crate. RustCrypto, to match sha2.
 ripemd = "0.1"
@@ -428,10 +435,14 @@ pub fn digest_hash160(preimage: &[u8; 32]) -> [u8; 20] {
 }
 
 // NO `digest` ALIAS. An earlier draft kept the old name as a `#[deprecated]`
-// shim "so phase 3 keeps compiling". Measured, that adds NINE clippy errors in
-// ms-codec and four in ms-cli under `-D warnings`, which is a REQUIRED CI
-// context -- every internal call site becomes a deprecation warning, and the
-// gate that would have caught it had dropped the flag.
+// shim "so phase 3 keeps compiling". Every internal call site then becomes a
+// deprecation warning, and `-D warnings` is a REQUIRED CI context. Measured by
+// building that counterfactual (2026-09-15): `clippy -p ms-codec
+// --all-targets` reports 14, `-p ms-cli --all-targets` 4. Without
+// `--all-targets` ms-codec reports 1, which is why a gate that drops the flag
+// does not see this at all. (An earlier record said "nine"; it did not
+// reproduce under any flag combination, and this file's own new unit tests are
+// two of the 14.)
 //
 // `digest` is renamed to `digest_sha256` and its call sites in THIS repo move
 // with it. Phase 3 (`me-cli`) is a different repo pinned to a git rev, so it
@@ -1194,15 +1205,72 @@ fn under_json_the_object_carries_every_kind_when_none_was_named() {
     assert!(v.get("digests_by_kind").is_none(), "{v}");
     assert!(v.get("kind_specified").is_none(), "{v}");
 }
+
+/// The cell between the other two: `--json` WITHOUT `--no-engraving-card`.
+///
+/// This is the normal way to use `--json` — `ms hashlock … --json > out.json` —
+/// and it is the one the stderr purity contract does NOT cover, because that
+/// contract is on the two flags TOGETHER. The card still prints to the
+/// terminal here, so the human is reading stderr, and the `for md compose:`
+/// line they are reading says `sha256=`. Without the §13.4 listing beside it
+/// they are shown one unlabelled sha256 operand and nothing saying a kind was
+/// never chosen — while the machine-readable notice sits in the redirected
+/// file they are not looking at.
+///
+/// The guard was `!args.json` for one round and this cell was untested, which
+/// is how it got through (R0 round 5, I-1).
+#[test]
+fn under_json_with_the_card_the_human_still_gets_the_listing() {
+    let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--json"]);
+    assert!(
+        se.contains("for md compose:"),
+        "precondition: the card must still be on stderr here, or this test is \
+         asserting nothing:\n{se}"
+    );
+    for (kind, hexlen) in [
+        ("sha256", 64),
+        ("hash256", 64),
+        ("ripemd160", 40),
+        ("hash160", 40),
+    ] {
+        let found = se.lines().any(|l| {
+            let Some(rest) = l.strip_prefix("  ") else {
+                return false;
+            };
+            let Some(rest) = rest.strip_prefix(kind) else {
+                return false;
+            };
+            let hexpart = rest.trim_start();
+            hexpart.len() == hexlen && hexpart.bytes().all(|b| b.is_ascii_hexdigit())
+        });
+        assert!(
+            found,
+            "--json with the card: stderr carries no {kind} digest line, so the \
+             human reading `for md compose: sha256=` has nothing telling them a \
+             kind was never chosen.\n{se}"
+        );
+    }
+}
 ```
 
-**Five tests, not three.** The fifth (`under_json_the_object_carries_every_kind_
-when_none_was_named`) exists because the §13.4 fallback **cannot** ride on
-stderr under `--json`: `hashlock_outputs.rs` pins stderr under `--json
---no-engraving-card` to exactly the `PrivateKeyMaterial` advisory (§4.4, §11).
-So under `--json` the notice changes CHANNEL — into `kind`, `kind_specified`
-and `digests_by_kind` on the object — and that test is what keeps the change of
-channel from being a silent drop. See Step 3.
+**Six tests, not three**, and the last two are a matrix, not decoration.
+`hashlock_outputs.rs` pins stderr under `--json --no-engraving-card` — BOTH
+flags — to exactly the `PrivateKeyMaterial` advisory (§4.4, §11). That splits
+the kind-omitted case into three cells, and §13.4 must be satisfied in every
+one:
+
+| argv | where §13.4's notice goes |
+| --- | --- |
+| no `--json` | the stderr listing (card suppressed or not) |
+| `--json --no-engraving-card` | the OBJECT: `kind_specified`, `digests_by_kind` |
+| `--json`, card on | the stderr listing — the human is reading the card |
+
+`under_json_the_object_carries_every_kind_when_none_was_named` covers row 2 and
+`under_json_with_the_card_the_human_still_gets_the_listing` covers row 3. Row 3
+was missed for a round because the guard was written `!args.json`, broader than
+the contract it cited; the human was then shown the card's `for md compose:
+sha256=` line with no notice anywhere, the notice having gone into the
+redirected file. See Step 3.
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -1304,11 +1372,12 @@ instead:
 ```
 
 The human fallback prints to **stderr**, and note both guards — it is
-`args.kind.is_none() && !args.json`, and it sits **OUTSIDE** the
+`args.kind.is_none() && !(args.json && args.no_engraving_card)` — both flags,
+matching the contract exactly and not one flag wider — and it sits **OUTSIDE** the
 `!args.no_engraving_card` block:
 
 ```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
-    if args.kind.is_none() && !args.json {
+    if args.kind.is_none() && !(args.json && args.no_engraving_card) {
         // SPEC §13.4: a plate cut before --kind existed carries no kind, so
         // listing all four turns an impossible check into a lookup. What is
         // forbidden is assuming sha256 in silence -- which is what this did.
@@ -1320,11 +1389,18 @@ The human fallback prints to **stderr**, and note both guards — it is
         // that operator one unlabelled sha256 digest instead. It shipped that
         // way once (R0 round 4, C-1). Do not fold it back in.
         //
-        // Skipped under --json only because the object carries `kind_specified`
-        // and `digests_by_kind` instead -- the notice moves channel, it is not
-        // dropped. `--json --no-engraving-card` pins stderr to exactly the
-        // advisory (§4.4, §11), and that purity contract is load-bearing for
-        // machine consumers.
+        // The guard is `!(json && no_engraving_card)` -- BOTH flags -- because
+        // that pair, and only that pair, is what `hashlock_outputs.rs` pins to
+        // exactly the PrivateKeyMaterial advisory (§4.4, §11). There the notice
+        // changes channel instead, into `kind_specified` and `digests_by_kind`
+        // on the object.
+        //
+        // It was `!args.json` alone for one round (R0 round 5, I-1), which is
+        // BROADER than the contract. Under plain `--json > out.json` -- the
+        // normal way to use it -- the card still prints to the terminal, its
+        // `for md compose:` line still says `sha256=`, and the §13.4 notice had
+        // gone into the redirected file. The human was shown one unlabelled
+        // sha256 operand with nothing saying a kind was never chosen.
         writeln!(
             stderr,
             "no --kind given; stdout carries the sha256 record. This phrase's digest under each kind:"
@@ -1416,8 +1492,20 @@ Three things an upgrader cannot get from the CHANGELOG and must get here:
 1. `qr_text` is not merely re-signed — the `hash: <kind>` line is
    **unconditional**, so a **sha256** plate cut under v0.10 is NOT byte-identical
    to one cut under v0.9.
-2. **A plate with no `hash:` line MEANS sha256.** Absence is the sha256 case, not
-   an unknown. Every plate cut before this cycle is in that state.
+2. **A plate with no `hash:` line means the kind is UNKNOWN — NOT sha256.** The
+   line records which hash the SCRIPT commits to; its absence records only that
+   the tool never asked. Non-sha256 hashlock wallets exist today (spec §13.5:
+   `me bundle` already emits byte-identical six-plate output for a sha256 card
+   and a `ripemd160` card; §7.4: a decoded `ripemd160` card already shows
+   "hashlock" on the device), so an old plate can belong to any of the four.
+   The remedy is §13.4's fallback: run with no `--kind` and match the digest
+   against the operand the descriptor already names.
+
+   **Do not write the RECORD rule onto a PLATE.** A bare `hash:<hex>` *record*
+   does mean sha256 — §6's producer grammar, about a string a producer emits.
+   A plate is not a record. Collapsing the two is how this exact sentence
+   shipped once saying the opposite (R0 round 5, C-1), inside the fold that was
+   closing the silent-sha256 Critical.
 3. The record's producer rule keeps **bare** for sha256 precisely so no plate
    already cut becomes unreadable — but a consumer must never emit a bare record
    for a non-sha256 digest, because `me sysw pack` reads bare as sha256 and would
