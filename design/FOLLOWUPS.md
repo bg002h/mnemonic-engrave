@@ -17442,6 +17442,41 @@ re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
 
+### F-536 — three pre-existing `WARNING:` lines are hazard notices still scoped to the card
+
+Filed 2026-09-15 from the phase-2 R0 round 7 fold, which established the rule
+they fall under and deliberately did not move them.
+
+`crates/ms-cli/src/cmd/hashlock.rs` now carries an explicit boundary — *"above
+is THE CARD, which `--no-engraving-card` may suppress; below is a NOTICE about a
+hazard in what was just emitted, and suppressing the card is not consent to lose
+it."* Three `WARNING:` lines sit **above** it and are notices by that rule:
+
+1. the brainwallet warning under `--method sha256` (*"anyone holding the digest
+   tests 10^10 phrases per second"*);
+2. the short-phrase warning (*"a 20-character phrase falls in about 72 days on
+   one GPU"*);
+3. the `--hex` warning (*"the first spend of this hash path publishes these 32
+   bytes in the clear, forever. If this value is also anything else's secret …
+   every use of that secret is public with it"*).
+
+All three describe a hazard in what was just emitted, and all three vanish under
+`--no-engraving-card` — the flag a scripted or piping caller is most likely to
+pass. The third is the sharpest: it is about an operator's OTHER secrets
+becoming public, and it is silent in exactly the automated context where nobody
+is reading the card anyway.
+
+**Why it is not folded.** Moving them changes behaviour on paths no review round
+or journey walk flagged, and the phase-2 cycle's own rule is that a divergence
+earns a change only when the wrong outcome is worse than saying nothing. These
+are worth a deliberate decision rather than a drive-by one, taken with whoever
+owns the card's shape.
+
+Note the recurrence that produced the boundary in the first place: the same
+"notice nested one guard too deep" defect was found three times in one cycle
+(R0 r4 C-1, r5 I-1, r7 I-1). These three are the remaining instances of the
+class, already located. Owning phase: **this cycle's follow-up sweep.**
+
 ### F-535 — the `phrase:` record carries the METHOD axis and not the KIND axis
 
 Filed 2026-09-15 from the phase-2 journey walk (I-4), whose card half was fixed
