@@ -19,7 +19,7 @@ script commits to) is not the preimage METHOD (`preimage_hardened` vs
 | phase | repo | state |
 | --- | --- | --- |
 | spec | mnemonic-engrave | `design/SPEC_hashlock_kinds.md` — GREEN, 7 rounds incl. a journey walk |
-| 1 | descriptor-mnemonic | **built, R0 GREEN, NOT PUSHED** — branch `hashkinds-p1`, 4 commits, 1314 tests |
+| 1 | descriptor-mnemonic | **SHIPPED** — `origin/main` `65eab419`, md-codec 0.43.0 / md-cli 0.15.0, 1316 tests |
 | 2 | mnemonic-secret | **SHIPPED** — `origin/master` `9dcd2e0`, ms-codec 0.10.0 / ms-cli 0.19.0 |
 | 3 | mnemonic-engrave | not started. Pins phase 2 **by git rev**, not by publish (spec §9) |
 | 4 | seedhammer fork | not started. One phase on purpose; re-pins the corpus SHA |
@@ -32,17 +32,23 @@ required contexts success and **no bypass line**.
 Corpus SHA phase 4 must re-pin to:
 `0a911f78f3cdc867dcc44483b7f4c0c1ac87b6d9b30b79f52094e8979bc3d8ce`.
 
-## Phase 1: built, reviewed GREEN, not pushed
+## Phase 1: SHIPPED
 
-Branch `hashkinds-p1` in `/scratch/code/shibboleth/dm-worktrees/hashkinds-p1`,
-four commits off `40c400de`. md-codec 0.43.0 / md-cli 0.15.0. **1314 tests**
-(base 1304), clippy 0, fmt clean, `cargo metadata --locked` resolves at every
-commit.
+`origin/main` `65eab419`, five commits off `40c400de`. md-codec 0.43.0 /
+md-cli 0.15.0. **1316 tests** (base 1304), clippy 0, fmt clean, `cargo metadata
+--locked` resolves at every commit. Pushed via `ci/staging` with both required
+contexts success and **no bypass line**.
 
-R0 round 1 (opus, adversarial) returned 0C/2I; round 2 (sonnet, verification)
-returned **GREEN**, having probed the hand-written `Eq`/`Hash`/`Ord` contract
-with its own negative control. A journey walk across the `ms` → `md` seam is the
-remaining lens.
+Lenses, all closed: R0 round 1 (opus, adversarial) 0C/2I → folded; round 2
+(sonnet) **GREEN**, having probed the hand-written `Eq`/`Hash`/`Ord` contract
+with its own negative control; a journey walk across the `ms` → `md` seam
+0C/2I → folded; a two-repo fold verification **GREEN**.
+
+**Both rounds' Importants were the same shape: a claim contradicted by its own
+code.** `HashLock` derived traits that made the alloc-gate padding observable
+while its doc comment, MIGRATION.md and spec §5 all said otherwise; and three
+vectors carried a tag wrong for their shape, where **the wrong tag is what kept
+the `SINGULAR_TAGS` gate quiet**. Look for that shape directly next time.
 
 **DECISION — phase 1 has no transcript plan document, deliberately.** Phase 2's
 plan existed because it was the artifact under R0; here the **branch** was
