@@ -39,10 +39,10 @@ renders and lowers all four kinds**, proptested. An `md1` carrying a `ripemd160`
 hashlock reads correctly *today* — it just cannot be composed. Phase 1 is a
 **writing-path** change:
 
-1. `compose/mod.rs:151` — `pub hash: Option<[u8; 32]>`. The 32 is the problem.
-2. `compose/lowering.rs:78` — `tag: Tag::Sha256`, hardcoded. Only 3 sha256 sites
+1. `descriptor-mnemonic/crates/md-codec/src/compose/mod.rs:151` — `pub hash: Option<[u8; 32]>`. The 32 is the problem.
+2. `descriptor-mnemonic/crates/md-codec/src/compose/lowering.rs:78` — `tag: Tag::Sha256`, hardcoded. Only 3 sha256 sites
    in `compose/` at all.
-3. `compose/presets.rs:88-90` — `hashlock_gated(_, hash: [u8; 32], _)`, public,
+3. `descriptor-mnemonic/crates/md-codec/src/compose/presets.rs:88-90` — `hashlock_gated(_, hash: [u8; 32], _)`, public,
    10 references including the vector corpus.
 4. `md-cli` — 37 sha256 sites; `--path`/`--preset` grammar, `PresetParams`,
    `named_only`, the `--json` key.
@@ -77,12 +77,12 @@ Phase 1 is **independent of phase 2** (spec §9) and can start immediately.
 
 ## Open follow-ups
 
-- **F-534** — `ms decode`'s preimage route answers only for sha256 (`decode.rs:207`). Phase 3.
+- **F-534** — `ms decode`'s preimage route answers only for sha256 (`mnemonic-secret/crates/ms-cli/src/cmd/decode.rs:207`). Phase 3.
 - **F-535** — the `phrase:` record carries the method axis, not the kind. Phase 3.
   Note the asymmetry: `qr_text` (the plate) gained `hash: <kind>`; the record it
   is cut from did not.
 - **F-536** — six hazard notices still scoped to the engraving card. Sharpest is
-  the `--random` data-loss line, suppressed by `SPEC_ms_hashlock.md:340`'s own
+  the `--random` data-loss line, suppressed by `mnemonic-secret/design/SPEC_ms_hashlock.md:340`'s own
   documented one-liner. Cycle sweep.
 
 ## Housekeeping
