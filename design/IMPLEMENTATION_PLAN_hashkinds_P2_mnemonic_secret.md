@@ -54,6 +54,47 @@ chase five defects that are not yours.
   bin compiled clean while eleven test-file errors waited behind
   `--all-targets`, because test files carry their own `use` blocks.
 
+### The per-boundary gate — the one that catches ORDER
+
+The transcript gate below proves the plan's blocks match the tree. It says
+nothing about whether the tasks can be executed **in order**, because it sees
+only the final state. That question needs its own run, and it found a defect no
+review round had:
+
+```bash
+# from the shaped branch, gate every task boundary from a clean checkout
+for c in $(git log --format=%H --reverse <base>..HEAD); do
+  git checkout -q $c
+  cargo metadata --locked --offline >/dev/null || echo "$c DOES NOT RESOLVE"
+  cargo nextest run --locked --all-targets
+  cargo clippy --workspace --all-targets --locked -- -D warnings
+  cargo +1.95.0 fmt --all -- --check
+done
+```
+
+Measured on the shaped branch `hashkinds-p2-shaped`, every boundary from a clean
+checkout:
+
+| task | commit | tests | resolves | clippy | fmt |
+| --- | --- | --- | --- | --- | --- |
+| 1 — digest functions + dispatch | `bdf2ad0` | 570 pass | yes | 0 | clean |
+| 2 — KAT corpus rows | `14e4e0d` | 570 pass | yes | 0 | clean |
+| 3 — the KAT | `3549c3f` | 571 pass | yes | 0 | clean |
+| 4 — `qr_text` names the kind | `0544166` | 572 pass | yes | 0 | clean |
+| 5 — `ms hashlock --kind` | `a250bc9` | 583 pass | yes | 0 | clean |
+| 5b — release records | `b3b2656` | 583 pass | yes | 0 | clean |
+
+The shaped branch's final tree is **byte-identical** to the working branch's
+(`git diff --stat 0f70a8c hashkinds-p2-shaped` is empty), so the split is a
+re-ordering and not a rewrite.
+
+**Two defects came out of running it**, both invisible to six review rounds and
+to the transcript gate, because both are properties of the SEQUENCE and every
+gate until now had looked only at the end state: Task 2's version bump made the
+workspace unresolvable for four consecutive boundaries, and Task 1's Files block
+omitted the five files its rename breaks. A plan may not close while one of its
+own gates has never been run.
+
 ### The transcript gate — run this before committing any fold to this plan
 
 Every ```rust block here carries a `file=`/`mode=` header and is diffed against
@@ -250,6 +291,18 @@ from Task 2.
 - Modify: `crates/ms-codec/Cargo.toml` (add `ripemd`)
 - Modify: `crates/ms-codec/src/hashlock.rs:59` (`digest`)
 - Test: `crates/ms-codec/src/hashlock.rs` (the existing `mod tests`)
+- Modify (rename collateral, Step 4b — **the workspace does not build without
+  these**): `crates/ms-codec/tests/hashlock_derivation.rs`,
+  `crates/ms-codec/tests/hashlock_repro.rs`,
+  `crates/ms-cli/src/cmd/hashlock.rs` (the `use` at `:23` and the call at
+  `:325`), `crates/ms-cli/src/cmd/decode.rs`,
+  `crates/ms-cli/tests/hashlock_phrase_rule.rs`
+- Modify: `Cargo.lock`, `vendor/` (`ripemd` is a new dependency)
+
+**`crates/ms-cli/src/cmd/hashlock.rs` is in this task even though the flag is
+Task 5's.** Task 1 renames `digest`, which breaks that file's `use`, and a task
+that leaves the workspace red is not a task boundary. Rename it here and change
+its *semantics* in Task 5.
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks.
@@ -644,7 +697,23 @@ Record the new value in `CHANGELOG.md`. Per-release checklist item 1 in that fil
 states that a corpus-hash move is what **forces the version bump** — *"its hash
 moves and the pre-1.0 breaking-change axis requires `0.X+1.0`"* — and Task 4
 independently changes `qr_text`'s public signature, which is breaking on a 0.9.0
-crate. So this phase bumps `ms-codec` to **0.10.0**.
+crate. So this phase bumps `ms-codec` to **0.10.0** — **in Task 5b, not here.**
+
+**DO NOT BUMP THE VERSION IN THIS TASK.** An earlier revision of this plan did,
+and it is not a style preference: `crates/ms-cli/Cargo.toml` pins
+`ms-codec = { version = "=0.9.0" }`, an EXACT requirement, so bumping the codec
+alone makes the workspace unresolvable — measured by building the task sequence
+commit by commit:
+
+```
+error: failed to select a version for the requirement `ms-codec = "=0.9.0"`
+candidate versions found which didn't match: 0.10.0
+required by package `ms-cli v0.18.0`
+```
+
+and it stays unresolvable across Tasks 3, 4 and 5 — **four consecutive
+boundaries at which no `cargo` command runs at all** — until Task 5b moves the
+pin. The bump and the pin are one edit and belong in one commit.
 
 Carry the new SHA into the phase-close note: **phase 4 re-pins the fork's copy
 against it**, and without that hand-off the fork's provenance check has nothing
@@ -660,7 +729,7 @@ resolve.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/ms-codec/tests/vectors/hashlock-v0.8.json CHANGELOG.md crates/ms-codec/Cargo.toml
+git add crates/ms-codec/tests/vectors/hashlock-v0.8.json
 git commit -m "hashlock: KAT rows for the three new kinds, computed in python3"
 ```
 
