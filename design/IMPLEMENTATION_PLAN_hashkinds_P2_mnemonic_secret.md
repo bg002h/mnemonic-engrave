@@ -54,6 +54,33 @@ chase five defects that are not yours.
   bin compiled clean while eleven test-file errors waited behind
   `--all-targets`, because test files carry their own `use` blocks.
 
+### The transcript gate — run this before committing any fold to this plan
+
+Every ```rust block here carries a `file=`/`mode=` header and is diffed against
+the branch:
+
+```bash
+scripts/h2-plan-blocks-vs-tree.sh \
+  design/IMPLEMENTATION_PLAN_hashkinds_P2_mnemonic_secret.md \
+  /scratch/code/shibboleth/ms-worktrees/hashkinds-p2
+```
+
+Expected: **11 blocks checked, 0 FAIL.** `mode=whole` blocks must be byte-identical
+to the named file; `mode=fragment` blocks must appear in it as an exact substring.
+
+**This is not decoration.** R0 round 4 found a Critical that was purely a fold
+artefact — Task 3 Step 2 was corrected to drop the `hex` dev-dependency while
+Step 1 kept calling `hex::encode` five times, so the task no longer compiled and
+Step 3 told the executor to run a test that could not build. No gate had been run
+on that fold. On its first run this checker failed three more blocks, and in all
+three the BRANCH was the side that had drifted — dropped doc comments and two
+absent tests that four rounds of re-reading had not caught.
+
+**What it does NOT cover**, and the run prints this itself: bash recipes,
+illustrative snippets, the deliberate MUTATION block in Task 3 Step 4 (which must
+*not* match the tree), and every prose claim — expected test names, mutation
+outcomes, byte counts, spec references. Those still need a reader.
+
 ### The verified behaviour this phase produces
 
 Transcribed from the built binary, phrase `correct horse battery staple`:
@@ -79,7 +106,7 @@ review computed independently.
 WITHOUT the tests these tasks prescribe, and it shipped **two Criticals behind a
 568-green suite**:
 
-- the engraving card printed `for md compose: --path … sha256=<digest>` under
+- the engraving card printed `for md compose:  --path ... sha256=<digest>` under
   every `--kind`, telling the operator to compose a `sha256=` operand out of a
   `ripemd160` digest;
 - the no-`--kind` path silently assumed sha256 — which §13.4 forbids — while the
@@ -110,7 +137,8 @@ Transcribed from the completed branch, not predicted:
 
 | gate | result |
 | --- | --- |
-| test suites | **100 ok, 0 failed** |
+| test suites | **101 ok, 0 failed** |
+| `cargo nextest run --locked --all-targets` | **577 run, 577 passed**, 11 skipped |
 | `clippy -p ms-codec --all-targets -- -D warnings` | **0** |
 | `clippy -p ms-cli --all-targets -- -D warnings` | **0** |
 | `cargo fmt --all -- --check` | clean |
@@ -160,7 +188,7 @@ from Task 2.
    ```
 
    Both must come back empty. The literal-only guard was in an earlier draft and
-   passed while `hashlock_emit_record.rs:57` read *"carries only the public
+   passed while `crates/ms-cli/tests/hashlock_emit_record.rs:57` read *"carries only the public
    digest_sha256"* in a doc comment.
 2. **`ms hashlock`'s flag count is gated.** `--kind` moves the total from 68 to
    **69** and reds
@@ -215,10 +243,12 @@ from Task 2.
 
 Append to `mod tests` in `crates/ms-codec/src/hashlock.rs`:
 
-```rust
+```rust file=crates/ms-codec/src/hashlock.rs mode=fragment
     /// The four functions are FOUR FUNCTIONS (spec §3 F4), and the two that
     /// share a width are the pair with no structural signal — so they are
-    /// asserted to DIFFER, not merely to compute.
+    /// asserted to DIFFER, not merely to compute. The KAT in
+    /// `tests/hashlock_kat.rs` pins the VALUES against `python3 hashlib`;
+    /// this pins the STRUCTURE, and needs no corpus to do it.
     #[test]
     fn the_four_digests_are_four_different_functions() {
         let x = [0xabu8; 32];
@@ -226,24 +256,48 @@ Append to `mod tests` in `crates/ms-codec/src/hashlock.rs`:
         let d = digest_hash256(&x);
         let r = digest_ripemd160(&x);
         let h = digest_hash160(&x);
-        assert_ne!(s, d, "hash256 is sha256d, not sha256 — one word short is the C-1 failure");
-        assert_ne!(r, h, "hash160 is ripemd160(sha256(x)); ripemd160 is the bare primitive");
+        assert_ne!(
+            s, d,
+            "hash256 is sha256d, not sha256 — one word short is the whole defect"
+        );
+        assert_ne!(
+            r, h,
+            "hash160 is ripemd160(sha256(x)); ripemd160 is the bare primitive"
+        );
         assert_eq!(s.len(), 32);
         assert_eq!(d.len(), 32);
         assert_eq!(r.len(), 20);
         assert_eq!(h.len(), 20);
     }
 
-    /// The dispatch is the thing every caller uses, so it is tested as such.
+    /// The dispatch is the thing every caller uses, so it is tested as such:
+    /// four correct functions behind one mis-wired arm is the same lost-funds
+    /// outcome with a different cause.
     #[test]
     fn the_dispatch_selects_the_matching_function() {
         let x = [0x11u8; 32];
-        assert_eq!(HashKind::Sha256.digest(&x), DigestBytes::B32(digest_sha256(&x)));
-        assert_eq!(HashKind::Hash256.digest(&x), DigestBytes::B32(digest_hash256(&x)));
-        assert_eq!(HashKind::Ripemd160.digest(&x), DigestBytes::B20(digest_ripemd160(&x)));
-        assert_eq!(HashKind::Hash160.digest(&x), DigestBytes::B20(digest_hash160(&x)));
+        assert_eq!(
+            HashKind::Sha256.digest(&x),
+            DigestBytes::B32(digest_sha256(&x))
+        );
+        assert_eq!(
+            HashKind::Hash256.digest(&x),
+            DigestBytes::B32(digest_hash256(&x))
+        );
+        assert_eq!(
+            HashKind::Ripemd160.digest(&x),
+            DigestBytes::B20(digest_ripemd160(&x))
+        );
+        assert_eq!(
+            HashKind::Hash160.digest(&x),
+            DigestBytes::B20(digest_hash160(&x))
+        );
     }
 
+    /// The tokens are the miniscript fragment names, lowercase. They are the
+    /// operand name on the engraving card's `for md compose:` line and the
+    /// `hash:<kind>:` tag in the record, so a typo here composes a wallet
+    /// nobody can spend.
     #[test]
     fn tokens_are_the_lowercase_fragment_names() {
         assert_eq!(HashKind::Sha256.token(), "sha256");
@@ -272,7 +326,7 @@ ripemd = "0.1"
 
 In `crates/ms-codec/src/hashlock.rs`, replace the existing `digest` (line 59) with:
 
-```rust
+```rust file=crates/ms-codec/src/hashlock.rs mode=fragment
 /// Which hash the SCRIPT commits to. Crate-local by design: the spec forbids a
 /// shared type across repo boundaries (§5), so every consumer defines its own
 /// and maps onto these functions.
@@ -316,7 +370,8 @@ impl DigestBytes {
 impl HashKind {
     /// THE ONE NAMED DISPATCH in this crate. Spec §10 requires the KAT to
     /// exercise the dispatch and not only the four functions, because four
-    /// correct functions plus one mis-wired arm is the C-2 failure.
+    /// correct functions plus one mis-wired arm is the same lost-funds outcome
+    /// with a different cause.
     pub fn digest(self, preimage: &[u8; 32]) -> DigestBytes {
         match self {
             HashKind::Sha256 => DigestBytes::B32(digest_sha256(preimage)),
@@ -344,7 +399,7 @@ pub fn digest_sha256(preimage: &[u8; 32]) -> [u8; 32] {
     h
 }
 
-/// H = SHA-256(SHA-256(X)) — `sha256d`. THE DANGEROUS ONE: written one word
+/// H = SHA-256(SHA-256(X)) -- `sha256d`. THE DANGEROUS ONE: written one word
 /// short as `sha256(x)` it is still 32 bytes, still type-checks, still lowers,
 /// and Core still agrees with the address. Only the KAT catches it.
 pub fn digest_hash256(preimage: &[u8; 32]) -> [u8; 32] {
@@ -354,7 +409,7 @@ pub fn digest_hash256(preimage: &[u8; 32]) -> [u8; 32] {
     h
 }
 
-/// H = RIPEMD-160(X) — the BARE primitive, not hash160.
+/// H = RIPEMD-160(X) -- the BARE primitive, not hash160.
 pub fn digest_ripemd160(preimage: &[u8; 32]) -> [u8; 20] {
     use ripemd::Ripemd160;
     let mut h = [0u8; 20];
@@ -362,7 +417,7 @@ pub fn digest_ripemd160(preimage: &[u8; 32]) -> [u8; 20] {
     h
 }
 
-/// H = RIPEMD-160(SHA-256(X)) — `hash160`. Same width as ripemd160 and a
+/// H = RIPEMD-160(SHA-256(X)) -- `hash160`. Same width as ripemd160 and a
 /// different preimage relation (spec §3 F4).
 pub fn digest_hash160(preimage: &[u8; 32]) -> [u8; 20] {
     use ripemd::Ripemd160;
@@ -375,13 +430,12 @@ pub fn digest_hash160(preimage: &[u8; 32]) -> [u8; 20] {
 // NO `digest` ALIAS. An earlier draft kept the old name as a `#[deprecated]`
 // shim "so phase 3 keeps compiling". Measured, that adds NINE clippy errors in
 // ms-codec and four in ms-cli under `-D warnings`, which is a REQUIRED CI
-// context — every internal call site becomes a deprecation warning, and the
+// context -- every internal call site becomes a deprecation warning, and the
 // gate that would have caught it had dropped the flag.
 //
 // `digest` is renamed to `digest_sha256` and its call sites in THIS repo move
-// with it (Task 1 Step 4b). Phase 3 (`me-cli`) is a different repo pinned to a
-// git rev, so it does not break until it chooses to bump — and updating its two
-// call sites is phase 3's work, listed in its own plan.
+// with it. Phase 3 (`me-cli`) is a different repo pinned to a git rev, so it
+// does not break until it chooses to bump.
 ```
 
 **No extra import is needed** — settled by compiling this, not by reasoning:
@@ -531,7 +585,7 @@ Expected: the `openssl` output matches the `rmd160` value printed above.
 - [ ] **Step 3: Re-pin the corpus hash, and say so in the CHANGELOG**
 
 The corpus SHA-256 is `4f1819cdd0862b101afd48d0478e8f0b218f933dd3da449915fa3c5eaaba21d4`
-today, and **three things key on it**: `CHANGELOG.md:50-54`, the fork's
+today, and **three things key on it**: `mnemonic-secret/CHANGELOG.md`'s per-release checklist, the fork's
 `hashlock/testdata/hashlock-v0.8.provenance.json`, and spec §11's gate row.
 
 ```bash
@@ -547,6 +601,13 @@ crate. So this phase bumps `ms-codec` to **0.10.0**.
 Carry the new SHA into the phase-close note: **phase 4 re-pins the fork's copy
 against it**, and without that hand-off the fork's provenance check has nothing
 to move to.
+
+**This step is the `ms-codec` HALF ONLY.** The `ms-cli` bump, the exact-version
+pin that tracks it, the lockfile and `MIGRATION.md` are **Task 5b**, after the
+CLI change exists. Do not stop here: bumping `ms-codec` alone leaves
+`crates/ms-cli/Cargo.toml`'s `version = "=0.9.0"` pointing at a version that no
+longer exists in the workspace, and the very next `cargo` invocation fails to
+resolve.
 
 - [ ] **Step 4: Commit**
 
@@ -568,97 +629,124 @@ git commit -m "hashlock: KAT rows for the three new kinds, computed in python3"
 
 - [ ] **Step 1: Write the failing test**
 
-Create `crates/ms-codec/tests/hashlock_kat.rs`:
+Create `crates/ms-codec/tests/hashlock_kat.rs`. **This is the file, entire** —
+including its two local helpers, which is the point of Step 2 below:
 
-```rust
+```rust file=crates/ms-codec/tests/hashlock_kat.rs mode=whole
 //! The per-kind known-answer test (spec §10, §12 item 6).
 //!
-//! WHY THIS FILE EXISTS. Core's address vectors derive from the descriptor
-//! TEXT and are structurally blind to a wrong digest function; `ms hashlock`
-//! checked against this crate is self-consistency, not a KAT. Without these
-//! rows, a `digest_hash256` written one word short passes every other gate in
-//! the cycle and locks funds to a preimage that does not exist.
+//! WHY THIS FILE EXISTS. Core's address vectors derive from the descriptor TEXT
+//! and are structurally blind to a wrong digest function; `ms hashlock` checked
+//! against this crate is self-consistency, not a KAT. Without these rows, a
+//! `digest_hash256` written one word short passes every other gate in the cycle
+//! and locks funds to a preimage that does not exist.
 //!
-//! IT COVERS THE DISPATCH TOO. Four correct functions plus one mis-wired arm
-//! of `HashKind::digest` is the same failure with a different cause, so both
-//! are asserted here.
+//! IT COVERS THE DISPATCH TOO. Four correct functions plus one mis-wired arm of
+//! `HashKind::digest` is the same failure with a different cause.
 
 use ms_codec::hashlock::{
     digest_hash160, digest_hash256, digest_ripemd160, digest_sha256, HashKind,
 };
-use serde::Deserialize;
 
 const CORPUS: &str = include_str!("vectors/hashlock-v0.8.json");
 
-#[derive(Deserialize)]
-struct Corpus {
-    derivation: Vec<Row>,
-}
-
-#[derive(Deserialize)]
-struct Row {
-    phrase: String,
-    hardened_x: Option<String>,
-    hardened_h: Option<String>,
-    hardened_h_hash256: Option<String>,
-    hardened_h_ripemd160: Option<String>,
-    hardened_h_hash160: Option<String>,
+fn hex(b: &[u8]) -> String {
+    // `fold`, not `map(format!).collect()` -- clippy's format_collect fires
+    // under `-D warnings`, which is a required CI context.
+    b.iter()
+        .fold(String::with_capacity(b.len() * 2), |mut acc, x| {
+            use core::fmt::Write as _;
+            let _ = write!(acc, "{x:02x}");
+            acc
+        })
 }
 
 fn hex32(s: &str) -> [u8; 32] {
-    let v: Vec<u8> = (0..s.len()).step_by(2)
+    let v: Vec<u8> = (0..s.len())
+        .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex"))
         .collect();
     v.try_into().expect("32 bytes")
 }
 
 #[test]
-fn every_row_pins_all_four_kinds() {
-    let c: Corpus = serde_json::from_str(CORPUS).expect("corpus parses");
+fn every_row_pins_all_four_kinds_and_the_dispatch() {
+    let v: serde_json::Value = serde_json::from_str(CORPUS).expect("corpus parses");
+    let rows = v["derivation"].as_array().expect("derivation rows");
     let mut checked = 0usize;
-    for r in &c.derivation {
-        let (Some(xh), Some(h), Some(d), Some(rp), Some(h160)) = (
-            r.hardened_x.as_ref(), r.hardened_h.as_ref(),
-            r.hardened_h_hash256.as_ref(), r.hardened_h_ripemd160.as_ref(),
-            r.hardened_h_hash160.as_ref(),
-        ) else { continue };
-        let x = hex32(xh);
+    for r in rows {
+        for stem in ["hardened", "sha256"] {
+            let Some(xh) = r[format!("{stem}_x")].as_str() else {
+                continue;
+            };
+            let x = hex32(xh);
+            let want = |k: &str| -> String {
+                r[format!("{stem}_h{k}")]
+                    .as_str()
+                    .unwrap_or_else(|| panic!("row missing {stem}_h{k}"))
+                    .to_string()
+            };
+            let phrase = r["phrase"].as_str().unwrap_or("<no phrase>");
 
-        assert_eq!(hex::encode(digest_sha256(&x)), *h, "{}: sha256", r.phrase);
-        assert_eq!(hex::encode(digest_hash256(&x)), *d, "{}: hash256", r.phrase);
-        assert_eq!(hex::encode(digest_ripemd160(&x)), *rp, "{}: ripemd160", r.phrase);
-        assert_eq!(hex::encode(digest_hash160(&x)), *h160, "{}: hash160", r.phrase);
+            assert_eq!(hex(&digest_sha256(&x)), want(""), "{phrase}/{stem}: sha256");
+            assert_eq!(
+                hex(&digest_hash256(&x)),
+                want("_hash256"),
+                "{phrase}/{stem}: hash256"
+            );
+            assert_eq!(
+                hex(&digest_ripemd160(&x)),
+                want("_ripemd160"),
+                "{phrase}/{stem}: ripemd160"
+            );
+            assert_eq!(
+                hex(&digest_hash160(&x)),
+                want("_hash160"),
+                "{phrase}/{stem}: hash160"
+            );
 
-        // THE DISPATCH, over the same rows.
-        for (kind, want) in [
-            (HashKind::Sha256, h), (HashKind::Hash256, d),
-            (HashKind::Ripemd160, rp), (HashKind::Hash160, h160),
-        ] {
-            assert_eq!(hex::encode(kind.digest(&x).as_slice()), *want,
-                "{}: dispatch for {}", r.phrase, kind.token());
+            // THE DISPATCH, over the same rows.
+            for (kind, suffix) in [
+                (HashKind::Sha256, ""),
+                (HashKind::Hash256, "_hash256"),
+                (HashKind::Ripemd160, "_ripemd160"),
+                (HashKind::Hash160, "_hash160"),
+            ] {
+                assert_eq!(
+                    hex(kind.digest(&x).as_slice()),
+                    want(suffix),
+                    "{phrase}/{stem}: dispatch for {}",
+                    kind.token()
+                );
+            }
+            checked += 1;
         }
-        checked += 1;
     }
     // A loop that silently iterated zero rows would pass.
-    assert!(checked >= 8, "only {checked} rows carried all four kinds");
+    assert!(
+        checked >= 8,
+        "only {checked} row/stem pairs carried all four kinds"
+    );
 }
 ```
 
-- [ ] **Step 2: No new dev-dependency — write the helper**
+- [ ] **Step 2: No new dev-dependency — the `hex` helper is IN the file above**
 
-`serde_json` is already a dev-dependency and `hex` is **not needed**. Write a
-local helper, and write it as a `fold`: `map(format!).collect()` trips clippy's
-`format_collect` under `-D warnings`.
+`ms-codec` has **no `hex` dependency of any kind**, and it is not getting one:
+`[dev-dependencies]` is `proptest, bip39, serde, serde_json, zeroize`, and the
+whole reason `validate_phrase`'s 64-hex check was rewritten as
+`b.is_ascii_hexdigit()` in v0.9 was to keep the `hex` crate out of a codec that
+does not otherwise need it (MIGRATION.md v0.8 → v0.9). So the file above defines
+its own `hex`, **written as a `fold`** — `map(format!).collect()` trips clippy's
+`format_collect` under `-D warnings`, which is a required CI context.
 
-```rust
-fn hex(b: &[u8]) -> String {
-    b.iter().fold(String::with_capacity(b.len() * 2), |mut acc, x| {
-        use core::fmt::Write as _;
-        let _ = write!(acc, "{x:02x}");
-        acc
-    })
-}
-```
+An earlier revision of this plan prescribed `hex::encode` here in Step 1 while
+Step 2 told the executor not to add the dependency. Extracted and compiled, that
+block produced **five `E0433`s**. It is the failure class the build gate exists
+for, and it is why every block in this plan now carries a `file=`/`mode=` header
+and is diffed against the branch by
+`scripts/h2-plan-blocks-vs-tree.sh <this plan> <ms-worktree>`. Run that before
+committing any fold.
 
 - [ ] **Step 3: Run the test to verify it passes**
 
@@ -669,6 +757,10 @@ Expected: PASS, with `checked` at or above 8.
 
 Break `digest_hash256` in `src/hashlock.rs` by removing the second hash:
 
+
+**This block is a MUTATION and is deliberately absent from the tree**, so it
+carries no `file=` header and the transcript checker lists it as uncovered. That
+is correct: it is the one block here that must NOT match the branch.
 ```rust
 pub fn digest_hash256(preimage: &[u8; 32]) -> [u8; 32] {
     let mut h = [0u8; 32];
@@ -708,26 +800,30 @@ git commit -m "hashlock: the per-kind KAT, functions and dispatch, mutation-veri
 
 Append to `crates/ms-codec/tests/hashlock_qr_text.rs`:
 
-```rust
+```rust file=crates/ms-codec/tests/hashlock_qr_text.rs mode=fragment
 /// Spec §13.1: the plate is read years later by someone with neither the tool
 /// nor this firmware, so it spells its parameters out. Without the kind it is
 /// one step short, and the device tells the operator to store this plate APART
 /// from the md1 card that holds the missing step.
+///
+/// THE TWO AXES, in one assertion each. `hash:` is WHICH HASH THE SCRIPT
+/// COMMITS TO; `method:` is HOW THE PREIMAGE WAS DERIVED. They share the token
+/// `sha256` and mean different things, and every defect this cycle produced
+/// came from reading one as the other -- so this test pins that adding the
+/// first did not disturb the second.
 #[test]
 fn qr_text_names_the_kind_on_its_own_line() {
     let t = qr_text(true, HashKind::Ripemd160, "correct horse battery staple");
-    assert!(t.contains("\nhash: ripemd160\n") || t.ends_with("\nhash: ripemd160"),
-        "the kind is not on its own line:\n{t}");
-    assert!(t.contains("method: pbkdf2-hmac-sha256"),
-        "the METHOD line must survive unchanged — it is a different axis");
-}
-
-/// The worst case must stay inside the reserved envelope (spec §13.1).
-#[test]
-fn the_worst_case_qr_stays_within_its_measured_budget() {
-    let phrase = "a".repeat(100);
-    let t = qr_text(true, HashKind::Ripemd160, &phrase);
-    assert!(t.len() <= 210, "worst-case QR text is {} bytes, budget 210", t.len());
+    assert!(
+        t.contains("\nhash: ripemd160\n"),
+        "the kind is not on its own line:\n{}",
+        &*t
+    );
+    assert!(
+        t.contains("method: pbkdf2-hmac-sha256"),
+        "the METHOD line must survive unchanged -- it is a different axis:\n{}",
+        &*t
+    );
 }
 ```
 
@@ -740,7 +836,7 @@ Expected: FAIL to compile — `qr_text` takes 2 arguments.
 
 In `crates/ms-codec/src/hashlock.rs`, change `qr_text` to:
 
-```rust
+```rust file=crates/ms-codec/src/hashlock.rs mode=fragment
 pub fn qr_text(hardened: bool, kind: HashKind, phrase: &str) -> Zeroizing<String> {
     const HEAD: &str = "hashlock v1\n";
     const LABEL: &str = "\nphrase: ";
@@ -752,7 +848,7 @@ pub fn qr_text(hardened: bool, kind: HashKind, phrase: &str) -> Zeroizing<String
     } else {
         "method: sha256".to_string()
     };
-    // ITS OWN LINE, never appended to `method:` — H6 §6.5 pins that line at 73
+    // ITS OWN LINE, never appended to `method:` -- H6 §6.5 pins that line at 73
     // characters and the plate refuses an eleventh row at every font rung.
     let kind_line = format!("\nhash: {}", kind.token());
     let mut out: Zeroizing<String> = Zeroizing::new(String::with_capacity(
@@ -803,9 +899,20 @@ failures. Three are mechanical; one needs a decision, which this plan makes.
    **`HashKind::Ripemd160`**. Reason: `ripemd160` is the longest of the four
    tokens (9 characters against 7, 7, 6), so the sha256 case is no longer the
    worst case and a test named for the worst case must track the real one.
-   Measured: sha256 gives **207**, ripemd160 gives **210**, and 210 is what
-   spec §13.1 records and what the plan's new budget test pins. Keep the second
-   assertion as a sha256 row at **148** (was 135) so both are covered.
+   It ends with **four** assertions, not two, because both the hardened and the
+   unhardened row move and the pair is what makes the ranking legible. All four
+   measured on the branch:
+
+   | call | bytes |
+   | --- | --- |
+   | `qr_text(true,  Ripemd160, "0"×100)` | **210** — the true worst case |
+   | `qr_text(false, Ripemd160, "0"×100)` | **151** (was 135; `\nhash: ripemd160` is 16) |
+   | `qr_text(true,  Sha256,    "0"×100)` | **207** (was 194; `\nhash: sha256` is 13) |
+   | `qr_text(false, Sha256,    "0"×100)` | **148** (was 135) |
+
+   The sha256 rows are kept beside the ripemd160 ones because they are the
+   common case, not because they bound anything — and 210 − 207 = 3 is the
+   whole margin, which is why the test is re-keyed rather than re-numbered.
 
    This is **not** a spec defect: §13.1's 210 is the true worst case; 207 is the
    sha256 case. Do not "correct" the spec.
@@ -852,82 +959,250 @@ git commit -m "hashlock: the plate QR names the kind, on its own line"
 
 - [ ] **Step 1: Write the failing test**
 
-Create or append to `crates/ms-cli/tests/hashlock_kind.rs`:
+Create `crates/ms-cli/tests/hashlock_kind.rs`. **This is the file, entire** —
+its helper included, because the helper is where the two things an executor
+gets wrong live:
 
-```rust
-/// Spec §13.4. A plate cut before this cycle carries no kind, so the operator
-/// verifying one has nothing to pass — printing all four turns an impossible
-/// check into a lookup. What is forbidden is silently assuming sha256.
-#[test]
-fn no_kind_prints_all_four_and_says_so() {
-    let out = run_ms(&["hashlock", "--phrase", "correct horse battery staple"]);
-    assert!(out.contains("sha256"), "{out}");
-    assert!(out.contains("hash256"), "{out}");
-    assert!(out.contains("ripemd160"), "{out}");
-    assert!(out.contains("hash160"), "{out}");
-}
+**1. The phrase goes on STDIN, not in argv.** `--phrase` DOES NOT EXIST, and
+`--hashlock-phrase` is refused by the **argv guard before clap parses it** —
+this repo does not take secrets on the command line. The flag is
+`--hashlock-phrase-stdin`. An earlier revision of this plan prescribed
+`--phrase` in every test here and then retracted it in prose *below the block*,
+which left two mutually exclusive prescriptions for one file with the wrong one
+under the step an executor works from. The retraction is now the only version.
 
-#[test]
-fn an_explicit_kind_prints_only_that_one() {
-    let out = run_ms(&["hashlock", "--phrase", "correct horse battery staple",
-                       "--kind", "ripemd160"]);
-    assert!(out.contains("ripemd160"), "{out}");
-    assert!(!out.contains("hash256"), "an explicit kind must not print others:\n{out}");
-}
+**2. The helper returns stdout AND stderr separately**, because the §13.4
+fallback is on stderr under the stdout-purity contract, and the record is on
+stdout. A helper that joins them cannot express the purity assertions this file
+makes.
 
-#[test]
-fn an_unknown_kind_is_refused_not_folded() {
-    let out = run_ms_expect_fail(&["hashlock", "--phrase", "x", "--kind", "RIPEMD160"]);
-    assert!(out.contains("ripemd160"), "the refusal should name the accepted tokens:\n{out}");
-}
-```
+```rust file=crates/ms-cli/tests/hashlock_kind.rs mode=whole
+//! `ms hashlock --kind`: the operator surface for the three new hash kinds
+//! (SPEC_hashlock_kinds §6, §13.4).
+//!
+//! WHY THIS FILE EXISTS. The flag shipped once with ZERO coverage and two
+//! Criticals rode in behind a 568-green suite: the card told the operator to
+//! compose a `sha256=` operand out of a `ripemd160` digest, and the no-`--kind`
+//! path silently assumed sha256 while its own `--help` claimed otherwise. A
+//! green suite is only evidence about what it tests.
 
-This repo's CLI tests use `assert_cmd` — `cli_help_pointer.rs`,
-`cli_derive_bip48.rs` and `argv_guard_cross_product.rs` all open with
-`use assert_cmd::Command;` and call `Command::cargo_bin("ms")`. The two helpers
-the tests above use are:
-
-```rust
 use assert_cmd::Command;
 
-fn run_ms(args: &[&str]) -> String {
-    let a = Command::cargo_bin("ms").expect("ms binary").args(args).assert().success();
-    String::from_utf8_lossy(&a.get_output().stdout).into_owned()
+const PHRASE: &str = "correct horse battery staple";
+
+fn run(args: &[&str]) -> (String, String) {
+    let out = Command::cargo_bin("ms")
+        .unwrap()
+        .args(args)
+        .write_stdin(PHRASE)
+        .output()
+        .unwrap();
+    (
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+    )
 }
 
-fn run_ms_expect_fail(args: &[&str]) -> String {
-    let a = Command::cargo_bin("ms").expect("ms binary").args(args).assert().failure();
-    let o = a.get_output();
-    format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr))
+/// §6's producer rule: BARE for sha256, `hash:<kind>:<hex>` for the rest, hex
+/// at `digest_len()*2`. A bare record MEANS sha256, so emitting one under
+/// another kind hands `me sysw pack` a digest it reads as sha256 — the scheme
+/// §6 names as rejected because it composes an unspendable wallet.
+#[test]
+fn the_record_follows_the_producer_rule_for_every_kind() {
+    let (so, _) = run(&["hashlock", "--hashlock-phrase-stdin"]);
+    assert!(
+        so.trim().starts_with("hash:") && so.trim().matches(':').count() == 1,
+        "no --kind must still emit the BARE sha256 record: {so:?}"
+    );
+    assert_eq!(so.trim().len(), "hash:".len() + 64, "bare record is 64 hex");
+
+    for (kind, hexlen) in [
+        ("sha256", 64),
+        ("hash256", 64),
+        ("ripemd160", 40),
+        ("hash160", 40),
+    ] {
+        let (so, _) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
+        let rec = so.trim();
+        if kind == "sha256" {
+            assert!(
+                !rec.starts_with("hash:sha256:"),
+                "--kind sha256 must emit the BARE form, for byte-identical compatibility: {rec:?}"
+            );
+            assert_eq!(rec.len(), "hash:".len() + hexlen);
+        } else {
+            let want = format!("hash:{kind}:");
+            assert!(rec.starts_with(&want), "{kind}: want {want:?}, got {rec:?}");
+            assert_eq!(rec.len(), want.len() + hexlen, "{kind}: hex length");
+        }
+    }
+}
+
+/// §11: this line is the ONLY thing keeping the digest function and `md
+/// compose`'s option name in agreement. Under `--kind ripemd160` it must say
+/// `ripemd160=`, or it instructs the operator to build a wallet whose hashlock
+/// nobody can satisfy.
+#[test]
+fn the_md_compose_line_names_the_chosen_kind() {
+    for kind in ["hash256", "ripemd160", "hash160"] {
+        let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
+        let line = se
+            .lines()
+            .find(|l| l.contains("for md compose:"))
+            .unwrap_or_else(|| panic!("{kind}: no `for md compose:` line on the card"));
+        assert!(
+            line.contains(&format!("{kind}=")),
+            "{kind}: the card says {line:?} — an operator following it composes the wrong wallet"
+        );
+        assert!(
+            !line.contains("sha256="),
+            "{kind}: the card still offers a sha256= operand: {line:?}"
+        );
+    }
+}
+
+/// §13.4: never silently assume sha256. A plate cut before this existed carries
+/// no kind, so all four are listed and the operator matches.
+///
+/// BOTH argv shapes, because the first version of this test checked only the
+/// default one and the fallback had been nested inside the `--no-engraving-card`
+/// guard — so the flag that suppresses the card also suppressed the §13.4
+/// notice, and this test passed anyway (R0 round 4, C-1). §13.4's clause is
+/// unconditional; the operator who hides the card is the one who most needs the
+/// lookup, because the card is what carries the preimage.
+#[test]
+fn without_a_kind_every_digest_is_listed_on_stderr() {
+    for argv in [
+        &["hashlock", "--hashlock-phrase-stdin"][..],
+        &["hashlock", "--hashlock-phrase-stdin", "--no-engraving-card"][..],
+    ] {
+        let (so, se) = run(argv);
+        for (kind, hexlen) in [
+            ("sha256", 64),
+            ("hash256", 64),
+            ("ripemd160", 40),
+            ("hash160", 40),
+        ] {
+            // The fallback's own line shape: `  <token padded to 10> <hex>`.
+            // Matching the DIGEST and its WIDTH, not just the word: stderr
+            // already says "sha256" twice without the loop running at all --
+            // on the `for md compose:` line and in this block's own header
+            // ("stdout carries the sha256 record") -- so a bare `contains`
+            // would report coverage of a sha256 row that was never printed.
+            // Width is what separates the 20-byte kinds from the 32-byte ones.
+            let found = se.lines().any(|l| {
+                let Some(rest) = l.strip_prefix("  ") else {
+                    return false;
+                };
+                let Some(rest) = rest.strip_prefix(kind) else {
+                    return false;
+                };
+                let hexpart = rest.trim_start();
+                hexpart.len() == hexlen && hexpart.bytes().all(|b| b.is_ascii_hexdigit())
+            });
+            assert!(
+                found,
+                "{argv:?}: stderr carries no {kind} digest line; §13.4 forbids \
+                 assuming sha256 in silence.\n{se}"
+            );
+        }
+        assert!(
+            !so.contains("hash256"),
+            "the fallback must not reach stdout — purity contract: {so:?}"
+        );
+    }
+}
+
+/// Case is rejected, never folded (§6).
+#[test]
+fn an_uppercase_kind_is_refused() {
+    let out = Command::cargo_bin("ms")
+        .unwrap()
+        .args(["hashlock", "--hashlock-phrase-stdin", "--kind", "RIPEMD160"])
+        .write_stdin(PHRASE)
+        .output()
+        .unwrap();
+    assert!(
+        !out.status.success(),
+        "RIPEMD160 must be refused, not folded"
+    );
+}
+
+/// §13.4 on the MACHINE channel. The stderr listing cannot be used under
+/// `--json`: `--json --no-engraving-card` pins stderr to exactly the
+/// PrivateKeyMaterial advisory (§4.4, §11), a contract `hashlock_outputs.rs`
+/// enforces. So the notice travels in the object instead — and this test is
+/// what stops that from being a silent drop rather than a change of channel.
+#[test]
+fn under_json_the_object_carries_every_kind_when_none_was_named() {
+    let out = Command::cargo_bin("ms")
+        .unwrap()
+        .args([
+            "hashlock",
+            "--hashlock-phrase-stdin",
+            "--json",
+            "--no-engraving-card",
+        ])
+        .write_stdin(PHRASE)
+        .output()
+        .unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+
+    assert_eq!(
+        v["kind_specified"], false,
+        "no --kind was given; the object must say so rather than let \
+         `hash_operand`'s sha256 default read as a stated choice"
+    );
+    let by = v["digests_by_kind"]
+        .as_object()
+        .expect("digests_by_kind must be an object");
+    for (kind, hexlen) in [
+        ("sha256", 64),
+        ("hash256", 64),
+        ("ripemd160", 40),
+        ("hash160", 40),
+    ] {
+        let d = by[kind]
+            .as_str()
+            .unwrap_or_else(|| panic!("no digests_by_kind.{kind}"));
+        assert_eq!(d.len(), hexlen, "{kind}: digest width");
+        assert!(d.bytes().all(|b| b.is_ascii_hexdigit()), "{kind}: not hex");
+    }
+    assert_eq!(by["sha256"], v["digest"], "sha256 row must match `digest`");
+
+    // The purity contract the stderr listing was moved OUT of the way for.
+    assert!(
+        !String::from_utf8_lossy(&out.stderr).contains("no --kind given"),
+        "the human listing must not reach stderr under --json"
+    );
+
+    // With an explicit kind there is nothing to disambiguate.
+    let out = Command::cargo_bin("ms")
+        .unwrap()
+        .args([
+            "hashlock",
+            "--hashlock-phrase-stdin",
+            "--json",
+            "--kind",
+            "ripemd160",
+        ])
+        .write_stdin(PHRASE)
+        .output()
+        .unwrap();
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["kind"], "ripemd160");
+    assert!(v.get("digests_by_kind").is_none(), "{v}");
+    assert!(v.get("kind_specified").is_none(), "{v}");
 }
 ```
 
-**THE FLAG IS `--hashlock-phrase-stdin`, MEASURED.** `--phrase` does not exist,
-and `--hashlock-phrase` is **refused by the argv guard before clap parses it** —
-this repo does not take secrets on the command line. An earlier draft hedged here
-and its suggested remedy was wrong: dropping the flag pair leaves the command
-with *zero* phrase sources and it exits 64.
-
-So the helpers take the phrase on stdin, and the tests pass the flag:
-
-```rust
-fn run_ms(args: &[&str], phrase: &str) -> String {
-    let a = Command::cargo_bin("ms").expect("ms binary")
-        .args(args).write_stdin(format!("{phrase}\n")).assert().success();
-    let o = a.get_output();
-    format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr))
-}
-```
-
-and each call becomes, e.g.:
-
-```rust
-let out = run_ms(&["hashlock", "--hashlock-phrase-stdin", "--kind", "ripemd160"],
-                 "correct horse battery staple");
-```
-
-Note the helper joins stdout **and** stderr, because the four-digest fallback is
-on stderr by the purity contract above.
+**Five tests, not three.** The fifth (`under_json_the_object_carries_every_kind_
+when_none_was_named`) exists because the §13.4 fallback **cannot** ride on
+stderr under `--json`: `hashlock_outputs.rs` pins stderr under `--json
+--no-engraving-card` to exactly the `PrivateKeyMaterial` advisory (§4.4, §11).
+So under `--json` the notice changes CHANNEL — into `kind`, `kind_specified`
+and `digests_by_kind` on the object — and that test is what keeps the change of
+channel from being a silent drop. See Step 3.
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -938,75 +1213,146 @@ Expected: FAIL — `--kind` is not a recognised argument.
 
 Add to the hashlock args struct:
 
-```rust
-    /// Which hash the SCRIPT commits to. Omit it and all four digests are
-    /// printed: a plate cut before this existed carries no kind, and a lookup
-    /// beats an impossible check. Case is rejected, never folded.
-    #[arg(long, value_parser = parse_kind)]
-    kind: Option<HashKind>,
+```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
+    /// Which hash the SCRIPT commits to: sha256, hash256, ripemd160, hash160.
+    /// Omit it and every kind's digest is listed on stderr (under --json, in
+    /// the object as `digests_by_kind`, with `kind_specified: false`) -- a
+    /// plate cut before this existed carries no kind, and a lookup beats an
+    /// impossible check. Case is rejected, never folded.
+    #[arg(long, value_name = "KIND", value_parser = parse_kind)]
+    pub kind: Option<HashKind>,
 ```
 
-```rust
-fn parse_kind(s: &str) -> Result<HashKind, String> {
+```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
+fn parse_kind(s: &str) -> core::result::Result<HashKind, String> {
     match s {
         "sha256" => Ok(HashKind::Sha256),
         "hash256" => Ok(HashKind::Hash256),
         "ripemd160" => Ok(HashKind::Ripemd160),
         "hash160" => Ok(HashKind::Hash160),
         other => Err(format!(
-            "unknown hash kind {other:?}: expected one of sha256, hash256, ripemd160, hash160 \
+            "unknown hash kind {other:?}: expected sha256, hash256, ripemd160 or hash160 \
              (lowercase; case is rejected, never folded)"
         )),
     }
 }
 ```
 
-**THE ONE LINE THAT MATTERS IS `hashlock.rs:325`.** An earlier draft added new
-output and left `let h = digest(&d.x);` alone — so under `--kind` **six** channels
-would still have emitted the sha256 digest: the stdout `hash:` record, three
-`--json` keys, and two stderr card lines. Under `--kind hash256` the tool would
-print two indistinguishable 64-hex values: the spec's §13.2 operator-facing
-Critical, reproduced inside the very tool the reconciliation screen sends the
-operator to.
+Note the return type is `core::result::Result`, spelled out: this module has its
+own `Result` alias in scope and a bare `Result<HashKind, String>` does not
+compile against clap's `value_parser`.
+
+**THE ONE LINE THAT MATTERS IS THE DIGEST SOURCE.** An earlier draft added new
+output and left `let h = digest(&d.x);` alone — so under `--kind` **six**
+channels would still have emitted the sha256 digest: the stdout `hash:` record,
+three `--json` keys, and two stderr card lines. Under `--kind hash256` the tool
+would print two indistinguishable 64-hex values: the spec's §13.2
+operator-facing Critical, reproduced inside the very tool the reconciliation
+screen sends the operator to.
 
 So the change is at the source, not at the print sites:
 
-```rust
-use ms_codec::hashlock::{HashKind, DigestBytes};   // M-2: the plan listed this and never showed it
-
-// was: let h = digest(&d.x);
-let kind = args.kind.unwrap_or(HashKind::Sha256);
-let h = kind.digest(&d.x);                          // `d` is the Derived value; the preimage is d.x
-let h_hex = hex::encode(h.as_slice());
+```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
+    let kind = args.kind.unwrap_or(HashKind::Sha256);
+    let hb = kind.digest(&d.x);
+    let h = hb.as_slice();
 ```
 
-Then every existing consumer of `h_hex` is correct without further edits. Walk
-them and confirm — do not assume:
+`hb` is bound separately because `as_slice()` borrows it — `kind.digest(&d.x).as_slice()`
+on one line does not outlive the statement. Every existing consumer of `h` is
+then correct without further edits. Walk them and confirm — do not assume:
 
 ```bash
-grep -n "h_hex\|"digest"\|sha256" crates/ms-cli/src/cmd/hashlock.rs
+grep -n 'h_hex\|"digest"\|sha256' crates/ms-cli/src/cmd/hashlock.rs
 ```
 
 **STDOUT PURITY IS A CONTRACT, AND IT IS TESTED.** `crates/ms-cli/src/cmd/hashlock.rs:5`:
 *"stdout carries the PUBLIC digest record (`me sysw pack` reads it), stderr
 carries the SECRET preimage on the card."*
 `crates/ms-cli/tests/hashlock_outputs.rs:22` asserts stdout is **exactly**
-`hash:<hex>\n`. So:
+`hash:<hex>\n`. So nothing new goes to stdout — not the kind line, not the
+four-digest fallback, not the `for md compose:` line, which already exists on
+**stderr** and is made kind-aware there (Step 4).
 
-- **Nothing new goes to stdout.** Not the kind line, not the four-digest
-  fallback, not the `for md compose:` line — that one already exists on
-  **stderr** at `:406` and is made kind-aware there (Step 4).
-- The §13.4 four-digest fallback prints to **stderr**:
+**THERE ARE TWO CHANNELS FOR §13.4, AND THE SECOND IS NOT OPTIONAL.**
+`hashlock_outputs.rs` ALSO pins stderr under `--json --no-engraving-card` to
+**exactly** the `PrivateKeyMaterial` advisory (§4.4, §11). So the stderr
+fallback must stand down under `--json`, and the notice travels in the object
+instead:
 
-```rust
-if args.kind.is_none() {
-    eprintln!("no --kind given; this phrase's digest under each kind:");
-    for k in [HashKind::Sha256, HashKind::Hash256, HashKind::Ripemd160, HashKind::Hash160] {
-        eprintln!("  {:<10} {}", k.token(), hex::encode(k.digest(&d.x).as_slice()));
-    }
-    eprintln!("stdout carries the sha256 record, as it always has.");
-}
+```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
+        o.insert("kind".into(), kind.token().into());
+        if args.kind.is_none() {
+            // SPEC §13.4 for MACHINE consumers. The stderr listing below is
+            // suppressed under --json because `--json --no-engraving-card`
+            // pins stderr to exactly the advisory (§4.4, §11), so the notice
+            // has to travel in the object or it does not travel at all. A
+            // consumer reading `hash_operand` alone would otherwise take the
+            // sha256 default for a stated choice.
+            o.insert("kind_specified".into(), false.into());
+            let mut by = serde_json::Map::new();
+            for k in [
+                HashKind::Sha256,
+                HashKind::Hash256,
+                HashKind::Ripemd160,
+                HashKind::Hash160,
+            ] {
+                by.insert(k.token().into(), hex(k.digest(&d.x).as_slice()).into());
+            }
+            o.insert("digests_by_kind".into(), by.into());
+        }
 ```
+
+The human fallback prints to **stderr**, and note both guards — it is
+`args.kind.is_none() && !args.json`, and it sits **OUTSIDE** the
+`!args.no_engraving_card` block:
+
+```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
+    if args.kind.is_none() && !args.json {
+        // SPEC §13.4: a plate cut before --kind existed carries no kind, so
+        // listing all four turns an impossible check into a lookup. What is
+        // forbidden is assuming sha256 in silence -- which is what this did.
+        //
+        // OUTSIDE the --no-engraving-card guard ON PURPOSE. §13.4's clause is
+        // unconditional, and the operator who suppresses the card is the one
+        // who most needs this: the card carries the PREIMAGE, so suppressing
+        // it is the safety-conscious choice, and nesting this inside it hands
+        // that operator one unlabelled sha256 digest instead. It shipped that
+        // way once (R0 round 4, C-1). Do not fold it back in.
+        //
+        // Skipped under --json only because the object carries `kind_specified`
+        // and `digests_by_kind` instead -- the notice moves channel, it is not
+        // dropped. `--json --no-engraving-card` pins stderr to exactly the
+        // advisory (§4.4, §11), and that purity contract is load-bearing for
+        // machine consumers.
+        writeln!(
+            stderr,
+            "no --kind given; stdout carries the sha256 record. This phrase's digest under each kind:"
+        )
+        .ok();
+        for k in [
+            HashKind::Sha256,
+            HashKind::Hash256,
+            HashKind::Ripemd160,
+            HashKind::Hash160,
+        ] {
+            writeln!(
+                stderr,
+                "  {:<10} {}",
+                k.token(),
+                hex(k.digest(&d.x).as_slice())
+            )
+            .ok();
+        }
+    }
+```
+
+**Do not nest that block inside the engraving-card guard.** It shipped that way
+once (R0 round 4, C-1) and `ms hashlock --no-engraving-card` then emitted a bare
+sha256 record with empty stderr — the exact silent assumption §13.4 forbids,
+while `--help` claimed otherwise. §13.4's clause is unconditional, and the
+operator who suppresses the card is the one who most needs the lookup: the card
+is what carries the preimage, so suppressing it is the safety-conscious choice.
 
 - [ ] **Step 4: Update `method_line` and the `for md compose:` line**
 
@@ -1026,6 +1372,89 @@ git commit -m "ms hashlock: --kind, with a four-digest lookup when it is absent"
 
 ---
 
+### Task 5b: The release records — the two that break the build, and the two the process mandates
+
+**Files:**
+- Modify: `crates/ms-cli/Cargo.toml` (version, and the `ms-codec` pin)
+- Modify: `Cargo.lock`, `vendor/`
+- Modify: `MIGRATION.md`
+- Modify: `CHANGELOG.md`
+
+**Why it is its own task.** Two of these four are load-bearing for the build and
+two are mandated by `design/RELEASE_PROCESS.md`; all four were done on the
+branch and **none was prescribed by this plan** until R0 round 4 said so. An
+executor who follows Task 2 Step 3 and stops has an unresolvable workspace.
+
+- [ ] **Step 1: The pin — this is the one that breaks the build**
+
+`crates/ms-cli/Cargo.toml:20` reads
+`ms-codec = { path = "../ms-codec", version = "=0.9.0" }`. The requirement is
+**exact**, so Task 2's bump of `ms-codec` to `0.10.0` makes it unsatisfiable.
+Move it to `=0.10.0` and bump `ms-cli` itself `0.18.0` → **0.19.0** (its
+`--json` key rename is breaking).
+
+```bash
+grep -n '^version\|ms-codec = ' crates/ms-cli/Cargo.toml
+cargo metadata --locked --offline >/dev/null && echo "workspace resolves"
+```
+
+- [ ] **Step 2: Lockfile and vendor**
+
+Run: `cargo metadata --offline >/dev/null` (updates `Cargo.lock`), then
+`ci/repro/vendor-freshness.sh`. Task 1 added `ripemd`, so `vendor/` gained
+exactly one directory; this step is where the version bumps reach the lockfile.
+
+- [ ] **Step 3: `MIGRATION.md` — RELEASE_PROCESS item 5**
+
+That item is unconditional for a wire-format or API change: *"add a new section
+to `MIGRATION.md` per the v0.1 → v0.2 precedent."* This release removes the
+public `digest`, changes `qr_text`'s signature, and renames a `--json` key, so
+it needs a `## v0.9 → v0.10` section. The file is **oldest-first**; append.
+
+Three things an upgrader cannot get from the CHANGELOG and must get here:
+
+1. `qr_text` is not merely re-signed — the `hash: <kind>` line is
+   **unconditional**, so a **sha256** plate cut under v0.10 is NOT byte-identical
+   to one cut under v0.9.
+2. **A plate with no `hash:` line MEANS sha256.** Absence is the sha256 case, not
+   an unknown. Every plate cut before this cycle is in that state.
+3. The record's producer rule keeps **bare** for sha256 precisely so no plate
+   already cut becomes unreadable — but a consumer must never emit a bare record
+   for a non-sha256 digest, because `me sysw pack` reads bare as sha256 and would
+   compose an unspendable wallet.
+
+**Compile the section's snippets before committing it.** They are executable
+content in a document nothing else gates: drop them into a scratch test in the
+worktree, `cargo test -p ms-codec --test <probe>`, then delete it.
+
+- [ ] **Step 4: `CHANGELOG.md` — structure, not just content**
+
+Three rules the branch got wrong on its first attempt:
+
+1. The entry goes **below** the file's preamble (*"All notable changes…"* and the
+   Keep-a-Changelog paragraph), not between the `# Changelog` title and it.
+2. **One header per crate**, in the bracketed form every other entry and
+   `RELEASE_PROCESS.md` item 2 use: `## ms-codec [0.10.0] — <date>` and
+   `## ms-cli [0.19.0] — <date>`. A combined `## ms-codec 0.10.0 / ms-cli 0.19.0`
+   header leaves neither crate's history a clean sequence.
+3. **Fold any `## <crate> [Unreleased]` section for a crate you are releasing
+   into that release's entry.** `ms-cli [Unreleased]` held `--emit-record`
+   (F-495); shipping 0.19.0 without folding it leaves a section labelled
+   Unreleased describing released work, and 0.19.0's own notes silently omitting
+   a feature it contains.
+
+Each entry ends with a **Migration notes** section pointing at `MIGRATION.md`,
+per the `## ms-cli [0.18.0]` precedent.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add crates/ms-cli/Cargo.toml Cargo.lock vendor CHANGELOG.md MIGRATION.md
+git commit -m "release: ms-codec 0.10.0 / ms-cli 0.19.0, with the migration record"
+```
+
+---
+
 ### Task 6: Phase gate
 
 **Files:** none modified.
@@ -1041,7 +1470,7 @@ Run: `cargo +1.95.0 fmt --all -- --check`
 
 **The `+1.95.0` is REQUIRED.** `rust-toolchain.toml` pins 1.85.0, which a bare
 `cargo fmt` would use and which **formats differently**
-(`.github/workflows/rust.yml:60-63`, whose comment records a commit that left
+(`mnemonic-secret/.github/workflows/rust.yml:60-63`, whose comment records a commit that left
 master red by trusting the bare form). An earlier draft of this plan used the
 bare command — exactly the one the workflow warns against.
 
@@ -1075,7 +1504,7 @@ sha256sum crates/ms-codec/tests/vectors/hashlock-v0.8.json
 the corpus against that SHA; without it the fork's provenance check has nothing
 to move to.
 
-Phase 3 (`me-cli`) pins **this exact rev** in its `Cargo.toml`, following the `mt-codec` precedent at `me-cli/Cargo.toml:54-74` — a git rev pin, not a `cargo publish`, because publishing is irreversible and pinning a rev is not (spec §9).
+Phase 3 (`me-cli`) pins **this exact rev** in its `Cargo.toml`, following the `mt-codec` precedent at `mnemonic-engrave/crates/me-cli/Cargo.toml:54-74` — a git rev pin, not a `cargo publish`, because publishing is irreversible and pinning a rev is not (spec §9).
 
 - [ ] **Step 5: Push**
 
