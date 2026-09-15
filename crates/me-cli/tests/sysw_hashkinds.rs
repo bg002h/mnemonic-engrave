@@ -164,3 +164,62 @@ fn a_genuinely_orphaned_phrase_warns_and_names_what_it_checked() {
          operator compares against:\n{se}"
     );
 }
+
+/// §6's producer rule **AT THE WIRE**, which is the only place it counts.
+///
+/// WHY THIS EXISTS BESIDE THE UNIT TEST. The rule was implemented in
+/// `hash_record()` and `me sysw pack` stored the operator's text verbatim, so
+/// `hash:sha256:<64hex>` reached the wire tagged — and the SHIPPED device's
+/// parser demands a 64-character body, so it treated that record as
+/// ClassUnknown and **inert**. `me` accepted it without a word. The unit test
+/// was green the whole time because it tested a function with zero production
+/// call sites (R0 round 1, I-1).
+///
+/// A test that drives the real producer is the only one that can see that.
+#[test]
+fn the_producer_rule_reaches_the_wire_not_just_the_helper() {
+    let dir = tempfile::tempdir().unwrap();
+    let pack_one = |name: &str, record: &str| -> Vec<u8> {
+        let recs = dir.path().join(format!("{name}.txt"));
+        let out = dir.path().join(format!("{name}.bin"));
+        std::fs::write(&recs, format!("{record}\n")).unwrap();
+        Command::cargo_bin("me")
+            .unwrap()
+            .args([
+                "sysw",
+                "pack",
+                "--in",
+                &recs.display().to_string(),
+                "--out",
+                &out.display().to_string(),
+            ])
+            .output()
+            .unwrap();
+        std::fs::read(&out).unwrap()
+    };
+
+    // "Input is liberal, output is conservative": the explicit sha256 form is
+    // ACCEPTED and produces the SAME BYTES as the bare form.
+    let explicit = pack_one("explicit", &format!("hash:sha256:{D_SHA256}"));
+    let bare = pack_one("bare", &format!("hash:{D_SHA256}"));
+    assert_eq!(
+        explicit, bare,
+        "an explicit sha256 record must normalise to the bare form on the \
+         wire -- the shipped device reads only the bare one"
+    );
+
+    // ...and the other three keep their tag, because that is what says which
+    // hash the script commits to.
+    for (kind, digest) in [
+        ("hash256", D_HASH256),
+        ("ripemd160", D_RIPEMD160),
+        ("hash160", D_HASH160),
+    ] {
+        let blob = pack_one(kind, &format!("hash:{kind}:{digest}"));
+        let hay = String::from_utf8_lossy(&blob);
+        assert!(
+            hay.contains(&format!("hash:{kind}:{digest}")),
+            "{kind}: the tag must survive to the wire"
+        );
+    }
+}

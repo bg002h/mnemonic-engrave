@@ -192,12 +192,22 @@ enum SyswCmd {
     /// checks the bytes parse AND that every input carries a signature. `me`
     /// consumes constellation strings; it manufactures none of them.
     ///
-    /// `key:<hex of "[fingerprint/path]xpub">`, `hash:<64 lowercase hex>` and
+    /// `key:<hex of "[fingerprint/path]xpub">`,
+    /// `hash:[<kind>:]<lowercase hex>` and
     /// `now:<hex of "<seconds>[,<height>]">` feed the SeedHammer II's Wallet
-    /// Policy composer: a cosigner key for seating, a sha256 hashlock digest,
-    /// and the pack time (a lower bound the device echoes beside a time lock;
+    /// Policy composer: a cosigner key for seating, a hashlock digest, and the
+    /// pack time (a lower bound the device echoes beside a time lock;
     /// appended for you when a `key:`/`hash:` record is present — see
     /// `--now`/`--no-now`).
+    ///
+    /// A `hash:` record's KIND is which hash the SCRIPT commits to: omit it for
+    /// `sha256` (64 hex, the form every shipped device reads), or write
+    /// `hash:hash256:` (64 hex), `hash:ripemd160:` or `hash:hash160:` (40 hex).
+    /// An explicit `hash:sha256:` is accepted and normalised to the bare form.
+    ///
+    /// **That is a different axis from a `phrase:` record's METHOD**, which is
+    /// how a preimage was derived from a phrase. They share the token `sha256`
+    /// and mean different things, so name both or neither.
     ///
     /// `phrase:<hex of "<method>,<phrase>">` is a hashlock PHRASE and the method
     /// that derives its preimage — `hardened` or `sha256` — cut on the FIRST

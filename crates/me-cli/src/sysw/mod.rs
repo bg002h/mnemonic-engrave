@@ -561,6 +561,23 @@ fn split(
     }
     let mut payload = Payload::default();
     for r in records {
+        // SPEC_hashlock_kinds §6: "Input is liberal, output is conservative."
+        // THE PRODUCER RULE HAPPENS HERE, not in `hash_record` alone -- an
+        // explicit `hash:sha256:<64hex>` is ACCEPTED on input and must never
+        // reach the wire, because the SHIPPED device's parser demands a
+        // 64-character body and would treat the tagged form as ClassUnknown
+        // and inert. Storing the operator's text verbatim published a record
+        // every existing device silently ignores (R0 round 1, I-1).
+        //
+        // Only `hash:` records are touched; every other class is byte-identical
+        // to what the operator wrote, which is what keeps `now:` timestamps and
+        // `key:` text exactly as they were.
+        let r = match composer_records::parse(&r) {
+            Some(Ok(composer_records::ComposerRecord::Hash(lock))) => {
+                composer_records::hash_record(&lock)
+            }
+            _ => r,
+        };
         if classify_with(&r, adm).is_secret() {
             payload.secret.push(Zeroizing::new(r));
         } else {

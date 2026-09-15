@@ -811,7 +811,12 @@ hashed path's material, and two H6 §10.1 added, for one that does.
 > record N: key: needs [fingerprint/path]xpub with
 > an origin; a bare xpub is not a key record
 
-> record N: hash: must be exactly 64 hex characters
+> record N: hash: <kind> needs exactly <N> lowercase hex
+> characters
+
+> record N: hash: unknown hash kind; expected
+> `hash:<hex>` (sha256) or `hash:<kind>:<hex>` with kind
+> hash256, ripemd160 or hash160, lowercase
 
 > record N: now: must be <seconds>[,<height>] in range
 

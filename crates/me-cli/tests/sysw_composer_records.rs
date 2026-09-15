@@ -724,3 +724,38 @@ fn an_unknown_kind_token_is_refused() {
         Some(Err(ComposerRecordError::Hash(_)))
     ));
 }
+
+/// `HashLock::new` REFUSES a digest that is not its kind's width, and that
+/// guard is tested directly rather than through `parse`.
+///
+/// It was redundant with `parse_hash` and deletable with every test still green
+/// (R0 round 1, M11) — but it is a `pub` constructor, so the Go port will
+/// reimplement it, and a guard no test exercises is a guard the port can drop
+/// without anything noticing. A 20-byte digest inside a `Sha256` lock would
+/// reach `hash_record` and emit a 40-hex record claiming to be sha256.
+#[test]
+fn hash_lock_new_refuses_a_digest_of_the_wrong_width() {
+    let d32 = [0xa8u8; 32];
+    let d20 = [0x5cu8; 20];
+    for (kind, right, wrong) in [
+        (RecordHashKind::Sha256, &d32[..], &d20[..]),
+        (RecordHashKind::Hash256, &d32[..], &d20[..]),
+        (RecordHashKind::Ripemd160, &d20[..], &d32[..]),
+        (RecordHashKind::Hash160, &d20[..], &d32[..]),
+    ] {
+        assert!(
+            HashLock::new(kind, right).is_some(),
+            "{kind:?}: its own width must be admitted"
+        );
+        assert!(
+            HashLock::new(kind, wrong).is_none(),
+            "{kind:?}: the other width must be refused, not reshaped"
+        );
+        // ...and nothing in between, either.
+        assert!(HashLock::new(kind, &[]).is_none(), "{kind:?}: empty");
+        assert!(
+            HashLock::new(kind, &d32[..31]).is_none() || kind.digest_len() == 31,
+            "{kind:?}: 31 bytes"
+        );
+    }
+}
