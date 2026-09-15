@@ -17442,6 +17442,34 @@ re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
 
+### F-535 — the `phrase:` record carries the METHOD axis and not the KIND axis
+
+Filed 2026-09-15 from the phase-2 journey walk (I-4), whose card half was fixed
+in phase 2 and whose record half is not phase 2's to fix.
+
+`ms hashlock --emit-record --kind ripemd160` emits `phrase:` + hex of
+`hardened,correct horse battery staple` — the derivation method, no kind. An
+operator who cuts a HASHLOCK PHRASE plate from that record has committed the
+method to metal and nothing about which hash the script commits to.
+
+**Why it is not phase 2's.** The record's wire form belongs to
+`mnemonic-engrave` (`sysw::composer_records::phrase_record`), which is its only
+consumer; `ms-cli` pins the emitted bytes against that repo's committed corpus
+rows rather than against its own implementation
+(`crates/ms-cli/tests/hashlock_emit_record.rs`). Adding a field is a
+format change in the primary, and the Rust-primary rule puts it there first,
+with vectors.
+
+**Why phase 2 is nonetheless safe.** The card now names the kind in its
+write-down line and says what to do if that line is lost — re-run with no
+`--kind` and match the digest against the descriptor — so the kind is
+recoverable rather than gone. What is missing is the plate carrying it, which
+is the same gap §13.1 closed for the QR text.
+
+Note the asymmetry worth resolving together: `qr_text` (the plate) gained
+`hash: <kind>` in phase 2, and the `phrase:` record (the wire form the plate is
+cut from) did not. Owning phase: **phase 3** (`me-cli`).
+
 ### F-534 — `ms decode`'s preimage route answers only for sha256, and does not say so
 
 Filed 2026-09-15 from the phase-2 plan's R0 round 3 (M-2), which correctly
