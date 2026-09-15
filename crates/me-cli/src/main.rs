@@ -205,6 +205,13 @@ enum SyswCmd {
     /// `hash:hash256:` (64 hex), `hash:ripemd160:` or `hash:hash160:` (40 hex).
     /// An explicit `hash:sha256:` is accepted and normalised to the bare form.
     ///
+    /// **Never strip a kind tag to make a record parse.** An untagged record is
+    /// read as `sha256`, and a `hash256` digest is also 64 hex, so stripping
+    /// that one succeeds SILENTLY and commits the payload to a different digest
+    /// than the wallet. A device whose firmware has no hashlock-kind support
+    /// counts a tagged record as "not understood" and builds no hashlock path
+    /// from it — that is the fail-closed behaviour, not a reason to reshape it.
+    ///
     /// **That is a different axis from a `phrase:` record's METHOD**, which is
     /// how a preimage was derived from a phrase. They share the token `sha256`
     /// and mean different things, so name both or neither.
@@ -1533,6 +1540,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // is a warning about work already done". Warning 4 is inside
             // `decide_sealing`'s caller, AFTER the sealing line, because its own
             // wording refers to it.
+            // EVERY pack, not just --pack-preimage: a payload may carry a
+            // tagged `hash:` record and no preimage carrier at all.
+            report_hash_kind_inertness(&recs);
             if *pack_preimage {
                 report_preimage_admission(&recs);
             }
@@ -2524,6 +2534,51 @@ fn hashlock_carrier_shaped(record: &str) -> bool {
 ///
 /// Host lines are stderr, carry no panel budget, and are exempt from the
 /// device's ASCII rule; the shipped refusals already carry em dashes.
+/// SPEC_hashlock_kinds §6 — say that a kind-tagged `hash:` record is INERT on
+/// firmware without hashlock-kind support.
+///
+/// **The last moment the host can say it.** The record reaches the wire tagged,
+/// the device's `ParseHashRecord` demands a 64-character body, so it classifies
+/// as `ClassUnknown` and surfaces only in the door's generic "not understood"
+/// count — no screen, no hashlock path. Silence at pack reads as assent, and
+/// the operator's next act is to carry the payload to a machine where plates get
+/// planned and steel gets cut (P3 journey walk, J-1).
+///
+/// **Phrased about the FIRMWARE, never about a phase or a version.** Phase 4
+/// makes upgraded firmware read the tag; every device not yet flashed stays
+/// inert forever, so a note that says "not yet" would expire into a lie while
+/// the condition it describes is still true.
+///
+/// Runs on EVERY pack, not only under `--pack-preimage`: a payload may carry a
+/// tagged `hash:` record and no carrier at all.
+fn report_hash_kind_inertness(records: &[String]) {
+    use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord, RecordHashKind};
+    let mut kinds: Vec<RecordHashKind> = records
+        .iter()
+        .filter_map(|r| match parse(r) {
+            Some(Ok(ComposerRecord::Hash(h))) if h.kind() != RecordHashKind::Sha256 => {
+                Some(h.kind())
+            }
+            _ => None,
+        })
+        .collect();
+    if kinds.is_empty() {
+        return;
+    }
+    kinds.sort_unstable();
+    kinds.dedup();
+    let list: Vec<&str> = kinds.iter().map(|k| k.token()).collect();
+    eprintln!(
+        "me: note — this payload carries a kind-tagged hash record ({}). A device whose \
+         firmware has no hashlock-kind support does not understand that tag: it counts the \
+         record in the door's \"not understood\" total and builds NO hashlock path from it. \
+         Do not strip the tag to make it parse — an untagged record is read as sha256, and a \
+         hash256 digest is also 64 hex, so stripping it succeeds silently and commits the \
+         payload to a different digest than the wallet.",
+        list.join(", ")
+    );
+}
+
 fn report_preimage_admission(records: &[String]) {
     use mnemonic_engrave::sysw::classify;
     use mnemonic_engrave::sysw::composer_records::{

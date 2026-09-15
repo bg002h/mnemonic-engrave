@@ -223,3 +223,63 @@ fn the_producer_rule_reaches_the_wire_not_just_the_helper() {
         );
     }
 }
+
+/// A kind-tagged record is INERT on firmware without hashlock-kind support, and
+/// `me sysw pack` is the last moment the host can say so (P3 journey walk, J-1).
+///
+/// The device's `ParseHashRecord` demands a 64-character body, so a tagged
+/// record classifies as `ClassUnknown` and surfaces only in the door's generic
+/// "not understood" count — no screen, no hashlock path. Silence at pack reads
+/// as assent, and the operator's next act is to carry the payload to a machine.
+///
+/// **The note must be about the FIRMWARE, not a phase or a version.** Phase 4
+/// makes upgraded firmware read the tag; a device not yet flashed stays inert
+/// forever, so "not yet" would expire into a lie while the condition holds.
+#[test]
+fn a_kind_tagged_record_is_announced_as_inert_on_firmware_without_support() {
+    for (kind, digest) in [
+        ("hash256", D_HASH256),
+        ("ripemd160", D_RIPEMD160),
+        ("hash160", D_HASH160),
+    ] {
+        let (ok, se) = pack(&[&format!("hash:{kind}:{digest}")], &[]);
+        assert!(ok, "{kind}: refused:\n{se}");
+        assert!(
+            se.contains("kind-tagged hash record"),
+            "{kind}: pack says nothing about the tag being inert:\n{se}"
+        );
+        assert!(
+            se.contains(kind),
+            "{kind}: the note must name the kind:\n{se}"
+        );
+        assert!(
+            se.contains("firmware"),
+            "{kind}: phrased about the firmware, not a phase — a device never \
+             flashed stays inert forever:\n{se}"
+        );
+        // ...and it forbids the workaround the refusal used to invite.
+        assert!(
+            se.contains("Do not strip the tag"),
+            "{kind}: the note must forbid stripping, which succeeds SILENTLY \
+             for hash256 because that digest is also 64 hex:\n{se}"
+        );
+    }
+}
+
+/// ...and it stays QUIET for a bare sha256 record, which every shipped device
+/// reads. A note on the working path is a note operators learn to skip.
+#[test]
+fn a_bare_sha256_record_gets_no_inertness_note() {
+    let (ok, se) = pack(&[&format!("hash:{D_SHA256}")], &[]);
+    assert!(ok, "refused:\n{se}");
+    assert!(
+        !se.contains("kind-tagged hash record"),
+        "the bare form is what every shipped device reads:\n{se}"
+    );
+    // The explicit sha256 form normalises to bare, so it must be quiet too.
+    let (_, se) = pack(&[&format!("hash:sha256:{D_SHA256}")], &[]);
+    assert!(
+        !se.contains("kind-tagged hash record"),
+        "an explicit sha256 record is normalised away, so nothing is inert:\n{se}"
+    );
+}
