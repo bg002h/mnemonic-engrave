@@ -71,13 +71,46 @@ Rust side pins the same constant — `sysw/composer_records_test.go` is measured
 against it. Thirteen rows were added: each kind valid, an explicit `sha256:`,
 wrong width per kind twice, and three unknown/miscased tokens.
 
-## The device surface (§13)
+## The device surface, located (§13)
 
-Not yet located in detail: the locator `hash` row, the confirm and reconciliation
-bodies, the masked pick lead, and the census row. §6's binding rule applies to
-every one of them — *where both axes could be read, both are named or neither
-is* — and §13.2 calls the `hash256`-vs-`sha256` confusion the cycle's
-operator-facing Critical.
+Measured at fork `0562e81`. §13 says *"nothing here is optional"* and calls
+§13.2 the cycle's operator-facing Critical.
+
+**Three screens, all in `gui/composer_copy.go`, and all three take `method` and
+no kind** — which is exactly the defect §13.2 describes:
+
+| function | line | call sites |
+| --- | --- | --- |
+| `composerCopyHashlockConfirm(first8last8, method, chars, relation, otherPath)` | `:557` | 2 |
+| `composerCopyHashlockReconcile(first8last8, method, chars)` | `:641` | 2 |
+| `composerCopyPreimagePlateLead(first8last8, path, chars, method)` | `:717` | 2 |
+
+Six non-test call sites to thread a kind through. The third is the one §13.2
+notes *"the fold that wrote that rule missed the screen it condemned"* — it is
+in scope, not a bonus.
+
+**The reconcile screen is the Critical.** It instructs *"run `ms hashlock` … if
+they differ, do not fund this wallet: build it again"*, and supplies only
+`method: sha256` — the other axis. On a correct `hash256` wallet that check
+fails, both values are 64 hex, and the operator complying exactly discards a
+correct wallet and re-cuts five plates.
+
+**The locator's `hash` row** is `gui/composer_preimage_plate.go:232`,
+`hashlockPlateLocator`, which builds `"hash  " + hashlockFirst8Last8(digest)`
+and takes a bare `digest [32]byte` — the same type problem as `md/compose.go`.
+§13.1's measurement says the kind fits here (35 characters, 10 rows, 1.20 mm
+spare at 3.0 mm) and **must not** go on the `method:` line or a new row, either
+of which adds an eleventh row and blows the budget at every font rung.
+
+`composerHashlockLocator` (`:256`) is the composer-native twin and
+`hashlockPlatesLocator` (`gui/composer_hashlock_plates.go:205`) the Hashlock-flow
+one; both feed the same rows.
+
+**The plate's QR text** is bounded in `engrave/engrave.go:503` — *"the bound is
+v9 (dim 53), which is what the H6 hashlock phrase plate…"*. §13.1's measurement
+has the QR going 194 → 210 bytes and **staying at 53 modules**, so the reserved
+envelope holds and ACCEPTANCE item 8 (the operator's ~43-minute QR-scan gate) is
+unaffected.
 
 ## Toolchain facts, measured now
 
@@ -104,6 +137,6 @@ operator-facing Critical.
 
 ## Not measured here
 
-Where the device's hashlock screens live and how many there are; whether
+Whether
 `PolicyShape` crosses a wire boundary; the firmware size headroom for four
 tokens; whether any Go test asserts the old `ParseHashRecord` signature.
