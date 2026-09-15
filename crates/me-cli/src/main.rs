@@ -3193,7 +3193,12 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                      record whose body fails its rule ({}).\n      {}\n      Build the record \
                      with `me sysw pack`'s helpers: a key record is `key:` + the hex of \
                      `[fingerprint/path]xpub` exactly as `md decompose` prints it; a hash record \
-                     is `hash:` + the 32-byte digest as 64 lowercase hex; a now record is `now:` \
+                     is `hash:` + a sha256 digest as 64 lowercase hex, or `hash:<kind>:` + that \
+                     kind's digest for hash256, ripemd160 or hash160 — IF A RECORD ALREADY \
+                     CARRIES A KIND TAG, DO NOT DELETE IT TO SATISFY THIS RULE: an untagged \
+                     record is read as sha256, and a hash256 digest is also 64 hex, so \
+                     stripping the tag is accepted and commits the payload to a different \
+                     digest than the wallet; a now record is `now:` \
                      + the hex of `<seconds>[,<height>]`; a phrase record is `phrase:` + the hex \
                      of `<method>,<phrase>` with method `hardened` or `sha256`, cut on the FIRST \
                      comma — so a space after it is part of the phrase.",

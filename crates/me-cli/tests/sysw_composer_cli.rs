@@ -208,3 +208,49 @@ fn show_prints_each_class_legibly() {
     );
     assert!(s.contains("public record 2: pack time (now:) — 1756684800 (seconds): a lower bound on the present the device echoes beside a time lock; never a locktime"), "{s}");
 }
+
+/// The advice printed beside a rejected `hash:` record must not tell the
+/// operator to do the one thing that loses funds.
+///
+/// **This was a live hazard created by SPEC_hashlock_kinds** (phase 1 journey
+/// walk, F-C1). `me sysw pack` refuses `hash:hash256:<64 hex>` with *"hash: must
+/// be exactly 64 hex characters"*, and the build advice said a hash record is
+/// *"`hash:` + the 32-byte digest as 64 lowercase hex"* — follow that literally
+/// and you delete the `hash256:` tag. The untagged record is then ACCEPTED, as
+/// **sha256**, committing the payload to a different digest than the wallet.
+///
+/// `ms hashlock`'s card already warns against exactly this and quotes this
+/// error string, so before the fix the two tools contradicted each other and
+/// the dangerous one was the one on screen at the moment the operator was stuck.
+#[test]
+fn the_rejected_hash_record_advice_does_not_tell_you_to_strip_the_kind_tag() {
+    let out = me()
+        .args([
+            "sysw",
+            "pack",
+            "hash:hash256:98a20fc25dbcdf236fb0307e3f82cad47fca2e807f3ef82c31993549641cd488",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        !out.status.success(),
+        "a tagged hash256 record is refused here"
+    );
+    let se = String::from_utf8_lossy(&out.stderr);
+
+    assert!(
+        se.contains("DO NOT DELETE IT"),
+        "the advice must warn against stripping the tag, because the refusal \
+         above it reads as an instruction to:\n{se}"
+    );
+    assert!(
+        se.contains("hash:<kind>:"),
+        "the advice must name the tagged form as legitimate, or the operator \
+         concludes their record is malformed:\n{se}"
+    );
+    assert!(
+        se.contains("read as sha256"),
+        "the advice must say WHAT stripping it does; 'do not' without a reason \
+         loses to a refusal that looks like an instruction:\n{se}"
+    );
+}
