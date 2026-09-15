@@ -129,11 +129,28 @@ before its fix:
 | `an_uppercase_kind_is_refused` | case folded instead of rejected |
 | `under_json_the_object_carries_every_kind_when_none_was_named` | §13.4 silently dropped when it changed channel into `--json` |
 | `under_json_with_the_card_the_human_still_gets_the_listing` | the `--json`-with-card cell, where the human reads `sha256=` off the card |
+| `the_card_names_the_kinds_own_opcode` | the card naming `OP_SHA256` under all four kinds |
+| `a_non_sha256_kind_warns_that_md_may_not_accept_the_operand` | proposing an operand `md compose` refuses, with nothing saying why |
+| `hash256_warns_against_stripping_its_own_tag` | the 64-hex collision: strip `hash256:` and it is accepted as sha256 |
+| `the_write_down_line_names_both_axes` | the write-down list naming method and omitting kind |
+| `the_fallback_header_names_the_preimage_not_a_phrase` | calling the object a phrase on routes that have none |
 
-**Six, and the last three were each added by a review round that found the
-defect first.** That is the measurement, not a rhetorical point: the file went
-4 → 5 → 6 as rounds 4 and 5 each found a path the existing tests could not see.
-Every one was a flag combination nobody had passed.
+**Eleven, and seven of them were added by a review round that found the defect
+first.** That is a measurement, not a rhetorical point — `git log` on the file
+gives 4 → 5 → 6 → 10 → 11:
+
+| round | + | what it had found that no existing test could see |
+| --- | --- | --- |
+| R0 r4 | +1 | the fallback nested inside the `--no-engraving-card` guard |
+| R0 r5 | +1 | the guard one flag wider than the contract it cited |
+| journey walk | +4 | the opcode, the unusable operand, the 64-hex strip, the write-down list |
+| journey walk | +1 | "this **phrase's** digest" on routes with no phrase |
+
+The first four came from correctness rounds; **the last five came from walking
+an operator journey, after six correctness rounds had closed 0C/0I on the same
+code.** Correctness asks whether a section is right; the walk asks what a person
+holds at a moment and what happens when they reasonably do something else. The
+card was internally consistent and named the wrong opcode for three kinds.
 
 And in `hashlock_qr_text.rs`, a floor is not coverage — assert that a row exists
 **for each of the four kinds by name**, not that the array is at least N long.
@@ -145,7 +162,7 @@ Transcribed from the completed branch, not predicted:
 | gate | result |
 | --- | --- |
 | test suites | **101 ok, 0 failed** |
-| `cargo nextest run --locked --all-targets` | **578 run, 578 passed**, 11 skipped |
+| `cargo nextest run --locked --all-targets` | **583 run, 583 passed**, 11 skipped |
 | `clippy -p ms-codec --all-targets -- -D warnings` | **0** |
 | `clippy -p ms-cli --all-targets -- -D warnings` | **0** |
 | `cargo fmt --all -- --check` | clean |
@@ -207,8 +224,10 @@ from Task 2.
 3. **Renaming the `--json` key `sha256_operand` → `hash_operand` is a breaking
    change to a machine-readable contract**, pinned by
    `hashlock_outputs.rs::json_both_variants`. It is the right rename — the key is
-   wrong for three of four kinds — but it is a GUI-facing contract and belongs in
-   the CHANGELOG with the version bump, not folded in silently.
+   wrong for three of four kinds — but it is a machine-readable contract and
+   belongs in the CHANGELOG with the version bump, not folded in silently. (No
+   code in this constellation reads either key today; the break is for future
+   consumers.)
 
 ---
 
@@ -395,6 +414,24 @@ impl HashKind {
             HashKind::Hash256 => "hash256",
             HashKind::Ripemd160 => "ripemd160",
             HashKind::Hash160 => "hash160",
+        }
+    }
+
+    /// The Script opcode the spending script actually contains.
+    ///
+    /// Spec §3 F1: every hash fragment lowers to
+    /// `OP_SIZE <32> OP_EQUALVERIFY <hashop> <h> OP_EQUAL`, and `<hashop>` is
+    /// THE VARIABLE -- only it and the digest width move. The engraving card
+    /// names this opcode, and it named `OP_SHA256` under every kind for one
+    /// release: a false statement about the object in the operator's hand, on
+    /// the one axis this whole cycle exists to disambiguate, in the line a
+    /// kind-confused operator would use to check themselves.
+    pub fn opcode(self) -> &'static str {
+        match self {
+            HashKind::Sha256 => "OP_SHA256",
+            HashKind::Hash256 => "OP_HASH256",
+            HashKind::Ripemd160 => "OP_RIPEMD160",
+            HashKind::Hash160 => "OP_HASH160",
         }
     }
 }
@@ -1251,6 +1288,133 @@ fn under_json_with_the_card_the_human_still_gets_the_listing() {
         );
     }
 }
+
+/// Spec §3 F1: `OP_SIZE <32> OP_EQUALVERIFY <hashop> <h> OP_EQUAL`. `<hashop>`
+/// is the VARIABLE; the 32 is not. The card said `OP_SHA256` under every kind
+/// for one release — a false statement about the object in the operator's hand,
+/// on the one axis this cycle exists to disambiguate, in the line a confused
+/// operator would self-check against (journey walk, I-1).
+#[test]
+fn the_card_names_the_kinds_own_opcode() {
+    for (kind, op) in [
+        ("sha256", "OP_SHA256"),
+        ("hash256", "OP_HASH256"),
+        ("ripemd160", "OP_RIPEMD160"),
+        ("hash160", "OP_HASH160"),
+    ] {
+        let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
+        let line = se
+            .lines()
+            .find(|l| l.contains("OP_SIZE 32"))
+            .unwrap_or_else(|| panic!("{kind}: no script line on the card"));
+        assert!(
+            line.contains(&format!("before {op}")),
+            "{kind}: the card says {line:?} — an operator self-checking against \
+             it confirms the wrong hash function"
+        );
+        // The width half is correct for all four and must survive.
+        assert!(
+            line.contains("32 bytes (64 hex characters)"),
+            "{kind}: {line:?}"
+        );
+    }
+}
+
+/// The `for md compose:` line proposes a command fragment with full confidence,
+/// and `md compose` refuses a non-sha256 operand with "unknown option
+/// ripemd160" until phase 1 ships — which reads as a typo, not as "not wired up
+/// yet" (journey walk, I-2). Absent for sha256, which works today.
+#[test]
+fn a_non_sha256_kind_warns_that_md_may_not_accept_the_operand() {
+    for kind in ["hash256", "ripemd160", "hash160"] {
+        let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
+        assert!(
+            se.contains(&format!("requires `md compose` support for `{kind}=`")),
+            "{kind}: the card proposes an operand with no hint that `md` may \
+             refuse it:\n{se}"
+        );
+    }
+    let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", "sha256"]);
+    assert!(
+        !se.contains("requires `md compose` support"),
+        "sha256 works today; warning about it is noise:\n{se}"
+    );
+}
+
+/// Spec §13.2's operator-facing Critical at the moment of emission: `hash256`
+/// and `sha256` digests are BOTH 64 hex, so the tag is all that separates them
+/// — and `me sysw pack`'s refusal ("must be exactly 64 hex characters") is
+/// satisfied by deleting the tag, which yields a record accepted as sha256
+/// (journey walk, I-3). Only `hash256` is exposed; the 20-byte kinds are not.
+#[test]
+fn hash256_warns_against_stripping_its_own_tag() {
+    let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", "hash256"]);
+    assert!(
+        se.contains("DO NOT DELETE THE TAG"),
+        "hash256's record is one prefix-strip from a valid sha256 record and \
+         nothing on the card says so:\n{se}"
+    );
+    for kind in ["sha256", "ripemd160", "hash160"] {
+        let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
+        assert!(
+            !se.contains("DO NOT DELETE THE TAG"),
+            "{kind}: not the 64-hex collision; the warning is noise here:\n{se}"
+        );
+    }
+}
+
+/// §5's two axes are METHOD (phrase → preimage) and KIND (preimage → digest).
+/// The write-down instruction named only the first, and §13.2's own rule is
+/// that "a write-down list that omits a field is worse than no list, because
+/// the operator stops writing where the list stops" (journey walk, I-4).
+#[test]
+fn the_write_down_line_names_both_axes() {
+    let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", "ripemd160"]);
+    let line = se
+        .lines()
+        .find(|l| l.starts_with("phrase:"))
+        .expect("no write-down line on the card");
+    assert!(
+        line.contains("method line"),
+        "the method axis went missing: {line:?}"
+    );
+    assert!(
+        line.contains("hash line") && line.contains("ripemd160"),
+        "the kind axis is absent, so an operator complying exactly writes down \
+         the method and nothing about the hash: {line:?}"
+    );
+}
+
+/// The fallback header must not call the object a phrase: `--random`, `--hex`
+/// and the ms1-plate route have none, and on `--random` the line lands two
+/// lines after "No phrase exists" (journey walk, M-1). The digest is of the
+/// PREIMAGE on every route, so one word is true everywhere.
+#[test]
+fn the_fallback_header_names_the_preimage_not_a_phrase() {
+    // `--hex -` reads stdin: the argv guard refuses 64 raw hex characters on the
+    // command line BEFORE clap parses, which is the behaviour, not an obstacle.
+    let hex64 = "c3e97525442520da4cffd5f57aae3f6273990017f2e0fa30c056e32172e22016";
+    for (argv, stdin) in [
+        (&["hashlock", "--hashlock-phrase-stdin"][..], PHRASE),
+        (&["hashlock", "--hex", "-"][..], hex64),
+    ] {
+        let out = Command::cargo_bin("ms")
+            .unwrap()
+            .args(argv)
+            .write_stdin(stdin)
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).into_owned();
+        let line = se
+            .lines()
+            .find(|l| l.contains("digest under each kind"))
+            .unwrap_or_else(|| panic!("{argv:?}: no fallback header:\n{se}"));
+        assert!(
+            !line.contains("phrase"),
+            "{argv:?}: the header calls it a phrase, and this route has none: {line:?}"
+        );
+    }
+}
 ```
 
 **Six tests, not three**, and the last two are a matrix, not decoration.
@@ -1351,12 +1515,16 @@ instead:
 ```rust file=crates/ms-cli/src/cmd/hashlock.rs mode=fragment
         o.insert("kind".into(), kind.token().into());
         if args.kind.is_none() {
-            // SPEC §13.4 for MACHINE consumers. The stderr listing below is
-            // suppressed under --json because `--json --no-engraving-card`
-            // pins stderr to exactly the advisory (§4.4, §11), so the notice
-            // has to travel in the object or it does not travel at all. A
-            // consumer reading `hash_operand` alone would otherwise take the
-            // sha256 default for a stated choice.
+            // SPEC §13.4 for MACHINE consumers. Under `--json
+            // --no-engraving-card` -- and ONLY that pair -- stderr is pinned to
+            // exactly the advisory (§4.4, §11), so the stderr listing stands
+            // down there and the notice travels in this object instead. Under
+            // `--json` with the card it does BOTH, because the human is reading
+            // the card. (This comment said "suppressed under --json" for one
+            // round, which was the guard being one flag wider than its
+            // contract -- R0 round 5, I-1.) A consumer reading `hash_operand`
+            // alone would otherwise take the sha256 default for a stated
+            // choice.
             o.insert("kind_specified".into(), false.into());
             let mut by = serde_json::Map::new();
             for k in [
@@ -1403,7 +1571,12 @@ matching the contract exactly and not one flag wider — and it sits **OUTSIDE**
         // sha256 operand with nothing saying a kind was never chosen.
         writeln!(
             stderr,
-            "no --kind given; stdout carries the sha256 record. This phrase's digest under each kind:"
+            // "preimage", not "phrase": --random, --hex and the ms1-plate route have
+            // no phrase at all, and on --random this line lands two lines after
+            // "No phrase exists". The digest is of the PREIMAGE on every route,
+            // so one word is true everywhere. (Journey walk M-1 -- the same
+            // object-conflation class as R0 round 5's Critical.)
+            "no --kind given; stdout carries the sha256 record. This preimage's digest under each kind:"
         )
         .ok();
         for k in [
@@ -1433,6 +1606,45 @@ is what carries the preimage, so suppressing it is the safety-conscious choice.
 - [ ] **Step 4: Update `method_line` and the `for md compose:` line**
 
 `method_line` (`:299`) describes the **preimage method** and must keep doing exactly that. Separately, the line that prints `for md compose: … sha256=<h>` must name the chosen kind's option (`ripemd160=<h>`), because it is the only thing keeping the digest function and `md compose`'s option name in agreement (spec §11).
+
+- [ ] **Step 4b: The four OTHER card lines that vary with the kind**
+
+A correctness pass will not find these — six rounds did not. They came from
+walking an operator journey, and each is a line the card states with confidence
+that is false or incomplete once the kind is not `sha256`.
+
+1. **The script line names the kind's OPCODE.** It said *"the script checks
+   OP_SIZE 32 before OP_SHA256"* under all four kinds. Spec §3 F1 is
+   `OP_SIZE <32> OP_EQUALVERIFY <hashop> <h> OP_EQUAL` — `<hashop>` is the
+   variable and the `32` is not. Add `HashKind::opcode()` beside `token()`;
+   keep the width half, which is correct for all four. This is the line a
+   kind-confused operator self-checks against, so a wrong one confirms the
+   wrong answer.
+2. **A non-sha256 operand gets a caveat.** The `for md compose:` line proposes a
+   fragment `md compose` refuses until phase 1 ships, and its refusal
+   (*"unknown option ripemd160"*) reads as a typo. Write the caveat as a
+   **conditional** — *"if it answers `unknown option`, that support has not
+   shipped in your `md` yet"* — so phase 1 shipping cannot make the sentence
+   false. Do NOT write "not yet supported" as a statement about today.
+3. **`hash256` warns against stripping its own tag.** A `hash256` record is one
+   prefix-strip from a valid `sha256` record — both digests are 64 hex — and
+   `me sysw pack`'s refusal (*"must be exactly 64 hex characters"*) is satisfied
+   by deleting `hash256:`. The result is accepted and labelled `sha256 hashlock`:
+   a funded wallet whose hashlock the plate does not satisfy, reached by
+   following an error message literally. This is spec §13.2's operator-facing
+   Critical, which assigns the device screens and assigns **nothing** to the
+   moment of emission. `ripemd160`/`hash160` are immune at 40 hex, so the
+   warning is `hash256`-only.
+4. **The write-down line names BOTH axes.** It named the method and omitted the
+   kind, against §13.2's own rule that *"a write-down list that omits a field is
+   worse than no list, because the operator stops writing where the list stops."*
+
+Plus one Minor worth folding because it is the cycle's recurring class: the
+§13.4 header said *"this **phrase's** digest"* on `--random`, `--hex` and the
+ms1-plate route, which have no phrase — on `--random` two lines after *"No
+phrase exists"*. The digest is of the **preimage** on every route.
+
+Each of these gets a test; they are five of the eleven in `hashlock_kind.rs`.
 
 - [ ] **Step 5: Run to verify all pass**
 
