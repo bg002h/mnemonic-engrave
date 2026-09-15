@@ -426,7 +426,19 @@ kind-specific, so the three new kinds are siblings.
 All net new (§1).
 
 - **Round trip per kind**: compose → md1 → decode → script → address, under
-  `wsh` and `sh(wsh)`.
+  `wsh` and `tr`.
+
+  **Was `wsh` and `sh(wsh)`; corrected 2026-09-15 from phase 1, which proved it
+  unsatisfiable.** A legacy wrapper cannot carry a hashlock **of any kind,
+  `sha256` included**: `md-codec`'s composer answers
+  `ComposeError::LegacyWrapperShape` — *"legacy wrappers hold one plain sorted
+  multisig only (n >= 2, no lock, no hash); use wsh or tr"* — the
+  `ComposeError::LegacyWrapperShape` arm in `md-codec`'s `compose` module,
+  cited by name rather than by line because phase 1 moves it. That rule
+  predates this cycle and is deliberate narrowness, so the requirement was not
+  a phase-1 omission and widening the composer to satisfy it would be exactly
+  the wire-widening this constellation refuses. `tr` is the second wrapper that
+  can actually hold one, and phase 1's round trip covers it.
 - **Core's measured verdicts and addresses pinned as data**, so a drift in either
   direction fails a row rather than surfacing on a plate. The measured matrix is
   **keyed-shape only**; the keyless shape for the three new kinds is unmeasured

@@ -17442,6 +17442,52 @@ re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
 
+### F-537 — SPEC_hashlock_kinds carries 16 dangling bare-path citations
+
+Filed 2026-09-15 from the phase-1 R0 round 1 fold, which measured them and did
+not fix them.
+
+`scripts/plan-cite-check.sh design/SPEC_hashlock_kinds.md` resolves **28 of 44**;
+sixteen are bare paths that resolve under no root — `composer_consent.go:199`,
+`me-cli/Cargo.toml:53`, `ms-codec/hashlock.rs:59`, `main.rs:2275,2685,3196` and
+similar. **All sixteen predate this cycle's phase-1 work**: measured by stashing
+the fold's one-line spec edit and re-running, which gives the same 16.
+
+**Why not fixed here.** Qualifying them means touching a spec that closed GREEN
+over seven rounds, in sixteen places, for a reason unrelated to the fold in
+hand — and each one needs its path resolved against the right repo and read
+against the claim it supports, which is the part that takes judgment rather than
+sed (a citation that resolves to the wrong line reads as `ok`, F-279).
+
+**Do them in one pass, with the output of the checker read line by line**, not
+counted. Owning phase: this cycle's follow-up sweep.
+
+### F-538 — no in-tree gate closes SPEC §12 item 1's Core-measured addresses
+
+Filed 2026-09-15 from the phase-1 R0 round 1 review, which tried to close it and
+could not.
+
+§10 asks for *"Core's measured verdicts and addresses pinned as data, so a drift
+in either direction fails a row rather than surfacing on a plate."* The phase-1
+corpus does pin an address per vector, but those addresses come from
+`rust-miniscript` — the same library that derives them at run time — so the pin
+is **self-consistency, not an independent verdict**. The structural blindness §10
+warns about is real here: a wrong digest *function* would produce a
+self-consistent address and pass.
+
+Phase 2's per-kind KAT closes the digest-function class independently (python3
+`hashlib`, outside the crate), so the funds-loss path §4 names **is** covered.
+What is not covered is Core agreeing that the composed **script** is what this
+constellation thinks it is, for the three new kinds.
+
+**Why it is open rather than done:** the reviewer attempted it and the box's
+`bitcoind` answered `Work queue depth exceeded` on every call. That is an
+environment failure, not a finding, and it is recorded so the next attempt
+starts from "the node was unreachable" rather than from scratch.
+`crates/md-codec/tests/bitcoind_differential.rs` is the existing harness.
+
+Owning phase: **phase 4** (which re-pins the corpus anyway), or the cycle sweep.
+
 ### F-536 — six pre-existing card lines are hazard notices by the boundary's own rule
 
 Filed 2026-09-15 from the phase-2 R0 round 7 fold. **Scope corrected twice:
