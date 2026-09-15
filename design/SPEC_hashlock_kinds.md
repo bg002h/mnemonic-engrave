@@ -243,7 +243,14 @@ from it costs nothing.
 | --- | --- |
 | Back from the **kind screen** | → the source pick (`Which hash?`). Nothing is held yet; nothing is discarded. |
 | Back from the **hex pad** | → the kind screen, kind still selected. |
-| Back from the **phrase screen** | → the kind screen, kind still selected. H2 §4.6's existing leg is *"Back from the phrase screen → `Which hash?` (phrase dropped)"*; with a screen inserted in front, it stops one earlier, and **the phrase is still dropped there** — but the operator does not pay a second KDF to reach the same point, because the kind screen is upstream of the derivation. |
+| Back from the **phrase screen** | → the kind screen, kind still selected. H2 §4.6's existing leg is *"Back from the phrase screen → `Which hash?` (phrase dropped)"*; with a screen inserted in front, it stops one earlier, and **the phrase is still dropped there**. Back itself costs no derivation, because the kind screen is upstream of it. |
+
+**What that does not buy, stated so nobody over-reads it:** an operator who
+reaches the phrase screen, realises the kind is wrong, and goes back to fix it
+must re-type the dropped phrase and pay the KDF again to get back to where they
+were. Putting the kind screen upstream makes the *navigation* free; it does not
+make the *correction* free. Whether that is worth a "change the kind" affordance
+on a later screen is a plan-level question, not a spec one.
 
 A navigation leg left unstated is how this tree produced a Critical before — the
 Back path that skipped a screen also skipped a guard — and the new leg skips a
@@ -498,7 +505,8 @@ All net new (§1).
 | the confirm modal and the reconciliation body | `gui/composer_copy.go:557-571`, `:641-648` |
 | the hex pad's LIVE COUNTER — 30 lines past the range an earlier draft cited | `gui/composer_hash.go:135` |
 | `ms hashlock`'s operator surface, incl. `for md compose: … sha256=<h>` | mnemonic-secret, `ms hashlock` |
-| the preimage plate's QR text and locator row | `MethodLine`, `ms_codec::hashlock::qr_text`, `backup/hashlock` |
+| the preimage plate's QR text | `MethodLine`, `ms_codec::hashlock::qr_text`, `backup/hashlock` |
+| the preimage plate's **locator row** — the `hash` row §13.1 appends the kind to | `hashlockPlateLocator`, `gui/composer_preimage_plate.go:232-238` |
 | the preimage plate **fit gate and its goldens** — §13.1's placement is a layout claim and must be measured, not asserted | the fork's plate layout tests |
 | the masked plate-pick lead, which prints a bare `method:` | `gui/composer_copy.go:717-725` |
 | `me-cli`'s hashlock help text | `me-cli/src/main.rs:195,197` |
