@@ -77,11 +77,23 @@ operator-facing Critical.
 
 ## Toolchain facts, measured now
 
-- **`gofmt -l .` returns 0 files.** A prior record in this constellation said the
-  pristine baseline was five (`gui/transaction*.go`, `mt/mt*.go`, measured at
-  fork main `fcd1546`, F-499). Those are formatted upstream now, so **a phase-4
-  gate can assert `gofmt -l` comes back EMPTY** rather than diffing against a
-  five-file allow-list.
+- **`gofmt -l .` returns FIVE files, exactly as `CLAUDE.md` records** —
+  `gui/transaction.go`, `gui/transaction_golden_test.go`,
+  `gui/transaction_txrecord_test.go`, `mt/mt.go`, `mt/mt_test.go`. A phase-4
+  gate must diff against that five-file set, **not** assert the list is empty.
+
+  **`gofmt` IS NOT ON THE DEFAULT PATH IN THIS SHELL**, and that matters more
+  than the number. My first measurement here reported *zero* unformatted files
+  and I very nearly wrote a "the baseline is stale, it's 0 now" correction into
+  `CLAUDE.md` on the strength of it. The command did not exist —
+  `gofmt: command not found` went to stderr while the count came from an empty
+  stdout, so a **broken pipeline read as a clean tree**. Every Go command here
+  needs:
+
+      export PATH=/scratch/code/shibboleth/.toolchain/go/bin:$PATH
+
+  A phase-4 gate that shells out to `gofmt` without that line does not fail —
+  it **passes**, on every tree, forever.
 - Go tests: shard with `mnemonic-engrave/scripts/gui-shard-test.sh <pkg> 24` —
   `-parallel` does nothing here because the `gui` package's tests never call
   `t.Parallel()`.
