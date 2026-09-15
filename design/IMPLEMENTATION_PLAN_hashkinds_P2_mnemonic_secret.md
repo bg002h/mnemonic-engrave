@@ -73,6 +73,37 @@ reads as sha256. The `sha256` value above matches the corpus's existing
 `hardened_h` for that phrase; the `hash256` value matches what the journey-walk
 review computed independently.
 
+### The tests are the task, not the trimming
+
+**Read this before Task 5.** The branch this plan transcribes was first built
+WITHOUT the tests these tasks prescribe, and it shipped **two Criticals behind a
+568-green suite**:
+
+- the engraving card printed `for md compose: --path … sha256=<digest>` under
+  every `--kind`, telling the operator to compose a `sha256=` operand out of a
+  `ripemd160` digest;
+- the no-`--kind` path silently assumed sha256 — which §13.4 forbids — while the
+  flag's own `--help` text claimed every kind's digest was listed.
+
+Both survived because **`--kind` had zero test coverage**: no test passed the
+flag or named `hash:hash256:`. The same shape sat next door in the corpus, and
+was mutation-proven — deleting all three new per-kind `qr_text` rows left the
+suite green, because the row floor was still `>= 7` for 10 rows.
+
+A green suite is only evidence about what it tests. The tests below are
+`crates/ms-cli/tests/hashlock_kind.rs` on the branch, and each one went RED
+before its fix:
+
+| test | what it would have caught |
+| --- | --- |
+| `the_record_follows_the_producer_rule_for_every_kind` | a non-bare record under sha256, or a missing `hash:<kind>:` prefix |
+| `the_md_compose_line_names_the_chosen_kind` | **C-1** — the card's `sha256=` operand |
+| `without_a_kind_every_digest_is_listed_on_stderr` | **C-2** — the silent sha256 assumption |
+| `an_uppercase_kind_is_refused` | case folded instead of rejected |
+
+And in `hashlock_qr_text.rs`, a floor is not coverage — assert that a row exists
+**for each of the four kinds by name**, not that the array is at least N long.
+
 ### Measured outcomes — the numbers an executor should expect
 
 Transcribed from the completed branch, not predicted:
@@ -166,7 +197,9 @@ from Task 2.
   - `pub fn digest_hash160(preimage: &[u8; 32]) -> [u8; 20]`
   - `pub fn HashKind::digest(self, preimage: &[u8; 32]) -> DigestBytes` where `pub enum DigestBytes { B32([u8; 32]), B20([u8; 20]) }`
   - `pub fn HashKind::token(self) -> &'static str` returning `"sha256"`, `"hash256"`, `"ripemd160"`, `"hash160"`
-  - `digest` (the existing sha256 function) retained as a `#[deprecated]` alias of `digest_sha256`, so phase 3's callers keep compiling until they are migrated.
+  - **No `digest` alias.** The old name is RENAMED to `digest_sha256` and this
+    repo's call sites move with it (Step 4b). A `#[deprecated]` shim adds nine
+    clippy errors here and four in `ms-cli` under `-D warnings`, measured.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -467,8 +500,10 @@ Then check the diff is only additions:
 ```bash
 git diff --numstat crates/ms-codec/tests/vectors/hashlock-v0.8.json
 ```
-Expected: roughly **77 insertions, 0 deletions**. Any large deletion count means
-the indent is wrong — stop and fix it rather than committing the reformat. (some rows may carry only one stem; the count is whatever the assertion-guarded loop reports — record it).
+Expected: **88 insertions, 11 deletions** — measured. The 11 are not a reformat:
+adding a key to each row rewrites that row's previously-final line to gain a
+comma, once per row. A deletion count much above 11 means the indent is wrong;
+a count of 0 is not the goal and never was. (some rows may carry only one stem; the count is whatever the assertion-guarded loop reports — record it).
 
 - [ ] **Step 2: Verify `openssl` agrees, so the KAT has two independent sources**
 
@@ -599,12 +634,20 @@ fn every_row_pins_all_four_kinds() {
 }
 ```
 
-- [ ] **Step 2: Add the `hex` dev-dependency**
+- [ ] **Step 2: No new dev-dependency — write the helper**
 
-In `crates/ms-codec/Cargo.toml` under `[dev-dependencies]`:
+`serde_json` is already a dev-dependency and `hex` is **not needed**. Write a
+local helper, and write it as a `fold`: `map(format!).collect()` trips clippy's
+`format_collect` under `-D warnings`.
 
-```toml
-hex = "0.4"
+```rust
+fn hex(b: &[u8]) -> String {
+    b.iter().fold(String::with_capacity(b.len() * 2), |mut acc, x| {
+        use core::fmt::Write as _;
+        let _ = write!(acc, "{x:02x}");
+        acc
+    })
+}
 ```
 
 - [ ] **Step 3: Run the test to verify it passes**
