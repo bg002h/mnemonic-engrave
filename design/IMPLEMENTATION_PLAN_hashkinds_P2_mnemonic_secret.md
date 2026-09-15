@@ -126,9 +126,13 @@ In `crates/ms-codec/src/hashlock.rs`, replace the existing `digest` (line 59) wi
 /// that collision. Where both could be read, name both or neither.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HashKind {
+    /// `sha256(X)`.
     Sha256,
+    /// `sha256d(X)` = `sha256(sha256(X))`.
     Hash256,
+    /// `ripemd160(X)`, the bare primitive.
     Ripemd160,
+    /// `hash160(X)` = `ripemd160(sha256(X))`.
     Hash160,
 }
 
@@ -136,11 +140,14 @@ pub enum HashKind {
 /// separate thing to keep in sync.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DigestBytes {
+    /// A 32-byte digest: `sha256` or `hash256`.
     B32([u8; 32]),
+    /// A 20-byte digest: `ripemd160` or `hash160`.
     B20([u8; 20]),
 }
 
 impl DigestBytes {
+    /// The digest bytes, at their kind's width.
     pub fn as_slice(&self) -> &[u8] {
         match self {
             DigestBytes::B32(b) => &b[..],
@@ -216,12 +223,35 @@ pub fn digest(preimage: &[u8; 32]) -> [u8; 32] {
 }
 ```
 
-Add `use ripemd::Digest as _;` only if the compiler asks — `sha2::Digest` is already in scope and both traits are named `Digest`; prefer fully-qualified calls as written above.
+**No extra import is needed** — settled by compiling this, not by reasoning:
+`sha2::Digest` is already in scope and `Ripemd160` implements the same
+`digest::Digest` trait, so `Ripemd160::digest(...)` resolves as written. Do not
+add `use ripemd::Digest as _;`.
+
+**THE CRATE DENIES MISSING DOCS, AND IT COUNTS VARIANTS AND METHODS**
+(`crates/ms-codec/src/lib.rs:39`). Every public enum, *every variant*, and every
+public method needs a `///`. The doc comments above are not decoration; omit one
+and the build fails with `error: missing documentation for a variant`. This was
+found by compiling the plan's own code before review.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `cargo test -p ms-codec hashlock:: 2>&1 | tail -20`
 Expected: PASS, including the three new tests.
+
+**The expected values, already verified against `python3 hashlib` before this
+plan was written** — for `X = 0xab * 32`:
+
+```
+sha256     9a2db2e23f1504cd056606553ac049c5e718e8f9ce9233876df1a7a1821af885
+hash256    88b8f02ce56abce1d453e0610318130f4d0a13067549e804af1f5186f81a2691
+ripemd160  5786aabcae0e6cd2dfaeca2767dc8996c98f43f4
+hash160    e81bfa71da56f187cce1319ee773dabf56988e95
+```
+
+The `sha256` row matches the corpus's existing digest for that preimage, so the
+new functions are consistent with what is already vendored. If your build
+disagrees with any row, stop: the implementation is wrong, not the row.
 
 - [ ] **Step 6: Re-vendor and verify the gate**
 
