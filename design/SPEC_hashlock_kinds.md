@@ -93,8 +93,15 @@ change** (§7.4). The wire format and lowering are untouched.
 
 **Out:**
 
-- The H6 preimage plates and the phrase→**preimage** derivation, by F1. The
-  preimage stays `sha256(phrase)`, 32 bytes, for every kind.
+- The phrase→**preimage** derivation, by F1. The preimage stays `sha256(phrase)`,
+  32 bytes, for every kind.
+
+  **F1 does NOT put the preimage plate out of scope, and an earlier draft used it
+  that way.** F1 is a fact about what the preimage *is*; it says nothing about
+  what the plate *says*. The plate's own design rule is that it is read years
+  later by someone with neither the tool nor this firmware, so it spells its
+  parameters out — and adding a fourth-kind world without touching it leaves that
+  spelling one step short. §13 is that surface.
 
   **This is the boundary the design review found contradicted (C-2), so it is
   stated twice on purpose.** The phrase route IS in scope for the step that turns
@@ -151,9 +158,24 @@ as the hex body already refuses uppercase (`composer_records.rs:178-192`,
 Stated as a rule rather than left to "obviously lowercase", which is how two
 parsers come to disagree.
 
-**Naming.** This document's "kind" is always the *hashlock* kind of §5. The
-`phrase:` record's `method` field is a different axis — the preimage derivation —
-and the two share the token `sha256` without meaning the same thing (§7.1).
+**Two axes, one word — and this is a design constraint, not a naming note.**
+
+| axis | what it selects | where it lives | values include |
+| --- | --- | --- | --- |
+| **method** | how a *preimage* is derived from a phrase | `phrase:` records, the plate's `method:` line, the §8.3 census row | `sha256` |
+| **kind** | which hash the *script* commits to | the md1 tag, `HashLock.kind`, the §6 record token | `sha256`, `hash256`, `ripemd160`, `hash160` |
+
+They are orthogonal, and they share the token `sha256`. Three independent reviews
+of this cycle each found a defect caused by that collision — a spec sentence
+claiming records "carry their kind" when they carry a method (R0 r2 I-1), a
+census row showing the method where the operator reads an inventory (restore
+I-3), and a confirm screen printing `method: sha256` on a `hash256` wallet
+(journey C-1). It is not a wording problem.
+
+**The rule, and every screen and record is bound by it:** where both axes could
+be read, **both are named or neither is**. No surface prints one bare token that
+an operator could take for the other. A screen that shows `method:` and no kind
+on a policy whose kind is not sha256 violates this spec.
 
 **Producer rule.** The host emits the **bare** form for sha256 and the explicit
 form for the other three. Every payload that exists today, and every new sha256
@@ -205,6 +227,18 @@ earlier draft undercounted and left one of them unnamed anywhere in the spec:
 Only the typed-hex and typed-phrase arms ask. Route 6 is the one that must not be
 forgotten: it reaches the same lowering by a path with no screen on it at all.
 
+**Route 6 is `md compose --preset` (CLI).** The device's composer presets are a
+different thing and have no kind grammar; conflating them was an earlier draft's
+error.
+
+**The Back leg is normative and must be stated.** The typed-phrase arm is a loop
+whose Back contract is specified in `SPEC_hashlock_H2_device.md` §4.6, and the
+kind screen is being inserted into it. Back from the kind screen returns to the
+source pick, discarding no held material; Back from the pad returns to the kind
+screen with the kind still selected. A navigation leg left unstated is how this
+tree produced a Critical before — the Back path that skipped a screen also
+skipped a guard.
+
 **A stated limitation, not an oversight.** §2 decision 5 puts all four kinds on
 the phrase route. Routes 4 and 5 are payload-supplied **preimage material** —
 route 4 a `phrase:` record, route 5 a preimage-plate record decoding to
@@ -219,7 +253,11 @@ The rule modal fires on **row selection**, before either arm is entered, so at
 that moment no kind exists. The predicate was made row-independent deliberately,
 so that adding a band cannot leave the 32-byte rule unstated.
 
-- **Entry body:** unchanged, kind-generic, still fired by `taking`.
+- **Entry body:** kind-generic, still fired by `taking` — but **not unchanged**.
+  The shipped body says the hash must be *SHA-256* of a 32-byte value, which is
+  false the moment a fourth-kind world exists. An earlier draft said "unchanged,
+  kind-generic", and those cannot both hold. It is reworded to state the part
+  that is true for all four (**a 32-byte preimage**) without naming a function.
 - **Consent body:** names the kind — `<kind>` of a 32-byte value.
 
 ### 7.3 The emulator's window
@@ -280,6 +318,10 @@ two. A token budget stated in characters would pass a review and fail on the
 device.
 
 The constraint is the rendered **width** of the whole row at the shipped band.
+
+**The kind screen's own four rows are bound by the same arbiter.** They are new
+row forms on a new screen, so they get a row in the geometry gate rather than
+inheriting an assumption from the screen they were modelled on.
 
 **The wire tokens (§6) stay full and unambiguous.** The *display* token is a
 different string, and choosing it is delegated to the implementation plan under a
@@ -440,6 +482,12 @@ All net new (§1).
 | the walk's 64-hex helper | `cmd/emu/walk_hashlock_phrase.js:71,333` |
 | the compose→decode self-check | `gui/composer_selfcheck.go:134,136,138` |
 | the cross-language digest KAT | `hashlock/testdata/hashlock-v0.8.json` + its ms-codec source |
+| the confirm modal and the reconciliation body | `gui/composer_copy.go:557-571`, `:641-648` |
+| the hex pad's LIVE COUNTER — 30 lines past the range an earlier draft cited | `gui/composer_hash.go:135` |
+| `ms hashlock`'s operator surface, incl. `for md compose: … sha256=<h>` | mnemonic-secret, `ms hashlock` |
+| the preimage plate's `method:` line and `hashlock v1` QR text | `backup/hashlock`, `hashlockPlateFormWords`, `QRText` |
+| the §8.3 census row | the composer's plate inventory |
+| `me bundle`'s plate checklist | `me-cli` |
 | both provenance pin files | — |
 
 One of `composerHexEntry`'s constants is **documented as unreachable** — the
@@ -470,7 +518,9 @@ choice means `Which hash?` gains no band.
    "the digest it composed" is an expectation the device supplies to itself, and
    `cmd/emu/walk_hashlock_phrase.js:339-345` already argues this exact
    distinction for the sha256 case — *"Comparing short8(stored) against a
-   constant this file also compares the stored value against is a tautology."* The assertion is the acceptance, not the composing: a walk
+   constant this file also compares the stored value against is a tautology."*
+
+   The assertion is the acceptance, not the composing: a walk
    that composes one and never asserts the kind satisfies the sentence and gates
    nothing. This repo's rule is that a plan may not close while one of its own
    gates has never run, and its corollary is that a gate which cannot fail is not
@@ -482,8 +532,70 @@ choice means `Which hash?` gains no band.
    is the gate.
 6. **The per-kind digest KAT passes in both languages**, against rows computed
    outside either implementation.
+7. **A `hash256` wallet survives its own reconciliation screen** (§13.2): compose
+   one, follow the screen's instruction literally, and the check passes. This is
+   the cycle's operator-facing Critical and the pair with no width, no truncation
+   and no visual distance, so it gets an acceptance item of its own.
+8. **A preimage plate cut for a non-sha256 kind names that kind** (§13.1), and
+   its QR still measures 53 modules — the reserved envelope, so **the H6
+   acceptance's own item 8** (the operator's QR-scan gate, ~43 min) is
+   unaffected and need not be re-cut for this cycle.
+9. **A written record made by following §13.2's list is sufficient to rebuild the
+   descriptor** — the test is `md compose` with nothing but what the operator was
+   told to write down.
 
-## 13. What would falsify this
+## 13. The engraved surface and the operator's record
+
+Two lenses that ran after the correctness gate closed found this surface
+untouched: seven plate- and restore-related identifiers appear nowhere in the
+earlier drafts, and the word "restore" appeared once, in a background clause.
+Nothing here is optional.
+
+**13.1 The preimage plate names the kind.** The plate's `method:` line and its
+`hashlock v1` QR are, by the plate's own written design rule, the complete
+definition of the derivation — and a fourth-kind world makes them one step short,
+while the device instructs the operator to store that plate *apart from* the md1
+card holding the missing step. **Measured, the remedy is free:** adding
+`hash: ripemd160` to the 100-character worst-case QR text takes it 194 → 210
+bytes and it remains at **53 modules**, the envelope already reserved — so no
+layout change and no change to ACCEPTANCE item 8's 32m12s cut.
+
+**13.2 The confirm and reconciliation screens name the kind.** This is the
+cycle's operator-facing Critical. The reconciliation screen instructs: *"run
+`ms hashlock` … if they differ, do not fund this wallet: build it again."* On a
+correct `hash256` wallet that check **fails**, because the screen supplies only
+`method: sha256` — the other axis (§5) — and `ms hashlock` without a kind returns
+the sha256 digest. Both are 64 hex; nothing but a label distinguishes them, and
+the label was never printed. The operator, complying exactly, discards a correct
+wallet and re-cuts five plates.
+
+So: both bodies name the kind, and the reconcile sentence names the flag —
+`ms hashlock … --kind <kind>`. Its write-down list gains the kind too; an
+operator who writes down exactly what they are told must be able to rebuild the
+descriptor, and `md compose` needs one of four option names that list does not
+currently contain. A write-down list that omits a field is worse than no list,
+because the operator stops writing where the list stops.
+
+**13.3 The census row distinguishes the kinds.** It is the operator's only
+inventory of what they must store apart, and today it describes all four
+constructions identically — two plates for one preimage under two kinds differ by
+sixteen hex characters and nothing else.
+
+**13.4 `ms hashlock` can be given a kind, and says what it does without one.**
+The plate-verification route of ACCEPTANCE item 1 needs a kind the plate does not
+carry today (13.1 fixes that). For plates already cut, printing all four digests
+when no kind is given turns an impossible check into a lookup. This spec
+**requires the `--kind` flag** and **permits** the four-digest fallback; it must
+not silently assume sha256.
+
+**13.5 Two CLI gaps, named rather than fixed here.** `me bundle` emits
+byte-identical six-plate output for a sha256 card and a `ripemd160` card, names
+no preimage plate, and cannot cut one at all; and the composer emits **no restore
+document** (`restoreDoc` occurs zero times in `gui/composer*.go`), which widens
+F-132's open half. Both are recorded as follow-ups owned by this cycle's plan,
+not as silent scope.
+
+## 14. What would falsify this
 
 - **If a later Core gains tapscript miniscript**, F2's uniform wrapper rules stop
   holding and the `tr` row needs its own answer.
