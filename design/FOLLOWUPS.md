@@ -17441,3 +17441,27 @@ would become false on the new predicate. Note `keyed_tr_multi_a` and
 re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
+
+### F-534 — `ms decode`'s preimage route answers only for sha256, and does not say so
+
+Filed 2026-09-15 from the phase-2 plan's R0 round 3 (M-2), which correctly
+placed it outside that phase's letter.
+
+`crates/ms-cli/src/cmd/decode.rs:207` prints `digest: <sha256>` for any preimage
+`ms1`, in both the text and `--json` forms. With four hash kinds in the world
+that label is ambiguous: an operator verifying a plate through `ms decode` gets
+an answer for sha256 with nothing indicating a choice was made on their behalf.
+
+**Why it is not phase 2's.** SPEC_hashlock_kinds §13.4 names `ms hashlock`
+specifically, and phase 2 closed that surface — `--kind`, the four-digest
+fallback when it is absent, and the §6 record grammar. `ms decode` is a
+different verb and was never in scope.
+
+**Why it should not be left.** It is the same silence §13.4 forbids next door:
+the fallback exists precisely because a plate cut before this cycle carries no
+kind, and `ms decode` is the other tool an operator reaches for with such a
+plate in hand.
+
+The shape of the fix is already built: `HashKind::digest` plus the same
+four-digest listing. Owning phase: **phase 3** (`me-cli`), or this cycle's
+follow-up sweep if phase 3 does not touch the verb.

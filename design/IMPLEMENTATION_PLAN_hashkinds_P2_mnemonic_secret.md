@@ -151,7 +151,17 @@ from Task 2.
    labels and assertion messages** — measured collateral in four files, including
    `k0["digest"]` (a corpus field) and `"digest:"` (an output label). Rename call
    sites only, and re-check every string literal afterwards:
-   `grep -rn '"[^"]*digest_sha256' --include=*.rs crates/` must come back empty.
+   **two** greps, because one is not enough — the first inspects string
+   literals, and the rename also lands in English prose:
+
+   ```bash
+   grep -rn '"[^"]*digest_sha256' --include=*.rs crates/          # string literals
+   grep -rn "digest_sha256" --include=*.rs crates/ | grep -E ":\s*(///|//)"   # comments
+   ```
+
+   Both must come back empty. The literal-only guard was in an earlier draft and
+   passed while `hashlock_emit_record.rs:57` read *"carries only the public
+   digest_sha256"* in a doc comment.
 2. **`ms hashlock`'s flag count is gated.** `--kind` moves the total from 68 to
    **69** and reds
    `gui_schema_emits_spec_v7_json.rs::the_schema_names_every_flag_p2_added_and_the_total_is_67`.
