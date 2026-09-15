@@ -99,13 +99,113 @@ pub struct PhraseRecord {
     pub phrase: String,
 }
 
+/// Which hash the SCRIPT commits to, in a `hash:` record
+/// (SPEC_hashlock_kinds §6).
+///
+/// **A LOCAL definition, deliberately** (spec §5: "one local definition per
+/// crate, nothing shared across repo boundaries"). `ms-codec` exposes one
+/// digest function per kind and each caller maps its own kind onto one; sharing
+/// a type across the repo boundary would tie this crate's record grammar to
+/// that crate's release schedule.
+///
+/// NOT the same axis as a `phrase:` record's METHOD, which says how a preimage
+/// was derived. They share the token `sha256` and mean different things, and
+/// §6 requires that where both could be read, both are named or neither is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum RecordHashKind {
+    /// `sha256(X)` — the bare form on the wire.
+    Sha256,
+    /// `hash256(X)` = `sha256(sha256(X))`.
+    Hash256,
+    /// `ripemd160(X)`, the bare primitive.
+    Ripemd160,
+    /// `hash160(X)` = `ripemd160(sha256(X))`.
+    Hash160,
+}
+
+impl RecordHashKind {
+    /// **The only place a digest length is written** (spec §5). The hex rule is
+    /// `digest_len() * 2`.
+    pub const fn digest_len(self) -> usize {
+        match self {
+            RecordHashKind::Sha256 | RecordHashKind::Hash256 => 32,
+            RecordHashKind::Ripemd160 | RecordHashKind::Hash160 => 20,
+        }
+    }
+
+    /// The lowercase miniscript fragment name, which is the §6 record token.
+    pub const fn token(self) -> &'static str {
+        match self {
+            RecordHashKind::Sha256 => "sha256",
+            RecordHashKind::Hash256 => "hash256",
+            RecordHashKind::Ripemd160 => "ripemd160",
+            RecordHashKind::Hash160 => "hash160",
+        }
+    }
+
+    /// Parse a §6 token. **Case is rejected, never folded** — no
+    /// `to_ascii_lowercase` here, by rule, because that is how two parsers come
+    /// to disagree about what a record means.
+    pub fn from_token(t: &str) -> Option<Self> {
+        match t {
+            "sha256" => Some(RecordHashKind::Sha256),
+            "hash256" => Some(RecordHashKind::Hash256),
+            "ripemd160" => Some(RecordHashKind::Ripemd160),
+            "hash160" => Some(RecordHashKind::Hash160),
+            _ => None,
+        }
+    }
+
+    /// This kind's digest of a 32-byte preimage, via `ms-codec`'s one function
+    /// per kind. The preimage is 32 bytes for EVERY kind (spec §3 F1); only the
+    /// digest width moves.
+    pub fn digest_of(self, preimage: &[u8; 32]) -> Vec<u8> {
+        use ms_codec::hashlock as h;
+        match self {
+            RecordHashKind::Sha256 => h::digest_sha256(preimage).to_vec(),
+            RecordHashKind::Hash256 => h::digest_hash256(preimage).to_vec(),
+            RecordHashKind::Ripemd160 => h::digest_ripemd160(preimage).to_vec(),
+            RecordHashKind::Hash160 => h::digest_hash160(preimage).to_vec(),
+        }
+    }
+}
+
+/// A `hash:` record's content: which hash, and the digest at that kind's width.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct HashLock {
+    kind: RecordHashKind,
+    digest: Vec<u8>,
+}
+
+impl HashLock {
+    /// Build one, refusing a digest that is not this kind's width. Returns
+    /// `None` rather than truncating or padding: a wrong-width digest is an
+    /// error at the boundary, not something to reshape.
+    pub fn new(kind: RecordHashKind, digest: &[u8]) -> Option<Self> {
+        (digest.len() == kind.digest_len()).then(|| HashLock {
+            kind,
+            digest: digest.to_vec(),
+        })
+    }
+
+    /// Which hash the script commits to.
+    pub const fn kind(&self) -> RecordHashKind {
+        self.kind
+    }
+
+    /// The digest, at its kind's width.
+    pub fn digest(&self) -> &[u8] {
+        &self.digest
+    }
+}
+
 /// A parsed record of one of the four classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ComposerRecord {
     /// `key:`
     Key(KeyRecord),
-    /// `hash:` — the digest.
-    Hash([u8; 32]),
+    /// `hash:` — which hash the script commits to, and the digest (§6).
+    Hash(HashLock),
     /// `now:` — pack seconds and optional height.
     Now {
         /// Unix seconds, 1..=2147483647.
@@ -122,8 +222,16 @@ pub enum ComposerRecord {
 pub enum ComposerRecordError {
     /// `key:` failed; the detail is for logs and tests, the line is fixed.
     Key(&'static str),
-    /// `hash:` is not exactly 64 lowercase hex characters.
-    Hash,
+    /// `hash:` failed its rule (§6). `Some(kind)` means the token was
+    /// understood and the body was not that kind's width or not lowercase hex;
+    /// `None` means the token itself was unknown or wrongly cased.
+    ///
+    /// **It carries the kind, unlike `Phrase`, because a digest is PUBLIC.**
+    /// `Phrase` is one variant on purpose — naming which rule a phrase failed
+    /// would print a property of a secret. Nothing here is secret, and an
+    /// operator told "must be exactly 64 hex characters" about the 64-hex
+    /// `ripemd160` value they just pasted learns nothing.
+    Hash(Option<RecordHashKind>),
     /// `now:` is not `<seconds>[,<height>]` in range.
     Now,
     /// `phrase:` is not `<method>,<phrase>` with a known method and a phrase
@@ -141,7 +249,15 @@ impl ComposerRecordError {
             ComposerRecordError::Key(_) => format!(
                 "record {index}: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record"
             ),
-            ComposerRecordError::Hash => format!("record {index}: hash: must be exactly 64 hex characters"),
+            ComposerRecordError::Hash(Some(k)) => format!(
+                "record {index}: hash: {} needs exactly {} lowercase hex characters",
+                k.token(),
+                k.digest_len() * 2
+            ),
+            ComposerRecordError::Hash(None) => format!(
+                "record {index}: hash: unknown hash kind; expected `hash:<hex>` (sha256) or \
+                 `hash:<kind>:<hex>` with kind hash256, ripemd160 or hash160, lowercase"
+            ),
             ComposerRecordError::Now => format!("record {index}: now: must be <seconds>[,<height>] in range"),
             ComposerRecordError::Phrase => format!(
                 "record {index}: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256"
@@ -153,7 +269,8 @@ impl ComposerRecordError {
     pub fn detail(&self) -> &'static str {
         match self {
             ComposerRecordError::Key(d) => d,
-            ComposerRecordError::Hash => "not exactly 64 lowercase hex characters",
+            ComposerRecordError::Hash(Some(_)) => "not that kind's width in lowercase hex",
+            ComposerRecordError::Hash(None) => "unknown or wrongly-cased hash kind token",
             ComposerRecordError::Now => "not <seconds>[,<height>] in range",
             ComposerRecordError::Phrase => {
                 "not <method>,<phrase> with a known method and an admissible phrase"
@@ -197,8 +314,15 @@ pub fn key_record(text: &str) -> String {
 }
 
 /// `hash:` + the digest as 64 lowercase hex.
-pub fn hash_record(digest: &[u8; 32]) -> String {
-    format!("{HASH_PREFIX}{}", hex_lower(digest))
+pub fn hash_record(lock: &HashLock) -> String {
+    // §6's PRODUCER RULE: the bare form for sha256, the explicit form for the
+    // other three. "Input is liberal, output is conservative" -- an explicit
+    // `hash:sha256:` is accepted on input and never emitted, so every payload
+    // that exists today and every new sha256 payload is byte-identical.
+    match lock.kind() {
+        RecordHashKind::Sha256 => format!("{HASH_PREFIX}{}", hex_lower(lock.digest())),
+        k => format!("{HASH_PREFIX}{}:{}", k.token(), hex_lower(lock.digest())),
+    }
 }
 
 /// `phrase:` + hex of `<method>,<phrase>`. The text is NOT validated here;
@@ -300,13 +424,29 @@ fn parse_phrase(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
 }
 
 fn parse_hash(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
-    if body.len() != 64 {
-        return Err(ComposerRecordError::Hash);
+    // SPEC_hashlock_kinds §6: `hash: [<kind>:] <hex>`. An ABSENT kind means
+    // sha256 -- that is what keeps every payload packed before this cycle
+    // byte-identical.
+    //
+    // Split on the LAST colon rather than the first: the body is either
+    // `<hex>` or `<kind>:<hex>`, and hex contains no colon, so the tail after
+    // a colon is always the digest.
+    let (kind, hex_body) = match body.rsplit_once(':') {
+        Some((tok, rest)) => (
+            // An unknown or wrongly-cased token is a REFUSAL, never a fallback
+            // to sha256. Reading `hash:sha512:<hex>` as sha256 is exactly the
+            // silent-mis-read §6's fail-closed paragraph rules out.
+            RecordHashKind::from_token(tok).ok_or(ComposerRecordError::Hash(None))?,
+            rest,
+        ),
+        None => (RecordHashKind::Sha256, body),
+    };
+    if hex_body.len() != kind.digest_len() * 2 {
+        return Err(ComposerRecordError::Hash(Some(kind)));
     }
-    let bytes = unhex_lower(body).ok_or(ComposerRecordError::Hash)?;
-    let mut h = [0u8; 32];
-    h.copy_from_slice(&bytes);
-    Ok(ComposerRecord::Hash(h))
+    let bytes = unhex_lower(hex_body).ok_or(ComposerRecordError::Hash(Some(kind)))?;
+    let lock = HashLock::new(kind, &bytes).ok_or(ComposerRecordError::Hash(Some(kind)))?;
+    Ok(ComposerRecord::Hash(lock))
 }
 
 fn parse_now(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
@@ -451,11 +591,24 @@ pub const CASES: &[Case] = &[
     Case { name: "key-uppercase-H-marker-out-of-scope", record: "key:5b37336335646130612f3438482f30482f30482f32485d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "hash-valid", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Hash", host_line: None },
     Case { name: "hash-valid-zeros", record: "hash:0000000000000000000000000000000000000000000000000000000000000000", class: "Hash", host_line: None },
-    Case { name: "hash-63-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
-    Case { name: "hash-66-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
-    Case { name: "hash-uppercase", record: "hash:A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
-    Case { name: "hash-empty", record: "hash:", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
-    Case { name: "hash-31-bytes", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: must be exactly 64 hex characters") },
+    Case { name: "hash-63-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a", class: "Unknown", host_line: Some("record 0: hash: sha256 needs exactly 64 lowercase hex characters") },
+    Case { name: "hash-66-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: sha256 needs exactly 64 lowercase hex characters") },
+    Case { name: "hash-uppercase", record: "hash:A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8A8", class: "Unknown", host_line: Some("record 0: hash: sha256 needs exactly 64 lowercase hex characters") },
+    Case { name: "hash-hash256-valid", record: "hash:hash256:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Hash", host_line: None },
+    Case { name: "hash-ripemd160-valid", record: "hash:ripemd160:5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c", class: "Hash", host_line: None },
+    Case { name: "hash-hash160-valid", record: "hash:hash160:5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c", class: "Hash", host_line: None },
+    Case { name: "hash-sha256-explicit", record: "hash:sha256:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Hash", host_line: None },
+    Case { name: "hash-ripemd160-wrong-width", record: "hash:ripemd160:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: ripemd160 needs exactly 40 lowercase hex characters") },
+    Case { name: "hash-hash160-wrong-width", record: "hash:hash160:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: hash160 needs exactly 40 lowercase hex characters") },
+    Case { name: "hash-hash256-wrong-width", record: "hash:hash256:5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c", class: "Unknown", host_line: Some("record 0: hash: hash256 needs exactly 64 lowercase hex characters") },
+    Case { name: "hash-unknown-token", record: "hash:sha512:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: unknown hash kind; expected `hash:<hex>` (sha256) or `hash:<kind>:<hex>` with kind hash256, ripemd160 or hash160, lowercase") },
+    Case { name: "hash-kind-uppercase", record: "hash:RIPEMD160:5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c", class: "Unknown", host_line: Some("record 0: hash: unknown hash kind; expected `hash:<hex>` (sha256) or `hash:<kind>:<hex>` with kind hash256, ripemd160 or hash160, lowercase") },
+    Case { name: "hash-kind-mixedcase", record: "hash:Hash160:5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c", class: "Unknown", host_line: Some("record 0: hash: unknown hash kind; expected `hash:<hex>` (sha256) or `hash:<kind>:<hex>` with kind hash256, ripemd160 or hash160, lowercase") },
+    Case { name: "hash-ripemd160-short", record: "hash:ripemd160:5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c", class: "Unknown", host_line: Some("record 0: hash: ripemd160 needs exactly 40 lowercase hex characters") },
+    Case { name: "hash-hash160-uppercase", record: "hash:hash160:5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C5C", class: "Unknown", host_line: Some("record 0: hash: hash160 needs exactly 40 lowercase hex characters") },
+    Case { name: "hash-hash256-non-hex", record: "hash:hash256:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8ag", class: "Unknown", host_line: Some("record 0: hash: hash256 needs exactly 64 lowercase hex characters") },
+    Case { name: "hash-empty", record: "hash:", class: "Unknown", host_line: Some("record 0: hash: sha256 needs exactly 64 lowercase hex characters") },
+    Case { name: "hash-31-bytes", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Unknown", host_line: Some("record 0: hash: sha256 needs exactly 64 lowercase hex characters") },
     Case { name: "now-seconds-only", record: "now:31373536363834383030", class: "Now", host_line: None },
     Case { name: "now-seconds-and-height", record: "now:313735363638343830302c393130303030", class: "Now", host_line: None },
     Case { name: "now-min", record: "now:31", class: "Now", host_line: None },

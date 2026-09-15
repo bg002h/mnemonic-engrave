@@ -180,8 +180,12 @@ fn malformed_records_are_refused_with_the_8n_lines() {
     assert!(!o.status.success());
     assert!(String::from_utf8_lossy(&o.stderr).contains("record 1: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record"));
     let (_, o) = pack_to(&dir, &[], &[&format!("hash:{}", "a8".repeat(31))]);
+    // A BARE `hash:` body is the sha256 case (§6), so the refusal names
+    // sha256's width -- it said "must be exactly 64 hex characters" under every
+    // kind before, which told a `ripemd160` record given 64 hex that its 64-hex
+    // value should be 64 hex.
     assert!(String::from_utf8_lossy(&o.stderr)
-        .contains("record 0: hash: must be exactly 64 hex characters"));
+        .contains("record 0: hash: sha256 needs exactly 64 lowercase hex characters"));
     let (_, o) = pack_to(&dir, &[], &[&format!("now:{}", hex("0"))]);
     assert!(String::from_utf8_lossy(&o.stderr)
         .contains("record 0: now: must be <seconds>[,<height>] in range"));
@@ -224,17 +228,23 @@ fn show_prints_each_class_legibly() {
 /// the dangerous one was the one on screen at the moment the operator was stuck.
 #[test]
 fn the_rejected_hash_record_advice_does_not_tell_you_to_strip_the_kind_tag() {
+    // PHASE 3 CLOSED THIS HAZARD AT ITS ROOT: `hash:hash256:<64 hex>` is now
+    // ACCEPTED (SPEC_hashlock_kinds §6), so it no longer reaches this advice at
+    // all. The advice still matters for a record that IS malformed, and it must
+    // still not push the operator toward deleting a tag — so the trigger is a
+    // wrong-width tagged record instead.
     let out = me()
         .args([
             "sysw",
             "pack",
-            "hash:hash256:98a20fc25dbcdf236fb0307e3f82cad47fca2e807f3ef82c31993549641cd488",
+            // ripemd160 given sha256's width
+            "hash:ripemd160:98a20fc25dbcdf236fb0307e3f82cad47fca2e807f3ef82c31993549641cd488",
         ])
         .output()
         .unwrap();
     assert!(
         !out.status.success(),
-        "a tagged hash256 record is refused here"
+        "a wrong-width tagged record is still refused"
     );
     let se = String::from_utf8_lossy(&out.stderr);
 

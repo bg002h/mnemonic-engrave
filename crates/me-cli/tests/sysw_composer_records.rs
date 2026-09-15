@@ -4,13 +4,20 @@
 
 use mnemonic_engrave::sysw::composer_records::{
     hash_record, key_record, now_indices, now_record, parse, phrase_record, ComposerRecord,
-    ComposerRecordError, HashlockMethod, HASH_PREFIX, KEY_PREFIX, NOW_PREFIX,
+    ComposerRecordError, HashLock, HashlockMethod, RecordHashKind, HASH_PREFIX, KEY_PREFIX,
+    NOW_PREFIX,
 };
 
 /// The wallet-policy journey's cosigner @0: master 73c5da0a at m/48'/0'/0'/2'.
 const KEY0: &str = "[73c5da0a/48'/0'/0'/2']xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf";
 const XPUB0: &str = "xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf";
 const H: [u8; 32] = [0xa8; 32];
+
+/// `H` as the sha256 lock it has always meant. Existing rows keep asserting the
+/// BARE record, which §6's producer rule says stays byte-identical.
+fn hl() -> HashLock {
+    HashLock::new(RecordHashKind::Sha256, &H[..]).expect("32 bytes is sha256's width")
+}
 
 fn hex(b: &[u8]) -> String {
     use std::fmt::Write as _;
@@ -41,9 +48,9 @@ fn a_key_record_is_the_prefix_plus_the_hex_of_the_origin_text() {
 
 #[test]
 fn a_hash_record_is_the_prefix_plus_64_lowercase_hex() {
-    let r = hash_record(&H);
+    let r = hash_record(&hl());
     assert_eq!(r, format!("{HASH_PREFIX}{}", "a8".repeat(32)));
-    assert_eq!(parse(&r), Some(Ok(ComposerRecord::Hash(H))));
+    assert_eq!(parse(&r), Some(Ok(ComposerRecord::Hash(hl()))));
 }
 
 #[test]
@@ -205,24 +212,44 @@ fn a_descriptor_form_key_names_the_suffix_not_the_xpub() {
 fn hash_must_be_exactly_64_lowercase_hex() {
     assert_eq!(
         parse(&format!("hash:{}", "a8".repeat(31))),
-        Some(Err(ComposerRecordError::Hash))
+        Some(Err(ComposerRecordError::Hash(Some(RecordHashKind::Sha256))))
     );
     assert_eq!(
         parse(&format!("hash:{}", "a8".repeat(33))),
-        Some(Err(ComposerRecordError::Hash))
+        Some(Err(ComposerRecordError::Hash(Some(RecordHashKind::Sha256))))
     );
     assert_eq!(
         parse(&format!("hash:{}", "A8".repeat(32))),
-        Some(Err(ComposerRecordError::Hash))
+        Some(Err(ComposerRecordError::Hash(Some(RecordHashKind::Sha256))))
     );
-    assert_eq!(parse("hash:"), Some(Err(ComposerRecordError::Hash)));
+    assert_eq!(
+        parse("hash:"),
+        Some(Err(ComposerRecordError::Hash(Some(RecordHashKind::Sha256))))
+    );
     assert_eq!(
         parse(&format!("hash:{}g", "a8".repeat(31))),
-        Some(Err(ComposerRecordError::Hash))
+        Some(Err(ComposerRecordError::Hash(Some(RecordHashKind::Sha256))))
+    );
+    // The refusal now names the KIND'S OWN width. It said "must be exactly 64
+    // hex characters" under every kind, so a `ripemd160` record given 64 hex
+    // was told its 64-hex value should be 64 hex (SPEC_hashlock_kinds §6).
+    assert_eq!(
+        ComposerRecordError::Hash(Some(RecordHashKind::Sha256)).line(0),
+        "record 0: hash: sha256 needs exactly 64 lowercase hex characters"
     );
     assert_eq!(
-        ComposerRecordError::Hash.line(0),
-        "record 0: hash: must be exactly 64 hex characters"
+        ComposerRecordError::Hash(Some(RecordHashKind::Ripemd160)).line(0),
+        "record 0: hash: ripemd160 needs exactly 40 lowercase hex characters"
+    );
+    // An unrecognised token is its own refusal: it must NOT fall back to
+    // sha256's width, because falling back at all is how `hash:sha512:<hex>`
+    // could be read AS sha256 (§6's fail-closed paragraph).
+    assert!(
+        ComposerRecordError::Hash(None)
+            .line(0)
+            .contains("unknown hash kind"),
+        "{}",
+        ComposerRecordError::Hash(None).line(0)
     );
 }
 
@@ -306,7 +333,7 @@ fn pack(records: Vec<String>) -> Result<Vec<u8>, SyswError> {
 #[test]
 fn the_three_classes_classify_before_the_sniffers_and_are_not_secret() {
     assert_eq!(classify(&key_record(KEY0)), Class::Key);
-    assert_eq!(classify(&hash_record(&H)), Class::Hash);
+    assert_eq!(classify(&hash_record(&hl())), Class::Hash);
     assert_eq!(classify(&now_record(1_756_684_800, None)), Class::Now);
     for c in [Class::Key, Class::Hash, Class::Now] {
         assert!(!c.is_secret(), "{c:?}");
@@ -338,7 +365,7 @@ fn a_malformed_prefixed_record_is_unknown_and_refused_with_its_8n_line() {
         pack(vec![short]),
         Err(SyswError::Unclassifiable(
             0,
-            UnknownReason::Composer(ComposerRecordError::Hash)
+            UnknownReason::Composer(ComposerRecordError::Hash(Some(RecordHashKind::Sha256)))
         ))
     );
     // now: out of range.
@@ -378,7 +405,7 @@ fn old_prefixes_and_unprefixed_records_classify_as_before() {
 fn the_classes_pack_as_public_records_and_read_back() {
     let recs = vec![
         key_record(KEY0),
-        hash_record(&H),
+        hash_record(&hl()),
         now_record(1_756_684_800, Some(910_000)),
     ];
     let blob = pack(recs.clone()).unwrap();
@@ -396,7 +423,7 @@ use sha2::Digest as _;
 /// (Stage 2). Changing a row means changing this in both repos — the point.
 /// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
 /// build-gate scratch copy; the regenerate test prints it again on every run.
-const FIXTURE_SHA256: &str = "3575ccb0e12d12646c45dde583380199170cff815ea5e8d86d4d37d4a1c4abaf";
+const FIXTURE_SHA256: &str = "d6766fdd7308ce28a23ef954f227d8e4e8431f841b64ea336ea9ea9a09b928dd";
 const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
 
 fn fixture_path() -> std::path::PathBuf {
@@ -441,7 +468,17 @@ fn the_fixture_covers_every_class_and_every_8n_line_at_least_twice() {
     }
     for l in [
         "key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record",
-        "hash: must be exactly 64 hex characters",
+        // One line PER KIND now (§6): the refusal names the kind's own width,
+        // so a `ripemd160` record given 64 hex is no longer told its 64-hex
+        // value should be 64 hex.
+        "hash: sha256 needs exactly 64 lowercase hex characters",
+        "hash: ripemd160 needs exactly 40 lowercase hex characters",
+        // ...and an unrecognised token is its OWN refusal rather than a
+        // fallback to sha256, which is what §6's fail-closed paragraph rules
+        // out: reading `hash:sha512:<hex>` AS sha256 composes a wallet nobody
+        // can spend, silently.
+        "hash: unknown hash kind; expected `hash:<hex>` (sha256) or `hash:<kind>:<hex>` \
+         with kind hash256, ripemd160 or hash160, lowercase",
         "now: must be <seconds>[,<height>] in range",
     ] {
         assert!(
@@ -584,4 +621,106 @@ fn a_phrase_record_is_wiped_on_drop_and_never_reallocates() {
             );
         }
     }
+}
+
+// ─── SPEC_hashlock_kinds §6: `hash: [<kind>:] <hex>` ────────────────────────
+
+/// §6's producer rule: **bare for sha256, explicit for the other three.** Every
+/// payload that exists today stays byte-identical, which is the whole reason
+/// the bare form was kept rather than tagging all four.
+#[test]
+fn the_producer_rule_is_bare_for_sha256_and_tagged_for_the_rest() {
+    let d32 = [0xa8u8; 32];
+    let d20 = [0x5cu8; 20];
+
+    assert_eq!(
+        hash_record(&HashLock::new(RecordHashKind::Sha256, &d32[..]).unwrap()),
+        format!("hash:{}", hex(&d32)),
+        "sha256 must stay BARE -- a tagged sha256 record would change every \
+         payload that exists"
+    );
+    for (kind, body) in [
+        (RecordHashKind::Hash256, &d32[..]),
+        (RecordHashKind::Ripemd160, &d20[..]),
+        (RecordHashKind::Hash160, &d20[..]),
+    ] {
+        assert_eq!(
+            hash_record(&HashLock::new(kind, body).unwrap()),
+            format!("hash:{}:{}", kind.token(), hex(body)),
+        );
+    }
+}
+
+/// §6: "Input is liberal, output is conservative." `hash:sha256:<64hex>` is
+/// ACCEPTED and never emitted.
+#[test]
+fn an_explicit_sha256_record_is_accepted_and_never_emitted() {
+    let d32 = [0xa8u8; 32];
+    let explicit = format!("hash:sha256:{}", hex(&d32));
+    let parsed = parse(&explicit).expect("recognised").expect("admitted");
+    let ComposerRecord::Hash(hl) = parsed else {
+        panic!("not a hash record: {parsed:?}")
+    };
+    assert_eq!(hl.kind(), RecordHashKind::Sha256);
+    assert_eq!(hl.digest(), &d32[..]);
+    assert_eq!(
+        hash_record(&hl),
+        format!("hash:{}", hex(&d32)),
+        "accepted on input, but the emitted form is the bare one"
+    );
+}
+
+/// §6: the hex body is `digest_len() * 2`, so a 20-byte kind takes 40 and a
+/// 64-hex `ripemd160` is a refusal rather than a truncation.
+#[test]
+fn each_kind_takes_its_own_hex_width() {
+    let h64 = hex(&[0xa8u8; 32]);
+    let h40 = hex(&[0x5cu8; 20]);
+    for (kind, ok_hex, wrong_hex) in [
+        ("sha256", &h64, &h40),
+        ("hash256", &h64, &h40),
+        ("ripemd160", &h40, &h64),
+        ("hash160", &h40, &h64),
+    ] {
+        let good = if kind == "sha256" {
+            format!("hash:{ok_hex}")
+        } else {
+            format!("hash:{kind}:{ok_hex}")
+        };
+        assert!(
+            matches!(parse(&good), Some(Ok(ComposerRecord::Hash(_)))),
+            "{kind}: its own width must be admitted: {good}"
+        );
+        let bad = format!("hash:{kind}:{wrong_hex}");
+        assert!(
+            matches!(parse(&bad), Some(Err(ComposerRecordError::Hash(_)))),
+            "{kind}: the other width must be REFUSED, not truncated: {bad}"
+        );
+    }
+}
+
+/// §6: "Case is rejected, never folded." Stated as a rule rather than left to
+/// "obviously lowercase", which is how two parsers come to disagree.
+#[test]
+fn an_uppercase_kind_token_is_refused_not_folded() {
+    let h40 = hex(&[0x5cu8; 20]);
+    for tok in ["RIPEMD160", "Ripemd160", "riPEMD160"] {
+        let r = format!("hash:{tok}:{h40}");
+        assert!(
+            matches!(parse(&r), Some(Err(ComposerRecordError::Hash(_)))),
+            "{tok} must be refused, not folded: {r}"
+        );
+    }
+}
+
+/// An unknown token is refused as a hash record, NOT silently read as a bare
+/// digest. Reading `hash:sha512:<hex>` as sha256 is the failure mode §6's
+/// fail-closed paragraph exists to rule out.
+#[test]
+fn an_unknown_kind_token_is_refused() {
+    let h64 = hex(&[0xa8u8; 32]);
+    assert!(matches!(
+        parse(&format!("hash:sha512:{h64}")),
+        Some(Err(ComposerRecordError::Hash(_)))
+    ));
 }

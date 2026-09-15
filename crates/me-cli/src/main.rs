@@ -2270,11 +2270,19 @@ fn print_composer_confirmation(records: &[String]) {
                 println!("public record {i}: cosigner key (key:) — {}", k.text)
             }
             ComposerRecord::Hash(h) => {
-                let hx = hex(&h);
+                // NAME THE KIND. This said "sha256 hashlock" under every kind,
+                // which is what let a tag-stripped hash256 record read as
+                // confirmation that stripping it was right (P1 journey, F-C1).
+                //
+                // And slice from the END, not from 56: that literal is one of
+                // spec §10's six 64-hex assumptions, and a 40-hex ripemd160
+                // digest through it PANICS.
+                let hx = hex(h.digest());
                 println!(
-                    "public record {i}: sha256 hashlock (hash:) — {}..{}",
+                    "public record {i}: {} hashlock (hash:) — {}..{}",
+                    h.kind().token(),
                     &hx[..8],
-                    &hx[56..]
+                    &hx[hx.len() - 8..]
                 );
             }
             ComposerRecord::Phrase(_) => {
@@ -2508,7 +2516,9 @@ fn hashlock_carrier_shaped(record: &str) -> bool {
 /// device's ASCII rule; the shipped refusals already carry em dashes.
 fn report_preimage_admission(records: &[String]) {
     use mnemonic_engrave::sysw::classify;
-    use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
+    use mnemonic_engrave::sysw::composer_records::{
+        parse, ComposerRecord, HashLock, RecordHashKind,
+    };
     use mnemonic_engrave::sysw::record::Class as C;
 
     let carriers: Vec<(usize, C)> = records
@@ -2563,7 +2573,7 @@ fn report_preimage_admission(records: &[String]) {
     // `my phrase`), and the WRONG METHOD SELECTOR. Both are one PBKDF2 run away
     // here -- milliseconds on the host against ~10 s on the device, after a
     // pick, at a screen with no copy for a digest that matches nothing.
-    let hashes: Vec<[u8; 32]> = records
+    let hashes: Vec<HashLock> = records
         .iter()
         .filter_map(|r| match parse(r) {
             Some(Ok(ComposerRecord::Hash(h))) => Some(h),
@@ -2592,24 +2602,45 @@ fn report_preimage_admission(records: &[String]) {
         return;
     }
     for (i, class) in carriers {
-        let Some(digest) = preimage_digest_of(&records[i], class) else {
+        let Some(x) = preimage_of(&records[i], class) else {
             continue;
         };
-        if hashes.contains(&digest) {
+        // COMPARE UNDER EACH RECORD'S OWN KIND. A sha256-only derivation
+        // checked against a `hash:hash256:` record never matches, so the
+        // operator would get a WARNING saying their phrase matches nothing --
+        // when it matches perfectly, under the kind the record names. A warning
+        // that fires on a correct payload is how a warning stops being read.
+        if hashes
+            .iter()
+            .any(|hl| hl.kind().digest_of(&x) == hl.digest())
+        {
             continue;
         }
-        let hx = hex(&digest);
-        let (first8, last8) = (&hx[..8], &hx[56..]);
+        // Report the digest under each DISTINCT kind the payload actually
+        // carries -- those are the values the operator would be comparing
+        // against. Naming one bare digest would re-create the two-axis
+        // collision §6 forbids.
+        let mut kinds: Vec<RecordHashKind> = hashes.iter().map(|h| h.kind()).collect();
+        kinds.sort_unstable();
+        kinds.dedup();
+        let checked: Vec<String> = kinds
+            .iter()
+            .map(|k| {
+                let hx = hex(&k.digest_of(&x));
+                format!("{} {}..{}", k.token(), &hx[..8], &hx[hx.len() - 8..])
+            })
+            .collect();
+        let checked = checked.join(", ");
         match class {
             C::Phrase => eprintln!(
                 "me: WARNING — record {i} (records count from 0) is a hashlock phrase whose \
-                 digest {first8}..{last8} matches no `hash:` record in this payload. Check \
+                 digest matches no `hash:` record in this payload (checked: {checked}). Check \
                  the method selector and the text after the first comma — a space after the \
                  comma is part of the phrase and derives a different preimage."
             ),
             _ => eprintln!(
                 "me: WARNING — record {i} (records count from 0) is a preimage whose digest \
-                 {first8}..{last8} matches no `hash:` record in this payload. Nothing here \
+                 matches no `hash:` record in this payload (checked: {checked}). Nothing here \
                  tells the device which policy it unlocks, and the Hashlock plates flow will \
                  print the digest alone."
             ),
@@ -2617,28 +2648,27 @@ fn report_preimage_admission(records: &[String]) {
     }
 }
 
-/// H = sha256(X) for an admitted carrier: decoded for a plate, DERIVED for a
-/// `phrase:` record.
+/// The 32-byte PREIMAGE X for an admitted carrier: decoded for a plate,
+/// DERIVED for a `phrase:` record.
+///
+/// **Returns the preimage, not a digest** (SPEC_hashlock_kinds §3 F1: the
+/// preimage is 32 bytes for every kind; only the digest width moves). It
+/// returned `sha256(X)` before this cycle, which made the caller's comparison
+/// blind to the other three kinds.
 ///
 /// Deriving is what makes §8.2.3's phrase half possible at all, and it is the
 /// reason the check lives on the host: PBKDF2 at 100,000 iterations is
 /// milliseconds here and about ten seconds on the SH2.
-fn preimage_digest_of(
-    record: &str,
-    class: mnemonic_engrave::sysw::record::Class,
-) -> Option<[u8; 32]> {
+fn preimage_of(record: &str, class: mnemonic_engrave::sysw::record::Class) -> Option<[u8; 32]> {
     use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
     use mnemonic_engrave::sysw::record::Class as C;
     match class {
         C::Phrase => match parse(record) {
-            Some(Ok(ComposerRecord::Phrase(p))) => {
-                let x = p.method.preimage(p.phrase.as_bytes());
-                Some(ms_codec::hashlock::digest(&x))
-            }
+            Some(Ok(ComposerRecord::Phrase(p))) => Some(*p.method.preimage(p.phrase.as_bytes())),
             _ => None,
         },
         C::Preimage => match ms_codec::decode(record.trim()) {
-            Ok((_, ms_codec::Payload::Preimage(x))) => Some(ms_codec::hashlock::digest(&x)),
+            Ok((_, ms_codec::Payload::Preimage(x))) => Some(*x),
             _ => None,
         },
         _ => None,

@@ -50,7 +50,15 @@ sha2 = "0.10"
 # this crate puts around the same words. Found by the Phase 2 Rust-side review.
 bip39 = { version = "2.2", features = ["zeroize"] }
 rand = "0.9"
-ms-codec = "0.9"
+# A GIT dependency pinned to a rev, exactly as mt-codec below and for the same
+# reason: SPEC_hashlock_kinds §9 says phase 3 pins phase 2 BY REV, not by a
+# publish. ms-codec 0.10.0 (the four hash kinds) is not on crates.io and
+# deliberately so -- publishing is irreversible and pinning a rev is not, and
+# scheduling `cargo publish` mid-cycle would put an irreversible act before
+# anything has been proven on a device.
+#
+# Pinned to origin/master of mnemonic-secret, which is where phase 2 shipped.
+ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "9dcd2e0dc0fef57ef94274359181a9f706a10fc6" }
 # The mt1 wire format -- the PRIMARY for everything sysw::mt converges on.
 # A path dependency because mt-codec lives in a private sibling repo
 # (mnemonic-transaction) and is unpublished; the layout is the constellation's
