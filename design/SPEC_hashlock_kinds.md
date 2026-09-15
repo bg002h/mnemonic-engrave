@@ -231,13 +231,23 @@ forgotten: it reaches the same lowering by a path with no screen on it at all.
 different thing and have no kind grammar; conflating them was an earlier draft's
 error.
 
-**The Back leg is normative and must be stated.** The typed-phrase arm is a loop
-whose Back contract is specified in `SPEC_hashlock_H2_device.md` §4.6, and the
-kind screen is being inserted into it. Back from the kind screen returns to the
-source pick, discarding no held material; Back from the pad returns to the kind
-screen with the kind still selected. A navigation leg left unstated is how this
-tree produced a Critical before — the Back path that skipped a screen also
-skipped a guard.
+**The Back leg is normative and must be stated — for BOTH arms.** The typed-phrase
+arm is a loop whose Back contract is specified in `SPEC_hashlock_H2_device.md`
+§4.6, and the kind screen is being inserted in front of it.
+
+**The kind screen precedes the material entry on both arms.** That is what keeps
+the KDF out of the Back path: nothing is held when the kind is chosen, so Back
+from it costs nothing.
+
+| leg | behaviour |
+| --- | --- |
+| Back from the **kind screen** | → the source pick (`Which hash?`). Nothing is held yet; nothing is discarded. |
+| Back from the **hex pad** | → the kind screen, kind still selected. |
+| Back from the **phrase screen** | → the kind screen, kind still selected. H2 §4.6's existing leg is *"Back from the phrase screen → `Which hash?` (phrase dropped)"*; with a screen inserted in front, it stops one earlier, and **the phrase is still dropped there** — but the operator does not pay a second KDF to reach the same point, because the kind screen is upstream of the derivation. |
+
+A navigation leg left unstated is how this tree produced a Critical before — the
+Back path that skipped a screen also skipped a guard — and the new leg skips a
+screen.
 
 **A stated limitation, not an oversight.** §2 decision 5 puts all four kinds on
 the phrase route. Routes 4 and 5 are payload-supplied **preimage material** —
@@ -392,9 +402,9 @@ tree surfaces at tag time rather than at PR time.
 | # | repo | what |
 | --- | --- | --- |
 | 1 | descriptor-mnemonic | `md-codec`: `HashKind`, `HashLock`, lowering arms, **and `presets::hashlock_gated`'s public `[u8; 32]` parameter** (§9.1). `md-cli`: sibling `ripemd160=` / `hash160=` / `hash256=` options on **both** `--path` and `--preset`, plus the `PresetParams` field, the `named_only` allow-list and the `--json` key. Vectors. |
-| 2 | mnemonic-secret | `ms-codec`: one digest function per kind, and the §10 per-kind KAT. `ms hashlock` learns the kind. |
+| 2 | mnemonic-secret | `ms-codec`: one digest function per kind, and the §10 per-kind KAT. `ms hashlock` learns `--kind` (§13.4). **The plate's QR text gains `hash: <kind>` (§13.1)** — `qr_text` lives here. |
 | 3 | mnemonic-engrave | `me-cli`: the §6 record grammar, both directions. Depends on phase 2's API, consumed **by git rev pin** (above). Vectors. |
-| 4 | seedhammer fork | Go ports of 1-3 **and** the device UI, as ONE phase. |
+| 4 | seedhammer fork | Go ports of 1-3 **and** the device UI, as ONE phase. Also §13's device surface: the locator `hash` row, the confirm and reconciliation bodies, the masked pick lead, and the census row. |
 
 **Phase 4 is one phase on purpose.** Changing `md.SpendPath.Hash` breaks 39
 production and 76 test references atomically; there is no tree where the port has
@@ -464,6 +474,9 @@ All net new (§1).
   `hash:sha256:<64hex>` (§6), which must parse to the same `HashLock`.
 - **Cross-repo token agreement**, pinned by `record_class_vectors.provenance.json`
   and `compose_vectors.provenance.json`.
+- **The preimage plate, per kind**: its QR text, its locator row, and a **layout
+  fit** assertion at the worst case (100-character phrase) — §13.1's placement is
+  a measurement and decays like one. Goldens for the plate bytes.
 
 ## 11. Gates that must move deliberately
 
@@ -485,7 +498,10 @@ All net new (§1).
 | the confirm modal and the reconciliation body | `gui/composer_copy.go:557-571`, `:641-648` |
 | the hex pad's LIVE COUNTER — 30 lines past the range an earlier draft cited | `gui/composer_hash.go:135` |
 | `ms hashlock`'s operator surface, incl. `for md compose: … sha256=<h>` | mnemonic-secret, `ms hashlock` |
-| the preimage plate's `method:` line and `hashlock v1` QR text | `backup/hashlock`, `hashlockPlateFormWords`, `QRText` |
+| the preimage plate's QR text and locator row | `MethodLine`, `ms_codec::hashlock::qr_text`, `backup/hashlock` |
+| the preimage plate **fit gate and its goldens** — §13.1's placement is a layout claim and must be measured, not asserted | the fork's plate layout tests |
+| the masked plate-pick lead, which prints a bare `method:` | `gui/composer_copy.go:717-725` |
+| `me-cli`'s hashlock help text | `me-cli/src/main.rs:195,197` |
 | the §8.3 census row | the composer's plate inventory |
 | `me bundle`'s plate checklist | `me-cli` |
 | both provenance pin files | — |
@@ -551,14 +567,31 @@ untouched: seven plate- and restore-related identifiers appear nowhere in the
 earlier drafts, and the word "restore" appeared once, in a background clause.
 Nothing here is optional.
 
-**13.1 The preimage plate names the kind.** The plate's `method:` line and its
-`hashlock v1` QR are, by the plate's own written design rule, the complete
-definition of the derivation — and a fourth-kind world makes them one step short,
-while the device instructs the operator to store that plate *apart from* the md1
-card holding the missing step. **Measured, the remedy is free:** adding
-`hash: ripemd160` to the 100-character worst-case QR text takes it 194 → 210
-bytes and it remains at **53 modules**, the envelope already reserved — so no
-layout change and no change to ACCEPTANCE item 8's 32m12s cut.
+**13.1 The preimage plate names the kind — in the QR, and on the locator's
+`hash` row.** The plate's `method:` line and its `hashlock v1` QR are, by the
+plate's own written design rule, the complete definition of the derivation, and a
+fourth-kind world makes them one step short — while the device instructs the
+operator to store that plate *apart from* the md1 card holding the missing step.
+
+**The QR is free. The engraved text is free only at one placement**, and an
+earlier draft said "no layout change" on the strength of the QR measurement
+alone. Measured against the fork's own layout, worst case (100-character phrase):
+
+| placement | result |
+| --- | --- |
+| baseline (no kind) | fits at 3.0 mm, 10 rows, 1.20 mm spare |
+| QR text gains `hash: <kind>` | 194 → **210 bytes, still 53 modules**, fits, 1.20 mm spare |
+| kind appended to the **`method:` line** (88 chars) | **REFUSES at every rung** — 11 rows at 3.0 mm need 427520 units against a 416000 budget |
+| kind as **its own body row** | **REFUSES at every rung**, same arithmetic |
+| kind appended to the **locator's `hash` row** (35 chars) | fits at 3.0 mm, 10 rows, 1.20 mm spare |
+
+So the kind goes in the **QR text** and on the **locator's `hash` row**, and
+explicitly **not** on the `method:` line — which H6 §6.5 had already pinned at 73
+characters and ruled cannot carry more — and **not** as a new row, because either
+adds an eleventh row and blows the budget at every font rung.
+
+ACCEPTANCE item 8 of the H6 cycle (the operator's QR-scan gate, ~43 min) is
+unaffected: the QR stays at 53 modules, the reserved envelope.
 
 **13.2 The confirm and reconciliation screens name the kind.** This is the
 cycle's operator-facing Critical. The reconciliation screen instructs: *"run
@@ -569,7 +602,12 @@ the sha256 digest. Both are 64 hex; nothing but a label distinguishes them, and
 the label was never printed. The operator, complying exactly, discards a correct
 wallet and re-cuts five plates.
 
-So: both bodies name the kind, and the reconcile sentence names the flag —
+**Three screens, not two.** The masked plate-pick lead
+(`gui/composer_copy.go:717-725`) prints `method: <method>` and no kind, which §5's
+rule condemns as directly as the other two; the fold that wrote that rule missed
+the screen it condemned. It is in scope here.
+
+So: all three bodies name the kind, and the reconcile sentence names the flag —
 `ms hashlock … --kind <kind>`. Its write-down list gains the kind too; an
 operator who writes down exactly what they are told must be able to rebuild the
 descriptor, and `md compose` needs one of four option names that list does not
