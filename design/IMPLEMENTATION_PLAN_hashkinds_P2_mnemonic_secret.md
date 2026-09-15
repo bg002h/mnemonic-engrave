@@ -175,10 +175,11 @@ before its fix:
 | `hash256_warns_against_stripping_its_own_tag` | the 64-hex collision: strip `hash256:` and it is accepted as sha256 |
 | `the_write_down_line_names_both_axes` | the write-down list naming method and omitting kind |
 | `the_fallback_header_names_the_preimage_not_a_phrase` | calling the object a phrase on routes that have none |
+| `the_json_purity_contract_holds_for_every_kind` | a notice breaking the stderr pin — `json_both_variants` never passes `--kind` |
 
-**Eleven, and seven of them were added by a review round that found the defect
-first.** That is a measurement, not a rhetorical point — `git log` on the file
-gives 4 → 5 → 6 → 10 → 11:
+**Twelve, and EIGHT of them were added by a review round that found the defect
+first.** That is a measurement, not a rhetorical point — `grep -c '^#\[test\]'`
+across the file's history gives 4 → 5 → 6 → 10 → 11 → 12:
 
 | round | + | what it had found that no existing test could see |
 | --- | --- | --- |
@@ -186,12 +187,19 @@ gives 4 → 5 → 6 → 10 → 11:
 | R0 r5 | +1 | the guard one flag wider than the contract it cited |
 | journey walk | +4 | the opcode, the unusable operand, the 64-hex strip, the write-down list |
 | journey walk | +1 | "this **phrase's** digest" on routes with no phrase |
+| R0 r8 | +1 | a notice breaking the `--json --no-engraving-card` stderr pin |
 
-The first four came from correctness rounds; **the last five came from walking
-an operator journey, after six correctness rounds had closed 0C/0I on the same
-code.** Correctness asks whether a section is right; the walk asks what a person
-holds at a moment and what happens when they reasonably do something else. The
-card was internally consistent and named the wrong opcode for three kinds.
+Four came with the original implementation; **eight were added by a round that
+had already found the defect**, and five of those came from walking an operator
+journey *after six correctness rounds had closed 0C/0I on the same code*.
+Correctness asks whether a section is right; the walk asks what a person holds
+at a moment and what happens when they reasonably do something else. The card
+was internally consistent and named the wrong opcode for three of four kinds.
+
+**The pattern in the +1s is worth reading.** Four of the five single-test rounds
+found the SAME defect — a notice on the wrong side of a guard — which is why the
+source now carries an explicit card/notice boundary with its rule, rather than a
+fifth correct line.
 
 And in `hashlock_qr_text.rs`, a floor is not coverage — assert that a row exists
 **for each of the four kinds by name**, not that the array is at least N long.
@@ -203,7 +211,7 @@ Transcribed from the completed branch, not predicted:
 | gate | result |
 | --- | --- |
 | test suites | **101 ok, 0 failed** |
-| `cargo nextest run --locked --all-targets` | **583 run, 583 passed**, 11 skipped |
+| `cargo nextest run --locked --all-targets` | **584 run, 584 passed**, 11 skipped |
 | `clippy -p ms-codec --all-targets -- -D warnings` | **0** |
 | `clippy -p ms-cli --all-targets -- -D warnings` | **0** |
 | `cargo fmt --all -- --check` | clean |
@@ -1397,10 +1405,33 @@ fn the_card_names_the_kinds_own_opcode() {
 fn a_non_sha256_kind_warns_that_md_may_not_accept_the_operand() {
     for kind in ["hash256", "ripemd160", "hash160"] {
         let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
+        // BOTH doors the journey walk found, and they live on DIFFERENT SIDES
+        // of the card/notice boundary: `md compose` is about the card's own
+        // operand line, `me sysw pack` is about the record on stdout, which
+        // ships whether or not the card does (R0 round 7 M-1, round 8 M-3).
         assert!(
-            se.contains(&format!("requires `md compose` support for `{kind}=`")),
+            se.contains(&format!("requires `{kind}=` support in `md compose`")),
             "{kind}: the card proposes an operand with no hint that `md` may \
              refuse it:\n{se}"
+        );
+        // Quoted as `md` actually prints it -- measured, backticks included.
+        assert!(
+            se.contains(&format!("unknown option `{kind}`")),
+            "{kind}: the caveat must quote md's real refusal:\n{se}"
+        );
+        // The stdout half survives suppression, because that is the path it
+        // describes.
+        let (_, se2) = run(&[
+            "hashlock",
+            "--hashlock-phrase-stdin",
+            "--kind",
+            kind,
+            "--no-engraving-card",
+        ]);
+        assert!(
+            se2.contains("`me sysw pack`"),
+            "{kind}: the record still ships under --no-engraving-card and the \
+             notice about its second door does not:\n{se2}"
         );
     }
     let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", "sha256"]);
@@ -1417,12 +1448,28 @@ fn a_non_sha256_kind_warns_that_md_may_not_accept_the_operand() {
 /// (journey walk, I-3). Only `hash256` is exposed; the 20-byte kinds are not.
 #[test]
 fn hash256_warns_against_stripping_its_own_tag() {
-    let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", "hash256"]);
-    assert!(
-        se.contains("DO NOT DELETE THE TAG"),
-        "hash256's record is one prefix-strip from a valid sha256 record and \
-         nothing on the card says so:\n{se}"
-    );
+    // BOTH argv shapes. It is a NOTICE, not a card line, so
+    // `--no-engraving-card` must not suppress it -- and that flag is part of
+    // the very pipe the hazard travels (`ms hashlock … | me sysw pack`). It
+    // shipped inside the card guard once, leaving stderr at zero bytes while
+    // `hash:hash256:…` still went to stdout (R0 round 7, I-1).
+    for argv in [
+        &["hashlock", "--hashlock-phrase-stdin", "--kind", "hash256"][..],
+        &[
+            "hashlock",
+            "--hashlock-phrase-stdin",
+            "--kind",
+            "hash256",
+            "--no-engraving-card",
+        ][..],
+    ] {
+        let (_, se) = run(argv);
+        assert!(
+            se.contains("DO NOT DELETE THE TAG"),
+            "{argv:?}: hash256's record is one prefix-strip from a valid sha256 \
+             record and nothing says so:\n{se}"
+        );
+    }
     for kind in ["sha256", "ripemd160", "hash160"] {
         let (_, se) = run(&["hashlock", "--hashlock-phrase-stdin", "--kind", kind]);
         assert!(
@@ -1443,14 +1490,32 @@ fn the_write_down_line_names_both_axes() {
         .lines()
         .find(|l| l.starts_with("phrase:"))
         .expect("no write-down line on the card");
+    // ASSERT THE INSTRUCTION, NOT THE WORDS. This asserted
+    // `contains("method line")` for one round, which the RECOVERY clause later
+    // in the same line ("if the method line is lost") also satisfies -- so
+    // deleting `write the method line AND` from the instruction left the suite
+    // at 11 passed, 0 failed. A test that cannot fail for the thing it names
+    // (R0 round 7, I-2).
     assert!(
-        line.contains("method line"),
-        "the method axis went missing: {line:?}"
+        line.contains("write the method line AND the hash line"),
+        "the write-down INSTRUCTION must name both axes; a later clause \
+         mentioning either word is not the instruction: {line:?}"
     );
     assert!(
-        line.contains("hash line") && line.contains("ripemd160"),
-        "the kind axis is absent, so an operator complying exactly writes down \
-         the method and nothing about the hash: {line:?}"
+        line.contains("(ripemd160)"),
+        "the instruction must name the kind in hand, not the word \"hash\": {line:?}"
+    );
+    // BOTH recovery clauses, not just the method one. An operator who loses the
+    // hash line needs the §13.4 lookup named, and that clause was unpinned
+    // while its method twin was (R0 round 8, M-2).
+    assert!(
+        line.contains("if the method line is lost"),
+        "the method-axis recovery is missing: {line:?}"
+    );
+    assert!(
+        line.contains("if the hash line is lost"),
+        "the kind-axis recovery is missing, so losing it has no stated remedy: \
+         {line:?}"
     );
 }
 
@@ -1481,6 +1546,52 @@ fn the_fallback_header_names_the_preimage_not_a_phrase() {
         assert!(
             !line.contains("phrase"),
             "{argv:?}: the header calls it a phrase, and this route has none: {line:?}"
+        );
+    }
+}
+
+/// The stderr purity contract, pinned ACROSS KINDS.
+///
+/// `hashlock_outputs.rs::json_both_variants` pins stderr under `--json
+/// --no-engraving-card` to exactly the PrivateKeyMaterial advisory — but it
+/// never passes `--kind`, so it is blind to any notice that only a particular
+/// kind fires. The `hash256` tag-strip warning is exactly that, and it shipped
+/// unguarded for one round, putting 485 bytes on a stream pinned to one line
+/// (R0 round 8, I-1).
+///
+/// Every kind, and the kind-omitted case, in one place.
+#[test]
+fn the_json_purity_contract_holds_for_every_kind() {
+    for kind in [
+        None,
+        Some("sha256"),
+        Some("hash256"),
+        Some("ripemd160"),
+        Some("hash160"),
+    ] {
+        let mut argv = vec![
+            "hashlock",
+            "--hashlock-phrase-stdin",
+            "--json",
+            "--no-engraving-card",
+        ];
+        if let Some(k) = kind {
+            argv.push("--kind");
+            argv.push(k);
+        }
+        let (_, se) = run(&argv);
+        let lines: Vec<&str> = se.trim_end().lines().collect();
+        assert_eq!(
+            lines.len(),
+            1,
+            "{kind:?}: `--json --no-engraving-card` pins stderr to exactly the \
+             advisory; a notice does not get to break that contract, it moves \
+             into the object.\n{se}"
+        );
+        assert!(
+            lines[0].contains("stdout carries private key material"),
+            "{kind:?}: the one line must be the advisory: {:?}",
+            lines[0]
         );
     }
 }
