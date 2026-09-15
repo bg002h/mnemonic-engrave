@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-**THIS PLAN WAS DERIVED BY BUILDING IT.** Tasks 1 and 5 were implemented for
+**THIS PLAN WAS DERIVED BY BUILDING IT.** All six tasks were implemented for
 real in a worktree of `mnemonic-secret` before this text was written — compiled,
 tested, linted under `-D warnings`, and run. Every command, error, count and
 output below is transcribed from that run, not predicted. Two earlier drafts
@@ -72,6 +72,47 @@ emitting one under `--kind hash256` hands `me sysw pack` a sha256d digest it
 reads as sha256. The `sha256` value above matches the corpus's existing
 `hardened_h` for that phrase; the `hash256` value matches what the journey-walk
 review computed independently.
+
+### Measured outcomes — the numbers an executor should expect
+
+Transcribed from the completed branch, not predicted:
+
+| gate | result |
+| --- | --- |
+| test suites | **100 ok, 0 failed** |
+| `clippy -p ms-codec --all-targets -- -D warnings` | **0** |
+| `clippy -p ms-cli --all-targets -- -D warnings` | **0** |
+| `cargo fmt --all -- --check` | clean |
+| `cargo vendor vendor/` | exactly **one** added directory (`vendor/ripemd`) |
+| `ci/repro/vendor-freshness.sh` | OK |
+| corpus `derivation` rows / `qr_text` rows | 11 / **10** (7 existing + 3 new per-kind) |
+| corpus SHA-256 after Task 4 | `0a911f78f3cdc867dcc44483b7f4c0c1ac87b6d9b30b79f52094e8979bc3d8ce` |
+
+**Task 2's diff is 88 insertions / 11 deletions**, not the "77 / 0" an earlier
+draft predicted: adding a key to each row also rewrites that row's previously
+final line to gain a comma. Eleven rows, eleven such lines. A `0` deletion count
+is the wrong thing to check for.
+
+**The corpus changes TWICE** — digest columns in Task 2, `qr_text` rows in Task 4
+— so the SHA above is the one after Task 4. Re-pin from the final state, not
+from Task 2.
+
+### Four more traps, all found by running
+
+4. **`qr_text`'s corpus test cannot read the new rows** until it is taught to.
+   The loop hardcoded `HashKind::Sha256`, so per-kind rows silently compared
+   against a sha256 render. `Row` gains a `kind: String` field and the loop maps
+   it. Without this, Step 5b's rows exist and gate nothing.
+5. **The four broken `qr_text` assertions surface ONE AT A TIME**, not all at
+   once — the corpus-row test aborts at its first failing row, so `bytes`, the
+   line count, and the worst case only appear as you fix forward. Expect four
+   rounds, not one.
+6. **`serde_json` is already a dev-dependency; `hex` is not needed.** An earlier
+   draft added `hex = "0.4"`. Write a local `hex()` helper instead — and write it
+   as a `fold`, because `map(format!).collect()` trips clippy's `format_collect`
+   under `-D warnings`.
+7. **The line count is a multi-line assertion.** `got.lines().count(), 3` spans
+   two source lines, so a single-line `sed` misses it. It becomes 4.
 
 ### Three traps the real build found, which no reviewer would have
 
