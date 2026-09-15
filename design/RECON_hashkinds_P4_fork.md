@@ -10,18 +10,22 @@ Spec §9: *"Changing `md.SpendPath.Hash` breaks 39 production and 76 test
 references atomically; there is no tree where the port has landed and the UI has
 not. Splitting it would label fork-native authorship as a convergence port."*
 
-**Those two numbers have drifted and the spec should not be trusted for them.**
-Measured now:
+**I tried to check those two numbers with `grep` and RETRACTED the result.**
+`grep -rn '\.Hash\b'` gave 51/74, and I briefly recorded that as "the spec has
+drifted". It does not measure the same thing: `\.Hash\b` also matches
+`chainhash.Hash{}` (a TYPE), `seal.FormatHash(p.Hash)` (a different `[16]byte`
+field at `seal/open.go:40`), and `picobin`'s `Image.Hash()` METHOD. The number
+is polluted and not comparable to whatever §9 counted.
 
-| spec §9 says | measured at `0562e81` |
-| --- | --- |
-| 39 production `.Hash` references | **51** |
-| 76 test `.Hash` references | **74** |
+**The instrument for this question is the COMPILER, not `grep`.** Change
+`SpendPath.Hash`'s type and count what fails to build — which phase 4 does on
+its first commit anyway, so the number costs nothing to obtain honestly and
+nothing is gained by estimating it now. Treat §9's 39/76 as unverified in either
+direction.
 
-Not a defect in the argument — the point stands and is if anything stronger —
-but it is the *"never hand-count what a tool can count"* class in the spec
-itself, and a future reader quoting 39 would be quoting a number that was true
-once. Re-measure before citing.
+The argument §9 makes does not depend on the exact figures: the field is read
+across the codec, the composer presets and the device UI, so there is no tree
+where the port has landed and the UI has not.
 
 ## The four code obligations, located
 
