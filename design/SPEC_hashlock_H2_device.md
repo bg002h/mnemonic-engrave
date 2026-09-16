@@ -256,13 +256,14 @@ the operator HOLDS to confirm and presses Back to decline (fidelity M-4). Title
 `Hash lock`. Lines, in order (§8i and §8h are NOT here, see §4.7 and §5):
 
 ```
-hash  <first8>..<last8>
+hash  <kind> <first8>..<last8>
 method: hardened   chars: <n>        (or: method: sha256   chars: <n>)
 <relation line, only when the payload holds hash: records>
 <other-path line, only when another path of this policy already carries a different
 hash: "another path has a different hash: back up every phrase">
-Write down this phrase, the method and this digest
-now. This composition holds them until it ends.
+Write down this phrase, the method, the hash kind and
+this digest now. This composition holds them until it
+ends.
 Without both, this path can never be spent.
 One phrase per policy. Never use this phrase as a
 passphrase or a password anywhere else.
@@ -294,13 +295,23 @@ shown immediately after HOLD assigns the digest and reachable for every policy
 that has a phrase-set hash (the drop order below names this same destination):
 
 ```
-hash  <first8>..<last8>
+hash  <kind> <first8>..<last8>
 method: <m>   chars: <n>
-Before you cut plates, run ms hashlock with this
-phrase and method on the host and check the digest
-matches. If they differ, do not fund this wallet:
-build it again.
+Before you cut plates, run ms hashlock --kind <kind>
+with this phrase and method on the host and check the
+digest matches. If they differ, do not fund this
+wallet: build it again.
 ```
+
+**`<kind>` on both lines is SPEC_hashlock_kinds §13.2, and it is that cycle's
+operator-facing Critical.** This screen tells the operator to compare a digest
+and discard the wallet if it differs. It used to supply only `method: <m>` —
+the *other* axis — and `ms hashlock` with no kind returns the sha256 digest. On
+a correct `hash256` wallet both values are 64 hex, nothing but a label
+distinguished them, and the label was never printed: an operator complying
+exactly discarded a correct wallet and re-cut five plates. Naming the kind in
+the body is not enough on its own; **the sentence must name the flag**, because
+what the operator types is what decides which digest comes back.
 
 - `chars: <n>` is the phrase's byte count — the one signal that shows a stray
   space when the operator later reconciles against the host card's

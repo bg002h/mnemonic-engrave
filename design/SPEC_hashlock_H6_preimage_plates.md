@@ -65,7 +65,7 @@ than with the others:
    guarded by `composerEveryPathHashed`, which §10.1 records is false the moment
    one path is keyed. So the stage fixed the sentence on the banner drawn NOWHERE
    and left it false on the modal drawn on EVERY phrase route. It becomes
-   *"Write down this phrase, the method and this digest now. This composition
+   *"Write down this phrase, the method, the hash kind and this digest now. This composition
    holds them until it ends. Without both, this path can never be spent."* --
    MEASURED at **342 drawn / headroom 107**, one character shorter than the
    sentence it replaces, because this body has only 27 characters of room against
@@ -935,12 +935,19 @@ a comment.
 **THE MASKED LEAD IS TWO LINES, AND THE NUMBER IS NORMATIVE** (plan round, gate
 fix F13). `composerPickScreen` draws the lead as a per-page header THROUGH
 `composerPageLines`, so every line the lead spends is a ROW lost from page 1.
-MEASURED at `sh2DisplaySize`: a two-line lead -- `hash  <first8>..<last8>`
+MEASURED at `sh2DisplaySize`: a two-line lead -- `hash  <kind> <first8>..<last8>`
 optionally with `   path <n>`, then `phrase: <n> characters   method: <m>` --
 puts **all four rows on page 1**; a four-line lead, with the digest, the path,
 the character count and the method each on their own line, leaves **three**, and
 the row it displaces to page 2 is `do not cut this preimage`, the row an operator
 reaches for to UNDO. §11.5 pins the four-on-page-1 count.
+
+**The hash KIND joins line 1 rather than taking a row** (SPEC_hashlock_kinds
+§13.1/§13.2). The two-line count above is normative and the kind does not get to
+cost a row: a third lead line displaces `do not cut this preimage` to page 2 --
+the row an operator reaches for to UNDO. So it widens `hash  ...` instead, and
+the paged-geometry gate is exercised at `ripemd160`, the longest of the four
+tokens, rather than at the shortest.
 
 **THE PLATE ORDER IS DETERMINISTIC -- NORMATIVE** (plan round, gate fix F14).
 The list of held plates may NOT be produced by ranging `hashlockHeld`: Go
