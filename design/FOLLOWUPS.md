@@ -18679,7 +18679,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-610 — the bearer-access warning is minted-side only; `md decode` of the same card is silent
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — dm `96499c6f`. The restorer is warned that the card has a key-less spend path; same predicate as F-599, asked in the MINTING disposition (Warn returns Ok for a key-less path, so the first version printed nothing). Ledger updated late: the fix shipped and this entry was left OPEN, which is the F-534/F-536 class again.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
