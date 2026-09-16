@@ -18605,13 +18605,13 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-594 — `md bytecode` refuses an md1 that `md encode` just produced
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — dm `2f07604d`. The verdict and exit code are unchanged; the message now says the card is NOT corrupt, names `md decode` and `md encode --path`, and a control asserts an origin-carrying card stays silent. Both routes RUN first.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-595 — `md address` cannot consume `md decode`'s own output
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — dm `3d837935`. `md decode`'s note names the invocation that consumes the origin, guarded to the single-shared-origin case because `--path` takes one PATH. The test RUNS the prescribed command and pulls the path out of the note.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
