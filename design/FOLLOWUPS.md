@@ -17949,3 +17949,60 @@ Worse than saying nothing? No — the text being dropped is text the operator ha
 just been advised not to use. Recorded because it shares F-571's mechanism and
 should be re-read when F-571 is folded: if the phrase starts surviving Back,
 only the screen count is left to fix.
+
+### F-618 — the ledger has four closure conventions and 318 entries with none, so no grep answers "what is open?"
+
+**Important. Owning phase: process tooling (ownerless residue — burn down with
+the next follow-up sweep).** Filed 2026-09-16, from three occurrences of one
+class in a single session.
+
+**The occurrences.** F-534 was fixed and still read as open, which a journey
+agent had to find and file as F-555. F-536 was fixed by ms `4f4b5a7` and still
+read *"Why still not folded."* F-547 … F-577 were never filed at all — fourteen
+of them were folded into code straight from an agent report, so a grep for
+`F-573` returned nothing outside a document nobody re-reads. Three occurrences
+is a wrong shape, not three mistakes.
+
+**The measurement.** 418 entries:
+
+```
+CLOSED marker      45
+~~strikethrough~~  52
+SHIPPED             1
+DOWNGRADED          1
+(withdrawn)         1
+nothing at all    318
+```
+
+So roughly a quarter carry a status and three quarters do not, in four different
+notations. **No predicate can read this file.** That is the defect: the burndown
+rule says *"record the owning phase in each follow-up entry so reconciliation is
+a grep"*, and reconciliation is not a grep.
+
+**Why the obvious gate does not work — measured, so the next person does not
+rebuild it.** Cross-checking the ledger against the commit record fails in both
+directions:
+
+* *Loose predicate* (any commit body naming `F-NNN`) — 43 "disagreements", almost
+  all false: the commit that **files** a follow-up names it, as does one that
+  merely cites it.
+* *Tight predicate* (the number in the commit **subject**) — **336** F-numbers
+  qualify, including dozens of entries that are legitimately open.
+
+There is no closure vocabulary to key on either: across all four repos the verbs
+near an F-number run `closed` 110, `fixed` 45, `close` 40, `resolved` 25,
+`closes` 18, `resolves` 2, `fixes` 1.
+
+**What would actually fix it**, in rough order of cost:
+
+1. One status notation, stated at the top of the file, and a `status:` line in
+   the entry template rather than a header decoration.
+2. A checker that reads that line and prints the open set — cheap once the
+   notation is single.
+3. The rule that **a fold commit closes its entry in the same commit**, which is
+   what would have prevented all three occurrences. Note this cannot be enforced
+   per-repo: folds land in `dm`/`ms`/the fork, where this file does not exist.
+
+**Not attempted in this session** beyond marking the seven closures that were
+verifiable, because renotating 418 entries is a mechanical pass that should be
+one reviewed change, not a side effect of answering "what is left to do?".
