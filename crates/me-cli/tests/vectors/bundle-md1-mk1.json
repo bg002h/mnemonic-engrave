@@ -3,6 +3,7 @@
   "version": "x.y.z",
   "wallet_plates": 4,
   "key_slots": 1,
+  "keyless_template": true,
   "ms1_required": true,
   "sets": [
     {

@@ -88,6 +88,9 @@ pub struct Manifest {
     /// those seeds the operator holds, so it must not state a plate total that
     /// silently assumes one.
     pub key_slots: usize,
+    /// True when a decoded md1 is a TEMPLATE: no `Pubkeys` TLV, so the plate
+    /// carries the policy and none of the cosigner keys (F-602).
+    pub keyless_template: bool,
     pub ms1_required: bool,
     pub sets: Vec<SetEntry>,
     pub plates: Vec<PlateEntry>,
@@ -117,6 +120,21 @@ impl Manifest {
             "me: backup needs {public} public plate{}, plus one ms1 plate per seed you hold:\n",
             if public == 1 { "" } else { "s" }
         );
+        // F-602: a key-less template plate does not restore the wallet on its
+        // own, and the count above says nothing about the cosigner cards that
+        // would. Measured before the fix: `me bundle` on a key-less 2-of-3 said
+        // "backup needs 2 plates" -- cut those two and the wallet is gone.
+        // Given the same md1 PLUS nine mk1 cards it said 32, so the first
+        // number was never a floor; it was stated as the answer.
+        if self.keyless_template {
+            out.push_str(&format!(
+                "me: NOTE — this md1 is a TEMPLATE: it carries the policy and NONE of the \
+                 cosigner keys. The plate{} above cannot restore this wallet alone. You also \
+                 need every cosigner's xpub — an mk1 card each, not counted here — or every \
+                 seed.\n",
+                if public == 1 { "" } else { "s" }
+            ));
+        }
         if self.key_slots > 1 {
             out.push_str(&format!(
                 "me: NOTE — this policy declares {} key slots. `me bundle` cannot know how many \
@@ -304,6 +322,7 @@ mod tests {
             hashlock_kinds: Vec::new(),
             wallet_plates: 3,
             key_slots: 3,
+            keyless_template: false,
             ms1_required: true,
             sets: vec![SetEntry {
                 kind: Kind::Mk1,
@@ -388,6 +407,7 @@ mod tests {
             hashlock_kinds: vec!["ripemd160"],
             wallet_plates: 3,
             key_slots: 3,
+            keyless_template: false,
             ms1_required: true,
             sets: Vec::new(),
             plates: Vec::new(),

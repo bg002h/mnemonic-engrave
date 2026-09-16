@@ -303,6 +303,12 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     // of those seeds are the operator's, which is exactly why the old checklist
     // was wrong to state a total that folded in a single hardcoded ms1 plate.
     let mut key_slots: usize = 0;
+    // F-602: true when a decoded md1 is a TEMPLATE -- no `Pubkeys` TLV, so the
+    // plate carries the policy and none of the cosigner keys. Restoring from
+    // that plate alone is impossible; you need each cosigner's xpub (an mk1
+    // card) or every seed. `me bundle` counted neither and said "backup needs
+    // 2 plates".
+    let mut keyless_template = false;
     let mut sets: Vec<SetEntry> = Vec::new();
     let mut plates: Vec<PlateEntry> = Vec::new();
 
@@ -314,6 +320,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         if let Ok(d) = md_codec::decode::decode_md1_string(s) {
             hashlock_kinds.extend(descriptor_hash_kinds(&d));
             key_slots = key_slots.max(d.n as usize);
+            keyless_template |= !d.is_wallet_policy();
         }
         plates.push(PlateEntry {
             plate: 0,
@@ -341,6 +348,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         // hands us the tree, so noticing costs nothing.
         hashlock_kinds.extend(descriptor_hash_kinds(&d));
         key_slots = key_slots.max(d.n as usize);
+        keyless_template |= !d.is_wallet_policy();
         let total = chunks.len() as u8;
         sets.push(SetEntry {
             kind: Kind::Md1,
@@ -453,6 +461,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         },
         wallet_plates: total_plates,
         key_slots,
+        keyless_template,
         ms1_required: true,
         sets,
         plates,
@@ -461,6 +470,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     const MD1_UNCHUNKED: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
@@ -670,6 +680,64 @@ mod tests {
             run_bundle(&input),
             Err(BundleError::SetIncompleteMk(..))
         ));
+    }
+
+    /// F-602: a key-less md1 is a TEMPLATE -- it carries the policy and NONE of
+    /// the cosigner keys -- and `me bundle` said "backup needs 2 plates" for
+    /// one. Cut those two and the wallet is gone: restoring needs every
+    /// cosigner's xpub (an mk1 card each) or every seed, and nothing told the
+    /// operator to cut any of them.
+    ///
+    /// Given the SAME policy with the keys embedded, the tool said 32 plates
+    /// for the 9-slot case -- so the first number was never a floor. It was
+    /// stated as the answer.
+    ///
+    /// The discriminator is `Descriptor::is_wallet_policy()`: true when the
+    /// `Pubkeys` TLV is present and non-empty.
+    ///
+    /// MUTATION: drop the `keyless_template` note from `checklist` -> the
+    /// first assertion fails. MUTATION: set `keyless_template` unconditionally
+    /// true -> the keyed control fails, which is the assertion that keeps this
+    /// from passing on a note that always fires.
+    #[test]
+    fn a_keyless_template_says_the_cosigner_cards_are_missing() {
+        // wsh(sortedmulti(2,@0,@1,@2)) with NO keys: one short md1.
+        let keyless = "md1yzfdsssj5qqcy8pzrqrxahye32v7pju";
+        // The SAME policy with three real xpubs embedded: a 6-chunk set.
+        let keyed = [
+            "md1fp8z0zspqsgqpsgwzyxzhs783l9ptp6y899r55wq66atyyv2fyvhqwawq8m4p9dsedhun4k2czf3z",
+            "md1fp8z0zs0pnfykxj458upmne64hl86j79cw06h2xjv7es8u2f2vhk9zv73pl3xdpcrdj5crvh54t9l",
+            "md1fp8z0zskjdwd4x2n6sy3kkfjh6lq3vcqq7lfnxv5qcs2tqtp2ygzuw0jfjgeqyec3mgkcmm7mck6a",
+            "md1fp8z0zsuey3qgfkmwl3qp89hp8xtkm8a0h6ch67jl5xqfcd85g0se056yvr7pgkgfpt56l90dkcmu",
+            "md1fp8z0z3rwujsepmc9h3mxzajul0gw9f5jcyrvxnq90svhxshepch75hcktucrmwq7znrjdx2rjtfy",
+            "md1fp8z0z3vnhgymmc0924tpdkh3prfu7f47g4ntt488aal33v7xgtm7nzyqq7dn6da2eu9nf",
+        ]
+        .join("\n");
+
+        let t = run_bundle(keyless).expect("key-less template should bundle");
+        assert!(
+            t.keyless_template,
+            "a key-less md1 is not flagged as a template"
+        );
+        assert!(
+            t.checklist()
+                .contains("carries the policy and NONE of the cosigner keys"),
+            "the checklist does not say the cosigner cards are missing:\n{}",
+            t.checklist()
+        );
+
+        // The control: the same policy WITH keys must not carry the note, or
+        // the note is unconditional and says nothing.
+        let k = run_bundle(&keyed).expect("keyed policy should bundle");
+        assert!(
+            !k.keyless_template,
+            "a wallet-policy md1 with embedded xpubs is wrongly flagged key-less"
+        );
+        assert!(
+            !k.checklist().contains("NONE of the cosigner keys"),
+            "a keyed policy is told its cosigner keys are missing:\n{}",
+            k.checklist()
+        );
     }
 
     /// F-580 (Critical): the checklist said `backup needs N plates (N-1
