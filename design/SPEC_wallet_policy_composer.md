@@ -768,10 +768,31 @@ hashed path's material, and two H6 §10.1 added, for one that does.
 
 ### 8i. Hashlock entry rule (at entry and at consent)
 
-> The hash must be SHA-256 of a 32-byte value. A
+**SPLIT IN TWO by SPEC_hashlock_kinds §7.2**, because the two moments know
+different things. Entry fires on row selection, before either typed arm and
+therefore *before a kind exists*; consent fires on a decided policy, where §6's
+both-or-neither rule says the kind must be named.
+
+**At entry** — kind-generic, naming no hash function. The shipped body asserted
+*SHA-256*, which was true of a one-kind world and false the moment a `hash256`
+or `ripemd160` wallet could be built:
+
+> The preimage must be a 32-byte value. A passphrase
+> must be hashed to 32 bytes first, then hashed again.
+> A hash of the passphrase itself can never be spent.
+
+**At consent** — names every kind the policy holds. It takes a *set*, not a
+single kind: a policy may carry two paths at two kinds, and naming one would
+print a false statement about the other on the screen the operator consents
+from.
+
+> The hash must be <kind> of a 32-byte value. A
 > passphrase must be hashed to 32 bytes first, then
 > hashed again. A hash of the passphrase itself can
 > never be spent.
+
+with `This wallet's hashes are <k1> and <k2>. Each must be of a 32-byte value.`
+replacing the first sentence where more than one kind is present.
 
 ### 8j. Shape edit after at least one slot was assigned
 
