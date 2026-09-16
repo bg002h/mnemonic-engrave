@@ -17462,7 +17462,7 @@ sed (a citation that resolves to the wrong line reads as `ok`, F-279).
 **Do them in one pass, with the output of the checker read line by line**, not
 counted. Owning phase: this cycle's follow-up sweep.
 
-### F-542 — SPEC_hashlock_kinds §7.4 claims a behaviour flip that does not happen
+### F-542 — CLOSED — SPEC_hashlock_kinds §7.4 claimed a behaviour flip that does not happen
 
 **Owning phase: this cycle's records.** Filed 2026-09-16 from the phase-4
 spec-coverage review, which correctly flagged §7.4's announced change as shipped
@@ -17487,7 +17487,13 @@ observable — verified by running it.
 **Why it is filed rather than silently corrected.** The spec is an artefact under
 review, and a false claim in it costs what a false claim in code costs: the next
 reader budgets a regression that cannot occur, and the *real* reason the mark is
-absent (N=0, not the hashlock clause) stays unrecorded. The clause and a
+absent (N=0, not the hashlock clause) stays unrecorded.
+
+**CLOSED 2026-09-16.** §7.4 now carries the correction inline: the retired
+sentence quoted, the measured table for both sides of the predicate, and why the
+clause still changes even though no regression was possible. The spec is the
+artefact a future reader opens, so the correction lives there rather than only
+here. The clause and a
 four-kind test are in place regardless — the outcome §7.4 wanted is pinned, just
 not by the mechanism it credited.
 

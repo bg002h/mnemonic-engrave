@@ -331,9 +331,28 @@ predicates" and cited one of them a line off. All re-key off **`Hashlock`** —
 "does this path have a hash of any kind" — rather than `len(Sha256Digests)`:
 
 - `gui/composer_consent.go:94` — the display loop that draws the digests.
-- `gui/composer_consent.go:97` — a `hash160`-locked sole unsorted path today prints
-  `UNSORTED (EXPERIMENTAL)` and after this change does not. **A regression if
-  left implicit; announced and tested here.**
+- `gui/composer_consent.go:97` — the `UNSORTED (EXPERIMENTAL)` mark's guard,
+  which re-keys from `Sha256Digests` to `Hashlocks` with it.
+
+  **CORRECTED 2026-09-16 (F-542): this said the flip was observable, and it is
+  not.** The sentence was *"a `hash160`-locked sole unsorted path today prints
+  `UNSORTED (EXPERIMENTAL)` and after this change does not — a regression if
+  left implicit."* Measured on both sides of the predicate:
+
+  | composed | decoded branch | consent row |
+  | --- | --- | --- |
+  | 2-of-3, unsorted, no hash | `N=3`, `hashlocks=0` | `Path 1: 2-of-3` + UNSORTED |
+  | 2-of-3, unsorted, hashed | **`N=0`**, `hashlocks=1` | `Path 1: 3 key(s), custom` |
+
+  A keyed **and** hashed path decodes with `N=0`, so the mark's own `b.N >= 2`
+  clause already excludes it under *either* predicate — it did not print
+  `UNSORTED` before the change. Mutating the hashlock clause to a sha256-only
+  count changes nothing observable, which is how this was found: the gate
+  written for the announced regression passed under its own named mutation.
+
+  The clause still changes, because it states the rule the mark means, and
+  `TestUnsortedMarkIgnoresNoHashlockKind` pins the outcome at all four kinds.
+  What is retired is the claim that a regression was possible here.
 - `gui/composer_consent.go:199` — a decoded `ripemd160` policy today is consented to
   **without** the 32-byte-preimage rule ever stated, and after this change states
   it. A fix.
