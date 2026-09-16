@@ -30,6 +30,18 @@
   "device": "ok",
   "rust": "agrees"
  },
+ "keyed_compose_preset_hashlock_gated_hash160": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_hashlock_gated_hash256": {
+  "device": "ok",
+  "rust": "agrees"
+ },
+ "keyed_compose_preset_hashlock_gated_ripemd160": {
+  "device": "ok",
+  "rust": "agrees"
+ },
  "keyed_compose_preset_kofn_recovery": {
   "device": "ok",
   "rust": "agrees"

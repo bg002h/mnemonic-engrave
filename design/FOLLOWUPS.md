@@ -17442,6 +17442,29 @@ re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
 
+**Re-measured 2026-09-16 at fork `ec11fab`, 30 commits after the original —
+still exactly two, still the same two.** `scripts/policy-generate.py --corpus`:
+
+```
+corpus: 70 vectors
+  expand           1
+  ok/agrees       45
+  ok/refused       2
+  source          22
+every vector matches the baseline
+```
+
+and the baseline names them: `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a`. So
+this is not decaying and not self-healing — 30 commits of hashlock-kinds work
+moved neither vector, which is the expected result (the divergence is about
+taproot key reuse, not hash kinds) and is now measured rather than assumed.
+
+The same run also showed the corpus had grown to 70 while the baseline held 67;
+the three additions were this cycle's `..._hash160` / `..._hash256` /
+`..._ripemd160` presets, all `ok/agrees`. Baselined in the same commit as this
+note, with the verdicts reconciled rather than invented: 42 agrees + 3 = 45,
+refused unchanged at 2, nothing MOVED and nothing GONE.
+
 ### F-537 — CLOSED — SPEC_hashlock_kinds carries 16 dangling bare-path citations
 
 Filed 2026-09-15 from the phase-1 R0 round 1 fold, which measured them and did
