@@ -17462,6 +17462,44 @@ sed (a citation that resolves to the wrong line reads as `ok`, F-279).
 **Do them in one pass, with the output of the checker read line by line**, not
 counted. Owning phase: this cycle's follow-up sweep.
 
+### F-539 — the phrase screen's hex guard is 64-only, and this cycle made 40 hex a digest
+
+**Owning phase: the phase-4 review (before the fork ships).** Filed 2026-09-15
+while wiring §7.1's kind screen.
+
+`ValidatePhrase` refuses a typed phrase that is **exactly 64 hex characters**
+with `ErrHex64` — *"that is a preimage in hex, not a phrase"* — because an
+operator holding a digest in hex would otherwise type it into the phrase screen,
+and the KDF would hash the **ASCII of the digest** rather than commit to the
+digest itself. The wallet is then locked to a preimage the operator does not
+know they have.
+
+**SPEC_hashlock_kinds makes 40 hex a digest too**, and the guard does not see it:
+
+    seedhammer  hashlock/hashlock.go:172   `len(phrase) == 64 && isHex(phrase)`
+    mnemonic-secret crates/ms-codec/src/hashlock.rs:357
+                                           `s.len() == 64 && s.bytes().all(is_ascii_hexdigit)`
+
+So an operator holding a 40-hex `ripemd160` or `hash160` digest can type it as a
+phrase and is not stopped. The failure is the *same shape* the 64 guard exists to
+prevent; only the width is new, and this cycle is what made that width real.
+
+**Not classed as blocking, deliberately.** The confirm screen draws the derived
+digest, so the path is not silent — the operator is shown a digest that is not
+the one in their hand. The 64 guard is a courtesy that catches the mistake one
+screen earlier, and the gap is that the courtesy did not follow the kinds. A
+journey walk should rule on whether that is worth a refusal, a warning, or
+nothing (§7.1's own test: a change is earned only if the wrong outcome is worse
+than telling the operator nothing).
+
+**RUST FIRST if it is fixed.** This is normative refusal behaviour with a Rust
+primary, so `ms-codec` changes first with a test vector, and the Go edit is the
+convergence port — not the other way round. Both sites are listed above so the
+check is a `grep`, not a hunt.
+
+**Reproduction:** type any 40 hex characters into `Hashlock phrase`. Accepted
+today at every kind; `ValidatePhrase` returns nil.
+
 ### F-538 — no in-tree gate closes SPEC §12 item 1's Core-measured addresses
 
 Filed 2026-09-15 from the phase-1 R0 round 1 review, which tried to close it and
