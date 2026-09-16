@@ -18503,41 +18503,208 @@ Coverage gap to weigh when reading them: both agents shared one Playwright
 browser, so the second lost its device tab twice. Whether the device reproduces
 F-600 at Done is unwalked.
 
-| # | sev | status | what |
-|---|---|---|---|
-| F-578 | Critical | **CLOSED** | `me bundle`'s hashlock completeness note is dead for every taproot wallet |
-| F-579 | Important | open | `ms encode` and `ms split` panic on a valid English mnemonic; the fixture's own tier-3 seed is one |
-| F-580 | Critical | open | `me bundle`'s "backup needs N plates" is not a set the device will accept |
-| F-581 | Important | open | the argv-secret guard prescribes a remedy that does not work for the verb and secret it just named |
-| F-582 | Important | open | `md verify` MISMATCHes a correct plate set, and the obvious fix produces the unseatable one |
-| F-583 | Important | open | the Engrave Bundle capture screen gives no per-chunk progress; four of five NFC taps change nothing |
-| F-584 | Important | open | the device says a secret is in flash for a payload the host says holds none |
-| F-585 | Important | open | the emulator cannot load an operator-built payload |
-| F-586 | Important | open | `me bundle` refuses a preimage plate as "secret seed entropy" and points at CODEX32 seed entry |
-| F-587 | Important | open | `mk 0.13.0` cannot bind a key card to this wallet's md1 |
-| F-588 | Minor | open | the `me-preview` sidecar goes stale on every `me` upgrade and `cargo install` does not fix it |
-| F-589 | Minor | open | `ms encode --out FILE` warns about stdout when stdout is empty, and the secret goes to stderr |
-| F-590 | Nit | open | record indices disagree between `me sysw pack`'s refusal and `me sysw show` |
-| F-591 | Nit | open | device copy: "Scan a card" on a device with no camera; "4 unrecognised record" |
-| F-592 | Nit | open | `md verify`'s conflict error prints a usage line containing the conflict |
-| F-593 | Nit | open | two policy files for one fixture differ only in the account index, and the README's numbers match neither journey |
-| F-594 | Minor | open | `md bytecode` refuses an md1 that `md encode` just produced |
-| F-595 | Minor | open | `md address` cannot consume `md decode`'s own output |
-| F-596 | Nit | open | preview text block left margin is inconsistent across wrapped lines |
-| F-597 | Nit | open | sibling CLIs spell the same concept differently |
-| F-598 | Critical | **CLOSED** | `me sysw show` lists no record at all for a plaintext seed, a passphrase or free text; a container holding only a seed prints as empty |
-| F-599 | Important | open | `md encode --experimental` asserts the descriptor has a key-less spend path even when it provably has none |
-| F-600 | Important | open | `md compose` emits, at exit 0, a template that every downstream `md` verb refuses as malleable, whenever two key-less hash paths are adjacent |
-| F-601 | Important | open | `md descriptor` re-serialises supplied xpubs at depth 0 and silently drops the origin when no `--fingerprint` is given; `md decompose` then refuses `md`'s own output and prescribes a fix that would break the wallet |
-| F-602 | Important | open | `me bundle` states a total plate count that omits every cosigner card a key-less policy needs |
-| F-603 | Minor | open | `md compose --json` numbers paths 1-based in `experimental[]` and 0-based in `slots[].path`, so one object contradicts itself |
-| F-604 | Minor | open | `mk encode --from-md1` cannot consume a chunked md1 set, and reports it as a wire-format version mismatch |
-| F-605 | Minor | open | `me sysw pack` prints the full success card, including the container digest, before the write that fails |
-| F-606 | Minor | open | `md verify`'s MISMATCH message cites two identical numbers as its evidence |
-| F-607 | Nit | open | `md compose` accepts two byte-identical hash paths and emits a doubled branch |
-| F-608 | Nit | open | `me bundle` renumbers plates in an order unrelated to the input |
-| F-609 | Nit | open | `me sysw show` prints records out of numerical order when classes mix |
-| F-610 | Minor | open | the bearer-access warning is minted-side only; `md decode` of the same card is silent |
+*(These were first filed as a table on 2026-09-16 and converted to entries the
+same day: the status gate reads `### F-NNN` headings, so a table was invisible
+to it — a second format defeats the single reader it exists to be.)*
+
+### F-578 — `me bundle`'s hashlock completeness note is dead for every taproot wallet
+
+**Status:** CLOSED 2026-09-16 — me `9a3b69ce`
+
+**Critical.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-579 — `ms encode` and `ms split` panic on a valid English mnemonic; the fixture's own tier-3 seed is one
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-580 — `me bundle`'s "backup needs N plates" is not a set the device will accept
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Critical.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-581 — the argv-secret guard prescribes a remedy that does not work for the verb and secret it just named
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-582 — `md verify` MISMATCHes a correct plate set, and the obvious fix produces the unseatable one
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-583 — the Engrave Bundle capture screen gives no per-chunk progress; four of five NFC taps change nothing
+
+**Status:** OPEN — owning phase: the next device phase (needs the emulator or hardware)
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-584 — the device says a secret is in flash for a payload the host says holds none
+
+**Status:** OPEN — owning phase: the next device phase (needs the emulator or hardware)
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-585 — the emulator cannot load an operator-built payload
+
+**Status:** OPEN — owning phase: the next device phase (needs the emulator or hardware)
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-586 — `me bundle` refuses a preimage plate as "secret seed entropy" and points at CODEX32 seed entry
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-587 — `mk 0.13.0` cannot bind a key card to this wallet's md1
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-588 — the `me-preview` sidecar goes stale on every `me` upgrade and `cargo install` does not fix it
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-589 — `ms encode --out FILE` warns about stdout when stdout is empty, and the secret goes to stderr
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-590 — record indices disagree between `me sysw pack`'s refusal and `me sysw show`
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-591 — device copy: "Scan a card" on a device with no camera; "4 unrecognised record"
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-592 — `md verify`'s conflict error prints a usage line containing the conflict
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-593 — two policy files for one fixture differ only in the account index, and the README's numbers match neither journey
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-594 — `md bytecode` refuses an md1 that `md encode` just produced
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-595 — `md address` cannot consume `md decode`'s own output
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-596 — preview text block left margin is inconsistent across wrapped lines
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-597 — sibling CLIs spell the same concept differently
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
+
+### F-598 — `me sysw show` lists no record at all for a plaintext seed, a passphrase or free text; a container holding only a seed prints as empty
+
+**Status:** CLOSED 2026-09-16 — me `87c1bdff`
+
+**Critical.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-599 — `md encode --experimental` asserts the descriptor has a key-less spend path even when it provably has none
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-600 — `md compose` emits, at exit 0, a template that every downstream `md` verb refuses as malleable, whenever two key-less hash paths are adjacent
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-601 — `md descriptor` re-serialises supplied xpubs at depth 0 and silently drops the origin when no `--fingerprint` is given; `md decompose` then refuses `md`'s own output and prescribes a fix that would break the wallet
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-602 — `me bundle` states a total plate count that omits every cosigner card a key-less policy needs
+
+**Status:** OPEN — owning phase: this cycle's follow-up sweep
+
+**Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-603 — `md compose --json` numbers paths 1-based in `experimental[]` and 0-based in `slots[].path`, so one object contradicts itself
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-604 — `mk encode --from-md1` cannot consume a chunked md1 set, and reports it as a wire-format version mismatch
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-605 — `me sysw pack` prints the full success card, including the container digest, before the write that fails
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-606 — `md verify`'s MISMATCH message cites two identical numbers as its evidence
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-607 — `md compose` accepts two byte-identical hash paths and emits a doubled branch
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-608 — `me bundle` renumbers plates in an order unrelated to the input
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-609 — `me sysw show` prints records out of numerical order when classes mix
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
+### F-610 — the bearer-access warning is minted-side only; `md decode` of the same card is silent
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
+
 
 **Closed so far:**
 
