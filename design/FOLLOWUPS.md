@@ -18559,7 +18559,9 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-590 — record indices disagree between `me sysw pack`'s refusal and `me sysw show`
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue) NOT re-verified 2026-09-16 during the staleness sweep: reproducing needs an 11-record payload, and the entry is a documentation-only Nit. F-609 changed `show`'s ordering but not its indices, so this is probably still live.
+**Status:** CLOSED 2026-09-16 at `b24072d5`. REPRODUCED first (12 records: 10 `text:`, a `hash:` to trigger the auto-`now:`, a `phrase:`) — pack said record 11, show said record 12. Both were right about their own list: pack indexes the INPUT, show indexes the CONTAINER, and the container's auto-appended `now:` sits at the end of the public section, ahead of any secret record. Not an off-by-one; 12 pack-side messages now say `record N, as given (records count from 0)`.
+
+NOT a documentation-only Nit after all, which is why reproducing before writing mattered: a first draft used `record N (as given; records count from 0)` and turned `descriptor_seam.rs`'s outcome classifier red — it matches the literal `(records count from 0)`, which that phrasing splits, so five refusal rows reclassified as `unclassified`. The shipped form is the one three of `me`'s own messages already used. Mutation: strip the qualifier from all 15 sites → the new test fails and the seam gate stays green.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18667,7 +18669,9 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-608 — `me bundle` renumbers plates in an order unrelated to the input
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue) NOT re-verified 2026-09-16: reproducing needs a multi-mk1 bundle. F-580 changed the plate COUNT wording, not the ordering, so this is probably still live.
+**Status:** CLOSED 2026-09-16 at `789a752f`. REPRODUCED with three cosigner cards fed in the operator's own order (sets 0x38ea8, 0xf10a9, 0x5ac6c); `me bundle` returned 0x38ea8, 0x5ac6c, 0xf10a9, so card 2's plates carried card 3's numbers. Cause: sets were grouped in a `BTreeMap<u32, _>` keyed by chunk_set_id and then iterated, making the emission order ascending set id — a content hash unrelated to anything typed. All three cards shared an origin path and carried no fingerprint, so the checklist line did not disambiguate them either.
+
+Fixed by recording first-appearance order in a `*_order` vec and driving the loop from it; the map still groups. Section order (policy plates, then key cards) is unchanged. Test feeds both orders and asserts reversing the input reverses the output — one order alone is satisfiable by luck with two sets. Mutation: `mk1_order.sort()` reproduces the old ordering exactly and the test fails.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
