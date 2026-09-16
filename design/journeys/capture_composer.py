@@ -248,6 +248,17 @@ def main():
     ap.add_argument("--shot-port", type=int, default=8744)
     ap.add_argument("--emu", default=None, help="the fork's cmd/emu (default: the sibling checkout)")
     ap.add_argument("--no-build", action="store_true")
+    # F-545: the walk could not be run at all without a host-derived expectation
+    # set, so it went stale silently -- it carried two assertions this cycle had
+    # retired and nobody noticed until a review READ the file. These two flags
+    # make the set a committed artifact and keep it honest.
+    ap.add_argument("--emit-expect", metavar="PATH", default=None,
+                    help="write the host-derived expectation set to PATH as JSON "
+                         "and exit, so the walk is runnable from a clean checkout")
+    ap.add_argument("--check-expect", metavar="PATH", default=None,
+                    help="regenerate the expectation set and DIFF it against PATH, "
+                         "exiting non-zero on drift; run this after re-deriving the "
+                         "host artifacts")
     a = ap.parse_args()
 
     global EMU
@@ -255,6 +266,34 @@ def main():
         EMU = os.path.abspath(a.emu)
     if not os.path.isdir(EMU):
         sys.exit(f"no emulator at {EMU}\nPass --emu <fork>/cmd/emu or set EMU=.")
+
+    # F-545: both modes read ONLY the host artifacts, so neither builds the
+    # wasm, starts a browser, or needs a device. That is the point -- the
+    # fixture has to be cheap to regenerate or it will not be regenerated.
+    if a.emit_expect or a.check_expect:
+        built = {"keyed": read_keyed(), "keyless": read_keyless()}
+        blob = json.dumps(built, indent=2, sort_keys=True) + "\n"
+        target = a.emit_expect or a.check_expect
+        if a.emit_expect:
+            with open(target, "w") as fh:
+                fh.write(blob)
+            print(f"wrote {target} ({len(blob)} bytes)")
+            return 0
+        try:
+            with open(target) as fh:
+                have = fh.read()
+        except OSError as exc:
+            sys.exit(f"no committed expectation set at {target} ({exc}). "
+                     f"Create it with --emit-expect {target}.")
+        if have == blob:
+            print(f"ok: {target} matches what the host derives")
+            return 0
+        import difflib
+        d = "".join(difflib.unified_diff(have.splitlines(True), blob.splitlines(True),
+                                         "committed", "host-derived"))
+        sys.exit(f"the committed expectation set has DRIFTED from the host:\n{d}\n"
+                 f"This is the silent-staleness F-545 exists to end. Re-derive with "
+                 f"--emit-expect {target} and read the diff before committing it.")
 
     if a.prove_it_can_fail and a.arm != "keyed":
         sys.exit("--prove-it-can-fail corrupts an ADDRESS, which only the keyed arm has; "

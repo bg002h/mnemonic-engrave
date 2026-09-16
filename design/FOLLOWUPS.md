@@ -17963,7 +17963,7 @@ cannot cut one at all."*
 
 ### F-544 — §13.5's second CLI gap was never filed: the composer emits no restore document
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-16 — fork `5971ad3`. The composer now ends with the restore document `multisigRestoreDocFlow` already renders; unseated runs get one too, carrying the inventory. The status line is `verifyStatusNotFullyCheckedLine`, reused — the composer has no verify step and an empty status reads as a pass.
 **Owning phase: post-cycle CLI work.** Filed 2026-09-16, same source and same
 reason as [[F-543]] — see it for why an unfiled follow-up is itself a finding.
 
@@ -17972,7 +17972,7 @@ times in `gui/composer*.go`), which widens F-132's open half."*
 
 ### F-545 — the shots walk cannot be run without a host-derived expectation set
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-16 — fork `b77cb51` + engrave (`capture_composer.py --emit-expect/--check-expect`). `cmd/emu/expect_composer.json` is committed beside the walk and is its default, so `run({shotURL})` is the whole invocation. Two gates: a SHAPE gate deriving the field list from the walk's own source, and `--check-expect` for the VALUES.
 **Owning phase: post-cycle tooling.** Filed 2026-09-16 after running it.
 
 `cmd/emu/shots_composer.js` takes nine `expect.*` fields — `digest`,
@@ -18214,7 +18214,7 @@ Owning phase: **this cycle's follow-up sweep.**
 
 ### F-535 — the `phrase:` record carries the METHOD axis and not the KIND axis
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-16 — fork `fe51862`. The device filled the missing kind axis with `hashlockLockOf(md.KindSha256, &x)` at FOUR sites; the payload's own `hash:` records now say which kind the material is for, via one helper. No wire change: a preimage is kind-agnostic, which is why the record needs no field. Closes [[F-573]]'s first bullet with the same helper.
 Filed 2026-09-15 from the phase-2 journey walk (I-4), whose card half was fixed
 in phase 2 and whose record half is not phase 2's to fix.
 
@@ -18332,7 +18332,7 @@ number in the device report does not go looking for the entry.
 
 ### F-573 — the payload's own material is a dead end for three of the four kinds
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-16 — fork `fe51862`, first bullet, with [[F-535]]'s helper. The two material-bearing bands no longer assign sha256 to a hash256/ripemd160/hash160 payload. The row-annotation half of the entry stands as written.
 **Minor. Owning phase: post-release UX.** Classification: **documentation only**
 (or a row annotation), on the reporter's own reading.
 
