@@ -305,10 +305,21 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         .collect::<Result<_, _>>()?;
 
     // Partition: unchunked md1 (each its own bch-only plate), chunked md1 groups,
-    // mk1 groups — keyed by chunk_set_id. BTreeMap keeps a deterministic order.
+    // mk1 groups — keyed by chunk_set_id.
+    //
+    // F-608: the map keeps the grouping; `*_order` keeps the ORDER, which is
+    // first appearance in the input. Iterating the BTreeMap instead sorted sets
+    // by chunk_set_id — a hash-derived number with no relation to anything the
+    // operator typed — so an operator who fed three cosigner cards in the order
+    // they hold them got plates back in a third order, with nothing on the page
+    // saying so. Measured: input sets 0x38ea8, 0xf10a9, 0x5ac6c came back
+    // 0x38ea8, 0x5ac6c, 0xf10a9. Input order is the only ordering the operator
+    // can check a stack of plates against without decoding them.
     let mut md1_singles: Vec<String> = Vec::new();
     let mut md1_groups: BTreeMap<u32, Vec<(u8, String)>> = BTreeMap::new();
     let mut mk1_groups: BTreeMap<u32, Vec<(u8, String)>> = BTreeMap::new();
+    let mut md1_order: Vec<u32> = Vec::new();
+    let mut mk1_order: Vec<u32> = Vec::new();
     for p in parsed {
         match p {
             Parsed::Md1Single { s } => md1_singles.push(s),
@@ -318,6 +329,9 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
                 index,
                 ..
             } => {
+                if !md1_groups.contains_key(&chunk_set_id) {
+                    md1_order.push(chunk_set_id);
+                }
                 md1_groups.entry(chunk_set_id).or_default().push((index, s));
             }
             Parsed::Mk1Chunk {
@@ -326,6 +340,9 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
                 index,
                 ..
             } => {
+                if !mk1_groups.contains_key(&chunk_set_id) {
+                    mk1_order.push(chunk_set_id);
+                }
                 mk1_groups.entry(chunk_set_id).or_default().push((index, s));
             }
         }
@@ -371,7 +388,10 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     }
 
     // 2) Chunked md1 sets.
-    for (id, mut chunks) in md1_groups {
+    for id in md1_order {
+        let mut chunks = md1_groups
+            .remove(&id)
+            .expect("md1_order only holds ids inserted into md1_groups");
         chunks.sort_by_key(|(i, _)| *i);
         let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
         let d = md_codec::chunk::reassemble(&refs)
@@ -407,14 +427,18 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     }
 
     // 3) mk1 key-card sets.
-    for (id, mut chunks) in mk1_groups {
+    for id in mk1_order {
+        let mut chunks = mk1_groups
+            .remove(&id)
+            .expect("mk1_order only holds ids inserted into mk1_groups");
         chunks.sort_by_key(|(i, _)| *i);
         let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
         // The decoded card used to be DISCARDED here — decoded purely to prove
         // set integrity, then dropped. Its origin is what lets the engrave
         // checklist say WHOSE key a plate carries, which an operator cutting 34
-        // plates otherwise cannot tell: `me bundle` emits plates in
-        // chunk_set_id order, so position carries no information either.
+        // plates otherwise cannot tell. Since F-608 the plate ORDER is the input
+        // order too, but the origin line stays load-bearing: two cards can share
+        // a path, and the operator's input list is not on the plate.
         let card = mk_codec::decode(&refs)
             .map_err(|e| BundleError::SetIncompleteMk(fmt_chunk_set_id(id), e))?;
 

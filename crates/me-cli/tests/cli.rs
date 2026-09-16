@@ -1303,3 +1303,64 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
         );
     }
 }
+
+/// F-608: `me bundle` numbered plates in an order unrelated to the input.
+///
+/// MECHANISM: sets were grouped into a `BTreeMap<u32, _>` keyed by
+/// chunk_set_id and then iterated, so the emission order was ASCENDING SET ID —
+/// a content-derived hash with no relation to anything the operator typed.
+/// Measured on three cosigner cards fed in the order the operator holds them
+/// (sets 0x38ea8, 0xf10a9, 0x5ac6c), `me bundle` returned 0x38ea8, 0x5ac6c,
+/// 0xf10a9: card 2's plates carried card 3's numbers.
+///
+/// WHY THIS TEST FEEDS BOTH ORDERS. Asserting one order against a fixture pair
+/// proves nothing on its own — with two sets, one input order agrees with
+/// ascending id by luck, and a test that picked that one would pass against the
+/// unfixed code. Asserting that REVERSING the input reverses the output cannot
+/// be satisfied by any fixed ordering of the ids at all.
+///
+/// MUTATION (verified, not assumed): restore `for (id, mut chunks) in
+/// mk1_groups` in `bundle.rs` and the second half fails — 0x12345 sorts below
+/// 0x83bb2, so the clean-first input comes back legacy-first.
+#[test]
+fn bundle_emits_sets_in_input_order_not_set_id_order() {
+    let order_of = |stdin: String| -> Vec<String> {
+        let out = Command::cargo_bin("me")
+            .unwrap()
+            .arg("bundle")
+            .write_stdin(stdin)
+            .assert()
+            .success();
+        let v: serde_json::Value =
+            serde_json::from_slice(&out.get_output().stdout).expect("bundle emits JSON");
+        v["sets"]
+            .as_array()
+            .expect("a sets array")
+            .iter()
+            .map(|s| s["chunk_set_id"].as_str().unwrap().to_string())
+            .collect()
+    };
+
+    let legacy_first = order_of(format!(
+        "{MD1_VALID}\n{MK1_A}\n{MK1_B}\n{MK1_CLEAN_A}\n{MK1_CLEAN_B}\n"
+    ));
+    let clean_first = order_of(format!(
+        "{MD1_VALID}\n{MK1_CLEAN_A}\n{MK1_CLEAN_B}\n{MK1_A}\n{MK1_B}\n"
+    ));
+
+    // Both sets present both times, so the difference is ordering alone.
+    assert_eq!(legacy_first.len(), 2, "got {legacy_first:?}");
+    assert_eq!(clean_first.len(), 2, "got {clean_first:?}");
+
+    assert_eq!(
+        legacy_first,
+        vec!["0x12345".to_string(), "0x83bb2".to_string()],
+        "sets should come back in the order they were fed"
+    );
+    assert_eq!(
+        clean_first,
+        vec!["0x83bb2".to_string(), "0x12345".to_string()],
+        "reversing the input must reverse the output; getting the same order \
+         back means the emission order is still id-sorted (F-608)"
+    );
+}
