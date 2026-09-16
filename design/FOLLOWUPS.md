@@ -17571,6 +17571,33 @@ together or not at all:
 the point of the whole change: a `phrase:` record carrying a digest-shaped
 phrase must warn where it is USED, since nobody can confirm at the wire.
 
+
+**Measured 2026-09-16 — the prediction above is confirmed, and the blast radius
+is one test.** The pin (`9dcd2e0`) is **10 commits** behind `origin/master` and
+predates both `61904c5` (the digest-shaped corpus) and `65e200f` (`--emit-record`
+learns the record carries the METHOD axis, not the KIND axis).
+
+Bumping the rev to `549f77d` and running the full suite at the CI toolchain
+(`cargo +1.85.0 nextest run --locked`) gives **621 passed, 1 failed** — and the
+one failure is exactly item 1 above:
+
+```
+every_case_classifies_as_its_row_says_and_refuses_with_its_line
+phrase-64-hex:  left: "Phrase"  right: "Unknown"
+```
+
+`clippy -D warnings` and `fmt --check` stay clean across the bump. The mechanism
+is `classify` → `ms_codec::hashlock::validate_phrase`
+(`crates/me-cli/src/sysw/composer_records.rs:431`), which F-539 turned from a
+refusal into an advisory.
+
+So nothing here is exploratory any more: the change is the three listed steps,
+the cost is one row plus a regenerated fixture sha in two repos, and no other
+behaviour moves. **Not folded now** because it is normative admission behaviour
+binding a second repo through `FIXTURE_SHA256`, and because two journey agents
+were probing this exact surface when it was measured — changing it under them
+would have made their reports unreproducible.
+
 ### F-540 — two spellings of the method, two screens apart, on the colliding axis
 
 **Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
