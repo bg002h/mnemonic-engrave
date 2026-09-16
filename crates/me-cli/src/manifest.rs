@@ -82,6 +82,12 @@ pub struct Manifest {
     /// apply.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hashlock_kinds: Vec<&'static str>,
+    /// Key slots the policy declares (`Descriptor.n`), 0 when unknown (F-580).
+    ///
+    /// The seed-side number this tool CAN know. It cannot know how many of
+    /// those seeds the operator holds, so it must not state a plate total that
+    /// silently assumes one.
+    pub key_slots: usize,
     pub ms1_required: bool,
     pub sets: Vec<SetEntry>,
     pub plates: Vec<PlateEntry>,
@@ -95,11 +101,30 @@ pub fn fmt_chunk_set_id(id: u32) -> String {
 impl Manifest {
     /// A human-readable, one-line-per-plate checklist for stderr.
     pub fn checklist(&self) -> String {
+        // F-580: this said "backup needs {N} plates ({N-1} public + ms1 on
+        // device)", where the ms1 half was a HARDCODED ONE regardless of the
+        // policy. Measured: 1-, 3-, 5- and 7-cosigner policies all printed
+        // "backup needs 2 plates". An operator who gathers exactly that many
+        // for a 7-seed wallet is six seed backups short, and reads a count
+        // presented as the requirement AS the requirement.
+        //
+        // `me bundle` cannot know how many of a policy's seeds are the
+        // operator's -- a 2-of-3 where they hold one needs one ms1, a 7-of-7
+        // they hold alone needs seven. So it no longer states a total that
+        // folds them in. It states what it knows, and names what it does not.
+        let public = self.wallet_plates.saturating_sub(1);
         let mut out = format!(
-            "me: backup needs {} plates ({} public + ms1 on device):\n",
-            self.wallet_plates,
-            self.wallet_plates.saturating_sub(1)
+            "me: backup needs {public} public plate{}, plus one ms1 plate per seed you hold:\n",
+            if public == 1 { "" } else { "s" }
         );
+        if self.key_slots > 1 {
+            out.push_str(&format!(
+                "me: NOTE — this policy declares {} key slots. `me bundle` cannot know how many \
+                 of those seeds are yours, so ms1 plates are NOT counted above: hold all {} and \
+                 you need {} of them.\n",
+                self.key_slots, self.key_slots, self.key_slots
+            ));
+        }
         // F-557: the count above is complete about the POLICY and silent about
         // the WALLET. A hashlock path needs its preimage -- a phrase written
         // down, or a preimage plate cut by `ms hashlock`/the device -- and that
@@ -181,10 +206,21 @@ impl Manifest {
                 }
                 _ => "push via NFC & engrave".to_string(),
             };
-            out.push_str(&format!(
-                "  plate {}/{}  {label}  → {action}\n",
-                p.plate, p.of
-            ));
+            // F-580, second half: the ms1 entry is a REMINDER, not a plate in
+            // this bundle, and numbering it "2/2" told a seven-seed operator
+            // that one more plate completed the set. Public plates keep their
+            // x/y -- that set really is closed and countable -- and the ms1
+            // line carries no numbering at all.
+            match p.kind {
+                PlateKind::Ms1 => {
+                    out.push_str(&format!("  (per seed)  {label}  → {action}\n"));
+                }
+                _ => out.push_str(&format!(
+                    "  plate {}/{}  {label}  → {action}\n",
+                    p.plate,
+                    self.wallet_plates.saturating_sub(1)
+                )),
+            }
         }
         out
     }
@@ -267,6 +303,7 @@ mod tests {
             version: "x.y.z",
             hashlock_kinds: Vec::new(),
             wallet_plates: 3,
+            key_slots: 3,
             ms1_required: true,
             sets: vec![SetEntry {
                 kind: Kind::Mk1,
@@ -314,10 +351,20 @@ mod tests {
             ],
         };
         let c = m.checklist();
-        assert!(c.contains("3 plates"), "{c}");
-        assert!(c.contains("plate 1/3"), "{c}");
+        // F-580 moved these numbers, and the movement IS the fix. The three
+        // plate entries are two public plates plus one ms1 reminder; the old
+        // assertions read "3 plates" and "plate 3/3", which is precisely the
+        // claim that told a seven-seed operator one more plate closed the set.
+        // The test's purpose is unchanged: public plates are listed and
+        // numbered, and the ms1 reminder is present and unmistakable.
+        assert!(c.contains("2 public plates"), "{c}");
+        assert!(c.contains("plate 1/2"), "{c}");
         assert!(c.contains("mk1 [aabbccdd/48'/0'/0'/2'] chunk 1/2"), "{c}");
-        assert!(c.contains("plate 3/3"), "{c}");
+        assert!(c.contains("(per seed)  ms1 secret"), "{c}");
+        assert!(
+            !c.contains("plate 3/3"),
+            "the ms1 reminder is numbered again:\n{c}"
+        );
         assert!(c.contains("TYPE ON DEVICE"), "{c}");
         assert!(c.contains("CODEX32"), "{c}");
     }
@@ -340,6 +387,7 @@ mod tests {
             version: "x.y.z",
             hashlock_kinds: vec!["ripemd160"],
             wallet_plates: 3,
+            key_slots: 3,
             ms1_required: true,
             sets: Vec::new(),
             plates: Vec::new(),

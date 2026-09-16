@@ -298,6 +298,11 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     }
 
     let mut hashlock_kinds: Vec<&'static str> = Vec::new();
+    // F-580: the number of KEY SLOTS the policy declares. This is the only
+    // seed-side number `me bundle` can honestly know -- it cannot know how many
+    // of those seeds are the operator's, which is exactly why the old checklist
+    // was wrong to state a total that folded in a single hardcoded ms1 plate.
+    let mut key_slots: usize = 0;
     let mut sets: Vec<SetEntry> = Vec::new();
     let mut plates: Vec<PlateEntry> = Vec::new();
 
@@ -308,6 +313,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         // chunked shape would be a completeness claim with a hole in it.
         if let Ok(d) = md_codec::decode::decode_md1_string(s) {
             hashlock_kinds.extend(descriptor_hash_kinds(&d));
+            key_slots = key_slots.max(d.n as usize);
         }
         plates.push(PlateEntry {
             plate: 0,
@@ -334,6 +340,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         // the one that opens the hashed path. The reassemble above already
         // hands us the tree, so noticing costs nothing.
         hashlock_kinds.extend(descriptor_hash_kinds(&d));
+        key_slots = key_slots.max(d.n as usize);
         let total = chunks.len() as u8;
         sets.push(SetEntry {
             kind: Kind::Md1,
@@ -445,6 +452,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             hashlock_kinds
         },
         wallet_plates: total_plates,
+        key_slots,
         ms1_required: true,
         sets,
         plates,
@@ -662,6 +670,70 @@ mod tests {
             run_bundle(&input),
             Err(BundleError::SetIncompleteMk(..))
         ));
+    }
+
+    /// F-580 (Critical): the checklist said `backup needs N plates (N-1
+    /// public, ms1 on device)`, and the ms1 half was a HARDCODED ONE. Measured on
+    /// the real binary before the fix: 1-, 3-, 5- and 7-cosigner policies ALL
+    /// printed "backup needs 2 plates". An operator backing up a seven-seed
+    /// wallet reads a count presented as the requirement and is six seed
+    /// backups short, discovering it at the device with steel already cut.
+    ///
+    /// `me bundle` cannot know how many of a policy's seeds are the operator's,
+    /// so the fix is not a better number -- it is to stop stating a total that
+    /// folds in a number it cannot know, and to name what it does know
+    /// (`Descriptor.n`, the declared key slots).
+    ///
+    /// MUTATION: restore the "{N} plates ({N-1} public + ms1 on device)" line
+    /// -> the first two assertions fail. MUTATION: drop `key_slots` from the
+    /// manifest (leave it 0) -> the seven-slot assertion fails. MUTATION:
+    /// number the ms1 line "x/y" again -> the last assertion fails.
+    #[test]
+    fn the_checklist_never_states_a_seed_count_it_cannot_know() {
+        let one_key = "md1yq802gggqpsg5rh7m5mygtq5w9";
+        let seven_key = "md1yx802gggqpsgvzvpfewnjf3lqcza99pc";
+
+        let m1 = run_bundle(one_key).expect("1-key policy should bundle");
+        let m7 = run_bundle(seven_key).expect("7-key policy should bundle");
+
+        // The number the tool CAN know, and the one whose absence made every
+        // policy look identical.
+        assert_eq!(m1.key_slots, 1, "one key slot");
+        assert_eq!(m7.key_slots, 7, "seven key slots");
+
+        let c1 = m1.checklist();
+        let c7 = m7.checklist();
+
+        // No total that silently assumes exactly one seed.
+        for (n, c) in [(1, &c1), (7, &c7)] {
+            assert!(
+                !c.contains("ms1 on device):"),
+                "{n}-key checklist still states a total folding in one ms1:\n{c}"
+            );
+            assert!(
+                c.contains("per seed you hold"),
+                "{n}-key checklist does not say the ms1 count is per seed:\n{c}"
+            );
+        }
+
+        // A multi-slot policy names the count; a single-slot one has nothing
+        // to warn about, which is what keeps the note from becoming noise.
+        assert!(
+            c7.contains("declares 7 key slots"),
+            "the 7-key checklist does not name its slot count:\n{c7}"
+        );
+        assert!(
+            !c1.contains("key slots"),
+            "a single-key policy should not carry the multi-seed note:\n{c1}"
+        );
+
+        // The ms1 line is a reminder, not a numbered plate in this bundle:
+        // "plate 2/2" told a seven-seed operator that one more plate closed
+        // the set.
+        assert!(
+            c7.contains("(per seed)  ms1 secret"),
+            "the ms1 reminder is still numbered like a plate:\n{c7}"
+        );
     }
 
     /// F-578: `descriptor_hash_kinds` had NO test at all. The only thing that
