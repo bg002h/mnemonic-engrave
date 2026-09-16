@@ -1894,23 +1894,19 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     return EXIT_INVALID;
                 }
             };
-            // The digest is computed on the CONTAINER, before any padding. It
-            // must be: `identity` bounds itself by the header's declared total,
-            // so a padded region yields the same number, and the operator has to
-            // see the same value whichever form they wrote.
-            print_digest(&blob);
-            // G-P3.16 / SPEC §3.2. The DEVICE tells the operator to compare
-            // this number against `me sysw show <file>`, so `pack` names the
-            // same command rather than leaving them to find it. Pointing back
-            // at `pack` would be pointing at the WRITE path: re-running it
-            // needs every record again and, on the sealed path, mints a fresh
-            // passphrase. The operator standing at the machine has the file.
-            match out.as_ref() {
-                Some(p) => eprintln!("          re-print it with: me sysw show {}", p.display()),
-                None => {
-                    eprintln!("          re-print it with: me sysw show <the file you just wrote>")
-                }
-            }
+            // F-605: THE CARD IS PRINTED AFTER THE WRITE, NOT BEFORE.
+            //
+            // It used to print here, and a failing write then left the operator
+            // holding a digest and the sentence "re-print it with: me sysw show
+            // <path>" for a file that does not exist. Measured:
+            // `--out /dev/null` printed the full card and then
+            // "Operation not permitted", exit 2.
+            //
+            // The digest itself is still computed on the CONTAINER before any
+            // padding -- `identity` bounds itself by the header's declared
+            // total, so a padded region yields the same number and the operator
+            // sees the same value whichever form they wrote. Only the PRINTING
+            // moved.
             if *region {
                 let n = sysw::wire::REGION_LEN;
                 if blob.len() > n {
@@ -1930,19 +1926,27 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     blob.len(),
                     sysw::wire::REGION_ADDR
                 );
-                return emit(
+                let code = emit(
                     &img,
                     out.as_ref(),
                     PayloadKind::Bearer,
                     *allow_world_readable,
                 );
+                if code == EXIT_OK {
+                    print_pack_card(&blob, out.as_ref());
+                }
+                return code;
             }
-            emit(
+            let code = emit(
                 &blob,
                 out.as_ref(),
                 PayloadKind::Bearer,
                 *allow_world_readable,
-            )
+            );
+            if code == EXIT_OK {
+                print_pack_card(&blob, out.as_ref());
+            }
+            code
         }
 
         SyswCmd::Wipe { out, fill } => {
@@ -2035,6 +2039,28 @@ fn hex(b: &[u8]) -> String {
         let _ = write!(acc, "{x:02x}");
         acc
     })
+}
+
+/// `pack`'s success card: the container digest and how to re-print it (F-605).
+///
+/// CALLED ONLY AFTER A SUCCESSFUL WRITE. It used to print before `emit`, so a
+/// failing write left the operator holding a digest and a `me sysw show <path>`
+/// instruction for a file that does not exist -- a claim about an artifact that
+/// was never created. Measured on `--out /dev/null`: the full card, then
+/// "Operation not permitted", exit 2.
+///
+/// G-P3.16 / SPEC §3.2: the DEVICE tells the operator to compare this number
+/// against `me sysw show <file>`, so `pack` names the same command rather than
+/// leaving them to find it. Pointing back at `pack` would be pointing at the
+/// WRITE path -- re-running it needs every record again and, on the sealed
+/// path, mints a fresh passphrase. The operator standing at the machine has the
+/// file.
+fn print_pack_card(blob: &[u8], out: Option<&std::path::PathBuf>) {
+    print_digest(blob);
+    match out {
+        Some(p) => eprintln!("          re-print it with: me sysw show {}", p.display()),
+        None => eprintln!("          re-print it with: me sysw show <the file you just wrote>"),
+    }
 }
 
 /// The digest goes to STDERR, so `me sysw pack > f.bin` still shows the operator

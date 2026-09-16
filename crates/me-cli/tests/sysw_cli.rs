@@ -2790,3 +2790,59 @@ fn an_unsigned_tx_record_gets_exactly_one_line() {
         "show describes the record in full AND calls it unrecognised:\n{stdout}"
     );
 }
+
+/// F-605: `me sysw pack` printed the full success card — including the
+/// container digest and "re-print it with: me sysw show <path>" — and THEN the
+/// write failed. It claimed an artifact that does not exist, and named a
+/// command to run against a file that was never created.
+///
+/// Measured before the fix with `--out /dev/null`: the digest, the re-print
+/// line, then "Operation not permitted", exit 2.
+///
+/// The verdict and the exit code are unchanged; only the ORDER moved. The
+/// digest is still computed on the container before any padding, so a region
+/// image and a bare container still print the same number.
+///
+/// MUTATION: call print_pack_card before `emit` again -> the first assertion
+/// fails while the success case still passes, which is why both are here.
+#[cfg(unix)]
+#[test]
+fn pack_does_not_print_a_digest_for_a_write_that_failed() {
+    // /dev/null is writable-but-not-really: `emit` refuses it, which is the
+    // cheapest reproducible failing write there is.
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", "--no-now"])
+        .args(["--out", "/dev/null"])
+        .write_stdin(format!("{TEXT}\n"))
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "the write to /dev/null must fail");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        !err.contains("digest:"),
+        "pack printed a container digest for a file it never wrote:\n{err}"
+    );
+    assert!(
+        !err.contains("re-print it with"),
+        "pack told the operator to re-print a file that does not exist:\n{err}"
+    );
+
+    // The control: a write that SUCCEEDS still gets the whole card. Suppressing
+    // it everywhere would "fix" this by removing the operator's only record of
+    // the number the device asks them to compare.
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("ok.bin");
+    let good = me()
+        .args(["sysw", "pack", "--no-passphrase", "--no-now"])
+        .args(["--out", f.to_str().unwrap()])
+        .write_stdin(format!("{TEXT}\n"))
+        .output()
+        .unwrap();
+    assert!(good.status.success());
+    let gerr = String::from_utf8_lossy(&good.stderr);
+    assert!(
+        gerr.contains("digest:") && gerr.contains("re-print it with"),
+        "a successful pack lost its card:\n{gerr}"
+    );
+    assert!(f.exists(), "the file was not written");
+}
