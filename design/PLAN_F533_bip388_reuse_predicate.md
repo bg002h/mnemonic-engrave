@@ -63,27 +63,105 @@ predicate gets **wider**, not doubled.
    This plan ports one rule: a key slot may not appear at both the taproot
    internal key and inside the taptree.
 
-## Acceptance — written so it can fail in BOTH directions
+## Acceptance — corrected stage accounting (round 2 C1)
 
-Round 1's I3 was that `ok/refused 0` plus a same-commit baseline rewrite cannot
-fail in the over-refusal direction, and that my claim the script "demands"
-hand-checked verdicts was **false**: `--write-baseline` overwrites and exits 0.
+Round 2's Critical: I asserted `ok/agrees 45 → 47`, **and that number is
+unreachable**. `scripts/policy-generate.py:311-327` short-circuits —
 
-* **Must refuse:** `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a` → corpus
-  `ok/refused` goes 2 → 0.
-* **Must STILL derive**, named individually and asserted BEFORE any baseline
-  rewrite: `keyed_compose_tr_sole_sortedmulti_a`,
-  `keyed_compose_tr_unsorted_sole_leaf`, and the three
-  `keyed_compose_preset_hashlock_gated_*` vectors baselined today. The count
-  `ok/agrees` must go **45 → 47**, not merely "not fewer".
-* **The probe must exercise the DEVICE path.** Before trusting any corpus number,
-  confirm `cmd/policyprobe` reaches `complexAddressSource` for these vectors —
-  its own header warns that wrapping the wrong branch "manufactures device
-  findings".
-* **Mutation:** drop the `!isNums` guard → the two NUMS vectors above must go red.
-  Drop the internal-key term → `ok/refused` returns to 2.
+```python
+if not dev.get("ok"):
+    observed[cid] = {"device": dev.get("stage", "?")}
+    continue
+rust, _ = rust_addresses(...)
+```
+
+— so a DEVICE refusal never reaches the rust comparison at all. The two target
+vectors are in `ok/refused` today, not `ok/agrees`; refusing them moves them to
+their refusal STAGE, not into agreement. Verified by reading the script.
+
+**The only correct distribution:**
+
+| bucket | before | after |
+| --- | --- | --- |
+| `ok/refused` | 2 | **0** |
+| `source` | 22 | **24** |
+| `ok/agrees` | 45 | **45, unchanged** |
+| `expand` | 1 | 1 |
+
+`ok/agrees` staying at **45** is the over-refusal guard, and it is the assertion
+that matters: any vector this predicate wrongly refuses leaves that bucket.
+Assert the whole distribution, before any `--write-baseline`.
+
+**`--write-baseline` cannot be part of the evidence.** Round 2 also killed my
+round-1 claim that the script "demands" hand-checked verdicts: it overwrites and
+exits 0. Rewrite the baseline only AFTER the distribution above is asserted, in
+the same commit, never as the check itself.
+
+### The `!isNums` mutation, with a measured set rather than a count
+
+Round 2: my five named controls were wrong — **three of them are `wsh`**, so they
+cannot witness a taproot guard at all, and the mutation's real blast radius is
+larger than the two I named (round 2 measured **8**).
+
+The corpus holds **17** taproot vectors currently in `ok/agrees` (counted from
+`design/policy-corpus-baseline.json`). So:
+
+* **Do not hardcode a count.** At implementation time, enumerate the taproot
+  vectors whose internal key is NUMS *and* whose leaves reference the slot the
+  bogus zero would collide with, and assert that exact SET by name.
+* Dropping the `!isNums` guard must turn **every** member of that set red. A
+  mutation that reddens two when the set is eight is a mutation test that passes
+  on a broken guard.
+* `keyed_compose_tr_sole_sortedmulti_a` and `keyed_compose_tr_unsorted_sole_leaf`
+  are confirmed members (round 1 C1) — they are a floor, not the set.
+
+### Still required
+
+* Dropping the internal-key term → `ok/refused` returns to 2.
 * Fork gates: `./sysw/`, non-gui packages, `./gui/` sharded ×24 (all 1338),
   `gofmt -l .` against the five-file baseline.
+* The probe reaches `complexAddressSource` for these vectors — `cmd/policyprobe`
+  wraps the router, and its own header warns that wrapping the wrong branch
+  "manufactures device findings".
+
+## Copy is a code change, not a wish (round 2 I1)
+
+`composerCopyDuplicateKeys` (`gui/composer_copy.go:427-447`) is an `if` plus a
+fallthrough, so a NEW kind falls through to **"Bitcoin Core refuses such a
+descriptor"** — which this repo itself measured FALSE for both target vectors
+(Core 25.0.0 accepts them). Shipping the kind without touching this function
+would print a sentence the repo has already disproved.
+
+* Add the branch, in BIP 388's voice, naming the internal-key-and-leaf shape.
+* **The fit and golden gates enumerate kinds BY HAND and would stay green** — add
+  the new kind to both, or the copy ships unmeasured.
+* The screens a refused card lands on — *"This device can't derive addresses"*,
+  *"Complex policy - display only"* — are already recorded as defects; the new
+  kind must not inherit them.
+
+## Six places record the decision this reverses (round 2 I2)
+
+The rewrite reverses "a second predicate, not a wider read", which is written
+down in six places. Each must be updated or explicitly superseded **in the
+implementing commit** — not left to contradict the code:
+
+1. `gui/policy_address.go:48-56` — *"closing it needs a second predicate, not a
+   wider read of this one"*
+2. `gui/wallet_policy.go:345` — *"F-533 proposes moving the refusal onto a
+   BIP-388 predicate"*
+3. `md/duplicate_keys.go:34-41` — *"whose remedy is a SECOND predicate … not a
+   change to this one, whose two sentences are Core verdicts and would become
+   false"*
+4. `md/duplicate_keys_test.go:63-64` — asserts `DuplicateNone` for
+   `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a`, rationale *"Core ACCEPTS: the
+   internal key is outside the miniscript"*
+5. `gui/composer_flow_test.go:594` — the same two rows
+6. F-533's own entry in `design/FOLLOWUPS.md`
+
+**Those two tests going red is CORRECT** — the behaviour is deliberately
+changing — and their rationale stays true about *Core* while ceasing to be the
+predicate's answer. That is exactly why the new KIND exists: it keeps Core's
+verdict available for the Core-voiced sentences instead of overwriting it.
 
 ## Sequencing
 
