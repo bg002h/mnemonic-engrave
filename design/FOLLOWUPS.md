@@ -18029,3 +18029,77 @@ near an F-number run `closed` 110, `fixed` 45, `close` 40, `resolved` 25,
 **Not attempted in this session** beyond marking the seven closures that were
 verifiable, because renotating 418 entries is a mechanical pass that should be
 one reviewed change, not a side effect of answering "what is left to do?".
+
+---
+## The two journey walks of 2026-09-16 (F-578 … F-610)
+Filed **as the findings landed**, not after folding them — which is the whole
+point of F-618 and of the F-547…F-577 block above. Two agents drove all four
+hash kinds through the host CLIs and the emulator: one building the reasonably
+complex wallet end to end, one building a deliberately pathological 9-slot wsh
+wallet carrying all four kinds, both timelock flavours and a bearer path.
+
+**3 Critical, 12 Important, 9 Minor, 9 Nit.** Full reproductions, measured
+output and the per-finding *"worse than saying nothing?"* verdicts are in the
+persisted reports — this table is the index and the status, deliberately not a
+second copy:
+
+* `design/agent-reports/rcw-hashlock-journey-2026-09-16.md` (F-578…F-597)
+* `design/agent-reports/pathological-wallet-journey-2026-09-16.md` (F-598…F-610)
+
+Coverage gap to weigh when reading them: both agents shared one Playwright
+browser, so the second lost its device tab twice. Whether the device reproduces
+F-600 at Done is unwalked.
+
+| # | sev | status | what |
+|---|---|---|---|
+| F-578 | Critical | **CLOSED** | `me bundle`'s hashlock completeness note is dead for every taproot wallet |
+| F-579 | Important | open | `ms encode` and `ms split` panic on a valid English mnemonic; the fixture's own tier-3 seed is one |
+| F-580 | Critical | open | `me bundle`'s "backup needs N plates" is not a set the device will accept |
+| F-581 | Important | open | the argv-secret guard prescribes a remedy that does not work for the verb and secret it just named |
+| F-582 | Important | open | `md verify` MISMATCHes a correct plate set, and the obvious fix produces the unseatable one |
+| F-583 | Important | open | the Engrave Bundle capture screen gives no per-chunk progress; four of five NFC taps change nothing |
+| F-584 | Important | open | the device says a secret is in flash for a payload the host says holds none |
+| F-585 | Important | open | the emulator cannot load an operator-built payload |
+| F-586 | Important | open | `me bundle` refuses a preimage plate as "secret seed entropy" and points at CODEX32 seed entry |
+| F-587 | Important | open | `mk 0.13.0` cannot bind a key card to this wallet's md1 |
+| F-588 | Minor | open | the `me-preview` sidecar goes stale on every `me` upgrade and `cargo install` does not fix it |
+| F-589 | Minor | open | `ms encode --out FILE` warns about stdout when stdout is empty, and the secret goes to stderr |
+| F-590 | Nit | open | record indices disagree between `me sysw pack`'s refusal and `me sysw show` |
+| F-591 | Nit | open | device copy: "Scan a card" on a device with no camera; "4 unrecognised record" |
+| F-592 | Nit | open | `md verify`'s conflict error prints a usage line containing the conflict |
+| F-593 | Nit | open | two policy files for one fixture differ only in the account index, and the README's numbers match neither journey |
+| F-594 | Minor | open | `md bytecode` refuses an md1 that `md encode` just produced |
+| F-595 | Minor | open | `md address` cannot consume `md decode`'s own output |
+| F-596 | Nit | open | preview text block left margin is inconsistent across wrapped lines |
+| F-597 | Nit | open | sibling CLIs spell the same concept differently |
+| F-598 | Critical | **CLOSED** | `me sysw show` lists no record at all for a plaintext seed, a passphrase or free text; a container holding only a seed prints as empty |
+| F-599 | Important | open | `md encode --experimental` asserts the descriptor has a key-less spend path even when it provably has none |
+| F-600 | Important | open | `md compose` emits, at exit 0, a template that every downstream `md` verb refuses as malleable, whenever two key-less hash paths are adjacent |
+| F-601 | Important | open | `md descriptor` re-serialises supplied xpubs at depth 0 and silently drops the origin when no `--fingerprint` is given; `md decompose` then refuses `md`'s own output and prescribes a fix that would break the wallet |
+| F-602 | Important | open | `me bundle` states a total plate count that omits every cosigner card a key-less policy needs |
+| F-603 | Minor | open | `md compose --json` numbers paths 1-based in `experimental[]` and 0-based in `slots[].path`, so one object contradicts itself |
+| F-604 | Minor | open | `mk encode --from-md1` cannot consume a chunked md1 set, and reports it as a wire-format version mismatch |
+| F-605 | Minor | open | `me sysw pack` prints the full success card, including the container digest, before the write that fails |
+| F-606 | Minor | open | `md verify`'s MISMATCH message cites two identical numbers as its evidence |
+| F-607 | Nit | open | `md compose` accepts two byte-identical hash paths and emits a doubled branch |
+| F-608 | Nit | open | `me bundle` renumbers plates in an order unrelated to the input |
+| F-609 | Nit | open | `me sysw show` prints records out of numerical order when classes mix |
+| F-610 | Minor | open | the bearer-access warning is minted-side only; `md decode` of the same card is silent |
+
+**Closed so far:**
+
+* **F-578** — me `9a3b69ce` — the walk now covers `Body::Tr`, the match is exhaustive, and the detector has its first end-to-end test (mutation-verified both ways).
+* **F-598** — me `87c1bdff` — `print_unclaimed_records`, one exhaustive match over `Class`, so a class no printer claims can no longer be invisible.
+
+**Owning phases.** The remaining Critical (F-580) and every Important belong to
+**this cycle's follow-up sweep** — they are defects in what a tool claims to
+have done, which is the class that still gates. The four device-side entries
+(F-583, F-584, F-585, F-591) are owned by **the next device phase**, since none
+can be closed without the emulator or hardware. Minors and Nits are
+**post-release UX**, ownerless residue.
+
+**One interaction to note:** F-609 (`show` prints records out of numerical
+order when classes mix) is NOT fixed by F-598 and is mildly compounded by it.
+`show` is now five passes that each iterate every record, so output is ordered
+by printer rather than by record index. The fixture happens to come out 0,1,2.
+Whoever takes F-609 should expect to merge the passes, not reorder one.
