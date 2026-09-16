@@ -215,10 +215,33 @@ fn descriptor_hash_kinds(d: &md_codec::Descriptor) -> Vec<&'static str> {
         // under a thresh or a multi-family node is still a hashlock, and a walk
         // that saw one shape would be a completeness claim with a hole in it,
         // which is the defect this whole function exists to close.
+        //
+        // THIS MATCH IS EXHAUSTIVE ON PURPOSE -- NEVER ADD A WILDCARD ARM.
+        // It had `_ => {}`, and that arm silently swallowed `Body::Tr`, whose
+        // `tree` is where a taproot descriptor keeps its ENTIRE taptree. The
+        // result (F-578, journey walk 2026-09-16): the same wallet warned in
+        // `wsh` form and said nothing in `tr` form, with `hashlock_kinds`
+        // absent from the manifest for all four kinds -- and taproot is the
+        // reference wallet's primary form. A wildcard here cannot be
+        // distinguished from a deliberate decision, so the compiler must be
+        // the thing that forces one when a Body variant is added.
         match &n.body {
             Body::Children(kids) => kids.iter().for_each(|k| walk(k, out)),
             Body::Variable { children, .. } => children.iter().for_each(|k| walk(k, out)),
-            _ => {}
+            Body::Tr { tree, .. } => {
+                if let Some(t) = tree {
+                    walk(t, out);
+                }
+            }
+            // Leaves and key-only bodies: no child Node can hang off these, so
+            // there is nothing further to walk. Named individually rather than
+            // wildcarded, per the note above.
+            Body::MultiKeys { .. }
+            | Body::KeyArg { .. }
+            | Body::Hash256Body(_)
+            | Body::Hash160Body(_)
+            | Body::Timelock(_)
+            | Body::Empty => {}
         }
     }
     let mut out = Vec::new();
@@ -639,6 +662,61 @@ mod tests {
             run_bundle(&input),
             Err(BundleError::SetIncompleteMk(..))
         ));
+    }
+
+    /// F-578: `descriptor_hash_kinds` had NO test at all. The only thing that
+    /// mentioned `hashlock_kinds` built the vector BY HAND and asserted on
+    /// `checklist()` -- so it tested the renderer, and the detector behind it
+    /// could return an empty vector forever without a gate failing.
+    ///
+    /// It did exactly that for every taproot wallet: the walk matched
+    /// `Body::Children` and `Body::Variable` with a `_ => {}` arm, and a
+    /// taproot descriptor keeps its whole taptree in `Body::Tr`. The same
+    /// wallet warned in `wsh` form and said nothing in `tr` form -- and tr is
+    /// the reference wallet's primary form.
+    ///
+    /// This runs the REAL path: an md1 string through `run_bundle`.
+    ///
+    /// MUTATION: delete the `Body::Tr` arm -> `tr` row returns `[]` and the
+    /// first assert fails. MUTATION: make the walk unconditional -> the
+    /// no-hashlock control fails, because a wallet with no hashlock must not
+    /// claim one.
+    #[test]
+    fn the_hashlock_detector_sees_a_taproot_taptree_and_not_only_wsh() {
+        // Same policy shape in both wrappers; only the wrapper differs.
+        let tr_ripemd160 = "md1yq80tgggqps8fnvqkhz9jzkuntq3qpvf72n7avxt6us5c0ky528a6dm2ut7x25";
+        let wsh_sha256 =
+            "md1yq802gggqpsfxdwj6ugkg2mjdvzyq938e20m4se0tjznp7ceq0xymvpztpchjgdy3qfg6svfkr8rsj0mc";
+        let tr_no_hashlock = "md1yq80tgggqps89q34sy5q79h4yrk";
+
+        let tr = run_bundle(tr_ripemd160).expect("tr hashlock policy should bundle");
+        assert_eq!(
+            tr.hashlock_kinds,
+            vec!["ripemd160"],
+            "a taproot taptree hashlock is invisible to the detector, so the \
+             completeness note never fires for the wallet form that needs it"
+        );
+
+        let wsh = run_bundle(wsh_sha256).expect("wsh hashlock policy should bundle");
+        assert_eq!(wsh.hashlock_kinds, vec!["sha256"]);
+
+        // The control that makes the assertion above falsifiable: a walk that
+        // reported a hashlock unconditionally would pass both rows and be
+        // caught only here.
+        let plain = run_bundle(tr_no_hashlock).expect("plain tr policy should bundle");
+        assert!(
+            plain.hashlock_kinds.is_empty(),
+            "a policy with no hashlock claims one: {:?}",
+            plain.hashlock_kinds
+        );
+
+        // And the operator-visible half: the note must actually reach the
+        // checklist for the tr form, which is the thing F-557 promised.
+        assert!(
+            tr.checklist().contains("hashlock path") && tr.checklist().contains("ripemd160"),
+            "the checklist omits the hashlock note for a taproot wallet:\n{}",
+            tr.checklist()
+        );
     }
 
     #[test]
