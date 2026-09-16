@@ -2,7 +2,40 @@
 
 Low/nit items deferred from architect reviews (per the iterative-architect-review standard: Critical/Important fixed inline; low/nit recorded here). Promote to a cycle when convenient.
 
-## Convention — a follow-up's STATUS lives in its heading
+## Convention — a follow-up's STATUS is a `**Status:**` line (2026-09-16)
+
+**Every entry carries `**Status:**` as the first line of its body.** Exactly one
+per `### F-NNN` heading, one of four words, and nothing else may claim to be the
+status:
+
+```
+**Status:** OPEN — owning phase: <phase>
+**Status:** CLOSED <yyyy-mm-dd> — <repo> `<sha>`
+**Status:** WITHDRAWN — <why it is not a finding>
+**Status:** SUPERSEDED — <what replaced it>
+```
+
+`scripts/followups-status.sh` is the gate: it fails if an entry has no status
+line, if a status is not one of the four words, or if a CLOSED entry cites no
+commit. Run it before committing a change to this file.
+
+**This SUPERSEDES the older "status lives in the heading" rule below**, which was
+right about the problem and wrong about the mechanism. A heading is prose, and
+prose accumulated four notations — `— CLOSED`, `~~strikethrough~~ **CLOSED**`,
+`SHIPPED`, `DOWNGRADED` — plus 319 of 419 entries carrying no status at all. No
+predicate could read the file, so nothing could answer *"what is open?"* without
+archaeology. That is F-618, filed the same day this was fixed.
+
+Headings keep their historical markers; nothing was rewritten. The status line
+was ADDED to all 419 entries mechanically, and the conversion was verified
+content-preserving: the CLOSED set was identical before and after (99 → 99, none
+changed), and the only textual difference outside the inserted lines was a single
+blank line. **Entries that had never been marked either way default to OPEN** —
+the safe direction, since a closed item wrongly listed open costs a re-check
+while the reverse costs a missed defect. An OPEN status on an old entry
+therefore means "never explicitly closed", not "confirmed still live".
+
+### The older rule, kept for its reasoning
 
 **If an item is closed, answered, withdrawn or partially done, the heading says
 so.** Not the body, not a nested `####` entry, not a paragraph three screens
@@ -526,6 +559,7 @@ owning-phase rule exists to avoid. Worth fixing before the release tag.
 
 ### F-58 — total input wedge on the Footer entry screen, before engraving (owning phase: GUI)
 
+**Status:** OPEN
 **Observed 2026-08-06**, on the `test-e4-a125-j1300` build, from a cold boot while
 walking the `SIZEPROOF!BACK` workflow. On the **Footer** screen
 (`ftLineEntryFlow`, `gui/freetext_flow.go:705`) the checkmark did not advance to
@@ -606,6 +640,7 @@ of consumption; either removes the whole class rather than this instance.
 
 ### F-59 — ~~the artefact was Y-axis play, not cusps~~ **CLOSED 2026-08-21** (withdrawn — the artefact was Y-axis play, not cusps)
 
+**Status:** CLOSED 2026-08-21
 **The cause was a loose screw in the Y axis**, found and fixed by the operator;
 both forward and reversed tildes now cut perfectly. Nothing in this entry's
 causal story survives. The *face-wide fact* it records is still true and still
@@ -617,6 +652,7 @@ Original entry follows, kept for the record:
 
 ### F-59 (withdrawn) — `font/constant` has no curves, and its cusps pile dots (owning phase: the glyph pass, BEFORE `O`/`o`/`8` are drawn)
 
+**Status:** WITHDRAWN
 **Diagnosed 2026-08-06.** Full workings, with every measurement, in
 `design/RECON_cusp_dot_pileup.md`. Summary:
 
@@ -654,6 +690,7 @@ polygons and the only three left.
 
 ### F-60 — single-character test plates, top-left and uncentred (owning phase: every engraving investigation from now on)
 
+**Status:** OPEN
 **Operator directive, 2026-08-06.** Engraving tests cut **one character at a
 time**, at the **top-left-most position**, **not centred**.
 
@@ -673,6 +710,7 @@ centre it" is load-bearing and not a preference.
 
 ### F-61 — `preview/params.go` is a fourth, stale copy of the machine's motion params (owning phase: the next `me` preview cycle)
 
+**Status:** OPEN
 **Found 2026-08-06** by the synthesis pass of the motion-params recon; all five
 recon agents missed it because it lives outside the fork.
 
@@ -704,6 +742,7 @@ likely place for a subtle bug the moment they are not. Cross-ref
 
 ### F-62 — STILL OPEN, but no longer motivated by the artefact: curving a glyph panics the constant-time passphrase engraver
 
+**Status:** OPEN
 **2026-08-06:** the artefact this was meant to fix turned out to be Y-axis play,
 so there is no longer a reason to curve the face. **The panic itself is real and
 stays filed** — anyone who curves a `font/constant` glyph for any reason will hit
@@ -714,6 +753,7 @@ Original entry follows:
 
 ### F-62 (context withdrawn) — curving a `font/constant` glyph panics the constant-time passphrase engraver (owning phase: BEFORE any curve lands, and before `O`/`o`/`8` are drawn)
 
+**Status:** WITHDRAWN
 **Found 2026-08-06** by trying it. `~` was redrawn as three cubics; the geometry
 result was excellent — worst lateral dot pile-up fell from 0.0750mm to 0.0073mm,
 a **10x** reduction landing exactly on the `font/sh` reference — and then the
@@ -779,6 +819,7 @@ cost of curving the face; it was reached by the glyph rather than by the feature
 
 ### F-63 — the hammer's strike CURRENT is a lever the firmware cannot reach on this board (owning phase: any future depth investigation)
 
+**Status:** OPEN
 **Recorded 2026-08-06** while asking what the firmware knows about the engraving
 head. It is the third lever on depth, after feed and passes, and it is currently
 fixed in hardware.
@@ -832,6 +873,7 @@ question again.
 
 ### F-64 — `VOLTPROOF!`: engrave the machine's own strike conditions onto the plate (owning phase: the next depth investigation, or whenever engraving settings go system-wide)
 
+**Status:** OPEN
 **Operator idea, 2026-08-06.** A proof trigger that cuts the negotiated USB-PD
 voltage and the resulting `needleAct` dwell onto the plate itself.
 
@@ -888,6 +930,7 @@ start-screen version is the faster diagnostic.
 
 ### F-65 — back up the SH2 boot signing key (owning phase: after the encrypted-payload cycle ships; NOT during it)
 
+**Status:** OPEN
 **Operator question, 2026-08-07.** Can the encrypted-payload path carry the
 firmware boot signing key (`~/.sh2/sh2-boot-key.pem`)?
 
@@ -928,6 +971,7 @@ label and the key on one plate.
 
 ### F-66 — carry arbitrary plain text over the sealed payload path (owning phase: its own gated cycle, AFTER the encrypted-payload cycle is GREEN and shipped)
 
+**Status:** OPEN
 **Operator request, 2026-08-07.** Deliver arbitrary text to the engraver through
 the encrypted-payload path, not just constellation records.
 
@@ -975,6 +1019,7 @@ one plate. Related: [[F-58]] (input wedge on the Footer entry screen).
 
 ### F-71 — Nits from the Plan A whole-diff review (owning phase: ownerless residue; batch whenever `seal` is next touched)
 
+**Status:** OPEN
 Neither gates anything. Recorded so nobody rediscovers them or "simplifies" one
 away believing a test covers it.
 
@@ -991,6 +1036,7 @@ away believing a test covers it.
 
 ### F-72 — ~~md-codec 0.40 → 0.42 rode into the Task 1 commit~~ **CLOSED 2026-08-21** (historical note, not a task)
 
+**Status:** CLOSED 2026-08-21
 The review established that **every** md-codec API `seal` uses already exists in
 0.40 (`reassemble`, `decode_md1_string`, `ChunkHeader` + `chunk_set_id` +
 `ChunkHeader::read` with the same signature, `pub mod bitstream`), so the bump
@@ -1008,6 +1054,7 @@ future commits.
 
 ### F-79 — the payload buffer retains 64 KB for the GUI's whole lifetime (owning phase: **B2a-i, Task 2** — fix BEFORE the feature reaches an operator)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 by fix C** (`b2b` `3de8aa1`, "bound the payload read"). `seal/read_tinygo.go` now allocates `out := make([]byte, n)` with `n` bounded by what the header declares — ~1.4 KB typical, against the 65,536 this entry measured. The 64 KiB `unsafe.Slice` that remains is a view of memory-mapped XIP flash and allocates nothing.
 
 `uiFlow` probes once at startup and holds the result (`gui/gui.go:1541-1546`).
@@ -1040,6 +1087,7 @@ hardware-verified behaviour stayed untouched.
 
 ### F-80 — residue from the B1 whole-diff review (owning phase: **B2a-ii** for the two the 2026-08-08 decision assigned it; **B2b/ownerless** for the rest)
 
+**Status:** OPEN
 **PARTIALLY CLOSED 2026-08-10.** Two of the three bullets are DONE, each killed by an applied mutation:
 - Back-is-Lock: **CLOSED 2026-08-10 — assets.IconDiscard at gui/unlock_platelist.go:179; pixel-pinned by TestPlateListBackIconIsDiscardNotBack, killed by reverting to assets.IconBack.**
 - already-cut marks: **CLOSED 2026-08-10 — " (cut)" mark at gui/unlock_plates.go:59, set on completion only at gui/unlock_platelist.go:116; killed by dropping the cut branch, which fails TestPlateListMarksCutAfterACompletedEngraveAndNotAfterACancelledOne/completed and TestUnlockPlateLabelWrapsPlateLabel.**
@@ -1094,6 +1142,7 @@ Source: `design/agent-reports/encrypted-payload-planB-phaseB1-whole-diff-round0.
 
 ### F-78 — CLOSED 2026-08-11 (post-merge polish: the display font's index caps at ASCII; substituted '|' at 5 sites) — "·" has no glyph in the display font, and four shipped screens use it (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: ownerless residue; a font cycle, not a feature cycle. Still open; scheduled, not excused.
 
 Measured 2026-08-07 in `gui`, pinned by `TestPlateLabelSeparatorRenders`:
@@ -1140,6 +1189,7 @@ kind of edit whose defects this suite cannot see.
 
 ### F-77 — the encrypted section's md1/mk1 cards have no grouping (owning phase: **B2a-i, Task 1** — GATING, it blocks §10.2.2's secret plate labels)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 — labelEncryptedCards at seal/label_encrypted.go:28, wired into AdmitSection at seal/record.go:266-268 and reached from production via seal/unlock_key.go:102; killed by deleting the wiring, which fails TestEncryptedSectionCardsAreLabelled and TestEncryptedMultisigCardsAreDistinguishable.**
 
 B1's Task 4a surfaces `HRP`/`CardIndex`/`CardTotal`/`PlateIndex`/`PlateTotal` on
@@ -1168,6 +1218,7 @@ unimplementable for any multisig payload.
 
 ### F-76 — **RESOLVED (the reachable half) 2026-08-29, fork `f2007b7`** — `syswSession.cardSet` + `syswOfferCards` deliver whole cards at the three engrave doors, `syswPrimeCard` completes a tapped chunk from the payload, validation identical to the NFC path (reviewed: REVIEW-F76-F437-r1, cross-card isolation and parity refuted-by-construction), and the incomplete-card message is now TRUE for the one case that can reach it. **RESIDUE, kept open here:** no operator route reaches Inspect on a payload record — `unlockEngraveFlow` has no Inspect entry (its comment records this plainly); the primable machinery is built and unit-walked, the ENTRY POINT is not. Recorded non-gating notes from the review: SCAN CARDS draws without a `FeatureNFC` gate (latent — the SH2's reader is soldered on); the priming path draws no source-disclosure screen (2026-08-27 ruling class); `syswPrimeCard` sits outside the consumption oracle's sight, pinned behaviourally instead. — inspecting a payload-sourced card — **WIDENED 2026-08-29: the same wall binds the ENGRAVE path** (owning phase: **after B2b**; NOT B2a)
 
+**Status:** OPEN
 **Widening, measured in the S2 journey walk (headless sim, fork `e456970`):**
 the payload door hands its gatherer ONE record on the engrave route too, so
 Wallet Policy and Engrave Bundle show `md1 descriptors: 0` for a payload
@@ -1209,6 +1260,7 @@ is plumbing, not new codec behaviour, so the Rust-primary rule does not bind it.
 
 ### F-93 — the screensaver still PARKS a spec-legal derivation, and Run has to be the one to stop it (owning phase: B2b, with F-89's unwind)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 — ctx.KeepAwake() at gui/unlock_kdf.go:334, reconciled with F-89 via the "&& !armed" term at gui/run_flow.go:251; killed independently by (a) removing KeepAwake (TestRunKeepAwakeDuringDerivationDoesNotParkUnderTheScreensaver fails, derivation parks under the screensaver) and (b) removing "&& !armed" (TestRunKeepAwakeCannotPostponeAnArmedWipe fails, armed wipe never fires).**
 
 Found by the B2a-ii whole-diff review, lens 7 M1, and confirmed by measurement
@@ -1270,6 +1322,7 @@ residency timer with a saver that does not unwind.
 
 ### F-94 — CLOSED 2026-08-11 (post-merge polish: the 64-byte seed and BIP-32 master key now pinned) — the 64-byte BIP-39 seed and the BIP-32 master key are unpinned, and the seam is cheap (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: B2c, with F-88; re-assigned from B2b 2026-08-09. Scheduled, not excused — same class as F-88/F-90/F-104: seed-equivalent copies inside the payload flow.
 
 > **Re-assigned B2b → B2c, 2026-08-09.** The B2b plan deferred this to "own
@@ -1312,6 +1365,7 @@ full near-seed was being orphaned — are pinned in `bip39` itself.
 
 ### F-95 — CLOSED 2026-08-11 (post-merge polish: warning copy shortened; maxScroll +19 -> -17) — §10.2.3's warning clears the panel by 3 pixels, and its scroll affordance does not exist on this hardware (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: the GUI/font cycle, with F-78 and `seedhammer-warning-scroll-untouchable`. Still open; scheduled, not excused.
 
 Found by the B2a-ii whole-diff review, lens 4 MINOR 4. **Pre-existing from B1** —
@@ -1354,6 +1408,7 @@ same fix the StartScreen pager took) — then restore the clip.
 
 ### F-96 — the §11.3 mutation runner is uncommitted, so the 30-mutant run is reproducible by nobody — **CLOSED 2026-08-10** (owning phase: B2b)
 
+**Status:** CLOSED 2026-08-10
 > **The phase-report half is DONE:** `design/PHASE_REPORT_encrypted_payload_deviceB_phaseB2a_ii.md`,
 > written 2026-08-09 at the operator's instruction. It consolidates B2a-ii's 11
 > lens verdicts, the §11.3 row table, the whole-phase 30-mutant total (29 killed,
@@ -1411,6 +1466,7 @@ of this project throughout — see the reconciliation report,
 
 ### F-97 — CLOSED 2026-08-09 — plan and record corrections owed to the B2a-ii artefacts
 
+**Status:** CLOSED 2026-08-09
 **Closed the same day it was filed.** It was filed as "NOT foldable from the
 firmware worktree", which was true of the agent that filed it — every item lives
 in `mnemonic-engrave/design/`, which was read-only to it. It was never true of
@@ -1450,6 +1506,7 @@ Small, real, and NOT foldable from the firmware worktree — every item is in a
 
 ### F-98 — two citations in the GREEN spec do not resolve (owning phase: with F-85, before the release tag)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 (`3be5fc8`).** The repaired gate separated the two cases the old one conflated: `checksum.go:132` was AMBIGUOUS, not wrong — the claim is right and it needed `codex32/` prefixing. `main.rs:375` had genuinely decayed and is repointed to `crates/me-cli/src/main.rs:590` (`fn write_private`) with `:597` for the `0o600`. Both verified by the gate printing the resolved line.
 
 Found while cite-gating the §10.2.4 amendment; **pre-existing, and unchanged by
@@ -1473,6 +1530,7 @@ Bundle with F-85's §2.2 amendment so the GREEN spec is opened once, not twice.
 
 ### F-99 — CLOSED 2026-08-09 — §10.2.4 row 1 did not fix WHEN the warning starts
 
+**Status:** CLOSED 2026-08-09
 **Closed by `7c3a625`**, operator-approved: §10.2.4 now states that the 30 s is
 **additive** — the warning appears at 3:00 and the wipe fires at 3:30 — and names
 the rejected alternative (warn@2:30/wipe@3:00) so it is not silently re-opened.
@@ -1484,6 +1542,7 @@ B2b Task 8 is unblocked. Original entry follows.
 
 ### F-99 (original) — §10.2.4 row 1 does not fix WHEN the warning starts (owning phase: B2b Task 8 — blocking, needed operator sign-off BEFORE the hardware run)
 
+**Status:** SUPERSEDED — kept for the record; the live entry is the revised F-99
 Found by the B2b R0 design lens (opus, round 0). §10.2.4 row 1 reads
 "**3 min**, 30 s warning", which is genuinely ambiguous between:
 
@@ -1509,6 +1568,7 @@ first, alone, because Task 8 is gated on it.
 
 ### F-100 — CLOSED 2026-08-09 — SPEC §11.5's "confirm firmware reflash preserves the blob"
 
+**Status:** CLOSED 2026-08-09
 **Closed on real hardware the same day it was filed.** Vector F's sealed payload
 was loaded FIRST, the B2b firmware flashed second, and the start screen then
 showed Sealed Payload present with **9 pager dots** (B1 baseline: 8 absent, 9
@@ -1520,6 +1580,7 @@ Original entry follows.
 
 ### F-100 (original) — SPEC §11.5's "confirm firmware reflash preserves the blob" has never been run and is owned by nobody
 
+**Status:** SUPERSEDED — kept for the record; the live entry is the revised F-100
 Found by the B2b residue sweep, which asked the completeness question "what is
 required before a tag, is named somewhere in the corpus, and appears in NEITHER
 the plan's task list NOR its explicit 'does NOT cover' list" — silence being the
@@ -1552,6 +1613,7 @@ single place that list lives.
 
 ### F-101 — `mutation-run.py` is not crash-safe: killed mid-row it leaves a MUTANT in the worktree (owning phase: before the release tag, with F-96's runner)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 (`ba31e0c`).** An on-disk sentinel written before each mutation and cleared only after the restore verifies, plus handlers for SIGINT/SIGTERM/SIGHUP; `recover_sentinel()` runs BEFORE `preflight_clean()`, because the mutant a kill leaves is exactly what makes preflight refuse. Verified by SENDING the signals (`scripts/test/mutation-run-crashtest.py`): SIGKILL leaves the mutant and the next run restores it; SIGTERM restores in-handler and keeps an honest exit status.
 
 Hit three times in ten minutes on 2026-08-09 while verifying Task 7. A
@@ -1585,6 +1647,7 @@ uncommitted work — the general rule (restore from a file copy, never
 
 ### F-102 — `me seal` takes SEED MATERIAL on argv, while every other subcommand reads stdin (owning phase: before the release tag)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 (`2ed6ac1`).** `me seal` takes `--in <file>` or stdin into a Zeroizing buffer; argv survives for fixtures and warns when it carries seed material. Verified across every channel including CRLF-refused-not-normalised and warn-then-still-refuse without `--seal-secret`. SPEC §2.2 item 14 names the host-side exposure, which the spec had never mentioned.
 
 Raised by the operator 2026-08-09 while reading Task 8's setup, and measured
@@ -1628,6 +1691,7 @@ should gain a line either way.
 
 ### F-103 — CLOSED 2026-08-11 (post-merge polish: idle clock now keyed on EFFECTIVE input; narrowed, see F-122) — the PROTECTIVE SCREEN FILM silently disables §10.2.4's wipe, the screensaver, and every idle behaviour (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: B2c, and it belongs in the operator docs before any release.
 
 **MECHANISM CONFIRMED 2026-08-10, and the entry is both under- and
@@ -1712,6 +1776,7 @@ screensaver, which is upstream code this phase only borrowed.
 
 ### F-104 — four MORE members of the unreachable-seed-residue class, two of them on paths nobody had enumerated (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from B2c)
 
+**Status:** OPEN
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was B2c. This entry **still binds** — see the traced call graph above; §2.2 item 12 does not accept it — it is now scheduled later, not excused.
 
 **STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** all four: pbkdf2 state via F-88's chain; `splitMnemonic` residue via the classifier on `Inspect` and `UnlockWithKey` and via `unlockPassphraseFlow`'s `LastWordCandidates`; the `ms1` `ToUpper`/QR copies via `unlockEngraveCodex32` → `backup.EngraveSeedString`; keyboard fragments via `unlockPassphraseFlow` → `inputWordsFlow` → `Keyboard.Fragment`. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
@@ -1746,6 +1811,7 @@ does. Without both, B2c's inventory repeats the same failure a third time.
 
 ### F-105 — a typed passphrase is wiped by NOTHING until it is submitted (owning phase: **B2b Task 9** — operator ruling 2026-08-09)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 on hardware** — reading 3 of the B2b gate: two words typed at the passphrase keyboard, warning at 3:00, wipe at 3:30. Task 9.5 was the only part still owed. `design/HARDWARE_RESULT_2026-08-10c_b2b_gate.md`.
 
 > **OPERATOR RULING 2026-08-09: an in-flight passphrase IS seed-equivalent** — it
@@ -1808,6 +1874,7 @@ appear, it is an F-105 defect in its own right and not merely F-106 spilling ove
 
 ### F-106 — ~~§10.2.4's window runs 2x (6:00, not 3:00): a LATE ARM EDGE lands on the deadline~~ **CLOSED 2026-08-10** (heading corrected 2026-08-20)
 
+**Status:** CLOSED 2026-08-10
 **FIX WRITTEN AND R0-FOLDED 2026-08-10.** Design:
 `design/DESIGN_f106_late_arm_edge.md`. Implementation: worktree
 `seedhammer-f106`, branch `b2b-f106` @ `4b452d3` (off `b2b` @ `3de8aa1`).
@@ -1995,6 +2062,7 @@ search either way.
 
 ### F-107 — ~~the RENDERED seed is scrubbed ONLY on the wipe path; a normal exit leaves the twelve words in `ctx.B`~~ **CLOSED 2026-08-10** (heading corrected 2026-08-20)
 
+**Status:** CLOSED 2026-08-10
 **CLOSED 2026-08-10** — implemented on `b2b-residency` (`ctx.B.Scrub()` in both unlock brackets, pinned by `gui/unlock_session_scrub_test.go` and `gui/residency_wiring_test.go`), GREEN through three R0 rounds and a whole-diff review, and confirmed on hardware by reading 4c (abort→resume inside the secret session).
 
 Found 2026-08-10 by an operator question — *"a normal exit reuses the Context, but
@@ -2061,6 +2129,7 @@ cannot reach. Two findings in one day where residency rested on enumeration.
 
 ### F-108 — ~~`plate.Spline` is never zeroed AFTER the cut: F-83 buys the mid-cut window and nothing ends it~~ **CLOSED 2026-08-10** (heading corrected 2026-08-20)
 
+**Status:** CLOSED 2026-08-10
 **CLOSED 2026-08-10** — the zeroing landed on `b2b-residency` (`planEngraving`'s defer, the `SafePointer.Resume` trim, `splineResumer.Knot`'s `defer clear(c)`, `ClearHistory`, `releaseResumeState`), 11 mutation rows, toolpath byte-identical across 5 plates, and hardware readings 4a/4b/4c showed a resumed cut tracking its interrupted letter exactly.
 
 Raised by the operator 2026-08-10, correcting a misreading of F-83 in this
@@ -2158,6 +2227,7 @@ and each stopped being true without anyone editing the line that claimed it.
 
 ### F-120 — the device engraves `ms1` strings `me seal` will not seal: two different accept sets (owning phase: **post-merge polish and hardening**)
 
+**Status:** OPEN
 Surfaced 2026-08-10 by F-113's implementation, which could not write the test it
 was asked for and said so rather than faking it.
 
@@ -2208,6 +2278,7 @@ narrowing lives in `ms-codec`.
 
 ### F-121 — CLOSED 2026-08-11 (journeys/simulator: the emulator now homes, because the plate overlay cannot register without it) — the emulator does not HOME, so a resumed cut renders differently there than on the machine (owning phase: **post-merge polish and hardening**)
 
+**Status:** CLOSED 2026-08-11
 Filed 2026-08-11, out of the F-114 closure.
 
 `cmd/controller` wraps its engraver in a `homingEngraver`
@@ -2272,6 +2343,7 @@ set.
 
 ### F-119 — CLOSED 2026-08-11 (post-merge polish: comment corrected against a MEASURED fallback order) — `backup.go:368`'s comment describes a plate fallback order the code does not implement (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle, or whenever the descriptor plate is next touched. Still open; scheduled, not excused.
 
 Found 2026-08-10 by R0 round 1 on §10.2.1a, which measured the behaviour after I
@@ -2294,6 +2366,7 @@ variants exist".
 
 ### F-116 — `biptool seed -seedlen` emits codex32 strings this machine cannot engrave, silently (owning phase: **before the release tag**, with F-113)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 — `seedhammer` `c0c958d`.** `warnUnengraveable` in
 `cmd/biptool/main.go` warns on stderr, leaving stdout pipeable. Limits are
 measured, not hardcoded: validity via `codex32.New`, engraveability by the same
@@ -2332,6 +2405,7 @@ a bug against the engraver rather than the generator.
 
 ### F-117 — the seed plate cannot engrave a QR above 33 modules, and could reach 37 today (owning phase: **post-release feature**, with F-118)
 
+**Status:** OPEN
 `backup.EngraveSeedString` refuses `qrc.Size > 33` (v4), while
 `backup.EngraveText` — the md/mk path — already runs at **37** (v5) in
 production, on the same `bitmapForQRStatic` marker table. The difference is
@@ -2345,6 +2419,7 @@ plate geometry, so it re-opens toolpath equivalence and needs a hardware read.
 
 ### F-118 — engraving a LONG codex32 share needs QR version 6 support (owning phase: **post-release feature**)
 
+**Status:** OPEN
 125–127 characters encode to **41 modules (v6)**, past every current limit.
 `bitmapForQRStatic` tabulates position and alignment markers for **21/25/29/33/37
 only**; anything else reaches its `default:` and panics, which is why
@@ -2362,6 +2437,7 @@ honest interim: a clear message beats a dead end.
 
 ### F-115 — `plan-cite-gate.sh` resolves citations by BASENAME and takes the first match, including build artefacts (owning phase: **before the release tag**, with F-101's runner work)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 (`51ff889`).** The resolver prunes `target/`, `.git/` and `node_modules/` alongside `third_party/`, and FAILS as AMBIGUOUS naming every candidate rather than taking the first match. Verified: it now reports `bip380/checksum.go` and `codex32/checksum.go` by name instead of silently choosing the 89-line one.
 
 Found 2026-08-10 while gating the §2.2 item 12 amendment. The gate reported two
@@ -2391,6 +2467,7 @@ teach the gate to require one where the basename is not unique.
 
 ### F-114 — CLOSED 2026-08-11 — NOT A DEFECT: the machine homes before every run, so the head really is at the origin
 
+**Status:** CLOSED 2026-08-11
 **CLOSED 2026-08-11, post-merge polish and hardening.** The premise is false.
 The entry assumed the head is "wherever it actually is" when the synthesised
 approach line executes. It is not: the machine has just **homed to the plate
@@ -2477,6 +2554,7 @@ Fixed in `seedhammer` `c38cb6b` to require a needle-DOWN pass.
 
 ### F-113 — codex32 LONG CODES are admitted, decrypted and offered, then can never be engraved (owning phase: **post-B2b, before the release tag**)
 
+**Status:** OPEN
 **CLOSED 2026-08-10.** Implemented both sides, Rust first per the Rust-primary
 rule. Device: `seedhammer` `b2b` (merge of `f113-ms1-engraveable` @ `f3f866f`) —
 `AdmitSection`'s per-record pass refuses an `ms1` over 90 characters and wipes
@@ -2555,6 +2633,7 @@ fires on the iterator's exit rather than on a cut.
 
 ### F-110 — an ABANDONED engrave job's resume state is never zeroed (owning phase: **B2b** — OVERDUE, re-assigned 2026-08-11 to **post-merge polish and hardening**)
 
+**Status:** OPEN
 **STATUS CORRECTION 2026-08-11.** `CONTINUITY_2026-08-11.md` and the brief given
 to the 2026-08-11 triage agent both listed F-110 among the items "closed during
 the cycle". **It is not closed**, and this entry never said it was — the error
@@ -2617,6 +2696,7 @@ design that files them.
 
 ### F-111 — ~~`knotBuf` unzeroed wherever a plate is built and no cut happens — SUBSUMED by the F-108 design~~ **CLOSED 2026-08-21** (subsumed by the F-108 design)
 
+**Status:** CLOSED 2026-08-21
 **CLOSED 2026-08-10 — SUBSUMED by F-108's design and implemented with it.** `planEngraving` zeroes the caller's knot buffer on every exit path, which covers the plate-built-but-never-cut route this entry was filed for.
 
 Filed by the R0 round-1 fold of `DESIGN_b2b_residency_zeroing.md`; sharpens round
@@ -2647,6 +2727,7 @@ separately.** Applied in the gate worktree and building.
 
 ### F-112 — six LEGACY seed-rendering flows sit inside no `Scrub` bracket at all (owning phase: post-B2b, before the release tag)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 as ACCEPTED under SPEC §2.2 item 12** (operator ruling
 2026-08-10): §10.2.4's residency wipe and the `Scrub` brackets are scoped to the
 **Sealed Payload program's session**, and all six flows listed here are other
@@ -2694,6 +2775,7 @@ but it means "the machine wipes the rendered seed" is not true in general.
 
 ### F-109 — DOWNGRADED to Minor 2026-08-11 (measured: no secret in the residue; ~12 K of ~74 objects still unnamed) — ~35 K in ~81 REACHABLE objects survives every wipe, unidentified (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
+**Status:** OPEN
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling; the concerns below were raised and the operator decided). Was: the fable whole-diff review of ALL of Phase 2 — operator ruling 2026-08-10.
 
 **OPERATOR RULING 2026-08-10 — re-assigned to the fable whole-diff review of all
@@ -2798,6 +2880,7 @@ non-releasing `sync.Pool` retains a `fmt`-formatted copy of seed material on the
 
 ### F-92 — `tinygo test` cannot build `seal` at all: the TinyGo wipe caveat has never run on the target toolchain (owning phase: before the release tag)
 
+**Status:** OPEN
 **DECLINED 2026-08-10 — operator ruling: "what we have is good enough."**
 Accepted limitation, not a defect to fix before the tag. The evidence that makes
 that reasonable is recorded above and in
@@ -2898,6 +2981,7 @@ it is safe, it is a prerequisite, and it costs nothing.
 
 ### F-91 — CLOSED 2026-08-09 — the normative `vectors.json` digest is now asserted
 
+**Status:** CLOSED 2026-08-09
 One test, `TestVectorFileMatchesTheDigestTheREADMERecords` (`seal/vectors_test.go`),
 mutation-checked with a byte no other test can see: one space appended to the
 file's `note` field — touching no vector field — fails it while
@@ -2918,6 +3002,7 @@ file still matches.)*
 
 ### F-90 — the `ms1` engrave arm is the under-examined one, and it is the DEFAULT arm (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from B2c)
 
+**Status:** OPEN
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was B2c. This entry **still binds** — see the traced call graph above; §2.2 item 12 does not accept it — it is now scheduled later, not excused.
 
 **STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** `unlockEngraveCodex32` has exactly ONE caller in the whole tree — `unlockSecretPlate`, inside the same bracket. Not mixed. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
@@ -2970,6 +3055,7 @@ retains; `id` from `Split()`; `s.String()`; `plan`, then `plate.Spline`.
 
 ### F-89 — B2b's idle wipe MUST unwind the flow, not just call `p.Wipe()` (owning phase: B2b — a DESIGN CONSTRAINT, not a defect)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 — unwind via ctx.Done at gui/run_flow.go:282-288, RecordsResident's narrowed contract at seal/session.go:20-51; killed by removing ctx.Done=true from the armed-wipe branch, which fails TestWipeZeroesEveryPinnedBufferAtRunLevel (both subtests, "the wipe never restarted the session").**
 
 Found by lens 1 pass 3 (M3). Nothing is wrong today; this is a trap laid for the
@@ -3016,6 +3102,7 @@ reaches.
 
 ### F-88 — three more seed-equivalent copies on the mnemonic engrave path, two of them unreachable from `gui` (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from B2c)
 
+**Status:** OPEN
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was B2c. This entry **still binds** — see the traced call graph above; §2.2 item 12 does not accept it — it is now scheduled later, not excused.
 
 **STILL BINDS — checked against SPEC §2.2 item 12 on 2026-08-10 and NOT accepted.** `unlockEngraveMnemonic` (`gui/unlock_session.go:270`) is inside the `:88-89` wipeGuard bracket and reaches all three copies, directly or via `SeedScreen.Confirm` / `masterFingerprintFor`. Verified by tracing the call graph whole-tree, not by reading this entry: an earlier pass classified this as legacy-only from entry prose and was wrong. See `design/agent-reports/2026-08-10-b2c-program-boundary-verification.md`.
@@ -3070,6 +3157,7 @@ package's own convention scrubs what it can.
 
 ### F-87 — CLOSED 2026-08-11 (post-merge polish: unlockEngraveMnemonic's third early return pinned) — nothing pins `unlockEngraveMnemonic`'s deferred wipe (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: B2b, with the §10.2.4 timer tests. Scheduled, not excused — the missing test is on unlockEngraveMnemonic, the same path F-88 covers — doing them together reads that path once instead of twice.
 
 **NARROWED 2026-08-10, still OPEN.** Verified: 2 of the 3 early returns ARE pinned by applied-mutation testing. The residue is exactly one leg — the `masterFingerprintFor`-error path — which no test covers. That is the whole of what remains; the entry's original framing ("nothing pins it") is no longer accurate and would overstate the work.
@@ -3097,6 +3185,7 @@ observability.
 
 ### F-86 — CLOSED 2026-08-11 (post-merge polish: '%' added to Boldprogress45's alphabet; 3 tests had relied on it being invisible) — `%` renders as zero pixels in the KDF progress screen (owning phase: **post-merge polish and hardening** — operator ruling 2026-08-10; re-assigned from the font cycle)
 
+**Status:** CLOSED 2026-08-11
 **RE-ASSIGNED 2026-08-10 to the post-merge polish and hardening phase** (operator ruling). Was: with F-78's font cycle. Still open; scheduled, not excused.
 
 `unlockDerive` (`gui/unlock_kdf.go`) formats its percentage as `"%d%%"` in
@@ -3132,6 +3221,7 @@ this way.
 
 ### F-85 — §2.2 does not name the during-engrave residency (owning phase: before the release tag)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 (`b6bbae1`).** SPEC §2.2 item 13 names the during-engrave residency, in the same register as item 9, with physical custody as the control — and states its own narrowness explicitly, since the broad reading of F-83 is what cost F-108. §2.3 gains the operator half: do not start a secret cut you will walk away from.
 
 SPEC §2.2 lists what this design does **not** defend against. It does not say
@@ -3154,6 +3244,7 @@ of §2.2.
 
 ### F-84 — `SeedScreen` gains `NoEdit` (owning phase: B2a-ii, Task 6 — implemented there, not deferred)
 
+**Status:** OPEN
 **CLOSED 2026-08-10 (already recorded as implemented, not deferred, in the entry's own header) — SeedScreen.NoEdit at gui/gui.go:2341,2388,2464, wired at gui/unlock_session.go:291; killed by reverting the production call site to &SeedScreen{}, which fails TestPayloadSeedScreenRefusesEditing.**
 
 Recorded rather than deferred, because it changes a screen the NFC scan path also
@@ -3170,6 +3261,7 @@ that the guard must sit on the **click handler**, not the nav layout, because
 
 ### F-83 — ~~the plate cannot be wiped until the engrave finishes — ACCEPTED LIMITATION, not a follow-up (operator, 2026-08-08)~~ **CLOSED 2026-08-21** (accepted limitation — operator ruling, not a follow-up)
 
+**Status:** CLOSED 2026-08-21
 `validateMdmk`, `backup.SeedString`, `engraveSeed` and `toPlate` copy a record
 into Go strings and into `Plate.Spline`, none of which can be zeroed.
 `gui/ms1_decode.go:19-20` already carries the same caveat for the display path.
@@ -3202,6 +3294,7 @@ The SPEC amendment this owes is **F-85**.
 
 ### F-82 — `seal.Deriver` and the folded `DeriveKey` have no Rust counterpart (owning phase: ownerless residue)
 
+**Status:** OPEN
 The chunked derivation is device-only: the host has no progress bar to draw.
 B2a-i §3d then folds `DeriveKey` onto it, so `seal` no longer calls
 `crypto/pbkdf2` at all while the Rust side still uses its own PBKDF2.
@@ -3218,6 +3311,7 @@ for drift.
 
 ### F-75 — stale `gui/bundle_flow.go:224` citations outside the SPEC (owning phase: ownerless residue)
 
+**Status:** OPEN
 `bundleReviewFlow` is at `gui/bundle_flow.go:227`; `:224` lands on a comment
 line — ordinary citation decay, and exactly what `plan-cite-gate.sh` exists to
 surface (it resolves `:224` as "ok" and prints the comment, which is the gate's
@@ -3237,6 +3331,7 @@ was believed at the time is not.
 
 ### F-81 — ~~WITHDRAWN 2026-08-08 before it was ever open~~ **CLOSED 2026-08-21** (withdrawn before it was ever open)
 
+**Status:** CLOSED 2026-08-21
 Filed by the B2a plan's first draft: "a FAILED secret plate stays resident while
 its retry prompt is up." It described a residency window created by wiping the
 record *after* `EngraveScreen.Engrave` returned.
@@ -3259,6 +3354,7 @@ into the next commit touching this file.)*
 
 ### F-73 — CLOSED 2026-08-07 — the XIP read at the NORMATIVE 0x10E00000 is verified on hardware
 
+**Status:** CLOSED 2026-08-07
 **Operator decision 2026-08-07: leave it, do not buy a board for this.** Filed so
 it is tracked rather than remembered.
 
@@ -3347,6 +3443,7 @@ trip. **Not deferrable past B1.**
 
 ### F-74 — CLOSED 2026-08-08 — a build gate now covers a Go plan's code
 
+**Status:** CLOSED 2026-08-08
 `scripts/plan-build-gate.sh` extracts ```rust blocks into a scratch crate and
 builds them. Plan B's documents are **Go**, so every Go fragment in a plan
 reaches its reviewer uncompiled — the B1 plan says so in its own gate-coverage
@@ -3432,6 +3529,7 @@ four landed that day. Bodies retained verbatim below.
 
 ### F-67 — the Go `MDDataSymbols` lacks Rust's 93-symbol codeword cap (owning phase: Plan B, before the public-section decode ships)
 
+**Status:** OPEN
 **Found by the §6.3 scoped re-review, 2026-08-07.** Rust's
 `md_codec::codex32::unwrap_string` rejects an over-93-symbol codeword
 (`REGULAR_CODE_SYMBOLS_MAX` — "cycle-4 I1: β has order 93, degrees d and d+93
@@ -3457,6 +3555,7 @@ wider than any valid md1 codeword.
 
 ### F-68 — `plan-build-gate.sh` compiles the CLI tests but never runs them (owning phase: before Plan B's plan review; NOT gating Plan A)
 
+**Status:** OPEN
 The gate extracts `tests/seal_cli.rs` and, since 2026-08-07, compile-checks it
 with `--no-run`. It cannot run it: the scratch crate's binary is built from the
 UNMODIFIED `main.rs`, which has no `seal` subcommand, so every case would fail
@@ -3489,6 +3588,7 @@ this, and so did the fix verification for this entry.
 
 ### F-69 — amend §9 and §12 item 6 for `--seal-secret` (owning phase: before Plan B's plan review; the two artefacts must agree before Go binds to either)
 
+**Status:** OPEN
 Plan A Task 9 added a `--seal-secret` opt-in that the spec does not have. §9's
 synopsis omits it and §12 item 6 records `ms1` as ADMITTED with no opt-in, so the
 **spec's own documented invocation** — `me seal <ms1> --out x.uf2` — exits
@@ -3500,6 +3600,7 @@ Amend the spec to match the implementation; do **not** remove the flag.
 
 ### F-70 — the `--seal-secret` guard covers `ms1` only, not a raw BIP-39 mnemonic (owning phase: with F-69, same spec amendment)
 
+**Status:** OPEN
 Found by the whole-diff review (`design/agent-reports/REVIEW_plan_a_whole_diff_2026-08-07.md`,
 Minor). `main.rs`'s guard is
 `!seal_secret && secret.iter().any(|r| matches!(classify(r), Ok(Format::Ms)))`.
@@ -3764,6 +3865,7 @@ tests around it.
 
 ### F-122 — a flickering touch panel still produces GENUINE edges, so the wipe can still be delayed (owning phase: **post-merge polish and hardening**)
 
+**Status:** OPEN
 Filed 2026-08-11, out of F-103's fix. **This is the part of F-103 that was
 narrowed rather than closed, and it is filed rather than folded into that entry
 so it cannot be lost behind a CLOSED heading.**
@@ -3795,6 +3897,7 @@ ensures the machine wipes rather than holding a seed forever.
 
 ### F-123 — the documentation implies the wiping class is meaningfully safer than it is (owning phase: **systemwide payloads**)
 
+**Status:** OPEN
 Filed 2026-08-11, out of the systemwide-payloads brainstorm. **Operator ruling:
 Sealed Payload is frozen; its documentation is not.**
 
@@ -3824,6 +3927,7 @@ journey that repeats the current wording propagates the inference.
 
 ### F-124 — remedy Sealed Payload's security failures (owning phase: **deferred, a future cycle — operator ruling 2026-08-11**)
 
+**Status:** OPEN
 Filed 2026-08-11 alongside F-123. **Deliberately deferred, not forgotten.**
 
 The operator's ruling for the systemwide-payloads cycle was "keep it, file a doc
@@ -3849,6 +3953,7 @@ inherit no debt from this. The two are independent.
 
 ### F-125 — the restored user-supplied passphrase mode requires amendments to EPD and passphrase.rs, and they are unscheduled (owning phase: **systemwide payloads, before implementation**)
 
+**Status:** OPEN
 Filed 2026-08-11 out of R0 rounds 3 and 4 on `SPEC_systemwide_payloads.md`,
 which flagged it twice as NOT FIXED. Recording it so the collision is scheduled
 rather than argued about later.
@@ -3884,6 +3989,7 @@ them the mode they are implementing does not exist.
 
 ### F-126 — CLOSED 2026-08-12 by plan stage 10 — presenting an NFC tag to a gathering flow FREEZES the emulator, so the path stage 6 exists to open cannot be walked (owning phase: **systemwide payloads**) `#mnemonic`
 
+**Status:** CLOSED 2026-08-12
 **CLOSED 2026-08-12** by plan stage 10, and by fix 2 as recommended — the loop
 shape, not the reader. The five duplicated scan loops are now one
 `startScanner` (`gui/nfc_scan.go:45`) with a backoff keyed on **idle**, which is
@@ -3971,6 +4077,7 @@ emulator's NFC source as it stands.
 
 ### F-127 — ~~`mk encode --from-md1` cannot read a CHUNKED md1~~ **CLOSED 2026-08-21** `#mnemonic`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-11 building the pathological-wallet journey
 (`design/journeys/SeedHammer-II-pathological-wallet-journey.pdf`).
 
@@ -4086,6 +4193,8 @@ needs a batch input mode (`--xpub` repeatable, or a key file), which is a
 separate feature; see F-223.
 
 ### F-128 — ~~the stub's spec sentence and `mk`'s behaviour name different identities~~ **CLOSED 2026-08-21** `#mnemonic`
+
+**Status:** CLOSED 2026-08-21
 #### RESOLVED 2026-08-21 — `mnemonic-key` (SPEC 3.3 + 5)
 
 Fixed in the TEXT, since the refutation below establishes the code is right.
@@ -4160,6 +4269,7 @@ rename is real, bumping silently changes the stub every existing key card carrie
 
 ### F-129 — ANSWERED 2026-08-11 (see the nested entry) — `--path` is mandatory for a non-canonical wrapper and flattens divergent origins; which source wins on restore is unpinned (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-11, same run. **A design question, not a defect.**
 
 A `wsh(or_i(…))` wrapper has no canonical default derivation path. Without
@@ -4221,6 +4331,7 @@ F-130. That is a different problem and does not affect the above.
 
 ### F-130 — restored xpubs lose their BIP-32 depth/parent/child, so the descriptor and its checksum change (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-11 from the same round trip.
 
 The recovered wallet is the right wallet: for all 11 slots the chain code and
@@ -4258,6 +4369,7 @@ first operator to check a checksum after recovery will think the backup failed.
 
 ### F-131 — the engraving checklist tells the operator a recovery rule that is false in BOTH directions (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-11 from the miniscript-nesting review of the pathological wallet.
 Verified by running it, not by reading the report that raised it.
 
@@ -4297,6 +4409,7 @@ does) or refuse to print a threshold for a non-threshold policy.
 
 ### F-132 — PLATE HALF CLOSED 2026-09-06 (hashlock H6) — the hashlock preimage is required to spend, absent from the backup, and unmentioned by it (remaining half's owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** CLOSED 2026-09-06
 Filed 2026-08-11, same review.
 
 Tiers 1 and 2 are `and_v(v:sha256(H), …)`. Spending either requires revealing
@@ -4350,6 +4463,7 @@ the operator-journeys phase this item is already owned by.
 
 ### F-133 — the relative tiers are INVERTED: the weakest key-set matures ~90 days before the stronger one (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-11, same review. Arithmetic verified independently from BIP-68's
 field layout.
 
@@ -4389,6 +4503,7 @@ where it is authored, in `mnemonic-toolkit`, so the Rust-primary direction holds
 
 ### F-134 — plate count for one wallet ranges 26 → 58 depending on an md1-form flag nobody is told about (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-11, same review. All three counts measured.
 
 | route | md1 | mk1 | plates |
@@ -4421,6 +4536,7 @@ the spread rather than changing its shape.
 
 ### F-135 — CLOSED on filing: miniscript nesting depth is not a risk for this wallet, with the numbers so nobody re-derives them `#mnemonic`
 
+**Status:** CLOSED
 Recorded 2026-08-11 so the question stops being re-asked. Measured with
 `miniscript` v13.0.0 from `rust-miniscript-fork`, the crate actually depended on,
 against the real 11-key descriptor:
@@ -4473,6 +4589,7 @@ two orders of magnitude from anything that bites.
 
 ### F-136 — ~~`md encode` does not auto-chunk, though two places say it does~~ **CLOSED 2026-08-21** `#mnemonic`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-11 from the codec lens; **confirmed first-hand** — this is the
 error that stopped the journey build before the review raised it:
 
@@ -4531,6 +4648,7 @@ change a printed command without changing a card.
 
 ### F-137 — the md encoder has no depth guard but the decoder does, so an unrestorable card is expressible (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Raised by the codec lens; **carried on that report's authority — I have not
 re-measured it.** See `design/agent-reports/miniscript-nesting/codec.md` §F5.
 
@@ -4547,6 +4665,7 @@ A decoder-only bound protects the reader and abandons the writer.
 
 ### F-138 — ~~the Go port does NOT enforce a `Renderable` bound Rust lacks `#mnemonic`~~ **CLOSED 2026-08-21** (withdrawn — the claim was wrong) `#mnemonic`
 
+**Status:** CLOSED 2026-08-21
 **WITHDRAWN 2026-08-11.** The pre-flash conformance review refuted it by
 measurement: zero hits for `Renderable` in Go `sysw/` and in every Rust crate.
 It exists only in fork-native GUI md-template code, which the Rust-primary rule
@@ -4573,6 +4692,7 @@ able to reject a valid card. Decide which; do not leave it implicit.
 
 ### F-139 — CORPUS.md §C6 has an answer now (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 `descriptor-mnemonic/design/CORPUS.md` §C6 "Pathological deeply-nested
 miniscript (chunking forced)" has stood as an explicit placeholder — its own text
 says the 8-nested-`or_d` form "actually fits single string (45 B)" and that a
@@ -4590,6 +4710,7 @@ encodes to 13 bytes and one string.
 
 ### F-140 — `compare-cost` omits the witnessScript from its wsh column but not the tapleaf from its tr column, inverting the comparison it exists to inform (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-11. Raised by the limits lens, survived adversarial refutation with
 its numbers independently reproduced, and the **mechanism re-read at source by me
 before filing**.
@@ -4638,6 +4759,7 @@ assertion would have caught this.
 
 ### F-141 — CLOSED on filing: `me sysw pack --region`, because the plan's stage-2 green line was never actually met `#mnemonic`
 
+**Status:** CLOSED
 Found 2026-08-11 by trying to do the thing the feature exists for — put a payload
 on the machine — and discovering there was no command that produces the artifact.
 
@@ -4688,6 +4810,7 @@ by claims more often than by code.
 
 ### F-142 — CLOSED 2026-08-12 — the Go suite never runs at the device's word size, so a whole class of defect is invisible to CI (owning phase: **systemwide payloads**) `#mnemonic`
 
+**Status:** CLOSED 2026-08-12
 Filed 2026-08-11 out of the pre-flash conformance Critical, fixed in the fork at
 `74871d3`.
 
@@ -4732,6 +4855,7 @@ different question, which is not a repeatable process.
 
 ### F-143 — sh2-flash compares the key against a RECORDED fingerprint, not the device's live OTP (owning phase: **post-merge polish and hardening**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12 alongside the fix for the pre-flash flashpath review's I1.
 
 `sh2-flash` now refuses to sign with a key whose fingerprint is not the burned
@@ -4760,6 +4884,7 @@ back LOUDLY, never silently.
 
 ### F-144 — CLOSED 2026-08-12: the load flow was built, shipped in me v0.6.0 / firmware g753f729, and confirmed on the machine — the plan has no stage for the LOAD FLOW, so all six stages are done and the feature is inert (owning phase: **systemwide payloads**) `#mnemonic`
 
+**Status:** CLOSED 2026-08-12
 Filed 2026-08-12, from the operator's question after the firmware booted: *why
 does the machine never look?*
 
@@ -4816,6 +4941,7 @@ as a broken sentence rather than as an absent row.
 
 ### F-145 — PARTIALLY DONE 2026-08-12 (see the nested entry) — `syswLoadFlow` has no test of its own; the gui harness has no Platform fake with a SyswReader (owning phase: **systemwide payloads**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12 with the load flow itself (`seedhammer` `b1fb067`).
 
 The flow that closes F-144 is exercised by nothing. `go test ./gui/` passes and
@@ -4868,6 +4994,7 @@ directions, and sealed with the right and wrong passphrase.
 
 ### F-146 — ~~MISFILED, withdrawn 2026-08-12 (see the nested entry) — gui flow outcomes cannot be asserted: `runUITouch` gives the test goroutine no synchronised view`#mnemonic`~~ **CLOSED 2026-08-21** (misfiled and withdrawn) `#mnemonic`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-12 from writing F-145's tests, and it is why three of them are
 missing rather than merely unwritten.
 
@@ -4942,6 +5069,7 @@ cover the flow around it.
 
 ### F-147 — I claimed `clippy clean` in three commit messages while it was RED, because `cmd && echo OK` prints nothing when cmd fails (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12. Found by the stage 7/8 implementer, not by me, and confirmed
 by checking out the commit into a worktree and running clippy there:
 
@@ -4992,6 +5120,7 @@ here.
 
 ### F-148 — flashing is remote-safe; VERIFYING a flash is not — FIRST VERIFICATION LANDED 2026-08-12 (owning phase: **systemwide payloads, stage 11**) `#mnemonic`
 
+**Status:** OPEN
 Recorded 2026-08-12 when the operator noted they are remote. Two halves of the
 flash operation have opposite answers, and conflating them is how a remote
 session ends with a machine nobody can judge.
@@ -5028,6 +5157,7 @@ power is the verification step and belongs to whoever is in the room.
 
 ### F-149 — stage 12's integration is pinned by AST only; nothing drives a completed engrave into the verify flow (owning phase: **polish / v0.0.1**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12 on the whole-cycle review's recommendation (item 2.3.3), which
 judged it worth a follow-up rather than a log paragraph.
 
@@ -5074,6 +5204,7 @@ claims, and only one of them is currently tested.
 
 ### F-150 — the on-device wallet-descriptor builder needs major attention: it dead-ends, assumes one key, and offers none of miniscript (owning phase: **a future cycle — needs its own brainstorm**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12 from the operator's own use of the feature on the machine.
 **These are field observations, reported as given; only the code pointers below
 are mine and only they are verified.**
@@ -5118,6 +5249,7 @@ teaching the panel to author one. Worth weighing before building an editor.
 
 ### F-151 — the frame extractor sees text the DEVICE cannot draw, so every wording assertion in `gui/` shares a blind spot (owning phase: **(1) DONE; (2)+(3) polish / v0.0.1**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12. Found by the operator looking at the panel, and by nothing
 else in this project.
 
@@ -5194,6 +5326,7 @@ ride along on some other flash rather than earning one.
 
 ### F-152 — selecting "from payload" when one is PRESENT BUT NOT LOADED should launch the loader (owning phase: **a future cycle — needs a spec §3.1 state and one plan stage**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-13 by operator ruling. Agreed as a feature, deliberately not
 implemented freehand.
 
@@ -5244,6 +5377,7 @@ sentence rather than an absent row.
 
 ### F-153 — `me sysw pack`'s record index is 0-based and unlabelled, and `--in` filters blank lines so it is not a line number either (owning phase: **polish / v0.0.1**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12 writing the Load Payload journey
 (`design/journeys/SeedHammer-II-load-payload-journey.pdf`). Hit on the FIRST
 `me sysw pack` invocation of it.
@@ -5301,6 +5435,7 @@ question stated: number the records from 1, or report the line they came from?
 
 ### F-154 — ~~the tenth program's carousel dot is drawn underneath the firmware version line~~ **CLOSED 2026-08-20** `#mnemonic`
 
+**Status:** CLOSED 2026-08-20
 Filed 2026-08-12, same run. **Measured on the framebuffer, not eyeballed** —
 scanning row y=297 of `shots/p09-load-payload-program.png` for near-white runs:
 
@@ -5358,6 +5493,7 @@ run, so a mutant looked caught without having run. `-count=1` on every mutation.
 
 ### F-155 — the home screen cannot tell you whether a payload is loaded (owning phase: **systemwide payloads — spec question first**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12, same run. Not cosmetic, and not test infrastructure: the
 thing whose presence is unreported is a **seed in RAM**.
 
@@ -5390,6 +5526,7 @@ state the device tracks and does not show.
 
 ### F-156 — neither published journey can be regenerated by the commands its own README gives (owning phase: **operator journeys**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-12, found while writing the third journey against the convention
 the first two set — the convention turned out not to run.
 
@@ -5431,6 +5568,7 @@ are complete.
 
 ### F-157 — a nested-segwit multisig is labelled identically to a legacy P2SH one, in the RESTORE DOCUMENT (owning phase: **`SPEC_multisig_build_repair.md` P2**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-13 while brainstorming the on-device policy builder. **Measured by
 running the three summary surfaces**, not read:
 
@@ -5467,6 +5605,7 @@ distinct — the defect is that two of them are equal.
 
 ### F-158 — no NFC gather flow can be executed by any test or in the emulator, so half of Build-policy has never run outside the operator's hands (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-13. This is the cause behind F-150 item 1 reaching hardware.
 
 Three verified facts:
@@ -5534,6 +5673,7 @@ a step nothing exercises.
 
 ### F-159 — the Build-policy cosigner gather is titled "Engrave Bundle" (owning phase: **`SPEC_multisig_build_repair.md` P1**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-13, observed in the emulator. Inside Engrave Multisig → "Build
 policy", after the five parameter pickers, the cosigner-gather screen's title
 reads **"Engrave Bundle"** — a different program. It is the shared
@@ -5548,6 +5688,7 @@ work since both are in that flow.
 
 ### F-160 — the engraved census cannot see an ms1 cut through the standalone codex32 flows (owning phase: **`SPEC_multisig_build_repair.md` P0**) `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-14, from the independent false-PASS review of the walk harness
 (`design/agent-reports/walk-harness-false-pass-review.md`, its one Critical).
 
@@ -5578,6 +5719,7 @@ is the thing that would keep this boundary honest.
 
 ### F-161 — ~~the GUI *does* redraw during a cut, and the refresh degrades with `shPace``#mnemonic` `#seedhammer`~~ **CLOSED 2026-08-21** (withdrawn — the claim was wrong) `#mnemonic` `#seedhammer`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-14 and **corrected the same day.** The original entry claimed the
 GUI stops redrawing during a cut and that *"nothing in the engrave path calls
 `ctx.WakeupAt`"*. **Both are false.** The retraction is kept in full rather than
@@ -5647,6 +5789,7 @@ loop is fed by the same `WakeupAt` that measurably works here.
 
 ### F-162 — ~~`mk1Gatherer.collected()` returned chunks in RANDOM order`#mnemonic` `#seedhammer`~~ **CLOSED 2026-08-21** (fixed `88c028e`) `#mnemonic` `#seedhammer`
 
+**Status:** CLOSED 2026-08-21
 **Closed.** The index walk now mirrors `md1Gatherer`, with the doc comment and
 the regression tests md1 got at `3a23dbb`. All four assumptions below were
 verified by reading before the change, and all four held — nothing compares mk1
@@ -5744,6 +5887,7 @@ same pass, since it feeds `mk1DisplayFlow` too.
 
 ### F-163 — ~~S3's gate is a whole-tree `grep` and S0 already broke it`#seedhammer`~~ **CLOSED 2026-08-21** (fixed `2b7fc96`) `#seedhammer`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-14 by the parallel-implementation review
 (`design/agent-reports/parallel-implementation-feasibility.md`), controller-verified.
 
@@ -5770,6 +5914,7 @@ text is the thing that needs editing, and the plan is a gated artifact.
 
 ### F-164 — ~~S0's gate names eight tests; three of them exist under different names, two do not exist`#seedhammer`~~ **CLOSED 2026-08-21** (fixed `2b7fc96`) `#seedhammer`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-14, found by checking S0's gate against the tree rather than
 against the plan's own prose. Sibling of [F-163]: a gate written in terms that
 have drifted from the code.
@@ -5800,6 +5945,7 @@ tree's names are better, and the plan is the thing that drifted.
 
 ### F-165 — D4 rescoped: it constrained a receiver no walk reaches (owning phase: **`SPEC_multisig_build_repair.md` S0**) `#seedhammer`
 
+**Status:** OPEN
 Filed and rescoped in the same change, 2026-08-14 (`2b7fc96`). Third gate this
 day that could not fail, after [F-163] and [F-164].
 
@@ -5827,6 +5973,7 @@ took running the check. A gate that has never executed is a hypothesis.
 
 ### F-166 — the fork's md decoder cannot read a PATHLESS origin; the Rust primary can (owning phase: **`SPEC_multisig_build_repair.md` post-S0 / its own cycle**) `#seedhammer` `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-14, found by S0 D8's coverage catch-up — and *only* by it. The
 re-pin's provenance half was green; this surfaced the moment the primary's new
 vectors were actually exercised.
@@ -5864,6 +6011,7 @@ are not bookkeeping.
 
 ### F-167 — D5's gate record carries a seed DIGEST, not seed words: a departure from the plan's text (owning phase: **`SPEC_multisig_build_repair.md` S0, folded at close**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 alongside the D5 implementation (`1333cc4`), so the departure
 is visible rather than discovered later by someone diffing the plan against the
 code.
@@ -5896,6 +6044,7 @@ and the code agree, or overrule it explicitly. Do not leave the plan saying
 
 ### F-168 — the only automated walk is a BUNDLE-ENGRAVE walk, and S0's evidence line calls it Trace A (owning phase: **`SPEC_multisig_build_repair.md` S0, folded at close**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md`.
 
 `cmd/emu/walk_trace_a.js` selects exactly two programs — `goTo("LoadPayload")`
@@ -5924,6 +6073,7 @@ per-run); write it down so a future `>=` does not convert that into a fail-open.
 
 ### F-169 — S1–S5 each need their own walk, and none exists; the shared script cannot tell which flow it is in (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C1, I1).
 
 `buildMultisigPolicyFlow` has one production caller, `gui/multisig.go:55`,
@@ -5988,6 +6138,7 @@ restore. Minor citation drift folded: `"Which md1?"` is now
 
 ### F-170 — the walk asserts a plate COUNT where the plan requires a census derived from the input tuple (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C3, I3).
 
     cmd/emu/walk_trace_a.js:274
@@ -6038,6 +6189,7 @@ cannot pass.
 
 ### F-171 — nothing invokes the pinned `md`/`mk`/`ms`, so S2's and S5's byte-comparison gates are unimplemented (owning phase: **`SPEC_multisig_build_repair.md` S2**, gating) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from `design/RECON_S1_S6_walk_gates.md` (C4).
 
 S2's gate: *"the current primary BUILDS an md1 from the same inputs and the
@@ -6088,6 +6240,7 @@ built from the commit it named.
 
 ### F-172 — ~~S3's restore-doc gate has nothing to read on the template branch~~ **RESOLVED 2026-08-15 by S3 — but the filed cause was only HALF of it** (owning phase: **`SPEC_multisig_build_repair.md` S3**) `#seedhammer`
 
+**Status:** OPEN
 > **RESOLUTION 2026-08-15. Read the second cause before citing this entry as
 > closed — closing it on the filed cause alone would put a false record on
 > disk.**
@@ -6129,6 +6282,7 @@ subject never drawn, which reads exactly like "the screen did not say it".
 
 ### F-173 — RULED 2026-08-14 (`0..n`): Trace A could not complete on the payload S0 delivered, once S1's unconditional payload feed landed (owning phase: **`SPEC_multisig_build_repair.md` S1**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from `design/agent-reports/s1-walk-gate-judgement-review.md`
 (C-1), independently re-measured by the controller before filing. **Independent
 of the walk-gate findings (F-168–F-172) and survives every option proposed for
@@ -6204,6 +6358,7 @@ it was found; the ruling above is what binds.**
 
 ### F-174 — a stage-gate build walk must assert ZERO `shNFC.present` calls (owning phase: **`SPEC_multisig_build_repair.md` S0b/S1**, gating) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from the same review (I-1). The recon's own remedy table
 prescribed `shSysw` **+ `shNFC.present`** for the build-flow gather — the harness
 substitution that makes S1's gate pass without S1's feature.
@@ -6236,6 +6391,7 @@ whole integrity. Also unit-covered in `cmd/emu/nfc_presented_test.go`.
 
 ### F-175 — an artifact-free stage cannot produce a gate record at all (owning phase: **`SPEC_multisig_build_repair.md` S1**, gating) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-14 from S0b, and **measured rather than reasoned about**:
 
     $ go run ./cmd/gaterecord -stage S0b -walk <a walk with an empty census> …
@@ -6285,6 +6441,7 @@ is red today — which is exactly why this would go unnoticed until S1's gate.
 
 ### F-176 — ~~`md` cannot author per-key origins, so S5's divergent md1 byte-comparison has no producer~~ **WITHDRAWN 2026-08-15: the premise is FALSE, measured** (owning phase: **none — nothing blocks S5**) `#seedhammer` `#cross-repo`
 
+**Status:** OPEN
 **✅ WITHDRAWN 2026-08-15, before any upstream change was made.** The implementer's
 first act was to run the mechanism rather than the three failing invocations
 below, and **`md encode` authors per-key origins today** — not through a flag,
@@ -6368,12 +6525,14 @@ Cross-ref: §1a now rules **full string equality for all three artifact classes*
 
 ### F-177 — the `ms` oracle pin lags the settled ms-cli 0.16.0 (owning phase: **before S2's oracle extension**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-15. `oracle/pins.json` pins `ms` at commit `ddfa497` / `ms 0.15.0`, and the installed binary is that build — so the pin is HONEST and internally consistent, and no gate is affected. But `mnemonic-secret` HEAD is now `de593ca` with ms-cli **0.16.0**, whose bare-`bip48` permissiveness is the settled behaviour.
 
 Not urgent and deliberately not done in-session: re-pinning is a chain — rebuild, install, re-record `pins.json`, then re-anchor S0's gate record. Per the D5 doctrine that chain needs **no new emulator walk**, because an oracle re-pin cannot reach the device path; `gaterecord -force` over the saved walk is the sanctioned rebuild. Do it when S2 extends the oracle, so the re-anchor happens once rather than twice.
 
 ### F-178 — S1's gate has a THIRD outcome: D-1 did not reproduce, and the flow ran to the engrave screen (owning phase: **`SPEC_multisig_build_repair.md` S6** — hardware; reassigned 2026-08-15) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-15 from S1's implementation. **This entry exists because the spec
 demands it**: SPEC P1 says *"If P0 found no D-1 on the payload path, this stage
 records that as its result and names the source or shape that was not
@@ -6465,6 +6624,7 @@ What was wrong was reading it as evidence that the flow was healthy.
 
 ### F-179 — ~~an em-dash BLANKS THE WHOLE BODY~~ **RESOLVED 2026-08-15 by S3b — and it blanks a SIBLING LINE, which is worse** (owning phase: **`SPEC_multisig_build_repair.md` S3b** — re-owned 2026-08-15, was S3) `#seedhammer`
 
+**Status:** OPEN
 > **RESOLVED by S3b (`0290459` the 27 fixes, `db6486c` the guard). The mechanism
 > was worse than every description of it, including this entry's.**
 >
@@ -6683,6 +6843,7 @@ measured at 2652 px — i.e. currently invisible — which makes them the first
 ones to fix, not the last.
 ### F-180 — the Go cosigner-card roster is in a DIFFERENT order from the emulator payload (owning phase: **`SPEC_multisig_build_repair.md` S4**) `#seedhammer`
 
+**Status:** OPEN
 Found 2026-08-15 while writing S2's typed-seed walk, by running it:
 
     gui/multisig_build_payload_testdata_test.go  cosignerCardRoster
@@ -6710,6 +6871,7 @@ either align them or to state, in both files, that they deliberately differ.
 
 ### F-181 — ~~the typed-seed EMULATOR leg is not delivered: `shTap` cannot find a keyboard key~~ **WITHDRAWN 2026-08-15: the leg needed no keyboard, and S2's gate is now driven** (owning phase: **none for the gate; a keyboard driver remains OPTIONAL for S4**) `#seedhammer`
 
+**Status:** OPEN
 **WITHDRAWN, the way F-176 was, and for the same reason: the premise was false.**
 
 This entry said S2's emulator gate was blocked on driving the on-device
@@ -6776,6 +6938,7 @@ driving in the emulator, and the Go-side `typeWords` driver
 
 ### F-182 — the end-of-bundle ms1 reminder is titled "Engrave Bundle" on the Build path (owning phase: **`SPEC_multisig_build_repair.md` S5** — with the engrave tail) `#seedhammer`
 
+**Status:** OPEN
 D-4-adjacent, found 2026-08-15 while fixing D-4 and deliberately left out of it.
 
 S2 made `bundleGatherFlow`'s title the caller's, which fixes the gather for all
@@ -6791,6 +6954,7 @@ applies and is worth doing once, in the stage that owns the engrave tail.
 
 ### F-183 — ~~`assertFrameHasBody`'s floor is calibrated for ONE screen shape but named and worded as general~~ **FIXED 2026-08-15 by S3b (`db6486c`)** (owning phase: **`SPEC_multisig_build_repair.md` S3b** — with the F-179 raster class) `#seedhammer`
 
+**Status:** OPEN
 > **FIXED in the stage that owned it, the same day it was filed.** `const floor =
 > 4000` is now `titleOnlyInk(t) + margin`, where `titleOnlyInk` **searches 1..3
 > nav buttons and returns the worst** — so the floor is derived from a measured
@@ -6839,6 +7003,7 @@ no helper. Belongs with S3b because it is the same class and the same instrument
 
 ### F-184 — a needle's uniqueness proof counts COMMENTS as production sites (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
 
+**Status:** OPEN
 Found 2026-08-15 by S3, which worked around it and left a comment explaining the
 workaround so the next author does not undo it.
 
@@ -6866,6 +7031,7 @@ comments**, and say so where needles are defined.
 
 ### F-185 — a modal's body can scroll off the first frame with no affordance, so a required instruction is present in the string and absent from the screen (owning phase: **`SPEC_multisig_build_repair.md` S5** — with the engrave tail's screens) `#seedhammer`
 
+**Status:** OPEN
 Found 2026-08-15 by S4's emulator walk, on the screen whose whole purpose is to
 tell an operator what to do about a seed↔key mismatch.
 
@@ -6909,6 +7075,7 @@ rendering half.
 
 ### F-186 — ~~`md encode` cannot encode a DIVERGENT-origin multisig template~~ **HALF WITHDRAWN 2026-08-15: md CAN. The surviving half — an `internal:` error on wrong syntax — is FIXED in the primary.** (owning phase: **`SPEC_multisig_build_repair.md` S5**) `#seedhammer` `#cross-repo`
 
+**Status:** OPEN
 > **CORRECTION 2026-08-15, and the correction matters more than the entry.**
 >
 > **md encodes divergent origins today, and always could.** The claim below that
@@ -7007,6 +7174,7 @@ new md tag implies a rebuild and re-record, and an S0 re-anchor exactly like the
 
 ### F-187 — md's template origin syntax is undocumented for end users, and the only feedback for getting it wrong was an `internal:` error (owning phase: **none — cross-repo docs, batches to a manual cycle**) `#cross-repo` `#docs`
 
+**Status:** OPEN
 Filed 2026-08-15 out of F-186, which was itself a wrong conclusion caused by the
 gap this entry describes.
 
@@ -7054,6 +7222,7 @@ cross-repo notification convention.
 
 ### F-188 — RULED 2026-08-15 (operator: "Build this"): the supply path engraves ONE plate where the seed fills SEVERAL slots, so the engrave rule and the verify rule disagree at the source (owning phase: **`SPEC_multisig_build_repair.md` S5**) `#seedhammer`
 
+**Status:** OPEN
 Filed and immediately ruled IN by the operator, having been raised as a
 follow-up by the fable design review persisted at `5fc08c4`.
 
@@ -7101,6 +7270,7 @@ operator saw last time.
 
 ### F-189 — `multisigEngraveCards` and `findUserSlot`'s `reused` return have no production callers left (owning phase: **`SPEC_multisig_build_repair.md` S5** — with the block that retired them) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the F-188 implementer, which could not write this file from
 its worktree.
 
@@ -7118,6 +7288,7 @@ state in each why it is kept.
 
 ### F-190 — `cmd/emu/needle_test.go`'s uniqueness counter reads SHARED-HELPER strings as if they were per-flow (owning phase: **`SPEC_multisig_build_repair.md` S5.D** — with the walk block) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16, widened by F-188 and found by it.
 
 A walk needle must identify ONE flow. The counter proves a string appears at one
@@ -7140,6 +7311,7 @@ comments as production sites): the counter measures source text where the claim
 is about screens.
 ### F-191 — ~~a passphrase divergence between engrave and verify is reported as "That seed is not a cosigner"~~ **FIXED 2026-08-16 at the site filed, in `023505c`. THE CLASS IS NOT CLOSED — see the note at the end.** (owning phase: **`SPEC_multisig_build_repair.md` S5.D** — with the screens/prose block) `#seedhammer`
 
+**Status:** CLOSED
 Filed 2026-08-16 by the S5 policy-identity fold implementer, which could not
 write this file from its worktree. Found by the fable seam review (M1).
 
@@ -7187,6 +7359,7 @@ gate's fold, not here.
 
 ### F-192 — the F-185 drawn-frame check gates only the screens S5.C touched; every other long modal is still unmeasured (owning phase: **S6b — operator ruling 2026-08-17, sweep before the hardware flash**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the S5.C implementer, landed by the controller.
 
 The class check F-185 asked for now exists and is **a one-line call**, which is
@@ -7279,6 +7452,7 @@ renderer, not merely a hardening pass.
 
 ### F-193 — the same key is spelled two ways on two device screens (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the S5.C implementer, landed by the controller.
 
 The review screen shows the operator's **real** base58 xpub (`xpub6DkFA…`); the
@@ -7297,6 +7471,7 @@ renderings is a real improvement; reverting the review to the md1 form is not.
 
 ### F-194 — the pre-engrave review's first page cannot show a key while the §0.1 clause-3 header holds page one (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the S5.C implementer, landed by the controller.
 
 Measured, not predicted: page 1 ends at `"@0, no fingerprint:"` — the first key
@@ -7310,6 +7485,7 @@ together — would fix it properly. It touches `confirmReviewScreen`, which is
 
 ### F-195 — **CLOSED 2026-08-17** (S6a: the census page states it outright — `gui/multisig_build_census.go:208`, "Seed: this set contains NO seed. It is watch-only") — a watch-only set never states outright that it contains no seed (owning phase: **`SPEC_multisig_build_repair.md` S6**) `#seedhammer`
 
+**Status:** CLOSED 2026-08-17
 Filed 2026-08-16 by the S5.C implementer, landed by the controller.
 
 S5.C made the passphrase lines mode-safe and the inventory lists what was cut,
@@ -7326,6 +7502,7 @@ is exactly the kind of thing that gets copied onto the wrong tin.
 
 ### F-196 — a MIXED held set is not expressible through the screens (owning phase: **the spec — it is a model change, and earns its own R0**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the S5 picker/verify implementer, **landed by the controller
 2026-08-16 out of the whole-diff gate's I-10**, which is the only reason this
 entry exists: the implementer drafted it in
@@ -7367,6 +7544,7 @@ is the spec and not a stage.
 
 ### F-197 — **CLOSED 2026-08-17** (S6a: the abort ends the program — `gui/singlesig.go:177` returns on any non-`bundleEngraveDone`, so nothing below vouches for a set that was not fully cut) — the SINGLE-SIG engrave does not stop on an aborted set (owning phase: **`SPEC_multisig_build_repair.md` S6** — before the hardware cycle) `#seedhammer`
 
+**Status:** CLOSED 2026-08-17
 Found 2026-08-16 by the S5 whole-diff fold while landing I-12, and **not folded**:
 `gui/singlesig.go` is outside the review's scope, and scope creep in a fold is how
 a review round gets spent on unreviewed text.
@@ -7394,6 +7572,7 @@ enough — that is exactly what let the multisig instance ship.**
 
 ### F-198 — **CLOSED 2026-08-17** (S6a, the cycle built for it: the label now reads `Full (seed + keys, NOT passphrase)` at `gui/multisig_build_census.go:387`, and the restore document always renders with a plate inventory, a seed statement and a passphrase statement) — **CRITICAL** — the SINGLE-SIG flow takes a passphrase into derivation, labels the result "Full (seed + keys)", and its restore document cannot mention a passphrase (owning phase: **`SPEC_multisig_build_repair.md` S6** — MUST land before the hardware cycle) `#seedhammer`
 
+**Status:** CLOSED 2026-08-17
 Named by the S5 whole-diff review as "adjacent, out of scope, file it" (C-3), and
 filed by the fold with the harm **explicitly unverified**. **The controller
 verified it 2026-08-16, and the answer is the bad one**, so this is not a label
@@ -7441,6 +7620,7 @@ note** — the answer cost one grep.
 
 ### F-199 — `verifyRefused` dead-ends on a CORRECTABLE readback (owning phase: **S6b** — corrected 2026-08-17 from the bare string `S6`, which S6a has passed; the S6b assignment was asserted only in F-204's body and the continuity doc, never in this heading) `#seedhammer`
 
+**Status:** OPEN
 Found 2026-08-16 by the B1..B5 fold while implementing B3, and deliberately
 **not folded**: it is outside B1..B5, and folding an unreviewed control-flow
 change into a fold is exactly what produces the text nobody has read.
@@ -7471,6 +7651,7 @@ unchanged by the S5 seam, so it did not gate the fold").
 
 ### F-200 — `engraveOnePlate`'s frame budget is harness-dependent, and the failure looks like a broken flow (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer` `#test-infra`
 
+**Status:** OPEN
 `gui/multisig_build_walk_test.go:443` gives one plate 4096 frames. **Measured on
 the same plate**: the engraver closed at frame **881** under `runUITouchRaster`
 and at frame **10585** under plain `runUI`, because virtual time in the synctest
@@ -7487,6 +7668,7 @@ or have the helper state its precondition. Recorded meanwhile at
 
 ### F-201 — `multisigVerifyRetryLeadFor(res)` now covers three distinct verdict shapes with one sentence (owning phase: **none — cross-cutting Minor, batches to the end**) `#seedhammer`
 
+**Status:** OPEN
 Upgraded from round 1's Minor 4 by the B1..B5 fold. The retry lead *"Not every
 plate is verified. Try again?"* was filed for narrating a FAILED verify as an
 incomplete one. B3 adds a third shape: a first-seed refusal with **zero** legs.
@@ -7501,6 +7683,7 @@ flow level** — the mechanism to fix this properly landed with B4.
 
 ### F-202 — **CLOSED 2026-08-17** (S6a: `gui/singlesig.go:163` gates the engrave behind `confirmReviewScreen(…, "Plates To Cut", buildPlateCensusLines(cards))`) — the SINGLE-SIG engrave shows no pre-engrave plate census (owning phase: **S6a — `IMPLEMENTATION_PLAN_s6a_singlesig_truth.md`, in scope, not deferred**) `#seedhammer`
 
+**Status:** CLOSED 2026-08-17
 Found 2026-08-16 by the controller during the S6a recon, and **not previously
 filed by anyone**. It is recorded here for the record and is being fixed inside
 S6a — it entered that plan *before* its R0 gate, so it is reviewed rather than
@@ -7527,6 +7710,7 @@ wasted blanks and wasted hours, not funds.
 
 ### F-203 — the two multisig paths give the plate census two different titles (owning phase: **none — cross-cutting Nit, batches to the end**) `#seedhammer`
 
+**Status:** OPEN
 Found 2026-08-16 alongside F-202. The same census screen is titled **"Plate
 Count"** on the BUILD path (`gui/multisig_build.go:394`) and **"Plates To Cut"**
 on the SUPPLY path (`gui/multisig.go:279`).
@@ -7540,6 +7724,7 @@ value of the census work is that it went through the gate.
 
 ### F-204 — a FAILED single-sig verify sends the operator to doubt the PLATES, where the multisig sibling says suspect the passphrase first (owning phase: **S6b — with F-199, before the hardware flash**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the S6a R0 adversarial review (M-5), FILE-not-fix.
 
 `gui/singlesig_verify.go:145` tells a failed verify to "Check the engraved
@@ -7561,6 +7746,7 @@ both are single-screen verify-flow copy decisions on the same tail.
 
 ### F-205 — `backupWalletFlow` and `deriveXpubFlow` engrave passphrase-bound artifacts and say nothing about the missing factor (owning phase: **`key & password custody refinement`** — operator ruling 2026-08-17; NOT gating the hardware flash) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-16 by the S6a R0 adversarial review (N-1), FILE-not-fix.
 
 `backupWalletFlow` (`gui/gui.go:2419-2432`) lets the operator engrave a
@@ -7580,6 +7766,7 @@ should say is a design question rather than a wiring change.
 
 ### F-206 — the pass line's ms1 clause stays singular on a multi-seed multisig verify (owning phase: **S6b, with F-199's verify-screen copy pass**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-17 by the S6a whole-diff adversarial review (M-1), FILE-not-fix.
 
 §4.7c's clause **B** is the fixed string `The ms1 secret you typed matched this
@@ -7599,6 +7786,7 @@ reopen NG1.**
 
 ### F-207 — `singleSigReadbackCards` silently drops a card of an unexpected kind (owning phase: **none yet — pre-existing, NOT gating the hardware flash**) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-17 by the S6a whole-diff adversarial review (N-1), FILE-not-fix.
 
 The readback accounting recognises the card kinds it expects and **silently
@@ -7613,6 +7801,7 @@ should be an adverse observation rather than a non-event.
 
 ### F-208 — a long modal has NO affordance saying more text exists, and `Warning` never wired its scroll to anything touchable (owning phase: **S6b** — operator directive 2026-08-17, REAFFIRMED on corrected facts) `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-08-17 on an operator directive:
 
 > "I think we need the down arrow available on screen everywhere there is a need
@@ -7759,6 +7948,7 @@ F-208 is now the open handle for it.
 
 ### F-209 — **CLOSED 2026-08-18, same day, inline** (S6b: `gui/s6b_modal_fit_sweep_test.go` gains the third arm — 177 raw chars, 146 drawn, headroom 418 — in fork commit `e3ac212`; the staleness it exposed swept in `1cec141`) — F3's new failure-copy arm is missing from the modal-fit sweep its two siblings are in (owning phase: **S6b — filed and closed within it**) `#seedhammer`
 
+**Status:** CLOSED 2026-08-18
 Found by the P9 fold verification (`design/agent-reports/s6b-p9-fold-verification.md`,
 Minor N1), the sonnet pass over the failure-states fold. P9's F3 fix turned
 `singleSigVerifyFlow`'s failure-copy `switch` from two arms into three; the fit
@@ -7803,6 +7993,7 @@ dispatched on discovery; see `design/agent-reports/s6b-falsified-elsewhere.md`.
 
 ### F-210 — the operator journeys cannot be regenerated: all three transcripts read intermediates nothing writes, and the tool versions have moved under them (owning phase: **the arbitrary-`tr()`/`wsh()` cycle — before it leans on the pathological journey**) `#seedhammer` `#test-infra`
 
+**Status:** OPEN
 Found 2026-08-18 by running `design/journeys/transcript.sh` on the operator
 (5-of-12 `wsh(multi(…))`) journey, at the operator's request, to check whether it
 still reproduced before the next cycle relied on it. It does not.
@@ -7953,6 +8144,7 @@ prose beside the image.
 
 ### F-212 — ~~Go and Rust compute DIFFERENT `WalletPolicyId` when the origin is elided~~ **CLOSED 2026-08-20** `#seedhammer` `#security` `#codec`
 
+**Status:** CLOSED 2026-08-20
 **Found 2026-08-20 by the R3 keyed conformance vectors, on their first run.** This
 is precisely the class those vectors were built to find, and no keyless corpus
 could have found it: the divergence is in how KEYS enter a hash.
@@ -8019,6 +8211,7 @@ their first run. That is the argument for keyed conformance vectors in one line.
 
 ### F-213 — ~~`md encode` mints a card carrying a key for a placeholder the template never uses~~ **CLOSED 2026-08-20** `#codec` `#funds-safety`
 
+**Status:** CLOSED 2026-08-20
 **Found 2026-08-20** while adding a `wsh(or_b(...))` conformance vector: the
 vector was accidentally given three keys for a two-key template, Rust encoded it
 happily, and the Go port refused to read the result.
@@ -8078,6 +8271,7 @@ open dispute.
 
 ### F-211 — `bip39.RandomWord()` is an exported CSPRNG-backed word generator compiled into the firmware, on a device that is not supposed to generate seeds (owning phase: **next `#seedhammer` cycle**) `#seedhammer` `#security`
 
+**Status:** OPEN
 **Surfaced 2026-08-19** by an operator-directed audit of every RNG call site
 across the constellation. Operator statement: *"sh2 seed generation is not
 supposed to exist."*
@@ -8147,6 +8341,7 @@ strictly an improvement for a device with the same design intent.
 
 ### F-214 — ~~a card this constellation can ENGRAVE has addresses the DEVICE cannot derive~~ **CLOSED 2026-08-21** `#seedhammer` `#funds-safety`
 
+**Status:** CLOSED 2026-08-21
 `md encode` accepts `tr(@0/<0;1>/*,and_v(v:pk(@1/<0;1>/*),older(144)))` and
 `md address` derives its addresses. The device cannot: `md.TapLeavesChunks`
 describes `pk`, `multi_a` and `sortedmulti_a` leaves only, so anything else
@@ -8239,6 +8434,7 @@ the device can say nothing about where it pays.
 
 ### F-215 — ~~the template-engrave shape guard refuses two shapes that have both moved out from under it~~ **CLOSED 2026-08-21** `#seedhammer` `#codec`
 
+**Status:** CLOSED 2026-08-21
 `md.templateEngraveShapeGuard` refuses `tr(sortedmulti_a)` and `sortedmulti`
 nested under a combinator, on the stated grounds that the shipped off-device
 toolkit cannot reconstruct them — *"they would be silently engraved as an
@@ -8300,6 +8496,7 @@ and three new tests pin the boundary directly.
 
 ### F-216 — a keyless template gathered *with* its mk1 key cards still shows no addresses (owning phase: **the tr/wsh cycle, Stage 5**) `#seedhammer`
 
+**Status:** OPEN
 Plan D3 has two halves. The Wallet Policy program ships the second — *"skipping
 the gather proceeds to consent without address proof"* — and not the first:
 *"a keyless template md1 … gates addresses on gathering N mk1 key cards."*
@@ -8436,6 +8633,7 @@ their own sentences but no emulator walk.
 
 ### F-217 — ~~a card can declare ONE key origin for SEVERAL DIFFERENT keys~~ **CLOSED 2026-08-20** `#codec` `#funds-safety`
 
+**Status:** CLOSED 2026-08-20
 Found by a reader's two questions about the Wallet Policy journey — first why all
 four cosigners share a master fingerprint, then the sharper one: **how can one
 seed and one path yield two different keys?**
@@ -8533,6 +8731,7 @@ exist.
 
 ### F-218 — ~~`md encode` accepts the SAME xpub in every slot~~ **MOSTLY CLOSED 2026-08-21** `#codec` `#funds-safety`
 
+**Status:** CLOSED 2026-08-21
 From the same question. `md encode` on a 4-key template with one xpub repeated
 four times emits a card without complaint — a policy that reads as 4-of-4 and is
 spendable by one key.
@@ -8640,6 +8839,7 @@ Two more are correctly labelled partial and stay open on purpose: **F-145**
 
 ### F-219 — a card's per-key origins are shown by `inspect --json` but by no TEXT surface, and the decoded text re-encodes to a DIFFERENT card (owning phase: **the tr/wsh cycle, Stage 6**) `#codec`
 
+**Status:** OPEN
 Found building the taproot pathological journey, whose round-trip gate this
 breaks.
 
@@ -8734,6 +8934,7 @@ Two separable pieces:
 
 ### F-220 — a CANONICAL wrapper never demands an origin, so a keyless template can be engraved declaring `m` for every slot (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
 
+**Status:** OPEN
 Found adding the address step to the operator journey (5-of-12 `wsh(multi(...))`).
 
 `md inspect` on that journey's engraved card:
@@ -8782,6 +8983,7 @@ twelve paths came from the key files, not from the card.
 
 ### F-221 — F-217's contradiction check cannot see a KEYLESS template, which is where the pathological journey's card hides one (owning phase: **the tr/wsh cycle, Stage 6**) `#codec` `#funds-safety`
 
+**Status:** OPEN
 Found by a reader asking *"what is a round trip if not a restore test?"* about the
 pathological journey's decode step.
 
@@ -8822,6 +9024,7 @@ minimum a warning. The precise rule needs a ruling; the measurement does not.
 
 ### F-222 — ~~the example vault is single-master in THREE of its four tiers and neither journey says so~~ **CLOSED 2026-08-21** `#mnemonic` `#docs`
 
+**Status:** CLOSED 2026-08-21
 Found by the comprehension lens, then re-measured and found to be worse than
 reported. The lens said master C alone drains the vault after ~365 days; the
 slot-to-master mapping says **three of the four tiers need only one master**:
@@ -8857,6 +9060,7 @@ absent from the backup), F-133 (the tiers are inverted). This is the fourth
 member of that family and the one that most changes how the wallet reads.
 ### F-223 — ~~`mk encode` takes one key per invocation~~ **CLOSED 2026-08-21** `#mnemonic`
 
+**Status:** CLOSED 2026-08-21
 Filed 2026-08-21, closing F-127.
 
 F-127 was expected to collapse the pathological wallet's key-card build from
@@ -8955,6 +9159,7 @@ a build of the previous tree.
 
 ### F-224 — residual Minors/Nits from the six-lens review — ~~24~~ **PARTIALLY BURNED DOWN 2026-08-21** `#mnemonic`
 
+**Status:** OPEN
 Filed 2026-08-21, closing the review round.
 
 **All 3 Criticals and all 8 Importants are folded** (`mnemonic-key` 47d7f97 +
@@ -9041,6 +9246,7 @@ a batch is a genuine member; only the count is short.
 
 ### F-225 — **HIGH PRIORITY FEATURE**: one chunk per plate wastes ~60% of every plate, and nothing decided it (owning phase: **engraving throughput**) `#mnemonic` `#hardware`
 
+**Status:** OPEN
 Filed 2026-08-21 from an operator question — "if we chunk at 80 for the
 mnemonic, does that force us to engrave each chunk separately, or can multiple
 chunks be on one plate?" — which nothing in this repo answers.
@@ -9108,6 +9314,7 @@ same operator confusion; this is the *engraving* half and the expensive one.
 
 ### F-226 — ~~`descriptor-mnemonic`'s vendor-freshness gate cannot pass~~ **CLOSED 2026-08-21** `#mnemonic` `#ci`
 
+**Status:** CLOSED 2026-08-21
 > **Title corrected.** It originally ended "…and is path-filtered so it never says so". The gate DID say so — it ran on the pin commit and failed, and the failure was ignored for two days. See the correction in the body.
 
 Filed 2026-08-21, found incidentally while gating the F-136 fix.
@@ -9218,6 +9425,7 @@ PR-time gate caught it. There the gate worked; here the gate cannot run.
 
 ### F-227 — a keyless template with colliding origins and no fingerprints cannot be seated `#journeys` `#funds` `#md` `#firmware`
 
+**Status:** OPEN
 Filed 2026-08-21, found by building the hashlock-vault journey — not by review.
 **Owning phase:** the hashvault journey part is DONE; the `md encode` warning
 and the two pathological journeys are open.
@@ -9334,6 +9542,7 @@ only when the walk fails — so the refusal assertion is not vacuous.
 
 ### F-228 — you cannot get from the English spec to the policy with the shipped tools `#md` `#usability` `#experimental`
 
+**Status:** OPEN
 Filed 2026-08-22. The operator asked the obvious question a journey exists to
 provoke: *how does a user go from the four-tier English description to
 `policy-tr.txt`?* Measured answer: **they cannot.** I hand-wrote that string in
@@ -9394,6 +9603,7 @@ without saying it was hand-written; the transcript's new §1b now says so.
 
 ### F-229 — ~~decide whether tier 4 gets a key~~ **RESOLVED 2026-08-22: IT GETS ONE** `#wallet-design` `#interop`
 
+**Status:** OPEN
 **Operator ruling: *"keyless path is not reasonable."*** Tier 4 of the RCW is now
 `after(1383520) AND sha256(H3) AND pk(@6)` — a seventh seed. Applied to all three
 fixture policies, to `design/journeys/derive-rcw-keys.sh` (the generator, not the
@@ -9431,6 +9641,7 @@ conditions is the operator's signature.
 
 ### F-230 — hot-wallet export: NOT NOW, with a two-part trigger `#export` `#secrets` `#LOW`
 
+**Status:** OPEN
 **Priority: LOW.** Operator-filed 2026-08-22. Ruled NOT NOW; **"never" was
 explicitly rejected**, so this is deferred rather than closed.
 
@@ -9466,6 +9677,7 @@ interactive confirm. R0 still applies.
 
 ### F-231 — the OTHER two fixtures still carry the defects the RCW just fixed (owning phase: **journeys**) `#journeys` `#funds-safety` `#wallet-design`
 
+**Status:** OPEN
 **Filed 2026-08-22**, while applying the two RCW rulings (F-229 and the
 double-hash fix). Those rulings were scoped to the reasonably-complex wallet on
 purpose. Two sibling fixtures were left alone, and each still has one or both of
@@ -9504,6 +9716,7 @@ vault's spending conditions is the operator's signature. Filing the options only
 
 ### F-232 — the RCW journey artifacts describe a wallet that no longer exists (owning phase: **journeys**) `#journeys` `#docs`
 
+**Status:** OPEN
 **Filed 2026-08-22.** The two RCW rulings changed the wallet's identity —
 seven keys instead of six, three new hash literals — so every id and address
 moved:
@@ -9605,6 +9818,7 @@ still hashes to that value. Verified, not assumed.
 
 ### F-233 — `rust-miniscript` sanity-checks `Tr` only, so one wallet's two wrappings disagree about their own validity (owning phase: **the tr/wsh cycle**) `#codec` `#funds-safety` `#upstream`
 
+**Status:** OPEN
 **Filed 2026-08-22**, found while keying the RCW's tier 4.
 
 `Descriptor::from_str` runs `sanity_check()` **only** for the `Tr` variant —
@@ -9633,6 +9847,7 @@ was.
 
 ### F-234 — every QR carries the STANDARD form, never a codex32 string: a constellation-independent recovery path (owning phase: **Goal 1 — Engrave a Transaction**; RE-OWNED 2026-08-24, **OVERDUE** — its original owning phase was *the mt cycle*, which closed with this open because QR was deferred out of v0.1 entirely and nothing re-scoped it) `#mt` `#qr` `#recovery` `#firmware` `#md`
 
+**Status:** OPEN
 **Operator directive, 2026-08-22:** *"convert all QR codes to remove all
 codex32-style encoding … this way we have a constellation independent
 information recovery format."*
@@ -9870,6 +10085,7 @@ them. **Any future QR sizing work must carry that gate.**
 
 ### F-235 — CLOSED 2026-08-24 — `mt` rendered every address with MAINNET parameters, so a testnet or regtest transaction showed an address that does not exist (owning phase: **post-v0.1 UX**) `#mt` `#report` `#LOW`
 
+**Status:** CLOSED 2026-08-24
 **Found by running P5's fixtures, 2026-08-24.** The `OUT` row of a regtest
 transaction reads
 
@@ -9899,6 +10115,7 @@ is not a substitute.
 
 ### F-236 — CLOSED 2026-08-24, by the adversarial review rather than by this entry — `--input-value` took BTC as an `f64` (owning phase: **post-v0.1 UX**) `#mt` `#funds-safety` `#LOW`
 
+**Status:** CLOSED 2026-08-24
 **Noticed while writing P5's tests, 2026-08-24.** `parse_input_values` does
 `btc.parse::<f64>()` then `(btc * 100_000_000.0).round()`. For every value a
 person will actually type this is exact — `f64` has 53 bits of mantissa and
@@ -9918,6 +10135,7 @@ rounding it. That refusal is the actual user-visible gain, not the arithmetic.
 
 ### F-237 — CLOSED 2026-08-24 — `md1`/`mk1` strings reached `mt decode`'s codec and were reported as bad bech32 rather than as a sibling's material (owning phase: **post-v0.1 UX**) `#mt` `#refusals` `#NIT`
 
+**Status:** CLOSED 2026-08-24
 **Noticed while implementing §8.9, 2026-08-24.** §8.9 refuses `ms1` *before*
 §8.2e's byte-naming, because that refusal prints the first eight bytes and for a
 secret those bytes are the secret. The sibling formats have no such hazard —
@@ -9936,6 +10154,7 @@ enough and would not import anything; that is what to write if it is done.
 
 ### F-238 — CLOSED 2026-08-24 — §5 and §8.4's worked example `~FALL 2034` disagreed with §8.4's own algorithm, which gives SUMMER (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
 
+**Status:** CLOSED 2026-08-24
 **Found by implementing it, 2026-08-24.** §8.4 rules the projection exactly:
 
     estimated unlock = MT_REF_TIME + (target_height − MT_REF_HEIGHT) × 600 s
@@ -9967,6 +10186,7 @@ will disagree with some future reference pair too.
 
 ### F-239 — CLOSED 2026-08-24 — §8.4 gave ONE state two normative spellings and never said they are different surfaces (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
 
+**Status:** CLOSED 2026-08-24
 **Found by the post-implementation spec-conformance review, 2026-08-24 (S-2).**
 For a transaction with a non-zero `nLockTime` and every input final:
 
@@ -9994,6 +10214,7 @@ implementer does not have to derive it.
 
 ### F-240 — CLOSED 2026-08-24 — §1.1's row-presence table named `verify` as a report caller; §1.1's own `verify` example does not (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#NIT`
 
+**Status:** CLOSED 2026-08-24
 **Found by the post-implementation spec-conformance review, 2026-08-24 (S-1).**
 §1.1's table lists `mt1 SET` as a row `verify` produces, which reads as `verify`
 being a caller of the shared report. §1.1's own worked `verify` output is a
@@ -10031,6 +10252,7 @@ how a closed item gets "fixed" twice, or how a real one hides behind a stale one
 
 ### F-241 — CLOSED 2026-08-24 — `SPEC_mt_v0_1.md` §3's retraction note stated the `count` width as **12 bits**, while §3 itself states **15** (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#MINOR`
 
+**Status:** CLOSED 2026-08-24
 **Found 2026-08-24**, reading the spec against itself while correcting F-234's
 chunk arithmetic. `SPEC_mt_v0_1.md:86` reads:
 
@@ -10072,6 +10294,7 @@ it will not catch itself.
 
 ### F-242 — `SPEC_mt_v0_1.md` calls a chunk "~96 characters"; a full chunk is **91** (owning phase: **the mt spec, next touch**) `#mt` `#spec` `#sizing` `#MINOR`
 
+**Status:** OPEN
 **Found 2026-08-24**, sizing the `sysw` transaction payload for Goal 1 and
 declining to hand-count what the shipped vectors could be measured for.
 
@@ -10148,6 +10371,7 @@ warning you its numbers are low, using a stale number to say by how much.
 
 ### F-243 — F-234's case against raw octets in the QR rests on an UNTESTED scanner claim, stated in the same register as its measurements (owning phase: **Goal 1 — Engrave a Transaction**) `#qr` `#mt` `#measurement` `#IMPORTANT`
 
+**Status:** OPEN
 **Found 2026-08-24**, when the operator asked *"Raw octets doesn't work for some
 scanners?"* and the claim was checked instead of repeated.
 
@@ -10198,6 +10422,7 @@ found nothing because nothing is there.
 
 ### F-244 — CLOSED 2026-08-24 — `me sysw pack` wrote the container with `std::fs::write`, so an UNSEALED payload holding a BIP-39 mnemonic landed mode 0644 (owning phase: **immediate — pre-existing defect, not Goal 1**) `#me` `#sysw` `#funds-safety` `#CRITICAL`
 
+**Status:** CLOSED 2026-08-24
 **Found 2026-08-24 by the Goal 1 journey walk**, at the step where the operator
 said *"I didn't realize `>` creates a world readable file"*. The walk was about
 transactions; it found a seed-exposure defect in shipped code.
@@ -10344,6 +10569,7 @@ the walk found it.
 
 ### F-245 — `me sysw pack` packs a record's trailing whitespace VERBATIM into the public section (owning phase: **post-P1, `md1`/`mk1` path**) `#me` `#sysw` `#IMPORTANT`
 
+**Status:** OPEN
 **Found 2026-08-24** while machine-checking a claim in R0 round 3 of the P1 plan.
 The plan cited `seal`'s `validate_record` as precedent for refusing padding. The
 citation does not hold, and checking why turned up a live defect on a path P1
@@ -10389,6 +10615,7 @@ accepts is its own defect.
 
 ### F-246 — `me sysw pack` generates and PRINTS a passphrase before it validates the records, so an invalid input still emits secret material
 
+**Status:** OPEN
 **DONE 2026-08-25** — `mnemonic-engrave` `08c9c80` (both instances: admission hoisted out of `split` into `sysw::admit_check`, and the write gate hoisted above every report line) and `9952c7f` (the gate repositioned so R2 still outranks it).
 
 **Severity:** Minor. **Owning phase:** post-P1 UX (not P1 — P1 neither introduces
@@ -10473,6 +10700,7 @@ remedies here; neither needs to copy the other.)*
 
 ### F-247 — `mt encode --qr` does not say whether the record fits an NFC TAG (owning phase: **P2, and it needs an operator ruling FIRST**) `#mt` `#nfc`
 
+**Status:** OPEN
 **NOT DONE, and deliberately — operator, 2026-08-25: "skip nfc stuff for now."** It was in the burndown range but is the one item there that needs a ruling rather than an implementation, and its own text below forbids grafting the worked reference without one. Stays open at its stated owning phase.
 
 **Filed 2026-08-25 during P3b, deliberately NOT implemented.**
@@ -10688,6 +10916,7 @@ which is why it happens BEFORE the tag rather than after.
 
 ### F-248 — `mt encode` refuses its own output without recognising it (owning phase: **post-ship polish**) `#mt` `#ux`
 
+**Status:** OPEN
 **DONE 2026-08-25** — `mnemonic-transaction` `24b8cef`. Two forms: `mt1` strings (with an exact count) and the `tx:` record, neither echoed.
 
 **Found in the side-by-side walk, 2026-08-25.** The operator ran `mt encode`,
@@ -10717,6 +10946,7 @@ name the right one.
 
 ### F-249 — WITHDRAWN 2026-08-25 — FALSE AS FILED; the message names three remedies (owning phase: **none — closed**) `#mt` `#ux` `#f-244`
 
+**Status:** OPEN
 **WITHDRAWN before implementation, during the overnight burndown.** The claim
 was **false**, and the way it became false is the finding worth keeping.
 
@@ -10777,6 +11007,7 @@ adopted here because §3b rules that stdout IS the artifact.
 
 ### F-250 — `mt encode -` is rejected as an unexpected argument (owning phase: **post-ship polish**) `#mt` `#ux`
 
+**Status:** OPEN
 **DONE 2026-08-25** — `mnemonic-transaction` `5c7d827`. A hidden positional whose `value_parser` admits only the literal `-`.
 
 **Found in the side-by-side walk, 2026-08-25.** The operator typed the ordinary
@@ -10820,6 +11051,7 @@ what the specification says.
 
 ### F-251 — `me`'s help tree never names the operator's goal, and the one sentence that does is unreachable (owning phase: **post-ship polish**) `#me` `#ux`
 
+**Status:** OPEN
 **DONE 2026-08-25** — `mnemonic-engrave` `6c3289b`. The one-liner lives in `Cargo.toml`; clap renders the first LINE, not the first paragraph.
 
 **Found in the side-by-side walk, 2026-08-25**, at the step after the `--qr`
@@ -10887,6 +11119,7 @@ instead of a generic one. Verified by feeding an `ms1` string.
 
 ### F-252 — the world-readable refusal asserts reachability it never checked, and is FALSE under any 0700 ancestor (owning phase: **post-ship polish**) `#me` `#mt` `#ux`
 
+**Status:** OPEN
 **DONE 2026-08-25** — `mnemonic-transaction` `54c6d54` and `mnemonic-engrave` `86854c6`. The sentence changed in both; the guard did not.
 
 **Found in the side-by-side walk, 2026-08-25**, when the operator read the
@@ -11060,6 +11293,7 @@ operator's own text — a warning the operator can turn off is not a control.
 
 ### F-253 — a bare `me sysw pack` writes the BEARER container to the terminal at exit 0, under an exemption justified by a false claim (owning phase: **post-ship polish**) `#me` `#security` `#ux`
 
+**Status:** OPEN
 **DONE 2026-08-25** — `mnemonic-engrave` `9ef69ee`. Both gates now live in one pure `write_block()`; a pipe is unaffected.
 
 **Found in the side-by-side walk, 2026-08-25**, immediately after F-252 and from
@@ -11256,6 +11490,7 @@ comment at the gate.
 
 ### F-254 — the installed `me` is four minor versions stale (0.3.0 vs 0.7.0), so a bare `me` in the operator's shell is not the `me` under review (owning phase: **post-ship polish**) `#me` `#repro`
 
+**Status:** OPEN
 **DONE 2026-08-26**, operator authorised ("You can update local binaries").
 `cargo install --path crates/me-cli --force --locked` → *Replaced package
 `mnemonic-engrave v0.3.0` with `v0.7.0`*. `mt` was not installed at all and is
@@ -11284,6 +11519,7 @@ installed binary keeps answering, confidently, as a version nobody is reviewing.
 
 ### F-255 — `md` collides with a near-universal `mkdir -p` alias, and the collision fails as SILENT SUCCESS (owning phase: **constellation naming**, tier-placement cycle) `#md` `#constellation` `#ux`
 
+**Status:** OPEN
 **Found 2026-08-26**, same sweep. In the operator's own shell, `type md` →
 **`md is an alias for mkdir -p`**, shadowing the real binary at
 `~/.cargo/bin/md`. Demonstrated, not reasoned:
@@ -11317,6 +11553,7 @@ install time.
 
 ### F-256 — the constellation's working set is **1.8T**, and ~1.83T of it is `target/`; ten linked worktrees are still registered (owning phase: **housekeeping**, operator ruling owed) `#housekeeping`
 
+**Status:** OPEN
 **Filed 2026-08-26** at the operator's direction ("We probably need to clean up
 extraneous trees eventually too"). Measured rather than estimated, because the
 answer was two orders of magnitude off what "extraneous trees" implies.
@@ -11364,6 +11601,7 @@ for uncommitted work first.
 
 ### F-257 — `plan-glyph-check.sh` is red on a CLI spec it was never built for (owning phase: **tooling**, before the next spec fold) `#tooling` `#gates`
 
+**Status:** OPEN
 **Filed 2026-08-26** during the verification fold. The gate exits 1 on
 `SPEC_constellation_cli_uniformity.md` at lines 699–700, and did so at `d31beed`
 too — it is **not** introduced by any recent fold.
@@ -11431,6 +11669,7 @@ watching, which is a different exposure from the one this item was filed about.
 
 ### F-258 — the `mnemonic-io-lib` extraction is **11 functions / 431 lines**, not the 3 the spec names (owning phase: **P0**, prep for the plan) `#P0` `#mnemonic-io-lib`
 
+**Status:** OPEN
 **Measured 2026-08-26** while preparing the P0 plan, before writing it. §5a names
 three donated pieces — `write_private`, `is_argv_forbidden`,
 `stdout_world_readable_mode`. The real closure is larger, and the plan needs the
@@ -11505,6 +11744,7 @@ not.**
 
 ### F-259 — `me sysw wipe` tells the operator a zeros image is BEARER, because "carries no secret" rides the `--allow-world-readable` parameter and the terminal arm ignores it (owning phase: **P0**, or sooner) `#me` `#ux` `#shipped`
 
+**Status:** OPEN
 **Found 2026-08-26** by the io-seam design review, in code **published as v0.7.0
 the same day**. Reproduced on a real pty:
 
@@ -11568,6 +11808,7 @@ must also survive where it is TRUE.
 
 ### F-260 — `mt encode` refuses mode 0620 saying it "grants read to group or others", when no read bit is set (repo: **mnemonic-transaction**; owning phase: **P1**, reassigned from P0 2026-08-26) `#mt` `#ux` `#shipped`
 
+**Status:** OPEN
 **Found 2026-08-26** while machine-checking the io-seam review's counterexample.
 Reproduced with a valid transaction and a 0600 control that passes:
 
@@ -11624,6 +11865,7 @@ passed is **overdue, not deferred**, so this moves rather than drifting.
 
 ### F-261 — `plan-table-check.sh` silently skips INDENTED tables, and does not list that among its blind spots (owning phase: **tooling**) — **DONE 2026-08-27** `#tooling` `#gates`
 
+**Status:** OPEN
 **Found 2026-08-26** by watching a number fail to move. A fold added a
 five-row table nested under a list item; the gate reported **82 rows, 0
 malformed** both before and after. The file contains **7 indented table lines**
@@ -11667,6 +11909,7 @@ did not — **watching a number NOT move is a check, and it costs nothing.**
 
 ### F-262 — fork B-0's root cause: the Go decoder DISCARDS what the Rust primary keeps, so the message cannot be fixed on its own (repo: **seedhammer**, Rust-primary convergence) `#fork` `#rust-primary` `#ux`
 
+**Status:** OPEN
 **Traced 2026-08-26** while burning down the fork fold review's B-0 (*"the
 `ErrUnsignedInputs` case still reads 'does NOT reassemble'"*).
 
@@ -11720,6 +11963,7 @@ let `transactionReviewLines` take the same unsigned branch both paths deserve.
 
 ### F-263 — worktree hygiene: the branch outlives the tree, and the wrapper outlives both (owning phase: **standing discipline**) `#housekeeping` `#process`
 
+**Status:** OPEN
 **Established 2026-08-27** at the operator's direction — *"Do not lose track of
 worktrees. We don't want dangling trees after merge."* — after one session
 created **seven** of them.
@@ -11766,6 +12010,7 @@ what makes them expensive is each carrying its own `target/`.
 
 ### F-264 — `me`'s zsh purge recipe removes NOTHING when run immediately, under stock zsh defaults (owning phase: **P0**) `#me` `#security` `#shipped`
 
+**Status:** OPEN
 **Found 2026-08-27** by the step-4 probe, which wrote the positive test §6
 condition 5 demands and then watched it fail. **The test was worth writing
 because it failed.**
@@ -11816,6 +12061,7 @@ filed as **F-271**.
 
 ### F-265 — `me` can respell five refusals from exit 2 to exit 3 with all 388 tests green (owning phase: **P0**) `#me` `#tests` `#false-pass`
 
+**Status:** OPEN
 **Found 2026-08-27** by the fourth-split probe, with a control that makes it
 unambiguous: mutating the **unmodified baseline's** own integers at five sites
 leaves **388/388 passing**, and each mutated line was **proven to execute** by
@@ -11854,6 +12100,7 @@ reachable — without which a build where everything exited 2 would pass.
 
 ### F-266 — **`me` echoes secret material verbatim to stderr on many argv shapes** (owning phase: **P0**, gating) `#me` `#security` `#shipped` `#critical`
 
+**Status:** OPEN
 **Found 2026-08-27** by R0 round 6, reproduced by the controller with a real
 `ms1` secret from the repo's own fixtures:
 
@@ -11926,6 +12173,7 @@ so the gate cannot be satisfied by refusing more.
 
 ### F-267 — a secret embedded in a PATH reaches stderr, and no argv guard can catch it (owning phase: **post-P0**, documentation) `#me` `#security` `#residue`
 
+**Status:** OPEN
 **Found 2026-08-27** by R0 round 10, as the honest residue of P0's argv guard.
 `me sysw pack --in /tmp/<ms1>.txt` leaks on five measured invocations, and
 `classify()` correctly calls that token **`Unknown`** — because it *is* a
@@ -11947,6 +12195,7 @@ in a guard.
 
 ### F-268 — the flag-name argv layer is normative in §6d and built by nobody (owning phase: **P3**) `#constellation` `#security`
 
+**Status:** OPEN
 **Filed 2026-08-27.** Spec §6d calls the flag-name layer **the primary layer**
 and assigns the union to P0. P0 builds the **value scan** — every token
 classified, five argv-forbidden classes — and **does not build the flag-name
@@ -11973,6 +12222,7 @@ rather than left on a condition that can never fire again.
 
 ### F-269 — operator override: fable folds R11 and R12, and fable performs the final review (owning phase: **recorded, not work**) `#process` `#record`
 
+**Status:** OPEN
 **Recorded 2026-08-27** so a later reader does not mistake the standing rule for
 the governing one.
 
@@ -12004,6 +12254,7 @@ operator-directed exception, scoped to this artifact and these two folds.
 
 ### F-270 — `me`'s shipped post-parse gate normalises for its `tx:` prefix arm only, so a near-miss secret of any OTHER class is refused for the wrong reason (owning phase: **P0**) `#me` `#security`
 
+**Status:** OPEN
 **Filed 2026-08-27**, from R0 round 10's M-6 on the P0 plan, carried by round
 11. The post-parse argv gate builds a normalised copy of each record —
 `crates/me-cli/src/main.rs:1952` — but feeds it only to the `tx:` prefix arm
@@ -12037,6 +12288,7 @@ it this.
 
 ### F-271 — `cargo publish mnemonic-io-lib 0.1.0` is AUTHORISED; the pre-flight is not yet run (owning phase: **P0 row 12**) `#irreversible` `#record`
 
+**Status:** OPEN
 **Operator authorisation given 2026-08-27**, recorded here because a
 one-sentence approval in conversation is lost when that context ends, and this
 is the only irreversible action in the phase.
@@ -12065,6 +12317,7 @@ publishing rather than trusted from here.
 
 ### F-272 — the P0 plan's argv-guard surface list is short by two subcommands, and `seal` is the one that mattered (owning phase: **P0, closed in the same commit**) `#plan` `#me` `#security`
 
+**Status:** OPEN
 **Found 2026-08-27** while implementing plan §4 row 6. Recorded because a future
 reader comparing the plan against the code will otherwise find the code doing
 more than the plan asked, with no explanation.
@@ -12122,6 +12375,7 @@ plan's eight plus `seal` and `hash` — and generates 450 rows, 0 leaking.
 
 ### F-273 — `me`'s fish purge advice cannot be verified, and `history delete --prefix` purges nothing unattended (owning phase: **P1**) `#me` `#ux` `#shipped`
 
+**Status:** OPEN
 **Found 2026-08-27** while building P0 row 5's F-264 gate. The zsh and bash
 halves of the purge recipe were fixed and are now covered by a positive test
 that runs the emitted recipe under a real interactive shell. **The fish half is
@@ -12163,6 +12417,7 @@ stands.
 
 ### F-274 — CLOSED 2026-08-27 (P1 step 3) — `mt`'s argv guard did not TRIM, so a whitespace-padded bearer artifact leaked verbatim through clap (repo: **mnemonic-transaction**; owning phase: **P1**) `#mt` `#security` `#shipped` `#critical`
 
+**Status:** CLOSED 2026-08-27
 **Found 2026-08-27** while measuring `mt` for the P1 plan.
 `looks_like_a_transaction` (`crates/mt-cli/src/validate.rs:503`) lowercases the
 token for its `mt1` arm and **never trims it**. A leading or trailing space
@@ -12214,6 +12469,7 @@ echoed. It remains the F-267 class.
 
 ### F-275 — `mt decode` writes broadcastable bearer hex to a world-readable stdout at exit 0, while `mt encode` refuses the identical destination (repo: **mnemonic-transaction**; owning phase: **P1** — RULED 2026-08-27, and the plan's decode-warning row now builds it) `#mt` `#security` `#shipped`
 
+**Status:** OPEN
 **Found 2026-08-27** while measuring which `mt` verbs `--out` should reach.
 
 `world_readable_stdout_guard` has exactly one caller,
@@ -12261,6 +12517,7 @@ warns **by decision**, not by omission.
 
 ### F-276 — the shared crate's boundary is `me`-shaped in two places, found by the first second consumer (owning phase: **`mnemonic-io-lib` 0.2, before a third consumer**) `#mnemonic-io-lib` `#P1` `#design`
 
+**Status:** OPEN
 **Found 2026-08-27** writing the P1 plan. `mt` adopts **5 of the crate's 11
 public items and 3 of its 7 modules**. Three of the six declines are ordinary —
 `mt` has its own record reader and its own empty-input refusal, and those are
@@ -12298,6 +12555,7 @@ and `me` is its only consumer.
 
 ### F-277 — §6d rules the override's parse and its routing, and is SILENT on the collision with `--in`; `mt` had to invent an answer (owning phase: **the spec, before P2 gives a second tool the override**) `#spec` `#mt` `#ux`
 
+**Status:** OPEN
 **Found 2026-08-27** implementing P1's override work — the row named *the
 override* in `IMPLEMENTATION_PLAN_P1_mt_adopts.md`.
 
@@ -12330,6 +12588,7 @@ once. `mt`'s answer is offered as the candidate, not as precedent by seniority.
 
 ### F-278 — RESOLVED 2026-08-27: F-275 was RULED but no plan row owned it, so the operator's decision was scheduled nowhere (owning phase: **P1** — closed by adding the decode-warning row) `#mt` `#plan` `#record` `#resolved`
 
+**Status:** OPEN
 **Found 2026-08-27** reconciling open follow-ups against P1's rows before
 starting the adoption work, per the per-phase burndown rule.
 
@@ -12354,6 +12613,7 @@ the reading verbs and a stdout-side sibling. It needs a row, not a design.
 
 ### F-279 — 14 of 15 `mt` line citations in the P1 plan are stale for the branch that will consume them, and the citation gate is green on every one (repo: **mnemonic-engrave**; owning phase: **P1**, at the merge of `impl/p1`) `#plan` `#tooling` `#gate`
 
+**Status:** OPEN
 **Found 2026-08-27** while adding the decode-warning row, by checking a new
 citation against the worktree instead of against the live checkout.
 
@@ -12399,6 +12659,7 @@ output, and the limit is where the next defect lived.
 
 ### F-280 — `mnemonic-engrave`'s tree is `cargo fmt --check` RED at 14 files, and CI cannot see it because CI never runs `fmt` (repo: **mnemonic-engrave**; owning phase: **after the P1 rev-pin push**) `#me` `#tooling` `#gate`
 
+**Status:** OPEN
 **Found 2026-08-27** building P1 row 5, when the row's own `cargo fmt --check`
 gate came back RED on thirteen files the row had not touched.
 
@@ -12449,6 +12710,7 @@ is owed to any other constellation repo whose workflow was copied from this one
 rather than from `mt`'s.
 ### F-281 — should `ms` gate a world-readable stdout at all? §9a says the gate is in scope; P2's row does not carry it, so it has no owning phase (repo: **mnemonic-secret**; owning phase: **operator ruling, before the cycle closes**) `#ms` `#cli-uniformity` `#ruling-needed`
 
+**Status:** OPEN
 **Found 2026-08-27** while writing the P2 plan, by measuring what `ms` does
 today instead of assuming it matched a sibling.
 
@@ -12484,6 +12746,7 @@ is the precedent and it is attached so the ruling is cheap.
 
 ### F-282 — `ms gen-man --out <DIR>` collides with the `--out FILE` this cycle introduces: one binary, two meanings for one flag (repo: **mnemonic-secret**; owning phase: **a later cycle, not P2**) `#ms` `#cli-uniformity` `#ux`
 
+**Status:** OPEN
 **Found 2026-08-27** measuring `ms`'s existing `--out` surface for the P2 plan.
 The sibling plan's equivalent measurement found `mt` had **one** `--out` in the
 whole repository and it was a refusal string. `ms` is different:
@@ -12516,6 +12779,7 @@ directory afterwards, so a later tidy-up cannot take it silently.
 
 ### F-283 — `mnemonic-gui`'s schema mirror for `ms` goes stale in P2, while §7 gives its regeneration to P3 (repo: **mnemonic-gui**; owning phase: **P3**) `#ms` `#cli-uniformity` `#gui`
 
+**Status:** OPEN
 **Found 2026-08-27** writing the P2 plan. `ms gui-schema` is clap-derived, so
 `ms`'s flag surface reaches the GUI's schema mirror automatically — and the
 mirror is a **third repository** with its own CI gate
@@ -12534,6 +12798,7 @@ and this entry exists so P3 knows it inherited a drift rather than created one.
 
 ### F-284 — after P2, `ms encode` and `ms split` disagree about their own stdout: one is ungrouped by default, the other still groups in fives (repo: **mnemonic-secret**; owning phase: **P3**, with the `md`/`mk` grouping work) `#ms` `#cli-uniformity` `#engraving`
 
+**Status:** OPEN
 **Found 2026-08-27** while scoping P2's grouping work, by measuring whether §3's
 argument reaches `ms split` and finding that it does not.
 
@@ -12564,6 +12829,7 @@ form to the card" is not free there either.
 
 ### F-285 — `ms decode` and `ms combine` write a recovered seed phrase to an unprotected stdout, and gain no `--out` in P2 (repo: **mnemonic-secret**; owning phase: **operator ruling**, alongside F-281) `#ms` `#cli-uniformity` `#funds-safety`
 
+**Status:** OPEN
 **Found 2026-08-27** scoping which `ms` verbs get `--out` in P2.
 
 `ms decode <ms1>` prints the BIP-39 mnemonic; `ms combine <shares>` prints the
@@ -12592,6 +12858,7 @@ and answering them separately is how one gets answered twice.
 
 ### F-286 — `plan-cite-check.sh` strips a leading dot from a path, so every workflow-directory citation is a false DANGLING (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#tooling` `#gate`
 
+**Status:** OPEN
 **Found 2026-08-27** writing the P2 plan, which needed to cite a CI workflow.
 
 A citation whose path begins with a dot has the dot removed before lookup, so
@@ -12613,6 +12880,7 @@ Blocks nothing; it costs one sentence per citation until then.
 
 ### F-297 — a new `ROOTS` entry can silently absorb an already-broken bare citation from a DIFFERENT repo, turning a loud DANGLING into a silent wrong-file `ok` (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#tooling` `#gate`
 
+**Status:** OPEN
 **Found 2026-08-27**, fixing F-286/F-296/the `.tsv` gap, by diffing
 `plan-cite-check.sh`'s full `design/*.md` corpus output before and after —
 required by the fix brief to confirm no *new* dangling citations, done wider
@@ -12677,6 +12945,7 @@ matches this gate's existing philosophy of stating blind spots rather than
 chasing all of them.
 ### F-291 — `mk`'s invalid-artifact 2 and its repair-uncorrectable 2 are the SAME `exit_code()` arm, so §6f's "2 → 1" as written also moves the repair code (repo: **mnemonic-key**; owning phase: **P3** — the plan's exit-code entry builds it) `#mk` `#spec` `#exit-codes`
 
+**Status:** OPEN
 **Found 2026-08-27** while writing the P3 plan, by reading the mapping instead
 of the ruling.
 
@@ -12717,6 +12986,7 @@ cycle changes"*; it is one of three codes that arm produces.
 
 ### F-292 — `mnemonic`'s argv-secret surface is 48 call sites across 20 files naming 11 material shapes, against the 5 channels §7's row names (repo: **mnemonic-toolkit**; owning phase: **P3** — the plan's refusal entry builds it) `#mnemonic-toolkit` `#security` `#spec`
 
+**Status:** OPEN
 **Measured 2026-08-27** for the P3 plan, with the spec's own two commands
 re-run and then narrowed to source.
 
@@ -12754,6 +13024,7 @@ layer.
 
 ### F-293 — the argv advisory prints a flag name with a trailing space, at **four** call sites on **two** different flags (repo: **mnemonic-toolkit**; owning phase: **P3** — fixed in passing by the plan's refusal entry) `#mnemonic-toolkit` `#ux` `#shipped`
 
+**Status:** OPEN
 **Reproduced 2026-08-27** by running the binary, not by reading the source:
 
 ```
@@ -12784,6 +13055,7 @@ flag the entry never named. Cosmetic, in a security message, in shipped code.
 
 ### F-294 — `records::no_records_guard`'s refusal text names `mt encode --qr`, another binary's flag, so no third consumer can adopt it (repo: **mnemonic-engrave**; owning phase: **`mnemonic-io-lib`'s next version, before a sixth consumer**) `#mnemonic-io-lib` `#P3` `#design`
 
+**Status:** OPEN
 **Found 2026-08-27** while drawing P3's boundary, by reading the text the
 function would make `md` print.
 
@@ -12806,6 +13078,7 @@ the guard as a predicate and leave all of the wording behind.
 
 ### F-295 — `mnemonic bundle` writes 6 non-artifact lines out of 12 to stdout, and §6a's stdout rule does not reach it (repo: **mnemonic-toolkit**; owning phase: **whichever cycle extends §6a past `encode` on the four encoders**) `#mnemonic-toolkit` `#spec` `#deferred`
 
+**Status:** OPEN
 **Measured 2026-08-27.** `mnemonic bundle --network mainnet --template bip84
 --slot "@0.phrase=<a BIP-39 phrase>" --passphrase <pw>` exits 0 and writes 12
 lines to stdout, of which 6 are non-artifact: three `# ms1 (entropy,
@@ -12827,6 +13100,7 @@ surface — the exact class §6a refused to break for `mk decode`, saying it
 
 ### F-296 — `plan-cite-check.sh` has no root for `mnemonic-gui`, the fourth repo P3 touches (repo: **mnemonic-engrave**; owning phase: **P3**, before the plan's GUI-mirror entry is written) — **DONE 2026-08-27** `#tooling` `#gate` `#P3`
 
+**Status:** OPEN
 **Found 2026-08-27** by probing the gate with the citations the P3 plan needed,
 before writing them.
 
@@ -12856,6 +13130,7 @@ sha256-pinned in three CI configs — is invisible to it.
 
 ### F-301 — `me`'s shipped private-channel remedy advises a pipeline that exits 4 and writes nothing, and a source comment asserts it is verified (repo: **mnemonic-engrave**; owning phase: **before P2's sibling-remedy entry**) `#me` `#ms` `#remedy` `#cli-uniformity`
 
+**Status:** OPEN
 **Found 2026-08-27** by R0 round 0 on the P2 plan (its C-2), by running the line
 `me` prints instead of reading it. **Reproduced independently during the fold.**
 
@@ -12903,6 +13178,7 @@ rather than written twice.
 
 ### F-302 — `ms`'s argv surface leaks through the `=`-joined flag spelling, and a guard gated only on space-joined spellings passes its own gate while leaking (repo: **mnemonic-secret**; owning phase: **P2**, with the argv guard) `#ms` `#cli-uniformity` `#funds-safety`
 
+**Status:** OPEN
 **Found 2026-08-27** by R0 round 0 on the P2 plan (its C-1). Logged here per the
 operator ruling of the same day.
 
@@ -12949,6 +13225,7 @@ material (measured across all eight material verbs: only `-h`, plus `split`'s
 
 ### F-303 — after P2, `ms derive` from a phrase PLUS a passphrase has no one-command private form (repo: **mnemonic-secret**; owning phase: **a later cycle**, with the remaining argv work) `#ms` `#cli-uniformity` `#funds-safety`
 
+**Status:** OPEN
 **Found 2026-08-27** by R0 round 0 on the P2 plan (its I-3).
 
 `ms derive --phrase <seed> --passphrase <pass>` exits 0 today, with two argv
@@ -12988,6 +13265,7 @@ enumerates P2's content and includes none.
 
 ### F-304 — `ms encode`'s standing stdout advisory recommends a redirect that lands at 0644, while P2 adds an `--out` that gives 0600 (repo: **mnemonic-secret** + **mnemonic-toolkit**; owning phase: **P3**) `#ms` `#cli-uniformity` `#remedy` `#funds-safety`
 
+**Status:** OPEN
 **Found 2026-08-27** by R0 round 0 on the P2 plan (its I-8).
 
 `ms encode` prints, on **every** invocation, a warning that stdout carries
@@ -13034,6 +13312,7 @@ a repo — so GUI manifest citations are written repo-qualified.
 
 ### F-311 — `mk encode --keys` silently accepts a key file carrying the same BIP-380 record twice, at exit 0 (repo: **mnemonic-key**; owning phase: **NOT P3** — a `mk` admission ruling, outside P3's row) `#mk` `#admission` `#silent-accept`
 
+**Status:** OPEN
 **Found 2026-08-27** by the R0-P3 round-0 fold, while testing the P3 plan's
 justification for deleting the blank line `mk encode` prints between cards —
 *"the card boundary is recoverable from each card's own chunk header"*. It is
@@ -13070,6 +13349,7 @@ not get to make.
 
 ### F-312 — `mnemonic-gui`'s drift gate carries a stale comment naming a `v0.75.0` pin that is really `v0.97.0`, and it propagated a false premise into a plan (repo: **mnemonic-gui**; owning phase: **P3**, with the toolkit release) `#mnemonic-gui` `#stale-comment` `#gate`
 
+**Status:** OPEN
 **Found 2026-08-27** by the R0-P3 round-0 review, and the reason it is filed
 rather than fixed silently is what it cost.
 
@@ -13097,6 +13377,7 @@ moves the pin, which the P3 plan's release entry does anyway.
 
 ### F-313 — a plan whose definition of green is `fmt + clippy + nextest + conformance` is structurally blind to `mnemonic-toolkit`'s 62 byte-compared doc transcripts (repo: **mnemonic-engrave**; owning phase: **ownerless residue** — a process item) `#process` `#gates` `#docs`
 
+**Status:** OPEN
 **Found 2026-08-27** by the R0-P3 round-0 review, as the general shape behind a
 specific Important.
 
@@ -13121,6 +13402,7 @@ examples, and that is precisely when nobody is looking at `docs/`.
 
 ### F-320 — `mt`'s new git dependency drags `third_party/seedhammer` onto every cold CI runner, because cargo fetches a git dep's SUBMODULES (repo: **mnemonic-transaction**; owning phase: **ownerless residue** — a CI-cost item) `#ci` `#deps`
 
+**Status:** OPEN
 **Found 2026-08-27** while executing P1 row 7's own gate — a cold-`CARGO_HOME`
 resolve of the new dependency — rather than by reading anything.
 
@@ -13152,6 +13434,7 @@ per-dependency "do not fetch submodules" switch, so there is no cheap local fix.
 
 ### F-321 — this repo's copy of `design/SPEC_mt_v0_1.md` is now stale against `mnemonic-transaction`'s, in four places P1 changed (repo: **mnemonic-engrave**; owning phase: **P1's merge**, with F-279's re-anchoring pass) `#docs` `#drift`
 
+**Status:** OPEN
 **Found 2026-08-27** during P1 rows 8–13. The spec exists in **both**
 repositories, and the implementation edited the `mnemonic-transaction` copy
 because that is where the code and its tests are. This copy was deliberately not
@@ -13174,6 +13457,7 @@ one repo should stop carrying a copy at all.
 
 ### F-322 — a mutation gate that restores the SOURCE leaves a MUTATED BINARY, and the next thing that runs measures a program with a check deleted (repo: **both**; owning phase: **ownerless residue** — fixed in `mnemonic-transaction`, unfixed here) `#gates` `#process`
 
+**Status:** OPEN
 **Found 2026-08-27 by walking into it**, while measuring P1 row 9's stdout-mode
 differential.
 
@@ -13231,6 +13515,7 @@ restoring — and it costs nothing to apply before that day rather than after.
 
 ### F-323 — `mt decode --json --quiet` emits no JSON at all: `--quiet` silently disables `--json` (repo: **mnemonic-transaction**; owning phase: **P2**, which owns `--json`) `#cli` `#json`
 
+**Status:** OPEN
 **Found 2026-08-27** while wiring F-275's warning into `decode`'s `--json` path.
 
 `decode`'s whole report block, the JSON document included, sits inside
@@ -13260,6 +13545,7 @@ why this is filed rather than argued.
 
 ### F-324 — CLOSED 2026-09-02 (ms-cli-v0.17.1) — pinning `mnemonic-io-lib` by git rev breaks `ms`'s tag-time reproducible musl build, and the only fix is in **another repo's** shared reusable workflow (repo: **mnemonic-toolkit** + **mnemonic-secret**; owning phase: **before the next `ms-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
 
+**Status:** CLOSED 2026-09-02
 **Found 2026-08-27 by P2's implementation**, executing row 4 ("PIN THE CRATE").
 The plan does not mention vendoring, `vendor-freshness`, or the reusable repro
 workflow, and §5's enumeration of *"`ms`'s WHOLE validation surface"* omits all
@@ -13366,6 +13652,7 @@ musl-binary legs green; the 0.17.0 release notes point to 0.17.1. Report:
 `design/agent-reports/ms-cli-v0.17.1-release-report.md`.
 ### F-360 — `plan-table-check.sh` only checks rows AFTER the separator, so a malformed table HEADER passes (repo: **mnemonic-engrave**; owning phase: **the gate-hardening residue**) `#tooling` `#gate`
 
+**Status:** OPEN
 **Found 2026-08-27** by the P2 plan's fold, which hit it while writing a table
 and worked around it in the plan rather than in the gate. Recording it so the
 blind spot does not have to be re-discovered by the next author who trips on it.
@@ -13401,6 +13688,7 @@ the whole signal, and working around it in the document discards it.
 
 ### F-331 — `md encode --policy-id-fingerprint` still writes a NON-ARTIFACT line to `encode`'s stdout, which §6a forbids and P3's closure condition 6 asserts is gone (repo: **descriptor-mnemonic**; owning phase: **whichever cycle rules whether §6a binds an opt-in diagnostic flag**) `#spec` `#stdout` `#pipeline`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's `md` branch**, building the md ungrouping. The plan's
 §1.1 inventory says *"One emission site on stdout — `crates/md-cli/src/cmd/encode.rs`,
 `println!("chunk-set-id: 0x{csid:05x}")`"*. There is a **second**, and no row of
@@ -13436,6 +13724,7 @@ qualifier it currently lacks). `mk` has no counterpart flag, so this is `md`-onl
 
 ### F-332 — `md`'s TERMINAL-write decline is asserted only indirectly; the pty half is unbuilt (repo: **descriptor-mnemonic**; owning phase: **the test-infra residue**) `#test` `#gap`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's `md` branch** while writing row 20 (*the decline,
 asserted*). The row's gate reads *"`md`, `mk` and `mnemonic` each still write to
 a **terminal** without refusing, so an adoption of `exit::write_block` that
@@ -13468,6 +13757,7 @@ branch of P3.
 
 ### F-333 — the `mnemonic-io-lib` git pin lands on a `descriptor-mnemonic` release recipe that was ALREADY broken by the miniscript pin; same class as F-324, one repo over (repo: **descriptor-mnemonic** + **mnemonic-toolkit**; owning phase: **before the next `descriptor-mnemonic-md-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's `md` branch**, executing row 1 (*the pin*). The row
 says *"Three files, no other edit."* In this repo that is false, and the repo's
 own gate said so within one commit — `ci/repro/vendor-freshness.sh` failed
@@ -13540,6 +13830,7 @@ committed `vendor/` tree and a `vendor-freshness` gate before its pin is called
 done. Two of three so far.
 ### F-361 — ✅ CLOSED 2026-08-27 — F-280's new `clippy` CI step is RED on arrival: the CI-pinned toolchain's clippy disagrees with the repo's default clippy on pre-existing findings (repo: **mnemonic-engrave**; owning phase: **before `fix/f280-ci-fmt` merges to master** — non-deferrable, it is the required check) `#me` `#tooling` `#gate` `#clippy`
 
+**Status:** CLOSED 2026-08-27
 **Found 2026-08-27 closing F-280.** F-280's own text measured only
 `cargo fmt --check` (77 hunks / 14 files at `ba1f3ec`; re-measured on this
 branch at `3609b0c` as 76 hunks / 13 files). It never ran `cargo clippy`
@@ -13666,6 +13957,7 @@ actionlint .github/workflows/release.yml                      -> exit 0
 
 ### F-341 — `mk`'s tag-time reproducible musl build cannot be fixed by any input its shared workflow accepts, because that workflow can only ever redirect `rust-miniscript` (repo: **mnemonic-key** + **mnemonic-toolkit**; owning phase: **before the next `mk-cli-v*` tag** — non-deferrable past it) `#ci` `#repro` `#deps` `#cross-repo`
 
+**Status:** OPEN
 **Third instance of the F-324 / F-333 class, and the sharpest of the three**, because `mk` has no block list the shared workflow is *capable* of emitting that works.
 
 `mnemonic-key/.github/workflows/musl-binaries.yml:68` calls
@@ -13692,6 +13984,7 @@ The middle row is what makes this different from F-333. `md` needed a *fourth* b
 
 ### F-342 — `md repair --json` drops its error envelope on any codec failure, while `mk repair --json` keeps one (repo: **descriptor-mnemonic**; owning phase: **whichever cycle owns `--json` uniformity** — SPEC §6b puts it out of scope for this one) `#md` `#json` `#cli-uniformity`
 
+**Status:** OPEN
 Found while transplanting `md`'s repair exit-code bypass into `mk` for P3's exit-code row, by checking §6b (*"`--json` is UNCHANGED and explicitly OUT OF SCOPE this cycle"*) against the transplant rather than assuming it held.
 
 `md repair`'s bypass is a bare `Err(e) => { eprintln!("md: repair: {e}"); return Ok(2); }`. It runs **before** the `--json` mode is consulted, so on any codec error out of the correcting decode `md repair --json` exits 2 with an **empty stdout** and a plain-text line on stderr. Measured: `md repair --json <a card the correcting decode rejects>` → exit 2, stdout empty, stderr `md: repair: codex32 decode error: …`.
@@ -13706,6 +13999,7 @@ A consumer that parses `md repair --json` gets nothing to parse and no signal ot
 
 ### F-343 — `mk encode` binds stubs in FLAG order, not argv order, and stub order is on the wire (repo: **mnemonic-key**; owning phase: **ownerless residue** — a documentation/UX item, already documented and pinned) `#mk` `#cli` `#nit`
 
+**Status:** OPEN
 `--policy-id-stub`, then `--from-md1`, then `--from-md1-set`. clap does not preserve inter-flag argv position without `indices_of`, and the first two already had this ordering before P3 added the third.
 
 It matters because stub order is **on the wire**: measured, the same eight md1 strings supplied A-then-B and B-then-A mint different `mk1` cards. Found because the first draft of `--from-md1-set`'s test asserted argv order and went red.
@@ -13714,6 +14008,7 @@ Now stated in the flag's help text, in the source, and pinned by a test assertin
 
 ### F-362 — `me`'s SECRET-class private-channel advice is UNREACHABLE: the pre-parser guard refuses every input that would select it (repo: **mnemonic-engrave**; owning phase: **a later cycle** — it blocks nothing, and the text is now correct either way) `#me` `#dead-code` `#remedy` `#gates`
 
+**Status:** OPEN
 **Found 2026-08-27 by P2's row 11**, while building the test that RUNS the line
 `me` advises a secret-class operator.
 
@@ -13764,6 +14059,7 @@ and neither is urgent: nothing is wrong on any path an operator can walk.
 
 ### F-363 — the two `restore_test_*.py` journey drivers hard-bind `ms` to an absolute path, so no branch build can run them (repo: **mnemonic-engrave**; owning phase: **the ownerless residue** — one line each, and it blocks only a verification step) `#journeys` `#drivers` `#gates`
 
+**Status:** OPEN
 **Found 2026-08-27 by P2's row 12.** The plan's §1.9 measured that seven of the
 eight SHELL drivers bind `MS=$C/mnemonic-secret/target/release/ms`
 non-overridably, and row 12 fixed those by following
@@ -13795,6 +14091,7 @@ them would have falsified row 12's own control in the same commit.
 
 ### F-351 — `ms-shares combine` and `slip39 combine` have NO multi-record private channel, so `--share` cannot be refused without advising an impossible remedy (repo: **mnemonic-toolkit**; owning phase: **whichever phase gives `mnemonic` an `--in`**) `#argv` `#channels` `#p3`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch, while building the argv refusal.**
 `--share` is one of the eleven argv-material shapes F-292 measured, and it is
 the one shape the refusal deliberately does **not** cover.
@@ -13825,6 +14122,7 @@ shares, or an `--in FILE`. Once one exists, add `--share` to
 
 ### F-352 — clap ECHOES a stray positional verbatim, so a phrase pasted where no flag names it still reaches stderr (repo: **mnemonic-toolkit**; owning phase: **a later phase — §6d's SECOND, value-shape layer**) `#argv` `#leak` `#p3`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch, measured before the guard existed
 and re-measured after.** The refusal P3 built is §6d's *first*, flag-keyed layer.
 This is what only the second layer can reach.
@@ -13849,6 +14147,7 @@ the exposure is positional-only.
 
 ### F-353 — `--ms1` has no private channel on `verify-bundle` or `import-wallet`, so it is not refused there (repo: **mnemonic-toolkit**; owning phase: **whichever phase adds a second stdin channel or an `--in` to those two verbs**) `#argv` `#channels` `#p3`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch.** `--ms1` carries seed-equivalent
 material and is refused on `inspect`, `repair` and the three `xpub-search` verbs.
 It is exempt on the other two carriers, and the exemption is measured rather than
@@ -13868,6 +14167,7 @@ impossible combination. Same shape as F-351.
 
 ### F-354 — `vendor/miniscript` is NOT the rev `Cargo.toml` pins, and the freshness gate cannot see it (repo: **mnemonic-toolkit**; owning phase: **before the next release tag** — it decides what the shipped musl binary compiles) `#vendor` `#repro` `#miniscript`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch, while vendoring `mnemonic-io-lib`.**
 Running `cargo vendor vendor/` rewrote **16 files** under `vendor/miniscript/`
 that P3 had no business touching. Investigated rather than committed:
@@ -13916,6 +14216,7 @@ doing it again, and pins get bumped routinely.
 
 ### F-355 — the tag-time and scheduled reproducible builds are ALREADY broken, pre-P3, on the miniscript rev (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354**) `#repro` `#ci` `#miniscript`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch. Reported, not fixed** — P3 is not
 what broke it, and it cannot be exercised from a branch (the callers are
 tag-triggered and cron-triggered). Same class as **F-333** in
@@ -13952,6 +14253,7 @@ edited before both statuses are read together.
 
 ### F-356 — ~39 prose command blocks still teach an argv invocation that P3 now refuses (repo: **mnemonic-toolkit**; owning phase: **the toolkit release** — the manual ships with it) `#docs` `#argv` `#p3`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch, by a machine sweep rather than by
 reading.** P3 rewrote the 24 command blocks that are *paired with a committed
 transcript* (those are byte-gated in CI and had to move), and added an
@@ -13978,6 +14280,7 @@ they document a flag that still exists, and would read better as
 
 ### F-357 — the doc-validation surface is FIVE things, not three, and no plan has yet named all of them (repo: **mnemonic-toolkit**; owning phase: **ownerless residue** — a process item, generalises F-313) `#ci` `#docs` `#gates`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch, by RUNNING each workflow rather than
 reading the plan's census.** F-313 recorded that `cargo`-shaped green is blind to
 the doc transcripts. This records what the surface actually measures to.
@@ -13996,6 +14299,7 @@ cycle. Two cycles have now each found a piece the previous one missed.
 
 ### F-358 — there is no `make regen-examples`, so a drifted golden has to be regenerated by hand-reimplementing the verifier's capture semantics (repo: **mnemonic-toolkit**; owning phase: **ownerless residue**) `#docs` `#tooling`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch.** `docs/manual/tests/verify-examples.sh`
 replays a `.cmd` and byte-compares; nothing writes the result back. P3 needed a
 throwaway script that duplicated its substitution list, its per-`.cmd`
@@ -14008,6 +14312,7 @@ have had it.
 
 ### F-359 — `vendor-freshness.sh` reports a FALSE GREEN on a warm `CARGO_HOME` (repo: **mnemonic-toolkit**; owning phase: **ownerless residue**) `#ci` `#gates` `#vendor`
 
+**Status:** OPEN
 **Found 2026-08-27 by P3's mnemonic branch**, and it is the reason the branch
 caught its own vendor breakage at all.
 
@@ -14034,6 +14339,7 @@ same as making the gate correct.
 
 ### F-370 — P4, the operator journey, is DEFERRED until after release (operator ruling 2026-08-27) — and it is the FIRST post-release item, not "eventually" (repo: **mnemonic-engrave**; owning phase: **immediately post-release**) `#cli-uniformity` `#journey` `#scheduled`
 
+**Status:** OPEN
 **Ruled 2026-08-27**: *"We will defer p4 until after release."*
 
 So the cycle ships on P0..P3. Each of those carries its own gates, its own R0
@@ -14071,6 +14377,7 @@ not deferred.
 
 ### F-371 — the stale miniscript rev survives in FOUR more places F-355 does not enumerate, including the operator-facing rebuild procedure and a second independent pin (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354/F-355**) `#repro` `#docs` `#fuzz` `#miniscript`
 
+**Status:** OPEN
 **Found 2026-08-27 while fixing F-354** (the re-vendor to `ff4732e5`), by grepping
 for the stale rev rather than by reading. **Reported, not fixed** — the operator's
 standing instruction is that both repos' status be recorded before either the
@@ -14127,6 +14434,7 @@ vendor tree. Neither of those touches the literals above.
 
 ### F-381 — `SPEC_vendor_freshness_ci_guard.md` still describes a ONE-check gate, while the script it governs now runs four (repo: **mnemonic-toolkit**; owning phase: **the same one that resolves F-354/F-355/F-371**) `#docs` `#ci` `#gates` `#vendor`
 
+**Status:** OPEN
 **Found 2026-08-27 while merging F-354 into P3.** Reported, not fixed — the merge
 brief scoped the work to the merge itself, and this drift predates it on *both*
 parents, so it belongs to the phase that closes the F-354 family rather than to a
@@ -14169,6 +14477,7 @@ and it is better in the spec than duplicated.
 
 ### F-391 — `md`'s and `mk`'s vendor gates disagree on shape, and BOTH are resolution-only: a one-byte corruption of a vendored file passes them at rc 0 (repo: **descriptor-mnemonic** + **mnemonic-key**; owning phase: **the same one that resolves F-354/F-355/F-371/F-381**) `#ci` `#gates` `#vendor` `#deps`
 
+**Status:** OPEN
 **Found 2026-08-27** while moving `mnemonic-io-lib` from a git rev to the
 published registry version in both repos (see
 `design/agent-reports/FIX-io-lib-registry-md-mk.md`). Reported, not fixed — the
@@ -14234,6 +14543,7 @@ every vendored crate there is registry-anchored and the exemption list is empty.
 
 ### F-401 — `me sysw pack` cannot tell an over-cap `ms1` from an off-profile one: both get the profile message, and only `me seal` says "too long to engrave" (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#cli` `#diagnostics` `#codex32`
 
+**Status:** OPEN
 **Found 2026-08-28** while adding `UnknownReason::Bip93OutsideTheProfile` (see
 `design/agent-reports/FIX-codex32-seam.md`). Reported, not fixed — the brief
 scoped the change to one refusal arm.
@@ -14269,6 +14579,7 @@ defect in the arm it was found in.
 
 ### F-410 — ❌ RETRACTED 2026-08-28 (the encode/decode behaviour is CORRECT); what survives is `/**` sugar and one warning — originally filed as "accepts a non-BIP-388 use-site index and silently rewrites it" (repo: **descriptor-mnemonic**; owning phase: **before the descriptor-input cycle ships**) `#md` `#funds` `#round-trip`
 
+**Status:** OPEN
 **RETRACTED. THE ORIGINAL FINDING WAS WRONG, THROUGH THREE SUCCESSIVE WRONG
 DIAGNOSES, AND THE MEASUREMENT BELOW SETTLES IT.**
 
@@ -14422,6 +14733,7 @@ other caller uses.
 
 ### F-411 — the F-410 origin note is scoped to an ALL-unhardened origin, so a MIXED one (`@0/84'/0'/0'/0/*`) and an all-unhardened `--path` are both silent (repo: **descriptor-mnemonic**; owning phase: **ownerless residue**) `#md` `#cli` `#diagnostics`
 
+**Status:** OPEN
 **Filed while implementing F-410's two surviving items, as a record of a
 deliberate scope boundary — not as a claim that the boundary is wrong.**
 
@@ -14487,6 +14799,7 @@ decision covering both tiers is owed rather than a tier-2 patch.
 
 ### F-412 — the F-411 keyed origin note fires on a template origin that `--path` has already replaced (repo: **descriptor-mnemonic**; owning phase: **ownerless residue**) `#md` `#cli` `#diagnostics`
 
+**Status:** OPEN
 **Filed while implementing the F-411 keyed clause, as a record of a boundary the
 ruling did not decide — not as a claim it is wrong.**
 
@@ -14551,6 +14864,7 @@ pre/post matrix delta is exactly the one trailing line on c1/c3/c5. Gates:
 
 ### F-413 — should `me` normalise SLIP-132 keys host-side instead of refusing `ypub`? (repo: **mnemonic-engrave**; owning phase: **descriptor-input cycle, before S1 closes**) `#me` `#descriptor` `#ruling-needed`
 
+**Status:** OPEN
 Filed from R0's C2 fold (`SPEC_descriptor_input.md` §4.3). The device admits
 exactly `{xpub, tpub, zpub, Ypub, Zpub}`; `ypub` — the commonest non-`xpub` a
 real operator holds — is refused even with a full origin. The spec matches the
@@ -14583,6 +14897,7 @@ builds spec-as-written.
 
 ### F-414 — a descriptor cannot be packed TOGETHER with other records in one container (repo: **mnemonic-engrave**; owning phase: **post descriptor-input cycle**) `#me` `#descriptor` `#cli`
 
+**Status:** OPEN
 Filed from R0's C6 fold (`SPEC_descriptor_input.md` §5.1). `--as` puts the
 invocation in single-document mode: one descriptor, one container. The Engrave
 Bundle program admits `Descr` + `MDMK` in ONE container, and that composition
@@ -14592,6 +14907,7 @@ deliberately not half-specified in the spec.
 
 ### F-415 — `SPEC_systemwide_payloads` §3.3.2 has no Wallet Policy row, but `gui/sysw_admit.go:45` admits `ClassDescriptor` there (repo: **mnemonic-engrave**; owning phase: **ownerless residue**) `#sysw` `#spec-drift`
 
+**Status:** OPEN
 Filed from R0's I8. The §3.3.2 admission table (lines 341–352, re-read
 2026-08-28) lists `Descr` cells for Engrave Bundle and Engrave Multisig only —
 no Wallet Policy row, no Engrave Transaction row — while the code admits
@@ -14602,6 +14918,7 @@ own next cycle, with the usual gate.
 
 ### F-416 — `SPEC_systemwide_payloads` §5.6's `--in`/stdin contract needs the single-document amendment noted (repo: **mnemonic-engrave**; owning phase: **descriptor-input cycle, at ship**) `#sysw` `#spec-drift`
 
+**Status:** OPEN
 Filed from R0 r2's NEW-M2. `SPEC_descriptor_input.md` §5.1 switches `--in` and
 stdin to whole-document reads when `--as` is present; `SPEC_systemwide_payloads`
 §5.6 still states the unconditional newline-separated contract. Same shape as
@@ -14615,6 +14932,7 @@ flag table now carry `--as` and the single-document mode, deferring to
 
 ### F-419 — §4.2 refuses a zero-cosigner BlueWallet file and §6 has no row naming that cause (repo: **mnemonic-engrave**; owning phase: **descriptor-input plan — the §6 journey walk**) `#me` `#descriptor` `#refusals`
 
+**Status:** OPEN
 Filed from R0 r8 (the round that closed the correctness lens). §4.2's
 NORMATIVE list refuses four BlueWallet shapes and says each refusal names its
 cause in §6 — but §6's 34 rows carry no zero-cosigner-lines row, so that
@@ -14631,6 +14949,7 @@ cosigner lines … was the export truncated?"), P2.4 implemented it
 
 ### F-420 — `md encode` dead-ends on concrete descriptors and BlueWallet files with a placeholder error and no referral to `me` (repo: **descriptor-mnemonic**; owning phase: **with or after descriptor-input S1**) `#md` `#cli` `#cross-tool`
 
+**Status:** OPEN
 **Eligible since 2026-08-29** (S1 shipped; `--as` exists to refer to). Left
 open by the overnight cycle as the mandate's stretch item — descriptor-
 mnemonic's own cycle, one referral string + one test.
@@ -14658,6 +14977,7 @@ across tools.
 
 ### F-421 — `me`'s top-level NDEF converter half-captures the natural descriptor spelling and refuses without a referral (repo: **mnemonic-engrave**; owning phase: **with or after descriptor-input S1**) `#me` `#cli` `#cross-tool`
 
+**Status:** OPEN
 Filed from the 2026-08-28 journey walk (W3). `me` owns a top-level
 `--in <FILE>` (the NDEF converter), so the operator's natural
 `me --in wallet.txt --as descriptor` half-parses and clap tips `--base64` —
@@ -14673,6 +14993,7 @@ refusal now refers descriptor-shaped input to
 
 ### F-422 — RULING WANTED: should `--as md1` offer an explicit, consented transform for pre-multipath `/0/*` exports (receive-branch → the `<0;1>` wallet it denotes)? (repo: **mnemonic-engrave**; owning phase: **descriptor-input plan, before S1 closes**) `#me` `#descriptor` `#ruling-needed`
 
+**Status:** OPEN
 Filed from the 2026-08-28 journey walk (W12). A Specter-era JSON export
 carries `/0/*` as that era's spelling of the full receive+change wallet; in
 the S3-only window (F-418) such a file is temporarily unpackable on any path
@@ -14695,6 +15016,7 @@ a decision record, not scheduled work. Owning phase changed accordingly:
 
 ### F-418 — **S2 SHIPPED 2026-08-29 (evening), §11 ITEM 6 DISCHARGED ON HARDWARE** — the operator flashed `bga0c1615`, loaded a `--as descriptor` payload (digest compared and confirmed), and saw the Engrave Descriptor screen render the correct wallet (2-of-3 multisig, P2WSH) with the correct address 0 via the addresses screen — operator, verbatim: "Correct engrave descriptor and address shown". Every desk gate had already closed (7-round R0, three review loops, the whole-diff execution review); this was the one check only eyes on the machine could make. F-423's physical plate validation remains its own entry. Original ruling record below stands. — RULING RECORD: descriptor-input phase order is S1 → S3 → S2; S3 (`--as md1`) ships first (repo: **mnemonic-engrave**; owning phase: **descriptor-input planning**) `#me` `#descriptor` `#ruling`
 
+**Status:** OPEN
 **Operator ruling 2026-08-28, in conversation:** *"I'm away from sh2 and it's
 not connected. That should inform s2/3 ordering, I think."* — resolving the
 question `SPEC_descriptor_input.md` §8 deliberately left open.
@@ -14712,6 +15034,7 @@ review target does not move mid-round).
 
 ### F-417 — RULING RECORD: md1's use-site-path narrowness is DELIBERATE; the wire format will NOT be widened to arbitrary paths (repo: **descriptor-mnemonic**; owning phase: **none — standing decision, not scheduled work**) `#md` `#wire-format` `#ruling`
 
+**Status:** OPEN
 **Operator ruling 2026-08-28, in conversation, on the direct question "what is
 the best thing to do? Change md1 wire format?" — decided NO, and recorded at
 the operator's request** (*"document now so I don't make the mistake of
@@ -14739,6 +15062,7 @@ likelier future widening is device-side derivation, not this format.
 
 ### F-423 — **RESOLVED 2026-08-31, PHYSICAL VALIDATION DONE** — first real packed plate cut at the bench: 5×~86-char md1 strings (the pathological policy card, chunks 1-5), sh face, 3.8mm, 13:44 cut, operator verdict "perfectly legible"; the middle string (worst neighbors) transcribed back BYTE-PERFECT (the one diff was a keyboard insertion of 'i' — not a bech32 character, confirmed absent from the steel), and the operator's independent observation of all five strings' prefixes (4×`md1fkl3czs` + 1×`md1fkl3cz3`) matches the fixture exactly — the s/3 split being the chunk-index field's high bits rolling over at index 4. F-444 files the 3.0mm density rung. Original record below stands. — measured N=3 at the shipped font (MEASURE-S2-P4-1), packer landed (fork `231b7c2`): capacity 5×85-char strings/plate, the named keyed single-sig case 2→1 plates, full 2-of-3 build 9→4, W14 bequest → 1 plate. TRADEOFF the operator should see: a PACKED plate offers TEXT ONLY (no QR variant — F-433). Physical validation: operator ruling 2026-08-29 night — the single-character test is waived ("confident the single character test will pass or at least will be inferred to have passed if we jump straight to step 2"); the first REAL packed-plate cut is the validation. — `bundlePlatePlan` cuts one plate per md1 string; pack multiple strings per plate (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#engraving` `#efficiency`
 
+**Status:** OPEN
 **Operator direction 2026-08-28, verbatim: "1 plate per string is something
 to be addressed, it's wasteful."** Surfaced by the journey walk's plate-count
 correction (walk log, corrections §1): a BARE single-sig card is 2 strings
@@ -14765,6 +15089,7 @@ the walk-log correction) then update to the measured new counts.
 
 ### F-424 — the published `md-codec` 0.42.0 lacks the F-217/F-218 encode refusals; bump `me`'s dependency and drop the host mirror on the next publish (repo: **descriptor-mnemonic** + **mnemonic-engrave**; owning phase: **next md-codec publish, operator-gated**) `#md-codec` `#funds` `#publish`
 
+**Status:** OPEN
 **2026-08-31, twice-blocked and the remedy needs re-deriving.** (1) The
 publish half is BLOCKED: md-codec's default `derive` feature calls
 three miniscript APIs that exist only in the git-fork pin, so the
@@ -14792,6 +15117,7 @@ standing. Crate publishes are operator-gated — never overnight work.
 
 ### F-425 — the fork-side seam gate lives on an unmerged branch after S1; integrate it into fork CI (repo: **seedhammer fork**; owning phase: **the operator's fork-merge decision, at or before S2**) `#fork` `#vectors` `#ci`
 
+**Status:** OPEN
 **Branch pushed 2026-08-29** (`seam/descriptor-vectors` at `a5e29b4`,
 vector sha `542cd492…` in lockstep with the merged engrave copy). Unmerged,
 per the plan — the fork-main merge is the operator's decision.
@@ -14811,6 +15137,7 @@ becomes) closes this; S2's device work will need the branch anyway.
 
 ### F-426 — **DEVICE HALF RESOLVED-IN-BUILD 2026-08-29; ENTRY SPLIT** — the `ypubVer` case landed (fork `0abbf81`, tests `fe9475c`): the scan door accepts `ypub` → `P2SH_P2WPKH`, normalising to `xpub`; the seam row moved to the `version-gap` bullet as the LIVE WITNESS for the open half. **The HOST five-version widening stays OPEN as its own convergence cycle** (Rust-first: it lands in `me` with vectors, then the sysw classifier's five-version check widens to match; the `version-gap` row's `host_admits` flips then, retiring the bullet). — the device's `ParseExtendedKey` classification switch has no `ypub` case; add it (repo: **seedhammer fork**; owning phase: **with S2's firmware build**) `#fork` `#device` `#slip132`
 
+**Status:** OPEN
 Filed from RULING_f413_slip132 (2026-08-29). The device already normalises
 the SLIP-132 versions it accepts (`zpub`, `Ypub`, `Zpub`) — `ypubVer` is
 declared in the constants and handled in the normalisation switch, but the
@@ -14822,6 +15149,7 @@ Batch with S2's firmware build; upstream-PR candidate per the fork rules.
 
 ### F-427 — **RESOLVED 2026-08-29** — both spec sites ("canonical line", §5.4 prose + the quoted no-md1-form sentence) aligned to the code's "descriptor line", matching the shipped `identify.rs:65` text verbatim. — §5.4 says "canonical line", the block labels it `descriptor:` and the code says "descriptor line"; align the spec's word at its next touch (repo: **mnemonic-engrave**; owning phase: **next SPEC_descriptor_input amendment, batch**) `#spec-drift` `#docs`
 
+**Status:** OPEN
 Filed from the fold-1 re-review's N-c (2026-08-29): fold-1's N1 was DECLINED
 by controller ruling — the code's wording is the more executable, since the
 identification block labels the line `descriptor:` — and this entry is the
@@ -14829,6 +15157,7 @@ declination's durable record. Documentation-only; nothing gates.
 
 ### F-428 — **RESOLVED 2026-08-29 in S2's single vector regeneration** (engrave `70f566e`, fork copy `29cb930`; sha `e7a4160c…` both repos). NOTE, standing: the corrected `:158` cite is REV-QUALIFIED to fork `1f09537` in the annotation itself — do NOT re-base it on a later `main` (the S2 parse fix moves the line; the qualification is what keeps the cite true). — two vector `source` annotations and the generator cite `parse.go:151`; the measured line is 158 (repo: **mnemonic-engrave** + **seedhammer fork**; owning phase: **next vector-file byte change — realistically the S2/F-426 batch**) `#vectors` `#records`
 
+**Status:** OPEN
 Filed from IMPL-S1S3-fold2-verify (2026-08-29): the fork's count-mismatch
 error fires at `parse.go:158`, not `:151` — a citation carried forward
 unverified from the P1 reports despite being stated as measured. Annotation
@@ -14838,6 +15167,7 @@ in the same motion (the generator carries the same digit).
 
 ### F-429 — **RESOLVED-AS-WALKED 2026-08-29, no change to the record refusal** — the walk its own entry demanded ran (six mangles, each both ways, f429-walk.log): nothing is ever silently packed, every clause of the record refusal is TRUE, `-h` names the `--as` route out, and widening T4 would put descriptor vocabulary on typo'd `text:`/`pass:` records (the exact cost the entry feared). One mangle DID cross the bar — the missing-`descriptor`-key misdiagnosis — split out and fixed as **F-438**. Opportunistic nit, recorded not gating: the record refusal ends "see sysw::classify", a Rust module path in operator-facing text; name something an operator can act on at its next touch. — a truncated or invalid-JSON export gets the record refusal, whose vocabulary is wrong for it (repo: **mnemonic-engrave**; owning phase: **a future journeys cycle** — walk it before widening T1–T4) `#me` `#descriptor` `#journeys`
 
+**Status:** OPEN
 Filed from the adversarial review's M6 (2026-08-29): `{"label":"x"}` or a
 one-character-truncated JSON export matches none of §5.1's T1–T4, so the
 shipped record refusal answers ("see sysw::classify" vocabulary) — faithful
@@ -14847,6 +15177,7 @@ classifies the divergence first.
 
 ### F-430 — **RESOLVED 2026-08-29 by `scripts/lint-gate.sh`** (S2 P0.3, engrave `5deb88e`): one command running clippy on BOTH the CI-pinned 1.85.0 and nightly plus `cargo fmt --check`, `--locked`; every S2 gate ran it. The gate-script branch of the decision, taken. — every local gate linted with nightly clippy while CI pins 1.85.0; the mismatch cost a staging round (repo: **mnemonic-engrave**; owning phase: **next CI touch — decide: rust-toolchain.toml, or a gate script that runs `cargo +1.85.0 clippy`**) `#ci` `#toolchain`
 
+**Status:** OPEN
 Filed 2026-08-29 at the S1+S3 push: the whole cycle's clippy gates ran on
 local nightly 1.97, CI's pinned 1.85.0 fired `clippy::format_collect` on
 `descriptor/md1.rs`, and the staging ritual correctly refused master. The
@@ -14856,6 +15187,7 @@ remember harder.
 
 ### F-431 — two `ClassDescriptor` admission cells (`progBundle`, `progMultisig`) are declared and INERT; build their consumers or retire the cells (repo: **seedhammer fork**; owning phase: **a future device-UX cycle, operator-scoped**) `#fork` `#device` `#descriptor`
 
+**Status:** OPEN
 Filed at S2's P5.1. S2 built ONE consumer (`walletPolicyFlow`, §9 item 2's
 cell, sim-walked and pending hardware confirmation). `gui/sysw_admit.go`
 still admits `ClassDescriptor` to `progBundle` and `progMultisig` with no
@@ -14867,6 +15199,7 @@ entry is the only tracker.
 
 ### F-432 — `goprobe/go.mod`'s `replace` points at the transient S2 fork worktree; re-point at fork `main` at the S2 merge (repo: **mnemonic-engrave**; owning phase: **the S2 merge/push window (P5.3) — same commit as the merge or immediately after**) `#vectors` `#tooling`
 
+**Status:** OPEN
 Filed from REVIEW-S2-P1P2-r1 M-3. `scripts/descriptor-seam-vectors/goprobe/go.mod`
 points at `/scratch/code/shibboleth/sh-worktrees/s2-descriptor-arm` — the
 truthful pin for the corpus as measured, but a worktree with a defined end
@@ -14878,6 +15211,7 @@ Failure mode is a loud build error, not silent drift.
 
 ### F-433 — **RESOLVED 2026-08-29 night, BY MEASUREMENT** (MEASURE-F434, engrave `35384c3`): against the bound the packer actually packs against (the F-435 footer-budgeted 68.4mm body), **N=1 in all six configurations** — md1 and mk1, TEXT+QR and QR-ONLY alike (md1's QR is 37 modules, mk1's 41, via the fork's own qr.Encode — matching F-439's independent figures). A second pair fits ONLY against the raw footerless 79.0mm height, and only for md1 — i.e. packed QR would require abandoning the plate footer ('Card X of Y') contract, a different design, not a layout fix. **Packed plates stay TEXT ONLY, now documented as measured-no-gain; QR lives on single-string plates** (the NDEF-tag loop, demonstrated the same night: one rewritable tag, me's converter, the scan door). The overnight F-434-real pipeline STOPPED at this gate per its recorded conditions; the device was rebooted unflashed. — a PACKED bundle plate offers no QR variant; decide whether that is documentation or a fix (repo: **seedhammer fork**; owning phase: **operator decision at/after S2 acceptance (P5.4)**) `#fork` `#engraving` `#ux`
 
+**Status:** OPEN
 Filed from IMPL-S2-P4 §5.1. Before F-423 every md1/mk1 plate offered
 `TEXT+QR`/`TEXT ONLY`/`QR ONLY`; a packed (multi-string) plate is
 `TEXT ONLY`, forced by `backup.EngraveText`'s paragraph advance (QRs of
@@ -14888,6 +15222,7 @@ accept + document, or fix F-434 and restore QR on packed plates.
 
 ### F-434 — **CHEAP HALF RESOLVED 2026-08-29, fork `a0c1615`** — `EngraveText` returns an error and refuses `ErrMultiParagraphQR` (mutation-proven on three arrangements); the silent overlay is now a clean refusal. **THE REAL FIX: measured 2026-08-29 night as UNABLE TO DELIVER its motivating value** (MEASURE-F434: one string+QR pair per plate under the footer contract, every configuration) — so the advance-by-full-height rewrite would move every golden to enable a packed-QR plate that cannot exist at today's geometry. The refusal IS the shipped answer. Re-open only if the geometry changes (smaller QR scale, larger plate, or a footer-less plate class — each a design decision first, not a layout fix). — `backup.EngraveText` lays multi-paragraph QRs over one another and the fit check calls it a fit (repo: **seedhammer fork**; owning phase: **next `backup`/engrave touch — the cheap refusal first**) `#fork` `#engraving` `#latent`
 
+**Status:** OPEN
 Filed from IMPL-S2-P4 §5.2. The paragraph advance counts text lines only,
 so a multi-paragraph plate with QRs draws them across neighbours; `toPlate`
 accepts the overlay. Unreachable in production today (both multi-paragraph
@@ -14898,6 +15233,7 @@ silent wrong plate into an immediate error); real fix: advance by
 
 ### F-435 — **RESOLVED 2026-08-29, fork `a0c1615`** — the body is budgeted against the footer row by construction; `Text.FooterRow` and `bundlePlateTextFits`'s second check deleted; the announcing test replaced per its own instruction. Capacity 5 UNCHANGED and now held BY the budget (mutation: without it the packer fits 6). The budget binds on footered plates only — reviewed sound (REVIEW-F434-F435-r1): for footerless plates the limit is bit-for-bit `toPlate`'s own bound and `toPlate` tests ink, the true quantity; decision-identical to the deleted check over the reachable space, 0/1210 disagreements. — `Text.FooterRow` is a workaround for `EngraveText` having no body budget; give it one and delete the second fit check (repo: **seedhammer fork**; owning phase: **opportunistic** ) `#fork` `#engraving` `#cleanup`
 
+**Status:** OPEN
 Filed from IMPL-S2-P4 §5.3. The free-text path has `yBudget`; the paragraph
 path has nothing, so P4.2 added `FooterRow` + `bundlePlateTextFits`'s second
 check. Giving `EngraveText` the same budget deletes both; the named test is
@@ -14905,6 +15241,7 @@ written to fail when that happens, so the cleanup announces itself.
 
 ### F-436 — the seam corpus has no SINGLE-LINE JSON rows, so the classifier's JSON-branch scoping is gated by unit tests only; add rows at the next regeneration (repo: **mnemonic-engrave** + **seedhammer fork**; owning phase: **next vector-file byte change**) `#vectors` `#descriptor`
 
+**Status:** OPEN
 Filed from REVIEW-S2-P3-r1 C1's coda. The corpus's only JSON row is
 multi-line, so the derived rule never exercises the JSON branch as a
 RECORD; the C1 class (a `ypub` in a JSON `label`, the `\u0079`-escape
@@ -14915,6 +15252,7 @@ so the parity gate covers the branch from data.
 
 ### F-437 — **RESOLVED 2026-08-29, fork `f2007b7`** — SCAN CARDS at the four card doors (the walk's mislabel existed at three md1 doors beyond the one filed), ENTER IT kept where a keyboard genuinely opens, guarded by a test PROVEN to red under the blanket rename (the first guard could not fail — REVIEW-F76-F437-r1 I1); the card doors' lead updated to "Cards from where?" in the same honesty class. — the Wallet Policy door's "ENTER IT" choice promises typing and delivers an NFC card gather (repo: **seedhammer fork**; owning phase: **next device-UX touch, batch with F-76's door fix**) `#fork` `#device` `#ux`
 
+**Status:** OPEN
 Found by the S2 journey walk (round 2, F3): the door added with S2's
 Wallet Policy payload offer reads `Wallet policy from where? FROM PAYLOAD /
 ENTER IT`, and choosing ENTER IT lands in the md1 card gather waiting for
@@ -14926,6 +15264,7 @@ both edits touch the same flow.
 
 ### F-438 — **FILED AND RESOLVED 2026-08-29** — `{"label":"…"}` (no `descriptor` key) was told "the problem is in the descriptor string, not the JSON" (repo: **mnemonic-engrave**) `#me` `#descriptor` `#refusals`
 
+**Status:** OPEN
 Found by the F-429 journey walk, mangle (c): the JSON branch coerced an
 absent/null `descriptor` key to `""`, so the empty string failed the script
 parse and the operator got the sibling row's sentence — false twice over
@@ -14941,6 +15280,7 @@ silently. Spec §6 row-5 cell amended.
 
 ### F-439 — a QR-ONLY band can cross the footer row in principle; unreachable at real string sizes by ~4.2x (repo: **seedhammer fork**; owning phase: **with F-434's real fix, or any QR-size change**) `#fork` `#engraving` `#latent`
 
+**Status:** OPEN
 Filed from REVIEW-F434-F435-r1, measured: the window opens at 77 modules
 (QR v17, ~459-char input), QR-ONLY only — TEXT+QR has no window at all
 (the F-435 text budget refuses from 61 modules up). Longest real strings:
@@ -14952,6 +15292,7 @@ touches the same layout arithmetic.
 
 ### F-440 — **RESOLVED 2026-08-29 night, fork `5f02773`** — Button1 dismisses alongside Button3 with IconBack drawn, one Layout covering all 143 sites; force-ack surfaces (`ConfirmWarningScreen`, 6 sites) audited untouched; the queued-click-behind-dismiss regression the implementer introduced was shard-caught and pinned. Reviewed GREEN (REVIEW-F440-F441-r1: 7 adversarial input probes, no caller decision changes). — every `showError`/`showNotice` modal is BACK-deaf: 143 sites bind Button3 only, and a waiting modal reads as a hung device (repo: **seedhammer fork**; owning phase: **immediate — the operator hit it live, twice**) `#fork` `#device` `#ux`
 
+**Status:** OPEN
 Filed from the bench session 2026-08-29 night. The operator, on the
 "Bundle Incomplete" screen, pressed BACK repeatedly and reported the
 device hung ("I'm hung on bundle incomplete screen"); measured in the
@@ -14971,6 +15312,7 @@ design/agent-reports/BUG-wallet-policy-back-hang.md.
 
 ### F-441 — **RESOLVED 2026-08-29 night, fork `5f02773`** — the 2s Close bound + 3s join bound land the device on a live screen whatever stalls the read (~5s worst case, composed; healthy path ~50ms; false-abandon impossible with ~20x margin; post-abandon second visit works, measured). **CAVEAT, kept honest: the FIELD root cause remains unidentified** — the review could not construct a >2s non-cancellable path either; the bound is correct regardless, and the caveat stays until a field recurrence or F-442's redesign settles it. — `Poller.Close` can deadlock the UI goroutine forever: a stale cancel token makes `Interrupt` a no-op (repo: **seedhammer fork**; owning phase: **immediate — found live at the bench 2026-08-29**) `#fork` `#device` `#nfc` `#deadlock`
 
+**Status:** OPEN
 The night's real "hang", diagnosed from three field recipes plus sim
 tracing (design/agent-reports/BUG-wallet-policy-back-hang.md, Appendix
 B, CORRECTED by Appendix C): on the BACK edge out of a
@@ -14997,6 +15339,7 @@ teardown; ONE reader rather than one per screen entry) are follow-on:
 
 ### F-442 — teardown may not block the frame loop, and the NFC reader should be one long-lived poller, not one per gather entry (repo: **seedhammer fork**; owning phase: **next device-UX cycle**) `#fork` `#device` `#nfc` `#architecture`
 
+**Status:** OPEN
 Filed from F-441's diagnosis, proposals 3+4: `stopScanner`'s join runs
 on the UI goroutine (a scanner that cannot stop should be abandoned
 and the device marked unusable — a leaked goroutine beats a frozen
@@ -15013,6 +15356,7 @@ yield point: state that invariant where the redesign can rely on it.
 
 ### F-445 — packed-plate layout: 21.5mm bottom margin measured on the F-423 validation plate; determine the slack's source and whether a 6th string fits at 3.8mm (repo: **seedhammer fork**; owning phase: **next fork engraving cycle, WITH F-444**)
 
+**Status:** OPEN
 Operator measurements 2026-08-31, from the first real packed plate
 (5×~86-char md1 strings, sh face, 3.8mm — the F-423 validation cut):
 
@@ -15071,6 +15415,7 @@ without a new operator ruling.
 
 ### F-444 — packed md1 plates at 3.0mm: a density rung below the 3.8mm default (repo: **seedhammer fork**; owning phase: **next fork engraving cycle — operator-gated, needs one validation cut**)
 
+**Status:** OPEN
 Filed 2026-08-31 at the bench, operator: "We can try 3.0mm font next"
 — immediately after the FIRST 3.8mm packed plate (5×~86-char md1
 strings, sh face, 13:44 cut) came out "perfectly legible" (F-423's
@@ -15097,6 +15442,7 @@ capacity re-measure, goldens, one ~11-min validation plate.
 
 ### F-443 — `sysw.DecodeBody` accepts a truncated `pass:`/`text:` record silently: no length or checksum (repo: **seedhammer fork** + check the Rust primary; owning phase: **next sysw touch — and the Rust check is mandatory before any Go fix**) `#fork` `#sysw` `#records`
 
+**Status:** OPEN
 Filed from REVIEW-F440-F441-r1's N-3 (pre-existing, NOT introduced by
 the F-440/F-441 diff): a tag pulled mid-read can hand `DecodeBody` a
 truncated hex body and it decodes without complaint. Per the
@@ -15107,6 +15453,7 @@ belongs wherever record integrity is normatively defined.
 
 ### F-446 — Go port: the N1 admission taxonomy has no convergence target today; the obligation binds if the port ever grows a mint path (repo: **seedhammer fork**; owning phase: **conditional — trigger recorded, no scheduled work**) `#fork` `#go-port` `#rust-primary`
 
+**Status:** OPEN
 Filed 2026-08-31 from the mdcli-mini corpus sync (full record:
 `design/agent-reports/SYNC-go-corpus-mdcli-mini.md` §6; fork branch
 `mdcli-corpus-sync` at `8e564c5e`, 15 vector files re-vendored
@@ -15182,6 +15529,7 @@ restore surface, not before.
 
 ### F-447 — `device-csid-census-premise-gap`: the host cycle's "diagnostics that name plates by id" hazard did not transfer to the device's restore-doc surface, and a spec + a test both claimed it did (repo: **seedhammer fork**; owning phase: **recon for any future device-restore-doc cycle, before importing the same premise again**) `#fork` `#device` `#csid` `#spec-hygiene`
 
+**Status:** OPEN
 Filed 2026-09-01 from the device-csid-warning whole-diff review C1
 (`design/agent-reports/whole-diff-device-csid-review.md`; fold record
 `design/agent-reports/impl-device-csid-fold.md`).
@@ -15289,6 +15637,7 @@ into the spec amendment and the kept-but-commented `csidMarker(c)` calls).
 
 ### F-448 — `pkh-vs-pk-taproot-under-crqc`: investigate `pkh` vs `pk` in taproot wallets under the assumption that a cryptographically relevant quantum computer exists (owning phase: **recon, its own item — does NOT gate the wallet-policy composer**) `#seedhammer` `#mnemonic` `#funds-safety`
 
+**Status:** OPEN
 Filed 2026-09-01 by operator direction during the wallet-policy composer
 brainstorm (`design/BRAINSTORM_wallet_policy_composer.md`, ruling C17).
 Operator, verbatim: "file a followup 'investigate pkh vs. Pk in taproot
@@ -15334,6 +15683,7 @@ documentation, and whether the `pk`-in-tr default of C17 should change.
 
 ### F-449 — `liana-taproot-import-unspendable-xpub`: a device-composed taproot policy with an unspendable key path does not import into Liana, because md spells the NUMS internal key as raw `H` and Liana requires an xpub (owning phase: **its own constellation cycle in descriptor-mnemonic — a second internal-key KIND on the md1 wire; does NOT gate the wallet-policy composer**) `#mnemonic` `#seedhammer` `#codec` `#interop`
 
+**Status:** OPEN
 Filed 2026-09-01 by operator direction ("File Liana wallet import followup")
 during the wallet-policy composer brainstorm, from finding I5 of the fable
 review `design/agent-reports/composer-lowering-rules-bitcoin-expert-review.md`
@@ -15390,6 +15740,7 @@ independent of this item).
 
 ### F-450 — `payload-spec-transaction-rows-missing`: `SPEC_systemwide_payloads.md` has no Engrave Transaction admission row (3.3.2) and no `ClassMt`/`ClassTx` class rows (3.3.1) while the fork's `sysw/record.go` and `gui/sysw_admit.go` carry both (owning phase: **the payload spec's next cycle — a dated fold under that document's own gate; does NOT gate the wallet-policy composer**) `#spec-hygiene` `#payload` `#seedhammer`
 
+**Status:** OPEN
 Filed 2026-09-02 while folding the composer's classes into the payload spec
 (S1 Task 6, `12e0659` and its R0 fold). F-415 named two missing rows — Wallet
 Policy and Engrave Transaction; the composer cycle created the Wallet Policy
@@ -15414,6 +15765,7 @@ shape F-415 was filed for.
 
 ### F-451 — `sysw-pack-now-append-overflow-blames-records`: the auto-appended `now:` can push the public section past `MAX_SECTION_LEN`, and the refusal names the operator's records and a two-payload remedy instead of `--no-now` (owning phase: **composer S4 journey polish** — burn down before S4 closes) `#me-cli` `#sysw` `#composer`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S1-exec-review-r0` M-1 (reproduced there:
 467 `hash:` records + one 23-byte `text:` = 32713 bytes; `--no-now` packs,
 the default appends 25 bytes and refuses at exit 4 with "these records are
@@ -15426,6 +15778,7 @@ append fired; regression test from the reproduction.
 
 ### F-452 — `sysw-pack-now-flag-silent-when-now-record-supplied`: `--now` appends nothing when the operator also supplies a `now:` record (spec-conformant: "a supplied `now:` always wins"), and nothing says so (owning phase: **documentation only unless the operator disagrees** — composer S4 journey) `#me-cli` `#sysw` `#composer` `#ux`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S1-exec-review-r0` N-3. Below the journey
 rule's bar ("worse than telling the user nothing"): one stderr line ("a now:
 record was supplied, so --now appended nothing") would close it. Same review:
@@ -15437,6 +15790,7 @@ here"), charged to the descriptor-input spec's next fold, not to S1.
 
 ### F-453 — CLOSED 2026-09-02 (descriptor-mnemonic main 1dc8d409: `md compose --preset` + six `keyed_compose_preset_*` vectors; the Go half is S3 Task A10) — `composer-preset-vectors-missing`: the five archetype presets (`md-codec::compose::presets`, composer spec §4d) have no corpus entry and `md compose` exposes no `--preset`, so Stage 3's Go path lists would be authored with no Rust oracle (owning phase: **composer S3 — Rust first: `md compose --preset <name>` + one exported vector per archetype in descriptor-mnemonic, then vendor into the fork before the S3 shape flow ships**) `#composer` `#rust-primary` `#md-cli`
 
+**Status:** CLOSED 2026-09-02
 Filed 2026-09-02 from `composer-S2-plan-R0-r0-fidelity` M-5. A preset is a
 normative `PathList` shape; re-authoring it in Go with no pinned oracle is
 exactly the drift the Rust-primary rule exists to prevent (which tier unlocks
@@ -15445,6 +15799,7 @@ when, which head is bare). `md compose --help` at 66bdf2f4 shows `--wrapper`,
 
 ### F-454 — ~~`me-0.8.1-owed-plus-sign-path-tightening-unreleased`~~ **CLOSED 2026-09-04 by `f94c903`** (me v0.8.1 released; fable decision a30f7c3): the host refuses `+`-signed key: path components on master (c05074f1) but the released `me` v0.8.0 admits them, so host and device disagree for anyone on the release binary (owning phase: **before composer S4's journey runs with a release binary** — cut me 0.8.1 with the next host change or before S4) `#me-cli` `#release` `#composer`
 
+**Status:** CLOSED 2026-09-04
 Filed 2026-09-02 from `composer-S2-exec-review-r0` I-1's Rust-first fold. Fixture
 is 47 rows (sha 5b3960ca…); the device (fork main 321acb56) matches master, not
 v0.8.0. Low reach: no `md` output ever writes a `+` into an origin; only a
@@ -15471,6 +15826,7 @@ release binary.
 
 ### F-455 — `composer-secret-form-words-and-seedqr-are-one-plate`: SPEC §7f offers three secret forms; the device has two plate designs (owning phase: **a later cycle, spec fold at composer S4**) `#seedhammer` `#composer` `#backup`
 
+**Status:** OPEN
 Filed 2026-09-02 by the S3 plan's author (`IMPLEMENTATION_PLAN_composer_S3_fork_gui.md`,
 Part B engrave task). `engraveSeed` (gui/gui.go:839) bakes BIP-39 words AND a
 SeedQR onto ONE `backup.Seed` plate; `backup.SeedString` (backup/backup.go:26)
@@ -15483,6 +15839,7 @@ forms).
 
 ### F-456 — `composer-spec-8-date-ceiling-body`: §6b's date entry needs a ceiling refusal body (a date past 2038-01-19) that §8 does not enumerate; the S3 plan adds `composerCopyDateCeiling` and this entry carries the spec fold (owning phase: **composer S4 spec fold** — add the body to §8 so the copy table's source stays the spec) `#composer` `#spec-hygiene` `#copy`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S3-plan-R0-r0-journey` I-6 (a date past
 2038-01-19 was refused as "that date does not exist"). The plan's copy file is
 AST-scanned against a coverage table; a body with no §8 home would make the
@@ -15491,6 +15848,7 @@ table the source instead of the spec. Text to fold: the plan's Task A1
 
 ### F-457 — `composer-form-A-text-qr-plates-need-a-rust-first-renderer`: §7f's form A as plain-text or QR descriptor plates needs a descriptor RENDERER on the device, which `md` deliberately does not carry (its invariant: a rendering that cannot be re-parsed is the defect); S3 ships form A as the keyed md1 only and the census's descriptor-ceiling refusal went with it (owning phase: **a later cycle, Rust first** — port md-codec's renderer with vectors, then the plates; the operator may instead rule the text/QR forms out) `#composer` `#rust-primary` `#seedhammer` `#plates`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S3-plan-R0-r0-fidelity` I-10 and
 `composer-S3-plan-R0-r0-tests` C-15 (a refusal nothing could trigger). Note for
 the operator: C10 ("engraved FORM is the operator's choice: concrete text/QR/keyed
@@ -15503,6 +15861,7 @@ DEAD-IN-PROD survivor, named and justified there.
 
 ### F-458 — `composer-date-ceiling-dispatch-tautology`: the S3 plan's date-entry ceiling dispatch tested `u == 0` where it meant the impossible-date case, so "that date does not exist" was unreachable dead code for any impossible in-range date (owning phase: **composer S3 r1 fold — must be fixed with a failing test before the plan closes**) `#composer` `#seedhammer` `#copy`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S3-plan-R0-r1-fold-verification` (journey I-6's
 fix was defective on its own terms). Distinct from F-456, which owns the §8
 BODY for a date past 2038-01-19; this entry owns the DISPATCH defect and its
@@ -15512,6 +15871,7 @@ under the tautology.
 
 ### F-459 — `md-compose-preset-review-residue`: three nits from the S0b whole-diff review — lenient numeric parsing (`+2of3`, `02of03`, `older=+26280` accepted, inherited from `--path`), `ComposeError::PresetShape` not naming the archetype, and `--no-default-features` clippy red on pre-existing dead code (owning phase: none — md-cli residue) `#composer` `#md-cli`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S0b-exec-review-r0` (N-1, N-2, N-4). None
 changes a result: the accepted spellings denote the value typed, the bare
 `preset:` message is unambiguous with one preset under invocation, and no CI
@@ -15522,6 +15882,7 @@ Task A10 fold (0051be7), which the reviewer read the plan too early to see.
 
 ### F-460 — `multisig-build-deprecated-in-favour-of-the-composer`: Engrave Multisig's "Build policy" path is deprecated by comment, with no enforcement (owning phase: **none; a record, not a task**) `#seedhammer` `#composer` `#c7`
 
+**Status:** OPEN
 Deprecated 2026-09-01 in favour of Wallet Policy > Build a new policy. No
 enforcement by operator ruling (C7). The comment lives at the head of
 `gui/multisig_build.go` and is gated by
@@ -15535,6 +15896,7 @@ Checked 2026-09-03 (S4 Task 6): the comment is present at `gui/multisig_build.go
 
 ### F-461 — `composer-selfcheck-usesite-arm-has-no-reachable-input`: §7e's fixed-`<0;1>/*` use-site assertion cannot be driven by any artifact this tree can build, so its dispatch has no behavioural test (owning phase: **composer S3 residue; revisit when `md` exports a use-site override constructor, or at S4's journey run**) `#composer` `#seedhammer` `#tests`
 
+**Status:** OPEN
 Filed 2026-09-02 from `composer-S3-exec-review-r0` I-2, while folding it. Five
 of the six arms that survived `if false {` now have a fault-injection row that
 fails under their own mutation; the sixth does not.
@@ -15567,6 +15929,7 @@ that a use-site the device cannot construct needs no behavioural gate.
 
 ### F-462 — `composer-stub-screen-origin-notation-h-vs-apostrophe`: the composer's stub screen prints slot origins as `m/48h/0h/0h/2h` while the mapping review, the census and the card summaries print `m/48'/0'/0'/2'` (owning phase: **post-S4 polish**) `#composer` `#seedhammer` `#ux`
 
+**Status:** OPEN
 Filed 2026-09-03 from `composer-S4-plan-R0-r0-journey` M-1. The stub screen
 (`gui/composer_stub.go`) formats `ExpandedKey.OriginPath`, a `bip32.Path`,
 whose `String` uses `h`; `composerOriginText` (the mapping review, the census,
@@ -15578,6 +15941,7 @@ agree; S4's plan quotes the shipped `h` form as-is.
 
 ### F-463 — `composer-watch-only-engrave-shows-ms1-reminder`: after a composer engrave that cut no ms1 share (watch-only form A, form B, the keyless template) the flow still ends on "Bundle engraved. Also hand-engrave your ms1 share(s) - they are never sent over NFC." (owning phase: **post-S4 polish**) `#composer` `#seedhammer` `#ux`
 
+**Status:** OPEN
 Filed 2026-09-03 from `composer-S4-plan-R0-r0-journey` N-2 and I-9.
 `bundleEngrave` ends with `showError(ctx, th, "Wallet Policy",
 bundleMs1ReminderText())` whenever no `cardMS1` is in the set, and
@@ -15590,6 +15954,7 @@ shipped this stage.
 
 ### F-464 — `composer-paged-geometry-test-covers-two-of-four-screens`: the W-3 geometry test (`gui/composer_paged_geometry_test.go`) renders the keyed and keyless Template screens only; the mapping review and the `Which hash?` pick list share `composerPageLines` and are asserted by nothing (owning phase: **post-S4 polish**) `#composer` `#seedhammer` `#tests`
 
+**Status:** OPEN
 Filed 2026-09-03 from `composer-S4-W3-verification` M-1. The verifier drove
 both screens with a throwaway geometry check on `composer-s4c` `0b49f66`:
 correct after the fix, and the check would have caught the pre-fix defect
@@ -15600,6 +15965,7 @@ build rather than the operator.
 
 ### F-465 — `host-helper-passphrase-to-hash-record`: no host command turns a passphrase (or a 32-byte preimage) into the composer's `hash:` record and prints the preimage the operator must back up; today it is two `sha256sum` calls and an `xxd`, and the device's `Which hash?` screen does not tell an operator with no payload that the payload route exists (owning phase: **next host cycle (Rust-first); the screen hint is post-S4 polish**) `#composer` `#me` `#ux`
 
+**Status:** OPEN
 Filed 2026-09-03 from the S4 device walk (W-5). Measured: `X=$(printf '%s' "$PASS" | sha256sum | cut -d' ' -f1)`, `H=$(printf '%s' "$X" | xxd -r -p | sha256sum | cut -d' ' -f1)`, `printf 'hash:%s\n' "$H"` packs with `me sysw pack` and classifies as `sha256 hashlock`; the device offers it as one row. Shape: `me sysw hash --passphrase-stdin` (or `md hashlock`) that prints the `hash:` record on stdout and the 32-byte preimage on stderr with F-132's warning that the preimage is required to spend and is in no backup; refuses a preimage that is not 32 bytes (§8i). Rust first; the fork needs nothing. Screen hint: `Which hash?` with no `hash:` record loaded gains a lead line naming the host route.
 
 Terminology agreed with the operator 2026-09-03: the human-memorable text is the **hashlock phrase** (two words; `--hashlock-phrase` in flags -- never "passphrase", which is BIP-39's word and `ms derive --passphrase`'s flag); X = sha256(hashlock phrase), exactly 32 bytes, is the **preimage**; H = sha256(X) is the **digest**. Proposed home: `ms hashlock` (`--hashlock-phrase-stdin` | `--hex <32 bytes>` | `--ms1 <string>`), printing the preimage, sha256/hash256/ripemd160/hash160, the `hash:` record for `me sysw pack`, the `sha256=` operand for `md compose --path`, and the preimage as an ms1 backup string; `me` is ruled out by its own "manufactures none of them" rule and mnemonic-toolkit is the library floor. Awaiting the operator's confirmation of the home.
@@ -15608,6 +15974,7 @@ RULED 2026-09-03 (operator): `ms` owns it. Rust first.
 
 ### F-466 — `on-device-preimage-entry`: the operator asks to type the passphrase/preimage on the SH2 and have the device double-hash it into the hashlock (owning phase: **operator ruling first (revisits C25 and spec §14); then a spec fold and its own R0**) `#composer` `#seedhammer` `#ux` `#funds`
 
+**Status:** OPEN
 Filed 2026-09-03 from the S4 device walk (W-5). C25 deferred on-device preimage derivation and spec §14 lists "on-device preimage derivation, storage or engraving" as out of scope (adversarial C-5: the composer never derives, stores or engraves a preimage this cycle). What it would take: the passphrase keyboard exists, SHA-256 exists, the digit/keyboard flows scrub on exit (C14); the device would hold a bearer secret (the preimage) in RAM for the duration of entry, must apply §8i's rule itself (hash the passphrase to 32 bytes, then hash again; never the passphrase's own hash), and must tell the operator that the preimage is in no backup (F-132) -- and whether it may be engraved (a bearer plate) is a separate ruling. Not a change until ruled.
 
 
@@ -15617,20 +15984,24 @@ BRAINSTORMED 2026-09-03: `design/BRAINSTORM_hashlock_phrase.md` (rulings L1-L9: 
 
 ### F-467 — `hashvault-journey-hashlocks-unspendable`: the shipped hashvault journey derives its three hashlocks as sha256 of 40-, 38- and 34-byte phrases hashed ONCE, so no 32-byte preimage exists and the two hash-gated tiers can never be spent (owning phase: **the hashlock-phrase cycle, records stage: regenerate the journey with `ms hashlock` once it ships**) `#journeys` `#funds` `#docs`
 
+**Status:** OPEN
 Filed 2026-09-03 from the hashlock-phrase brainstorm (section 3.2). Measured: `design/journeys/derive-hashvault-keys.sh:61-76` sets `PRE=("correct horse battery staple vault alpha" "seven bridges over a quiet river bravo" "the last plate rings twice charlie")` and computes `h=$(printf '%s' "${PRE[$i]}" | sha256sum ...)`; `printf '%s' | wc -c` gives 40, 38, 34. `sha256(H)` compiles to `OP_SIZE <32> OP_EQUALVERIFY OP_SHA256 <H> OP_EQUAL` (composer spec §6c/§8i), so a witness must reveal exactly 32 bytes whose sha256 is H; the phrase is not 32 bytes and sha256(phrase) is H itself, not its preimage. The journey is never funded (the script says so), but the document teaches the construction the composer's own §8i modal warns against, and the transcript prints the phrase-hashed-once recipe as if it were the method. Fix: derive X with `ms hashlock` (either method), pack `hash:` from H = sha256(X), regenerate the transcript and PDF, and state in the journey README that the preimage X is the backup, not the phrase alone.
 
 ### F-468 — `ms-split-no-preimage-source`: `ms split` resolves `--phrase`/`--hex` only, so a preimage-kind ms1 cannot be shared K-of-N from the CLI although the codec's share path is kind-agnostic (owning phase: **post-cycle polish, after ms-cli 0.18.0**) `#ms` `#cross-repo`
 
+**Status:** OPEN
 Filed 2026-09-03 from the hashlock-phrase brainstorm (section 3.3). Measured: `crates/ms-cli/src/cmd/split.rs:108` calls `encode::resolve_secret_payload`, which accepts `--phrase` and `--hex` and produces entr/mnem payloads; `ms_codec::encode_shares` and `combine_shares` go through `payload_wire_bytes`/`dispatch_payload` (`shares.rs:15`), which the new kind extends. The codec-level share round trip of a preimage is pinned by a test in H1; the CLI source (an ms1 positional on `split`, or `ms hashlock --split k n`) waits. Companion entry to be mirrored in mnemonic-secret `design/FOLLOWUPS.md` when H1 opens.
 
 ### F-469 — `ms-hashlock-optional-salt`: the hardened method's fixed salt lets one precomputation table (top 2^32 phrases, 13.5 hours on one RTX 4090) break every ms1 hashlock ever made by lookup; an operator-chosen `--salt` printed on the method line would restore per-operator separation at the cost of one more line in the external backup (owning phase: **post-cycle, at the operator's call; RULED 2026-09-03 "no flag this cycle" (brainstorm L13)**) `#ms` `#funds` `#cross-repo`
 
+**Status:** OPEN
 Filed 2026-09-03 from the hashlock-phrase brainstorm's R0 review (I-1, `agent-reports/hashlock-brainstorm-R0-r0-crypto-bitcoin-expert.md`). Measured: hashcat v6.2.6 PBKDF2-HMAC-SHA256 8,865.7 kH/s at 999 iterations on one RTX 4090 = 8.9e4 guesses/s at 100,000; `2**32 / 8.86e4 = 48,470 s`. A targeted attacker pays the same per target either way; the flag defeats only the shared table. RFC 8018 section 4.1 names precomputation as the salt's purpose. The record carries the consequence in its copy ("choose the phrase from a generator"). If taken up: `--salt <ASCII>` on `ms hashlock`, printed verbatim on the method line and in `--json`, refused on the device unless the device's phrase screen gains a second field; vectors for a non-default salt. Companion entry in mnemonic-secret `design/FOLLOWUPS.md` when H1 opens.
 
 F-467 addendum (review Q3(c)/Q7, 2026-09-03): BIP-174 bounds no preimage length in `PSBT_IN_SHA256`, so the journey's 40-byte "preimage" rides a well-formed PSBT and fails only at `OP_EQUALVERIFY`; rust-miniscript's `Preimage32 = [u8; 32]` cannot even express the wrong satisfaction. The transcript would have printed success right up to broadcast.
 
 ### F-470 — `composer-preset-replaces-hand-built-paths-unasked`: on the Back leg's second pass through "Start from?", choosing a preset replaces the operator's own path list with no confirm when no slot is seated (owning phase: **post-S4 polish; an operator ruling, not a defect**) `#composer` `#seedhammer` `#ux`
 
+**Status:** OPEN
 Found while fixing W-6 (2026-09-04). Back at the path list now returns to
 "Start from?" (spec §7b), so a preset row is reachable with paths already
 built. The blank row keeps them; a preset row REPLACES them, which is what
@@ -15650,6 +16021,7 @@ call and a §8 copy row.
 
 ### F-471 — `composer-size-assignments-does-not-release-used-sources`: `composerSizeAssignments` rebuilds `st.assigned` without clearing `st.sources[i].used`, so a resize with seats held would take those sources out of every later pick list while nothing holds them (owning phase: **post-S4 hardening; unreachable today**) `#composer` `#seedhammer`
 
+**Status:** OPEN
 Found by the S4 W-6 fold verification round 2 (N-1,
 `agent-reports/composer-S4-W6-fold-verification.md`). `composerDiscardAssignments`
 releases both halves — the assignment and the source flag — and that release is
@@ -15668,6 +16040,7 @@ test that seats a source, resizes, and asserts the source is offered again.
 
 ### F-472 — `device-full-constellation-profile-convergence`: should the SeedHammer II refuse plain BIP-93 (48/74 characters) and shares of foreign ids, as `me` does? (owning phase: **none — an operator decision**) `#seedhammer` `#codex32` `#hashlock`
 
+**Status:** OPEN
 Filed with hashlock H0 (2026-09-04, `IMPLEMENTATION_PLAN_hashlock_H0_reader_guards.md`
 Task 4). H0 narrowed the device by exactly one shape — the kind-`0x03`
 preimage SINGLE — and deliberately nothing else. The device still admits what
@@ -15696,6 +16069,7 @@ question this entry asks is unchanged; only the starting inventory was wrong.
 
 ### F-473 — ~~`ms-codec-0.8-bump-needs-a-preimage-refusal-arm`~~ **CLOSED 2026-09-04 by `51f25c9`** (H1b: both halves landed in the same commit as the bump) `#hashlock` `#me` `#gating`
 
+**Status:** CLOSED 2026-09-04
 Filed with hashlock H0 (2026-09-04). At the pinned ms-codec `0.7`, `me` refuses
 a kind-`0x03` string at the codec's own prefix gate
 (`ReservedPrefixViolation { got: 3 }`), so H0's host half is a PIN, not a new
@@ -15751,6 +16125,7 @@ failed (`history_purge` x3). Both halves were mutation-checked; see
 
 ### F-474 — ~~`unlock-kdf-names-the-refused-record`~~ **CLOSED 2026-09-05 by fork `17b3979`** (H2 Task 7: the refusal carries the record index and kind, and the unlock screen names them) `#seedhammer` `#ux` `#seal`
 
+**Status:** CLOSED 2026-09-05
 Filed with hashlock H0 (2026-09-04). `seal.AdmitSection` refuses an encrypted
 section WHOLE when any record is not on the allow-list, and
 `gui/unlock_kdf.go`'s `default:` arm renders that as **"Payload unreadable."**
@@ -15791,6 +16166,7 @@ The RED was reproduced first: `never reached "hashlock preimage"; last frame
 
 ### F-475 — ~~`seam-corpus-33-byte-collision-row-names-the-wrong-0.8-error`~~ **CLOSED 2026-09-05** — the `bip93-plain-33-byte-payload-0x03` row's `source` prose said `me` refuses it "0.8 as a TagKindMismatch"; at 0.8 it is `UnknownTag` (owning phase: **H2**) `#hashlock` `#seam-corpus` `#records`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-04 from `hashlock-H1b-plan-R0-r0-fidelity` M-6, and MEASURED
 against ms-codec 0.8.0 before filing (a throwaway crate calling
 `ms_codec::decode` on the four strings in play, not read off the draft):
@@ -15887,6 +16263,7 @@ the merge commit.
 
 ### F-476 — `argv-secret-guard-does-not-cover-a-preimage-plate`: `me <plate>` on argv is echoed whole by clap's "unrecognized subcommand", because `argv_secret_guard` asks `sysw::classify` and a preimage plate is `Class::Unknown` (owning phase: **a later follow-up; secret-handling, never gating**) `#me-cli` `#secret-handling` `#hashlock`
 
+**Status:** OPEN
 Filed 2026-09-04 from `hashlock-H1b-post-impl` M-2. Not a regression -- at
 ms-codec 0.7 the plate was also `Unknown` and also uncovered -- but H0/H1b make
 the reason permanent: "inert, never `Codex32Secret`, no class of its own" is
@@ -15897,6 +16274,7 @@ is that test). Severity capped at Minor by the operator ruling of 2026-08-27.
 
 ### F-477 — ~~`composer-spec-still-says-the-device-never-derives-a-preimage`~~ **CLOSED 2026-09-05 by `657f40f`** (h3-composer-spec merge: §6c line 386 and the §14 row take H2's wording, provenance paragraph added): H2's phrase route falsifies `SPEC_wallet_policy_composer.md` §6c line 386 and its §14 out-of-scope row (owning phase: **H3**) `#composer` `#seedhammer` `#hashlock` `#records`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 during the H2 device implementation
 (`IMPLEMENTATION_PLAN_hashlock_H2_device.md` Task 6). Two sentences in the
 composer spec were true of the S-series cycle and are false as of H2, which
@@ -15919,6 +16297,7 @@ the composer spec is a separate artifact from the one H2 was reviewed against.
 
 ### F-478 — ~~`h2-spec-4.5-drop-order-names-an-unreachable-destination`~~ **CLOSED 2026-09-05 by `657f40f`** (h3-composer-spec merge: §4.5's drop-order clause names the post-HOLD screen): §4.5 step 2 sends the reconciliation line to the phrase-route §8h at Done, which `composerEveryPathHashed` guards (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05. `SPEC_hashlock_H2_device` §4.5's drop order ends *"then move
 the reconciliation line into the phrase-route §8h at Done (§4.7)"*. The build
 gate did exactly that and three R0 lenses traced the loss (r0 adversarial I-1 =
@@ -15939,6 +16318,7 @@ Replacement sentence for that clause, for whoever folds the spec:
 
 ### F-479 — ~~`h2-spec-4.5-line-list-has-no-other-path-line`~~ **CLOSED 2026-09-05 by `657f40f`** (h3-composer-spec merge: §4.5's line list gains the other-path line, count-free wording): the confirm modal draws a cross-path warning §4.5 does not enumerate (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05. §4.5 enumerates the confirm modal's lines "in order" and has
 no clause for r0 journey I-1's cross-path warning, which the plan added and which
 shipped as `composerCopyHashlockOtherPath` / `hashlockOtherPathLine`. Text to add
@@ -15961,6 +16341,7 @@ of headroom, above `assertModalBodyFits`'s margin of 80.
 
 ### F-480 — ~~`hash-provenance-is-composition-wide-not-per-path`~~ **CLOSED 2026-09-05 by fork `fb0dd04`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `gui/composer_provenance_test.go`'s six tests, `composerState.phraseDigests` replacing `hashByPhrase`): `composerState.hashByPhrase` is one bool for a whole policy, so §8h's phrase form can outlive the phrase-set hash that earned it (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; per-path provenance is a state-model change with its own gate) `#composer` `#seedhammer` `#hashlock`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from H2's R0 round 0 (adversarial I-2, tests I-4), where the
 per-path variant was the reviewers' preferred remedy and was **declined for H2
 with its reason**. `composerHashByPhraseSync` drops the flag on the one event
@@ -15982,6 +16363,7 @@ rather than to this route, which is why it is scheduled rather than bolted on.
 
 ### F-481 — ~~`hashlock-phrase-screen-draws-no-readout-and-show-does-nothing`~~ **CLOSED 2026-09-05 by fork `26fd1dd`** (post-impl I-2 graded it gating; the 8 px CutBottom removed; TestHashlockPhraseScreenDrawsTheMaskedReadout): the phrase screen's `show` key is drawn, is tappable, toggles to `hide`, and reveals nothing, because the readout is height-clamped to empty (owning phase: **H3**) `#hashlock` `#seedhammer` `#ux`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05, MEASURED on the emulator during H2's Task 5 walk (fork
 `hashlock-h2`, emu.wasm from that branch, served on a fresh port). On the
 `Hashlock phrase` screen:
@@ -16013,6 +16395,7 @@ new screen, and the post-implementation review is where its severity is ruled.
 
 ### F-482 — ~~`hashlock-two-more-spec-4-copy-departures-unrecorded`~~ **CLOSED 2026-09-05 by the H3 spec fold at the commit after `3aec2aa`** (§4.1's lead replaces; §4.2 quotes the two-sentence lead): §4.1's no-payload lead REPLACES "Which hash?" instead of adding a second lead line, and §4.2's lead is prefixed with "This screen does that hashing for you." — both decided in the plan, neither recorded as a spec departure (owning phase: **H3**) `#hashlock` `#seedhammer` `#spec` `#records`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from `hashlock-H2-post-impl` M-1. F-478 and F-479 record two
 §4.5 departures; these two have no record because
 `TestComposerCopyIsVerbatimFromTheSpec` compares the code against a table the
@@ -16029,6 +16412,7 @@ F-478/F-479, with the replacement text.
 
 ### F-483 — `hashlock-phrase-lives-in-an-unwipeable-go-string`: the typed phrase is `kbd.Fragment` (an immutable Go string) for the life of the phrase screen and across every Back via `initial`; `[]byte(kbd.Fragment)` copies it once more per OK; `seal.isPreimageRecord` stringifies a record a second time on the refusal path (owning phase: **a later follow-up; secret-handling, never gating**) `#hashlock` `#seedhammer` `#secret-handling`
 
+**Status:** OPEN
 Filed 2026-09-05 from `hashlock-H2-post-impl` M-3, per the operator ruling of
 2026-08-27 (secret-handling defects are logged, never gating) and consistent
 with ruling L15 (no scrub discipline beyond what the composer does by
@@ -16087,6 +16471,7 @@ refactored path is pinned by tests that already existed. The wipe itself is
 unobservable to a test and carries none.
 ### F-484 — ~~`hashlock-phrase-lead-paints-inside-the-back-button-margin`~~ **CLOSED 2026-09-05 by fork `fb0dd04`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `gui/composer_hashlock_geometry_test.go`, asserting the lead's ink stays out of the nav button rects): the phrase screen's lead wraps at `dims.X-2*8` centred on the whole panel and paints 152 px of ink inside the Back button's rectangle (its empty margin; 0 px of glyph or chip lost), where `composerPageLines` uses a narrower band for exactly this (W-3) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#geometry`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from the ultracode geometry lens (`hashlock-H2-post-impl-lens-geometry.md` M-1),
 measured by raster: lead (440,44) at (20,44), nav column from x=427, 152 px of lead ink
 inside (427,44)-(480,97), overlap with chip ink 0 px, z-order lead on top. Not folded with
@@ -16095,6 +16480,7 @@ height back; fold it with a re-measurement of both.
 
 ### F-485 — ~~`hashlock-walk-does-not-assert-hold-order-or-stored-vs-displayed`~~ **CLOSED 2026-09-05 by fork `fb0dd04`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate the rewritten `cmd/emu/walk_hashlock_phrase.js` plus `gui/composer_state_hook_test.go` / `ComposerPathHashes()`, asserting the post-hold stored hash against the token parsed from the confirm frame, and keeping the index pick with its landing assertion -- spec §4.3; F-485's index note is answered, not fixed): `cmd/emu/walk_hashlock_phrase.js` passes when the hash is assigned BEFORE the hold and when the stored digest differs from the displayed one (CI's gui tests catch both); it picks the phrase row by INDEX; `out.ok` restates assertions that already threw (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#walk` `#tests`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from the walk-control lens (`hashlock-H2-post-impl-lens-walk-control.md`
 M-1, M-2, N-1, N-2). The walk DOES fail under a mutated digest display and a mutated
 hardened derivation (measured on two mutated emulators); these are the gaps that remain.
@@ -16103,12 +16489,14 @@ token, and pick the row by label as the production code now does.
 
 ### F-486 — ~~`first8-last8-digest-form-is-documented-nowhere-the-operator-reads`~~ **CLOSED 2026-09-05 by toolkit `00980f9b`** (docs/manual/src/40-cli-reference/43-ms.md: the confirm-modal paragraph states the first-and-last-eight rule and shows `3cf5d421..b70a4c12` beside the host's full `hash:3cf5d421...b70a4c12` for the same phrase and method): the device shows `first8..last8` of the digest; `ms hashlock` prints only the full 64 hex and no manual page explains the abbreviation the operator must compare (owning phase: **H3**, toolkit manual + ms manual) `#hashlock` `#docs` `#reconciliation`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from the host-device e2e lens (`hashlock-H2-post-impl-lens-host-device-e2e.md`
 M-1). The H3 toolkit-manual draft describes the confirm modal; make sure it states the
 abbreviation rule and shows one host/device pair side by side.
 
 ### F-487 — ~~`hashlock-reconciliation-is-asked-after-the-digest-left-the-screen`~~ **CLOSED 2026-09-05 by fork `fb0dd04`** (hashlock H5 -- the next device code cycle this was owned to, not overdue; gate the `composerCopyHashlockReconcile` row in `gui/composer_copy_test.go` and `assertModalBodyFits` in `gui/modal_fits_test.go`; H2 spec §4.5/§4.7 folded in this same commit): the reconcile screen asks the operator to compare against the host after the confirm modal (which held the digest) has been dismissed, and the write-down instruction does not tell them to write the digest (owning phase: **the next device code cycle** -- RULED 2026-09-05) `#hashlock` `#seedhammer` `#ux` `#spec`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from the host-device e2e lens M-2. Options: repeat the abbreviated digest
 on the reconcile screen, or add "and this digest" to the write-down copy. A spec change;
 walk it with the operator.
@@ -16125,11 +16513,13 @@ operator pulls it forward.
 
 ### F-488 — ~~`f474-refusal-names-the-record-but-not-the-next-step`~~ **CLOSED 2026-09-05 by fork `fb0dd04`** (hashlock H5 -- the next device code cycle these five were owned to, not overdue; gate `TestUnlockNotPermittedBodyNamesTheRecordAndTheKind`, `gui/unlock_preimage_test.go`): the unlock KDF's new refusal says which record and what it is, but not what to do (remove the record on the host and re-seal) (owning phase: **the next device code cycle** -- re-scheduled 2026-09-05 from H3, which is records-only; this is a code change with its own gate) `#hashlock` `#seedhammer` `#ux`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from the host-device e2e lens M-3. One more sentence in the arm's copy,
 re-measured for fit.
 
 ### F-489 — ~~`me-seal-does-not-name-the-record-index-where-sysw-pack-does`~~ **CLOSED 2026-09-05 by `2abc4a1a`** (SealError::RecordAt; `seal_names_the_refused_record_index_like_sysw_pack`): `me seal --seal-secret` refuses a preimage plate by kind but without the record index that `me sysw pack` prints (owning phase: **the next me code cycle**) `#me-cli` `#ux` `#hashlock`
 
+**Status:** CLOSED 2026-09-05
 Filed 2026-09-05 from the host-device e2e lens N-1. Same message shape on both verbs.
 
 **RULING 2026-09-05 (operator, walked live: option 1).** Align the shape: `me seal` names
@@ -16140,6 +16530,7 @@ refusal: name what was refused and where.
 
 ### F-490 — `fork-engrave-resume-state-test-is-load-flaky`: `TestEngraveScreenReleasesResumeStateOnReturn` (`gui/residency_wiring_test.go:112`) fails INCONCLUSIVE ("the job never completed (state 1)") when a heavy neighbour shares the shard, and passes 3/3 alone (owning phase: **fork test hygiene, next fork code cycle**) `#seedhammer` `#tests` `#flaky`
 
+**Status:** OPEN
 Filed 2026-09-05 from the controller's whole-gui run on the H5 gated tree (shard 23, beside a
 2,000,000-iteration KDF test): a timing-dependent completion check that reports INCONCLUSIVE
 under load. H5 does not touch the file. Same class as the toolkit's wall-clock ceiling test:
@@ -16168,6 +16559,7 @@ ever reports INCONCLUSIVE again, that is now a signal about the job, not about
 the box.
 ### F-491 — CLOSED 2026-09-06 (hashlock H6 Task 13) — `h2-spec-reuse-block-drift-not-shipped-two-sentence-form`: H2 spec §4.5's reuse block quotes the four-sentence pre-drop-order form ("One phrase per policy. Spending any path of a wsh wallet publishes this digest. Never use this phrase as a passphrase or a password anywhere else -- a spend publishes the preimage, and anyone can then test guesses at the phrase itself."), while the shipped `composerCopyHashlockConfirm` (`gui/composer_copy.go:421-422` at fork main `b9a9a30`) has always drawn the drop order's two-sentence form: "One phrase per policy. Never use this phrase as a passphrase or a password anywhere else." (owning phase: **H2 spec hygiene**) `#hashlock` `#seedhammer` `#docs` `#records`
 
+**Status:** CLOSED 2026-09-06
 Filed 2026-09-05 from hashlock H5 Task 6 Step 1 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which declines to fold it alongside the write-down/reconcile edit so `git diff` on that commit is H5's change and nothing else. Real and pre-existing, not one of H5's five follow-ups. Fix: quote the shipped two-sentence text verbatim in §4.5's fenced block in place of the four-sentence form -- a transcription, not a re-decision.
 
 **CLOSED 2026-09-06 by hashlock H6 Task 13.** H6's own record 5 rewrites the
@@ -16181,6 +16573,7 @@ anywhere else."*
 
 ### F-492 — `no-manual-section-documents-the-re-sealed-payloads-new-passphrase`: H5 spec §5's documentation-only item (journey M-5) asks that "the manual's unlock section" state the re-sealed payload has a new passphrase, but no such section exists -- `docs/manual/src/40-cli-reference/` holds only `41-mnemonic.md`, `42-md.md`, `43-ms.md` and `44-mk-cli.md`, and a grep of the whole tree for the refusal's own words ("Nothing was opened", "cannot be unlocked here", "not a seed") returns nothing at toolkit `46b40bb` (owning phase: **the `me`/sysw manual chapter**) `#hashlock` `#seedhammer` `#docs` `#unlock`
 
+**Status:** OPEN
 Filed 2026-09-05 from hashlock H5 Task 6 Step 3 (`IMPLEMENTATION_PLAN_hashlock_H5_device_polish.md`), which measured the grep before filing rather than inventing a target: writing an unlock chapter is a documentation deliverable of its own, several screens wide, and a free-floating sentence in the `ms hashlock` chapter would sit where nobody reading about unlocking would find it. The device's own refusal text already carries the instruction (H5 spec §5); this follow-up is only the manual-side gap.
 
 
@@ -16200,6 +16593,7 @@ protect february`. `make lint` exits 0 (markdownlint, cspell, lychee,
 flag-coverage, glossary-coverage, index bidirectionality).
 ### F-493 — `me-phrase-record-builds-the-phrase-into-a-plain-string`: H6 Task 2's `phrase_record(method, phrase) -> String` (plan block at `IMPLEMENTATION_PLAN_hashlock_H6_preimage_plates.md`, "pub fn phrase_record") returns the typed hashlock phrase in an unprotected `String`, the same class as the pre-publish review's M-2 on ms-codec's `qr_text` (`design/agent-reports/hashlock-H6-A-pre-publish-review.md`), which WAS folded to `Zeroizing<String>` before the 0.9.0 publish because ms-codec's convention for secrets is `Zeroizing`. `me`'s convention is different — its record text (mnemonics included) already flows as plain `String`/`&str` through `validate_record`, `check_public` and `seal_deterministic` — so folding one function would be inconsistent rather than safer. Secret-handling class: never Critical/Important (operator ruling 2026-08-27). Owning phase: the next `me` secret-hygiene pass (with F-483), not H6.
 
+**Status:** OPEN
 Filed 2026-09-05 by the controller at the H6 pre-publish gate; B (Tasks 2-3) implements the plan's `String` form as written.
 
 
@@ -16221,6 +16615,7 @@ is argued from the function's four lines, not tested. The mutation the comment
 names instead (reserve eight bytes too many) does red it.
 ### F-494 — `fork-go-vet-is-red-at-baseline`: `go vet ./...` on the fork exits 1 at `main` `fb0dd04` before any H6 change — `bspline/bspline_test.go:126-127` (`bezier.Point` struct literals with unkeyed fields) and `testing.ArtifactDir requires go1.26 or later (file is go1.25)` in `gui/op/draw_test.go:176` and elsewhere (the `go.mod` language version is behind the Go 1.26 toolchain the tests already rely on). Neither package's tests fail; `vet` is not in the fork's CI gate, so nothing catches it. Fix in the fork's next hygiene cycle: key the literals, and raise the `go` directive to `1.26` (the toolchain floor the flake already pins) so `ArtifactDir` is legal by declaration, not by luck. Owning phase: next fork cycle, with F-490.
 
+**Status:** OPEN
 Filed 2026-09-05 by the controller from the H6 group-C gate re-run on fork `hashlock-h6` at `872ba06c` (`.tmp/h6-ctl-c-check/vet.txt`); measured red at `fb0dd04` too, so not C's.
 
 
@@ -16251,6 +16646,7 @@ merged tree, exit 1 on a probe finding (`fmt.Sprintf format %d has arg of wrong
 type string`). Gates: every non-gui package ok; gui 1290 across 24 shards.
 ### F-495 — `no-verb-emits-a-phrase-record`: H6 §3.1 gives the `phrase:` wire form a Rust constructor and §3.2 a `--pack-preimage` flag to admit it, but NO CLI verb writes one — the operator hand-builds the hex every time (owning phase: **the next `me`/`ms` cycle after H6**) `#hashlock` `#seedhammer` `#me` `#records`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (`IMPLEMENTATION_PLAN_hashlock_H6_preimage_plates.md`). **A wire form with no writer is worth its own follow-up.** §3.1 lands `phrase_record(method, phrase) -> String` and its parser, §4.2 classifies the record on the device, §5.1 draws it as `phrase record N (derive to see the digest)` and H6 Task 10 derives it on pick — an entire consumption chain over a record nothing in the constellation PRODUCES. §3.3's orphan warning (the payload holds a preimage and no matching `hash:` record) is therefore a mitigation for hand-assembly errors rather than a fix for them.
 
 Shape when taken up: either `ms hashlock … --emit-phrase-record` (it already holds the phrase and the method, and already prints the `hash:` record next to the ms1 string) or `me sysw record phrase --method …`. `ms hashlock` is the better home on the Rust-primary rule — it is where the method is decided — but it is the repo whose CLI must never take a secret on argv (§3.6), so the phrase has to arrive by `--hashlock-phrase-stdin` exactly as it does today.
@@ -16283,6 +16679,7 @@ testing the guard rather than the flag — the test now reads an ms1 plate throu
 `--in`.
 ### F-496 — `a-payload-phrase-gets-no-reconcile-screen`: H6 §10.2 scopes `composerCopyHashlockReconcile` to phrases typed on the device, so a `phrase:` record from the payload derives, confirms and assigns with nothing telling the operator to check the digest against the host (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2. The split is deliberate and correct as far as it goes: `hashlockPayloadRoute` is a different function from `hashlockPhraseRoute` precisely so the reconcile instruction (*"run ms hashlock with this phrase"*) cannot be drawn for a phrase the host already has, and §10.2 makes that true BY CONSTRUCTION — `composerCopyHashlockReconcile` has exactly one call site in the tree, so no runtime guard and no test for one is possible or needed.
 
 What is missing is the OTHER screen. A payload phrase still produces a digest the device derived on its own, and the operator still has no on-device proof that it equals what the host computed when it packed the record. A reconcile-STYLE screen for that route would say something different — compare against the payload's own `hash:` record, which §8.2's relation line already computes — rather than borrowing the phrase route's words. Not filed as a defect in H6: the route is right, and the screen is a new deliverable.
@@ -16313,6 +16710,7 @@ X directly, so there is no derivation to reconcile and no phrase for the host
 command to take.
 ### F-497 — `no-cross-run-awareness-of-preimage-plates-already-cut`: the composer's plate census reports what THIS run will cut and cannot know that a plate for the same digest was cut in an earlier run (owning phase: **the hashlock stage after H6**) `#hashlock` `#seedhammer` `#gui`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2, against §5.3 item 6 and §8.4b. `composerState.hashlockHeld` lives for one composition and `composerFlowExit` scrubs it, so a second composition over the same phrase re-derives, re-holds and re-offers a plate with nothing on any screen saying one already exists. Two consequences, and the second is the one that costs something: the operator can cut a duplicate bearer plate without being told (more copies of a spend secret than they meant to have), and §8.4b's abort arm — *"a preimage plate was cut"* — is scoped to the run it fired in, so an abort in run 2 says nothing about run 1's plate still being on the bench.
 
 Any fix needs persistent state the device does not currently keep for this, and "what plates has this machine cut" is a bigger question than the hashlock stage — the SH2 has no camera, so it cannot read a plate back to find out (see `sh2-has-no-camera`). Deliberately not attempted in H6.
@@ -16344,6 +16742,7 @@ GREEN). Also measured on the way: the copy table proves a body exists, is
 spelled right and fits, and proves nothing about anything drawing it.
 ### F-498 — `composerNotePhraseDigest-cites-a-stale-line-for-the-composerState-literal`: three sites say the production `composerState` literal is at `gui/composer_flow.go:34`; MEASURED at fork `hashlock-h6` it is at `:51` (owning phase: **next fork hygiene cycle, with F-490 and F-494**) `#seedhammer` `#docs` `#records`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 (H6 spec §2.2 item 1 names it as a nit for this stage's fold; the plan's own text says `:48`, which is itself stale). Measured with `grep -n "st := &composerState{" gui/composer_flow.go` at the H6 integration tip:
 
 ```
@@ -16356,6 +16755,7 @@ Three comments carry the wrong number — `gui/composer_state.go:304` (`composer
 
 ### F-499 — `fork-gofmt-is-red-at-baseline-in-FIVE-files-not-three`: `gofmt -l` on the pristine fork lists five files, and every H6 document that names the baseline says three (owning phase: **next fork hygiene cycle, with F-490 and F-494**) `#seedhammer` `#tests` `#records`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 — baseline red 1 of the plan's Global Constraints, **re-measured rather than transcribed**. Reproduction, on a detached worktree of fork `main` `fb0dd04` with no H6 change in it:
 
 ```
@@ -16373,6 +16773,7 @@ The plan's Global Constraints name the first three and say *"H6 touches none of 
 
 ### F-500 — `history-purge-trio-fails-for-want-of-zsh-not-for-a-box-quirk`: three `mnemonic-engrave` tests fail on this machine because `/usr/bin/zsh` does not exist, and they fail BY DESIGN rather than skip (owning phase: **this box's toolchain; no code change**) `#mnemonic` `#tests`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 2 — baseline red 3 of the plan's Global Constraints, with the CAUSE measured rather than the symptom recorded. Reproduction at engrave master `5e7211d0`:
 
 ```
@@ -16412,6 +16813,7 @@ file whose comment exists to stop exactly that. The system package matches CI
 byte for byte instead.
 ### F-501 — `ms-cli-engraving-card-still-says-the-method-line-is-on-no-plate`: record 4 of H6 spec §0's five falsified records was NOT folded, because it lives in a repo H6 Task 13 was given no branch in (owning phase: **the next `ms` cycle; before H6 ships to an operator**) `#hashlock` `#ms` `#docs` `#records`
 
+**Status:** OPEN
 Filed 2026-09-06 by H6 Task 13's implementer, as a **deviation from the plan**, not a discovery. `crates/ms-cli/src/cmd/hashlock.rs:352` in mnemonic-secret still prints, on the engraving card:
 
 > `phrase:          {n} characters -- write the method line next to your phrase; it is on no plate; …`
@@ -16430,6 +16832,7 @@ correctly declined to touch because its brief named no branch in that repo —
 the controller folded it there instead.
 ### F-502 — `the-8h-blockquotes-in-two-older-specs-show-one-arm-of-four`: `SPEC_wallet_policy_composer.md` §8h and `SPEC_hashlock_H2_device.md` §8h each quote a single `HASH ON EVERY PATH` body, while the shipped chooser has had four arms since H6 (owning phase: **spec hygiene, with the next hashlock stage**) `#hashlock` `#seedhammer` `#docs` `#records`
 
+**Status:** OPEN
 Filed 2026-09-06 from hashlock H6 Task 13 Step 1, as an OBSERVATION outside the five records the plan lists — recorded rather than folded, because neither blockquote is false and folding it is a re-decision about which spec owns §8h's copy. Measured at fork `hashlock-h6`: `composerCopyHashEveryPathFor` (`gui/composer_copy.go:582`) dispatches to four bodies — `composerCopyHashEveryPath` (`:182`), `…Phrase` (`:569`), `…Held` (`:683`) and `…HeldPhrase` (`:692`) — and the two held arms are H6's, added because the shipped pair say the preimage *"is not on this device"*, which §2.2 makes false for a composition that holds it.
 
 The composer spec quotes only the first arm and the H2 spec only the first two, so a reader of either sees a screen the device draws in fewer and fewer cases. `SPEC_hashlock_H6_preimage_plates.md` §10.1 carries all four and is the live authority; what these two owe is a pointer to it rather than a fourth copy of the copy.
@@ -16438,10 +16841,12 @@ The composer spec quotes only the first arm and the H2 spec only the first two, 
 
 ### F-503 — `device-classifies-a-17-byte-kind-0x03-single-as-a-seed-while-the-host-refuses-it`: a kind-`0x03` ms1 single under id `hash` whose X is 16 bytes (`ms10hashsqvqqqqqqqqqqqqqqqqqqqqqqqqqqmv3lqlgkn6s5c`) is refused by `me sysw pack` as `Unclassifiable(0, PreimagePlate)` (the 33-byte conjunct fails) but classifies `ClassCodex32Secret` -- a SEED class -- on the device, because `codex32.IsPreimage` needs `len(d)==33`, so `isStrictMs1`'s `!codex32.IsPreimage(c)` conjunct is satisfied. Pre-existing at fork `fb0dd04` (measured: class 2 there too), unchanged by H6, and unreachable through `me`; it is the one host/device classification divergence in the H6 post-impl probe set (`design/agent-reports/hashlock-H6-post-impl.md` M-1). Fix belongs to an H0-class change: narrow `isStrictMs1` (kind 0x03 under any id, any length, is never a seed) with its own inertness argument and corpus row, Rust-first (`me`'s `preimage_plate` already refuses it by name). Owning phase: next fork hashlock cycle. CLOSED 2026-09-06: me 277c6336, fork b32ff08, ms 81d67b85; rule = kind 0x03 under `hash` at every length (operator ruling), control row `hash-id-kind00-16-byte`.
 
+**Status:** CLOSED 2026-09-06
 Filed 2026-09-06 by the controller from the H6 post-impl review.
 
 ### F-504 — `pack-preimage-uppercase-plate-body-diagnoses-the-wrong-id-and-offers-the-seed-backup-sentence`: `me sysw pack --pack-preimage` on an UPPERCASE plate string says "is a kind-0x03 preimage payload whose 4-character id is not `hash`" and ends with the 1-in-256 seed-backup sentence; the id IS `hash` in the other case (§4.3's case-sensitive reading), so the first sentence is true only technically and the last is inapplicable. The remedy the body gives ("Re-encode it with `ms hashlock`") is right, and both sides refuse (device `ClassUnknown`). Wording only (`design/agent-reports/hashlock-H6-post-impl.md` N-1). Owning phase: next `me` UX pass.
 
+**Status:** OPEN
 Filed 2026-09-06 by the controller from the H6 post-impl review.
 
 
@@ -16475,12 +16880,14 @@ them. Related: F-503 and F-506 are the same family — a refusal or a
 classification that was true of one shape being applied to another.
 ### F-505 — `emu-wasm-size-is-not-a-reproducible-pin`: `cmd/emu/emu.wasm` rebuilds to 11,011,082 B from the H6 tip (Go 1.26.7, `sh ./cmd/emu/build.sh`) against the 11,011,084 B that H6 spec §11.6 and implementer F's runs record -- two bytes, in an artifact that is neither the firmware nor shipped. Do not treat that figure as a pin; if a spec needs a reproducible emulator identity, pin the walk file's sha256 (`dfb9e6d5…9bc581` at e089a539) instead (`design/agent-reports/hashlock-H6-post-impl.md` N-2). Owning phase: ownerless residue.
 
+**Status:** OPEN
 Filed 2026-09-06 by the controller from the H6 post-impl review.
 
 **CLOSED 2026-09-06.** `SPEC_hashlock_H6_preimage_plates.md` §11.6 keeps the original 11,011,084 B measurement and adds one sentence marking it an observation rather than a pin: the artifact is neither the firmware nor shipped, the size is not byte-reproducible across rebuilds (this follow-up's own two-byte drift), and a spec needing a reproducible emulator identity should pin `cmd/emu/walk_hashlock_phrase.js`'s sha256 instead — confirmed unchanged (`dfb9e6d5cf5521349db0c116cf7426039e7ff6c177f86e269f92105ddc9bc581`) between fork `e089a539` and the current `docs-cluster` tip.
 
 ### F-506 — `uppercase-hash-id-kind-0x03-short-x-is-still-a-device-seed-class`: F-503's fix is CASE-SENSITIVE by design (`sysw.isHashIdPreimageKind` reads the id from `codex32.String.Split()` and compares to the literal `"hash"`, mirroring `codex32.IsPreimagePlate`), so the UPPERCASE spelling of the F-503 string -- `MS10HASHSQVQQQQQQQQQQQQQQQQQQQQQQQQQQMV3LQLGKN6S5C`, the QR-alphanumeric form of a 17-byte 0x03 payload under `HASH` -- still classifies `ClassCodex32Secret` on the device. Measured at fork `f503` b32ff08 with a throwaway probe (deleted): lowercase F-503 string `Classify = 0` (fixed), UPPERCASE `Classify = 2` (a SEED class), lowercase plate `13` (ClassPreimage), UPPERCASE plate `0`, and the pinned H0 row `ms10testsqv0…` `2` (unchanged, as intended). The host refuses the uppercase string by name (`me sysw pack --pack-preimage` → "whose 4-character id is not `hash` and whose X is 16 bytes, not 32"), so this is the same host/device divergence F-503 closed, surviving in the other case. **The behaviour matches the operator's ruling** (stated as the id `hash`) and does not gate that ruling; what is wrong today is the JUSTIFICATION: `isHashIdPreimageKind`'s doc comment claims the uppercase spelling "is refused elsewhere (H6 §4.3) and never reaches a seed class", which is measured true of the uppercase PLATE (33 bytes, `Classify = 0`, because `IsPreimage` reads `Seed()` and is case-insensitive) and measured FALSE of the uppercase short-X form this follow-up is about. Minimum fix: correct that comment. Wider fix, if the operator wants it: compare the id case-insensitively in `isHashIdPreimageKind` (and decide whether `IsPreimagePlate` should follow), Rust-first as always. Unreachable through `me`, which never packs the record. Related but distinct: F-504 is the host-side WORDING for the uppercase plate; this is a device-side seed CLASS. Owning phase: next fork hashlock cycle.
 
+**Status:** OPEN
 Filed 2026-09-06 by the F-503 implementer, from a measurement taken while transcribing the plan's comment.
 
 **CLOSED 2026-09-06 by the operator's ruling — the id is compared
@@ -16509,6 +16916,7 @@ id in either case. That is F-504, and it is the next item.
 
 ### F-507 — `composer-hashlocks-are-sha256-only-while-md1-carries-four-hash-fragments`
 
+**Status:** OPEN
 **SPEC CLOSED 2026-09-14** — `design/SPEC_hashlock_kinds.md` at `ad1820a3`,
 after three R0 correctness rounds (1C/6I → 1C/2I → 0C/0I) **and then four more
 rounds under two operator-directed lenses**, which between them found 2 Critical
@@ -16581,6 +16989,7 @@ phrase means under `ripemd160`. That is a composer design question, not a patch.
 
 ### F-508 — `the-device-emits-multipath-descriptors-bitcoin-core-v25-refuses`: md1 templates carry `<0;1>` and a Core of this vintage rejects the descriptor outright — `tr(): Key path value '<0;1>' is not a valid uint32` — so a restored policy cannot be imported until it is split into receive and change (repo: **descriptor-mnemonic** + **mnemonic-toolkit** docs; owning phase: **the restore-documentation pass**) `#md` `#core` `#restore` `#docs`
 
+**Status:** OPEN
 Filed 2026-09-12, measured against the node on this box (`bitcoin-cli -version` reports
 Bitcoin Core RPC client v25.0.0; the daemon is Bitcoin Satellite v0.2.4). BIP-389 multipath
 is a later Core feature, and until a user is on a build that has it, EVERY md1-restored
@@ -16619,6 +17028,7 @@ restore step. Core 31.1 binaries deleted after the test, as the operator asked.
 
 ### F-509 — `taproot-miniscript-policies-cannot-be-imported-into-a-core-of-this-vintage`: the composer builds `tr()` policies whose leaves are miniscript, and Core answers `Miniscript expressions can only be used in wsh` — so a device-built taproot timelock or hashlock policy is un-importable there, while its wsh twin imports and funds (repo: **seedhammer fork** docs + **mnemonic-toolkit** manual; owning phase: **the restore-documentation pass, with F-508**) `#composer` `#taproot` `#core` `#docs`
 
+**Status:** OPEN
 Filed 2026-09-12 from the same experiment. Measured, same node, same three keys, receive
 branch expanded:
 
@@ -16657,6 +17067,7 @@ available* and reads like an import failure when it is not.
 
 ### F-510 — `shTargets-reports-one-region-per-keyboard-row-so-walks-must-hardcode-key-coordinates`: on any `Keyboard` screen the emulator's `shTargets()` returns ONE region per row, all at the row's centre, so a walk cannot address a key by index and has to compute or measure x itself (repo: **seedhammer fork**; owning phase: **the next walk-harness pass**) `#emulator` `#walks` `#tests`
 
+**Status:** OPEN
 Filed 2026-09-12 from writing `cmd/emu/walk_timelock_hashlock.js`. Measured on the composer's
 digit pad (`composerDigitKeys = "123\n456\n789\n0"`):
 
@@ -16677,6 +17088,7 @@ hashlock walk's `ppKeyPoint` is the same workaround written twice.
 
 ### F-511 — `md-vectors-overwrites-a-vector-whose-name-is-reused`: `md vectors` regenerates the corpus by NAME and silently replaces the five files of any existing vector whose name a new `Vector {}` entry repeats — no refusal, no warning, five files rewritten in place (repo: **descriptor-mnemonic**; owning phase: **the next md-codec cycle**) `#md` `#vectors` `#tooling`
 
+**Status:** OPEN
 Filed 2026-09-13 after hitting it TWICE in one sitting while adding
 `keyed_compose_wsh_timelock_hashlock`. Both `keyed_wsh_timelock_hashlock` and
 `keyed_compose_wsh_three_paths` are already taken by different policies, and each
@@ -16701,6 +17113,7 @@ two directions at once.
 
 ### F-512 — `policyprobe-wrapped-one-branch-of-the-router`: the device leg of the policy differential harness reported eight vectors as device refusals that the device derives — FIXED, fork `c747d17`
 
+**Status:** OPEN
 Filed and fixed 2026-09-13, in the first corpus smoke test the harness ever ran.
 
 `cmd/policyprobe` derived through `gui.PolicyAddressSource`, a thin export of
@@ -16739,6 +17152,7 @@ see that what it wraps is a branch.
 
 ### F-513 — `md-address-refuses-policies-its-own-corpus-has-addresses-for` — CLOSED: already fixed upstream; the inconsistency lives only in the fork's stale copy (see F-529)
 
+**Status:** CLOSED
 Filed 2026-09-13 from the first three-way corpus differential (42 agree, 0
 disagree, 3 declined by the Rust primary alone).
 
@@ -16836,6 +17250,7 @@ Owning phase: none.
 
 ### F-514 — `the-device-derives-a-bip-388-forbidden-policy-in-silence`
 
+**Status:** OPEN
 Filed 2026-09-13, same run as F-513.
 
 On a policy whose template reuses one key at two use sites with the same path,
@@ -16873,6 +17288,7 @@ Owning phase: none yet (fork, `gui/`).
 
 ### F-515 — `the-64-chunk-wire-cap-is-not-implied-by-ComposeMaxSlots` — CLOSED, `descriptor-mnemonic` `40c400de`
 
+**Status:** CLOSED
 Filed 2026-09-13 from the differential driver's 1000-policy run: 10 of the 80
 `md`-side refusals were policies that hit the **64-chunk wire cap**, a bound the
 composer's own `ComposeMaxSlots = 32` does not imply and does not mention.
@@ -16912,6 +17328,7 @@ Owning phase: none.
 
 ### F-516 — journey C-1: `Change the script` defaulted to Taproot — FIXED, fork `6728c22`
 
+**Status:** OPEN
 Critical, from the composer policy journey walk at fork main `812ff06`. The
 script picker built a fresh `ChoiceScreen` with no selection, so its highlight
 sat on row 0, Taproot, not on the wrapper in force. Opening it to **see** which
@@ -16935,6 +17352,7 @@ both halves mutated and RED; firmware +464 bytes flash, RAM unchanged.
 
 ### F-517 — journey I-7: the Review never names the script wrapper — FIXED, fork `c4d8527`
 
+**Status:** OPEN
 All four Review pages under `wsh` — paths, Template-ID, the hash rule, the
 keyless notice — never say `wsh`, `Segwit`, `tr` or `Taproot`. **This is what
 made F-516 undetectable**, and it outlives the fix: the path list is also
@@ -16953,6 +17371,7 @@ mutations RED; firmware +240 bytes flash, +32 RAM.
 
 ### F-518 — journey I-8: an illegal wrapper is accepted, and refused only after the seats are gone
 
+**Status:** OPEN
 Choosing a wrapper the composition cannot legally take is accepted silently, and
 the hold gate that precedes the change has **already cleared the seated keys**.
 The path list returns looking exactly as before. Only at `Done` does the machine
@@ -16961,6 +17380,7 @@ the refusal arrives before the damage. Owning phase: none yet (fork, `gui/`).
 
 ### F-519 — journey I-6: leaving the composer destroys the composition and the hashlock phrase, unwarned
 
+**Status:** OPEN
 Four `←` taps from the path list reach the carousel with no confirmation at any
 point, and re-entering gives `slots: 0`. What is lost includes **a hashlock
 phrase the device cannot show again**. Gate the last `←` out of a non-empty
@@ -16969,6 +17389,7 @@ none yet (fork, `gui/`).
 
 ### F-520 — journey I-5: "the shape changed, so this id changed" fires when nothing changed — CLOSED, fork `c1f7e3a`; the leg was found and the first fix was wrong
 
+**Status:** CLOSED
 The Template screen claims the id changed and that cards minted with the old
 stub will not seat — while printing, two lines below, an id byte-identical to
 the previous one. A false claim about card validity on the screen that governs
@@ -17017,6 +17438,7 @@ unchanged.
 
 ### F-521 — journey I-4: under `tr`, every offered key violates the slot's stated origin, silently
 
+**Status:** OPEN
 The only seating candidates are P2WSH-script-type keys (`…/2'`), and seating one
 under taproot is accepted without a word; `Key mapping` then prints the origin
 with no mark. Refusing would make taproot unusable with the payload, so the
@@ -17025,6 +17447,7 @@ origin. Owning phase: none yet (fork, `gui/`).
 
 ### F-522 — journey I-10: the final gate asks for a check the keyless artefact cannot support
 
+**Status:** OPEN
 The gate says to restore the plates in a coordinator and compare the first
 receive address. A keyless template **has no addresses** — the Review says so
 itself. Give the keyless arm its own sentence: compare the Template-ID against
@@ -17033,6 +17456,7 @@ learns to tap through. Owning phase: none yet (fork, `gui/`).
 
 ### F-523 — journey I-1: a leading zero silently costs a digit in the wait field
 
+**Status:** OPEN
 The field holds three characters and ignores the rest, so `0365` becomes `036`
 and reads back as `36 days`. Confirmed with `12345` → `123`. Don't append `0` to
 an empty buffer, and give feedback when a keypress is discarded. Owning phase:
@@ -17040,12 +17464,14 @@ none yet (fork, `gui/`).
 
 ### F-524 — journey I-2: `Build my own paths` does not clear a template's paths
 
+**Status:** OPEN
 The row promises a blank start and leaves the template's spend paths in place.
 Either clear the composition or rename the row to what it does. Owning phase:
 none yet (fork, `gui/`).
 
 ### F-525 — journey I-3 and I-9: two refusals of the wrong shape
 
+**Status:** OPEN
 **I-3**: the past-date refusal is a full-screen modal whose only forward control
 dismisses the operator to the path's own menu with no timelock set and the eight
 typed digits gone. The other two refusals on that screen are inline; this one
@@ -17055,6 +17481,7 @@ exists. Owning phase: none yet (fork, `gui/`).
 
 ### F-526 — journey Minors and Nits: 10 Minor, 6 Nit from the composer walk
 
+**Status:** OPEN
 Recorded as a batch; the detail is verbatim in
 `design/agent-reports/composer-policy-journey.md`. M-1 what the relative wait is
 measured from; M-2 the blanks instruction sits with a count that excludes the
@@ -17073,6 +17500,7 @@ was made), and the hardened KDF's timing on real hardware. Owning phase: none.
 
 ### F-527 — review M-2: four of the six `ChoiceScreen` initial-selection call sites are covered by nothing — PARTLY CLOSED, fork `0e6ade8`
 
+**Status:** CLOSED
 Filed 2026-09-13 from the adversarial review of the script-picker preselect fix.
 
 Making `ChoiceScreen.Choose` ignore `Initial` entirely — which reverts all six
@@ -17106,6 +17534,7 @@ phase: none (fork, `gui/`).
 
 ### F-528 — review N-1: `shown` records a template the operator was never shown when the stub screen fails to render — CLOSED, fork `0e6ade8`
 
+**Status:** CLOSED
 Filed 2026-09-13 from the follow-ons review; **pre-existing**, not introduced by
 the diff that surfaced it.
 
@@ -17132,6 +17561,7 @@ exactly where this class hides. Owning phase: none.
 
 ### F-529 — the fork's vendored vector corpus has DIVERGED from the primary under identical names
 
+**Status:** OPEN
 Filed 2026-09-13, found while trying to close F-513 by marking the primary's
 corpus and discovering the primary had nothing to mark.
 
@@ -17175,6 +17605,7 @@ Owning phase: none (cross-repo; blocks nothing until someone re-vendors).
 
 ### F-530 — the `expandOK` address route shows addresses without the duplicate-key warning
 
+**Status:** OPEN
 Filed 2026-09-13 from the F-514 review's C-1, which named two surfaces. One is
 fixed at fork `22bace1`; this is the other, left open deliberately rather than
 half-done.
@@ -17264,6 +17695,7 @@ Owning phase: closed.
 
 ### F-530 (historical) — what F-531 had already narrowed
 
+**Status:** SUPERSEDED — a historical note; the live entry is F-530 proper
 **NARROWED 2026-09-13 by F-531**, and the narrowing is the useful part. The
 `expandOK` route can no longer be handed a duplicate of any kind: `scriptForTemplate`
 admits only `PolicySingle` (one slot, cannot repeat) and `PolicySortedMulti`, and
@@ -17282,6 +17714,7 @@ Owning phase: none (fork, `gui/`).
 
 ### F-531 — two address routes in one binary disagree for a repeated-slot multisig — PRE-EXISTING, funds-critical
 
+**Status:** OPEN
 Found 2026-09-13 by the F-514 review, flagged as outside that fold's scope and
 correctly so: nothing in the duplicate-key work introduced it.
 
@@ -17352,6 +17785,7 @@ Owning phase: closed.
 
 ### F-532 — duplicate-key warning: the Minors the GREEN round left standing
 
+**Status:** OPEN
 Filed 2026-09-13. The F-514 review closed GREEN at fork `8f9e4d8` with 0
 Critical and 0 Important; these are the recorded-not-gating residue, in the
 order the reviewer would take them. Detail is verbatim in
@@ -17392,6 +17826,7 @@ Owning phase: none (fork, `gui/` and `md/`).
 
 ### F-533 — two taproot key-reuse policies still derive on-device where the primary refuses
 
+**Status:** OPEN
 Filed 2026-09-13, measured while closing F-531. Not introduced by it; F-531
 narrowed the divergence from three vectors to two and made the remaining two
 visible.
@@ -17467,6 +17902,7 @@ refused unchanged at 2, nothing MOVED and nothing GONE.
 
 ### F-537 — CLOSED — SPEC_hashlock_kinds carries 16 dangling bare-path citations
 
+**Status:** CLOSED
 Filed 2026-09-15 from the phase-1 R0 round 1 fold, which measured them and did
 not fix them.
 
@@ -17489,6 +17925,7 @@ counted. Owning phase: this cycle's follow-up sweep.
 
 ### F-542 — CLOSED — SPEC_hashlock_kinds §7.4 claimed a behaviour flip that does not happen
 
+**Status:** CLOSED
 **Owning phase: this cycle's records.** Filed 2026-09-16 from the phase-4
 spec-coverage review, which correctly flagged §7.4's announced change as shipped
 without a comment or a test — and then measuring it showed the announcement
@@ -17528,6 +17965,7 @@ doing. Worth a look if anyone is in `policy_shape.go` for another reason.
 
 ### F-543 — CLOSED — §13.5's first CLI gap was never filed: `me bundle` is kind-blind
 
+**Status:** CLOSED
 **Owning phase: post-cycle CLI work.** Filed 2026-09-16 from the phase-4
 spec-coverage review.
 
@@ -17547,6 +17985,7 @@ cannot cut one at all."*
 
 ### F-544 — §13.5's second CLI gap was never filed: the composer emits no restore document
 
+**Status:** OPEN
 **Owning phase: post-cycle CLI work.** Filed 2026-09-16, same source and same
 reason as [[F-543]] — see it for why an unfiled follow-up is itself a finding.
 
@@ -17555,6 +17994,7 @@ times in `gui/composer*.go`), which widens F-132's open half."*
 
 ### F-545 — the shots walk cannot be run without a host-derived expectation set
 
+**Status:** OPEN
 **Owning phase: post-cycle tooling.** Filed 2026-09-16 after running it.
 
 `cmd/emu/shots_composer.js` takes nine `expect.*` fields — `digest`,
@@ -17576,6 +18016,7 @@ runnable in one line. Related: [[F-546]], and see the walk-copy anchors gate in
 
 ### F-546 — bump me-cli's ms-codec pin so the wire follows the phrase screen
 
+**Status:** OPEN
 **Owning phase: the next Rust release cycle.** Filed 2026-09-16 from F-539's
 fold.
 
@@ -17627,6 +18068,7 @@ would have made their reports unreproducible.
 
 ### F-540 — CLOSED — two spellings of the method, two screens apart, on the colliding axis
 
+**Status:** CLOSED
 **Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
 walk (M-1), which classified it **documentation only** — recorded here rather
 than changed, on that reviewer's own reading.
@@ -17646,6 +18088,7 @@ should come from watching an operator, not from tidying strings.
 
 ### F-541 — CLOSED — Back from the hex pad silently discards the typed digest
 
+**Status:** CLOSED
 **Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
 walk (M-3).
 
@@ -17665,6 +18108,7 @@ lot.
 
 ### F-539 — CLOSED — the phrase screen's hex guard is 64-only, and this cycle made 40 hex a digest
 
+**Status:** CLOSED
 **Owning phase: the phase-4 review (before the fork ships).** Filed 2026-09-15
 while wiring §7.1's kind screen.
 
@@ -17705,6 +18149,7 @@ today at every kind; `ValidatePhrase` returns nil.
 
 ### F-538 — CLOSED — no in-tree gate closes SPEC §12 item 1's Core-measured addresses
 
+**Status:** CLOSED
 Filed 2026-09-15 from the phase-1 R0 round 1 review, which tried to close it and
 could not.
 
@@ -17733,6 +18178,7 @@ Owning phase: **phase 4** (which re-pins the corpus anyway), or the cycle sweep.
 
 ### F-536 — CLOSED — six pre-existing card lines are hazard notices by the boundary's own rule
 
+**Status:** CLOSED
 Filed 2026-09-15 from the phase-2 R0 round 7 fold. **Scope corrected twice:
 round 8 (I-3) and round 9 (I-1).** The corrections are recorded because the
 entry's defect was the same both times, and it is the defect this entry exists
@@ -17790,6 +18236,7 @@ Owning phase: **this cycle's follow-up sweep.**
 
 ### F-535 — the `phrase:` record carries the METHOD axis and not the KIND axis
 
+**Status:** OPEN
 Filed 2026-09-15 from the phase-2 journey walk (I-4), whose card half was fixed
 in phase 2 and whose record half is not phase 2's to fix.
 
@@ -17831,6 +18278,7 @@ only the record→plate hand-off, and that hand-off lives on the device.
 
 ### F-534 — CLOSED — `ms decode`'s preimage route answered only for sha256
 
+**Status:** CLOSED
 Filed 2026-09-15 from the phase-2 plan's R0 round 3 (M-2), which correctly
 placed it outside that phase's letter.
 
@@ -17906,6 +18354,7 @@ number in the device report does not go looking for the entry.
 
 ### F-573 — the payload's own material is a dead end for three of the four kinds
 
+**Status:** OPEN
 **Minor. Owning phase: post-release UX.** Classification: **documentation only**
 (or a row annotation), on the reporter's own reading.
 
@@ -17924,6 +18373,7 @@ phrase by hand on the phrase arm, and no screen says so.
 
 ### F-574 — the census names the kind on the rows it cuts and not on the rows it does not
 
+**Status:** OPEN
 **Minor. Owning phase: post-release UX.** Classification: **default**.
 
 `gui/composer_copy.go:962` and `:967` draw `preimage <first8last8>: not on any
@@ -17944,6 +18394,7 @@ account of the preimages they are walking away without.
 
 ### F-575 — no screen between assignment and the Done consent answers "which kind did I pick?"
 
+**Status:** OPEN
 **Minor. Owning phase: post-release UX.** Classification: **default**.
 
 `composerPathLine` (`gui/composer_state.go:413`) renders `Path 1: hash only`
@@ -17959,6 +18410,7 @@ measurement at `sh2DisplaySize` first — `ripemd160` is the long token.
 
 ### F-577 — the digest-shaped-phrase notice is one screen short, and the Back it asks for is destructive
 
+**Status:** OPEN
 **Nit. Owning phase: post-release UX, with F-571.** Classification:
 **documentation only**.
 
@@ -17975,6 +18427,7 @@ only the screen count is left to fix.
 
 ### F-618 — the ledger has four closure conventions and 318 entries with none, so no grep answers "what is open?"
 
+**Status:** OPEN
 **Important. Owning phase: process tooling (ownerless residue — burn down with
 the next follow-up sweep).** Filed 2026-09-16, from three occurrences of one
 class in a single session.
