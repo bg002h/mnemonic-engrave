@@ -1,5 +1,26 @@
 # "Our reasonably complex wallet" — the named fixture
 
+> ## THERE ARE TWO COPIES OF EACH POLICY, AT DIFFERENT ACCOUNTS (F-593)
+>
+> | file | account | what it is for |
+> | --- | --- | --- |
+> | `tr.policy`, `wsh.policy`, `wsh-shared-tr-keys.policy` (here) | **0'** | the fixture of record; every template-id, policy-id and address in the table below is computed at this account |
+> | `../../journeys/inputs-rcw/policy-tr.txt` | **8'** | what the journey actually runs |
+> | `../../journeys/inputs-rcw/policy-wsh.txt` | **9'** | what the journey actually runs |
+>
+> The files are otherwise byte-identical: the ONLY difference is the account
+> index inside each key's origin path. So **no address, template-id or
+> policy-id printed below will ever appear in a journey run**, and vice versa.
+> Both are correct; they are different wallets.
+>
+> The `.policy` files cannot say this themselves — `md encode --in` takes the
+> file as ONE template and rejects a `#` comment line (`miniscript parse error:
+> invalid character`), unlike `md decompose --in`, which skips them.
+>
+> Which one you want: the account-0 copies to reproduce this README, the
+> `inputs-rcw` copies to reproduce a journey or the committed device captures.
+
+
 > ## The hashlocks are DOUBLE-hashed, and that is load-bearing
 >
 > Miniscript's `sha256(H)` fragment compiles to
