@@ -478,6 +478,58 @@ fn everything_pack_emits_is_readable_by_show() {
     }
 }
 
+/// F-598 (Critical, journey walk 2026-09-16). `me sysw show` is described as
+/// "Print what a container holds, and its digest." For a container holding a
+/// cleartext BIP-39 mnemonic and a passphrase it printed FIVE HEADER LINES AND
+/// NOTHING ELSE -- no record line, no count, no "N withheld", exit 0. Measured
+/// on the fork's tracked `cmd/emu/sysw_test_payload.bin`, about which the
+/// DEVICE says "A SECRET is stored unencrypted in flash".
+///
+/// Cause: `print_composer_confirmation` did `let Some(Ok(rec)) = parse(r) else
+/// { continue }`, so every record outside the composer family was discarded in
+/// silence.
+///
+/// WHY NOTHING CAUGHT IT: `everything_pack_emits_is_readable_by_show` above
+/// asserts `stdout contains "identity:"` -- a HEADER line, present for every
+/// container including an empty one. It would pass with the record loop
+/// deleted entirely.
+///
+/// MUTATION: restore the bare `continue` -> both record assertions fail.
+/// MUTATION: print the material instead of the class -> the last assertion
+/// fails, which is what keeps this from becoming a disclosure change.
+#[test]
+fn show_names_every_record_it_holds_including_the_ones_it_will_not_print() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("mixed.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "--no-now"])
+        .args(["--allow-argv-secret", SEED, TEXT])
+        .arg("--out")
+        .arg(&f)
+        .assert()
+        .success();
+
+    let out = me().args(["sysw", "show"]).arg(&f).output().unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+
+    // The secret is NAMED, so an operator sees that the container carries one.
+    assert!(
+        stdout.contains("BIP-39 mnemonic"),
+        "show does not name the seed this container holds:\n{stdout}"
+    );
+    // The public record is named too -- "zero record lines" was the defect.
+    assert!(
+        stdout.contains("free text"),
+        "show does not name the free-text record:\n{stdout}"
+    );
+    // And the material itself never appears. Naming a class must not become a
+    // disclosure change: this is the assertion that keeps the fix honest.
+    let first_word = SEED.split_whitespace().next().unwrap();
+    assert!(
+        !stdout.contains(first_word),
+        "show printed seed material while naming the class:\n{stdout}"
+    );
+}
+
 /// Pre-flash fable review, I2. `show` printed a plausible identity and THEN
 /// panicked (exit 101) on a container whose header declares more than the file
 /// holds. A panic after a plausible-looking line is the worst shape: the
@@ -715,9 +767,19 @@ fn show_states_confirmed_or_unconfirmed_beside_each_mdmk_record() {
             "record {i} of a complete set must read confirmed:\n{out}"
         );
     }
+    // The rule is that the text: record gets no md1/mk1 line -- which is what
+    // this assertion's own message says. It used to assert the record appeared
+    // NOWHERE, which was broader than its intent and became wrong when F-598
+    // made `show` name every record it holds. Narrowed to the stated rule, so
+    // it still fails if a text: record is ever described as a card.
     assert!(
-        !out.contains("record 3:"),
+        !out.contains("record 3: md1/mk1"),
         "the text: record is not ClassMDMK and this rule is not about it:\n{out}"
+    );
+    // ...and F-598: it must still be SEEN, just not as a card.
+    assert!(
+        out.contains("record 3: free text"),
+        "the text: record is invisible in `show` (F-598):\n{out}"
     );
 
     // And the same command over a lone chunk says the opposite.
@@ -2552,6 +2614,23 @@ fn pack_then_show(dir: &std::path::Path, tag: &str, document: &str, extra: &[&st
 /// over five containers covering every public class `show` reports on. If the
 /// new block could ever print for a non-descriptor record — or perturb the
 /// lines around it — this goes red rather than being argued about.
+///
+/// **The capture moved once, deliberately, for F-598** (2026-09-16), and by
+/// exactly two lines — both of which are the defect being fixed:
+///
+/// ```text
+///  public record 0: md1/mk1 — unconfirmed — engraveable, …
+/// +public record 1: free text
+///  …
+///  identity: 07413e73…
+/// +secret record 0: BIP-39 mnemonic — not shown
+/// ```
+///
+/// The second is the Critical itself: a container holding nothing but a
+/// cleartext BIP-39 mnemonic printed FIVE HEADER LINES AND NOTHING ELSE. The
+/// three containers whose records are all `MdMk` or `Mt` stayed byte-identical,
+/// which is what proved the coverage pass claims only what no other printer
+/// does. Every future perturbation still goes red.
 #[test]
 fn the_descriptor_show_block_leaves_every_other_container_byte_identical() {
     let dir = tempfile::tempdir().unwrap();

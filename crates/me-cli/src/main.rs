@@ -2242,6 +2242,7 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
     print_mt_confirmation(&records);
     print_descriptor_confirmation(&records);
     print_composer_confirmation(&records);
+    print_unclaimed_records(&records);
 }
 
 /// §5.2's record in `show`, per record — the surface §11 item 1 assumes.
@@ -2262,6 +2263,52 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
 /// **ADDITIVE.** Classification is the guard: a record that does not classify
 /// `Class::Descriptor` prints nothing, so every container that existed before
 /// S2 shows byte-identically.
+/// Every record that no printer above claimed (F-598).
+///
+/// `show` is documented as "Print what a container holds, and its digest." It
+/// was built as FOUR printers that each filter by class -- MdMk, Mt,
+/// Descriptor, and the composer's key:/hash:/now:/phrase: -- so coverage was
+/// IMPLICIT: a class no printer claimed was simply invisible, with no record
+/// line, no count, no "N withheld" and exit 0. Eight classes were in that
+/// position, including every secret one except `Phrase`.
+///
+/// Measured on the fork's tracked `cmd/emu/sysw_test_payload.bin`: five header
+/// lines and nothing else, for a container holding a cleartext BIP-39 mnemonic
+/// and a passphrase -- about which the DEVICE says "A SECRET is stored
+/// unencrypted in flash".
+///
+/// THE MATCH BELOW IS EXHAUSTIVE ON PURPOSE -- NEVER ADD A WILDCARD ARM. It is
+/// the single place that decides whether a class is seen, so adding a
+/// `Class` variant must fail to compile until someone says which it is. A
+/// wildcard would restore exactly the silence this function exists to end.
+///
+/// Lines name the CLASS and never the material, as the `Phrase` arm does: the
+/// defect was that records were invisible, not that contents were withheld, so
+/// closing it must not open a disclosure surface.
+fn print_unclaimed_records(records: &[String]) {
+    use mnemonic_engrave::sysw;
+    use mnemonic_engrave::sysw::record::Class as C;
+    for (i, r) in records.iter().enumerate() {
+        let c = sysw::classify(r);
+        match c {
+            // Claimed above, each with detail this function cannot produce
+            // (confirmation state, the decoded descriptor block, the mt set
+            // summary, the digest and kind).
+            C::MdMk | C::Mt | C::Descriptor | C::Key | C::Hash | C::Now | C::Phrase => {}
+            // Unclaimed, and secret: named, never shown.
+            C::Mnemonic | C::Codex32Secret | C::Passphrase | C::Preimage => {
+                println!("secret record {i}: {} — not shown", class_name(c));
+            }
+            // Unclaimed, not secret. `Unknown` is the one an operator most
+            // needs: a record this build cannot classify is still IN the
+            // container and still counts toward what they are carrying.
+            C::FreeText | C::Tx | C::Address | C::Unknown => {
+                println!("public record {i}: {}", class_name(c));
+            }
+        }
+    }
+}
+
 fn print_descriptor_confirmation(records: &[String]) {
     use mnemonic_engrave::sysw;
     for (i, r) in records.iter().enumerate() {
@@ -2285,6 +2332,9 @@ fn print_descriptor_confirmation(records: &[String]) {
 fn print_composer_confirmation(records: &[String]) {
     use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
     for (i, r) in records.iter().enumerate() {
+        // Not a composer record. Another printer may claim it -- and if none
+        // does, `print_unclaimed_records` below is what guarantees it is still
+        // seen. This arm must stay narrow: it is the composer's printer.
         let Some(Ok(rec)) = parse(r) else { continue };
         match rec {
             ComposerRecord::Key(k) => {
