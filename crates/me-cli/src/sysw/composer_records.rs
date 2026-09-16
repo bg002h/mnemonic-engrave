@@ -291,7 +291,19 @@ fn hex_lower(b: &[u8]) -> String {
 /// Strict: even length, every character in `0-9a-f`. Uppercase is NOT hex here
 /// (section 5.3: the section is hashed in its canonical lowercase form).
 fn unhex_lower(s: &str) -> Option<Vec<u8>> {
-    if !s.len().is_multiple_of(2)
+    // `% 2 != 0`, NOT `is_multiple_of`, AND THE LINT IS ALLOWED ON PURPOSE.
+    //
+    // A newer clippy suggests `.is_multiple_of(2)`; that method is UNSTABLE
+    // (rust-lang/rust#128101) and CI pins Rust 1.85.0, where it is E0658. I
+    // took the suggestion, the local gate went green on a 1.97 nightly, and CI
+    // refused to compile -- a local tool demanding a change the pinned
+    // toolchain rejects. The push ritual caught it and correctly refused to
+    // push master, which is the whole reason the staging step exists.
+    //
+    // `unknown_lints` is allowed alongside it so the pinned 1.85 clippy, which
+    // has never heard of this lint, does not warn about the allow itself.
+    #[allow(unknown_lints, clippy::manual_is_multiple_of)]
+    if s.len() % 2 != 0
         || !s
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
