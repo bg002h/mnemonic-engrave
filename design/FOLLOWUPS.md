@@ -18635,25 +18635,25 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-599 — `md encode --experimental` asserts the descriptor has a key-less spend path even when it provably has none
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — dm `1d77e75d`. The bearer warning re-parses the template WITHOUT `--experimental`; parsing then is proof the flag relaxed nothing. Negative test added; the existing keyless test is the positive half.
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-600 — `md compose` emits, at exit 0, a template that every downstream `md` verb refuses as malleable, whenever two key-less hash paths are adjacent
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — dm `f6659575`. `compose` reads back what it emits with `parse_template_ext`, the same function `encode` calls. Exit 1, zero bytes emitted, and the message names the rule that broke.
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-601 — `md descriptor` re-serialises supplied xpubs at depth 0 and silently drops the origin when no `--fingerprint` is given; `md decompose` then refuses `md`'s own output and prescribes a fix that would break the wallet
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — dm `f6659575`..`HEAD`, the origins half only. A descriptor with no key origins now warns that it cannot be signed. The depth-0 re-serialisation is NOT a defect — md-codec stores a 65-byte chain code ‖ point with no BIP-32 metadata — and its residue is filed as [[F-611]].
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-602 — `me bundle` states a total plate count that omits every cosigner card a key-less policy needs
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — me `1854a1f0`. A key-less template now says it carries none of the cosigner keys and cannot restore alone. F-580 fixed the seed half and did not close this; measured after that fix before writing a second note.
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18723,3 +18723,32 @@ order when classes mix) is NOT fixed by F-598 and is mildly compounded by it.
 `show` is now five passes that each iterate every record, so output is ordered
 by printer rather than by record index. The fixture happens to come out 0,1,2.
 Whoever takes F-609 should expect to merge the passes, not reorder one.
+
+### F-611 — `md descriptor --help` promises "real xpubs" while the BIP-32 metadata is placeholder
+
+**Status:** OPEN — owning phase: post-release UX (documentation only)
+
+**Nit.** Split out of F-601 on 2026-09-16 rather than folded into it, because
+the two halves have different answers.
+
+`--help` reads *"the CONCRETE output descriptor — real xpubs, key origins and
+the BIP-380 checksum — for pasting into a coordinator."* The xpubs are real in
+the sense that matters — chain code and compressed point are the wallet's own,
+and both variants derive identical addresses — but their **depth, parent
+fingerprint and child number are placeholders**, so every emitted key
+serialises at depth 0 (`xpub661MyMwAqRbc…`) whatever depth was supplied.
+
+That is the wire format, not a bug: `md-codec`'s key model is a 65-byte
+`chain code ‖ compressed point` with no BIP-32 metadata, and
+`derive::xpub_from_tlv_bytes` fills the four metadata fields with documented
+placeholders because only chain code and point participate in CKDpub.
+`cmd/descriptor.rs`'s own header says the same — *"a card composes depth-0
+keys"*. Forcing a depth here would invent metadata the card never carried.
+
+**Measured 2026-09-16, both ways:** with `--fingerprint` the `[fingerprint/path]`
+origin appears and the xpub is still depth-0; without it, neither.
+
+So the fix is a sentence in `--help` and probably one on stderr, not a change to
+the codec. **Worse than saying nothing?** Weakly — a coordinator that compares
+the xpub string byte-for-byte against a signer's own export will mismatch, and
+nothing currently tells the operator why.
