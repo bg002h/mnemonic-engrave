@@ -18553,13 +18553,13 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-589 — `ms encode --out FILE` warns about stdout when stdout is empty, and the secret goes to stderr
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — ms `bcce581`. The advisory fires only when stdout actually carries material. The condition is `json || out.is_none()`, NOT `--out`: measured, `--out FILE --json` still puts `entropy_hex` and `ms1` on stdout, so keying on `--out` alone would have suppressed a TRUE warning. Text untouched (byte-identical to mnemonic-toolkit, parity-tested).
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-590 — record indices disagree between `me sysw pack`'s refusal and `me sysw show`
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** OPEN — owning phase: post-release UX (ownerless residue) NOT re-verified 2026-09-16 during the staleness sweep: reproducing needs an 11-record payload, and the entry is a documentation-only Nit. F-609 changed `show`'s ordering but not its indices, so this is probably still live.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18649,7 +18649,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-605 — `me sysw pack` prints the full success card, including the container digest, before the write that fails
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — me `2158f980`. The success card prints after a successful write, on both emit paths. Verdict, exit code and digest derivation unchanged; only the printing moved. The test carries the success case as a control, since suppressing the card everywhere would destroy the operator's record of the number the device asks them to compare.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18661,13 +18661,13 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-607 — `md compose` accepts two byte-identical hash paths and emits a doubled branch
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — dm `f6659575`, incidentally, by F-600's read-back. Retested: `md compose` with two identical `keyless,sha256=` paths now emits ZERO stdout bytes and refuses, naming the path list as the defect. The doubled branch can no longer reach an operator. The residual — that the message does not say "you duplicated a digest" — is smaller than the entry and not separately filed.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-608 — `me bundle` renumbers plates in an order unrelated to the input
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** OPEN — owning phase: post-release UX (ownerless residue) NOT re-verified 2026-09-16: reproducing needs a multi-mk1 bundle. F-580 changed the plate COUNT wording, not the ordering, so this is probably still live.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
