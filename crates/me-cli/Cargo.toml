@@ -57,8 +57,12 @@ rand = "0.9"
 # scheduling `cargo publish` mid-cycle would put an irreversible act before
 # anything has been proven on a device.
 #
-# Pinned to origin/master of mnemonic-secret, which is where phase 2 shipped.
-ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "9dcd2e0dc0fef57ef94274359181a9f706a10fc6" }
+# Pinned to origin/master of mnemonic-secret. Bumped past phase 2 for F-546:
+# the phrase screen learned that a digest-shaped phrase WARNS rather than
+# refuses (F-539), and `--emit-record` learned the phrase record carries the
+# METHOD axis and not the KIND axis. The old pin predated both, so `me` was
+# validating against a corpus the host had already moved.
+ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "e5dff6f9c2b7ae7dc02a4a137e7322abab32211e" }
 # The mt1 wire format -- the PRIMARY for everything sysw::mt converges on.
 # A path dependency because mt-codec lives in a private sibling repo
 # (mnemonic-transaction) and is unpublished; the layout is the constellation's

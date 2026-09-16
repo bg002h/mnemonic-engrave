@@ -619,7 +619,7 @@ dependencies = [
 [[package]]
 name = "ms-codec"
 version = "0.10.0"
-source = "git+https://github.com/bg002h/mnemonic-secret?rev=9dcd2e0dc0fef57ef94274359181a9f706a10fc6#9dcd2e0dc0fef57ef94274359181a9f706a10fc6"
+source = "git+https://github.com/bg002h/mnemonic-secret?rev=e5dff6f9c2b7ae7dc02a4a137e7322abab32211e#e5dff6f9c2b7ae7dc02a4a137e7322abab32211e"
 dependencies = [
  "getrandom 0.3.4",
  "pbkdf2",
