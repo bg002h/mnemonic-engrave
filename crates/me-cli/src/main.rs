@@ -2024,7 +2024,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 hex(&sysw::identity::identity(&blob[..h.total_len()]))
             );
             print_digest(&blob);
-            print_mdmk_confirmation(&blob, &h);
+            print_records(&blob, &h);
             EXIT_OK
         }
     }
@@ -2221,14 +2221,38 @@ fn report_unsigned_overrides(records: &[String]) {
     }
 }
 
-/// `me sysw show`: the same rule, stated per record, so the operator can see
-/// which cards the machine will treat as secrets before anything is flashed.
+/// Every record the container holds, IN RECORD ORDER, one line each.
 ///
-/// Indices are into the PUBLIC SECTION, which is the list `show` can see — and
-/// the only one that matters, since `Class::MdMk` is not secret and so never
-/// reaches the ciphertext. A sealed payload's secret records stay unread here;
-/// `show` has no passphrase.
-fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
+/// F-609: this was FIVE passes -- MdMk, Mt, Descriptor, the composer's
+/// key:/hash:/now:/phrase:, and F-598's unclaimed sweep -- each iterating every
+/// record. Output was therefore ordered by PRINTER, so a container whose
+/// classes interleave printed `record 0, record 2, record 1`, and a reader
+/// comparing the list against a payload had to sort it themselves.
+///
+/// Merging them fixed two more defects that the five-pass shape had hidden:
+///
+/// * A `tx:` record with UNSIGNED inputs printed TWICE. `classify` is strict, so
+///   under default admission such a record reads back `Class::Unknown`; the mt
+///   pass keyed on the PREFIX and described it in full, and the unclaimed pass
+///   then called the same record "unrecognised". Measured on a container packed
+///   with `--allow-unsigned-inputs`: two lines for record 0, the second
+///   contradicting the first. One record now yields one line by construction.
+/// * `print_unclaimed_records` had been inserted between
+///   `print_descriptor_confirmation`'s doc comment and its `fn`, so the
+///   descriptor printer silently lost its documentation to the newcomer. No
+///   lint fires on that: there was no blank line for "empty line after doc
+///   comment" to catch.
+///
+/// THE `tx:` PREFIX IS CHECKED BEFORE `classify`, deliberately, and that order
+/// is what keeps an `--allow-unsigned-inputs` record from falling to the
+/// unclaimed arm. A reader may disagree with the writer; it may not go quiet.
+///
+/// Set-level lines come after the per-record loop, because an mt SET is not a
+/// record and has no index to sort by.
+///
+/// Sealed payloads' secret records stay unread: `show` has no passphrase, and
+/// nothing here reaches the ciphertext.
+fn print_records(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
     use mnemonic_engrave::sysw;
     if h.pub_len == 0 {
         return;
@@ -2241,25 +2265,81 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
         return;
     };
     let records: Vec<String> = s.split('\n').map(str::to_owned).collect();
-    let unconfirmed = sysw::record::mdmk_unconfirmed(&records);
+    // Both computed ONCE for the whole loop; each was recomputed per pass
+    // before.
+    let mdmk_unconfirmed = sysw::record::mdmk_unconfirmed(&records);
+    let mt_unconfirmed = sysw::mt::mt_unconfirmed(&records);
+
     for (i, r) in records.iter().enumerate() {
-        if sysw::classify(r) != sysw::record::Class::MdMk {
+        if r.starts_with(sysw::record::TX_PREFIX) {
+            print_tx_line(i, r);
             continue;
         }
-        let state = if unconfirmed.contains(&i) {
-            "unconfirmed — engraveable, but the device REPLACES the legend"
-        } else {
-            "confirmed"
-        };
-        println!("public record {i}: md1/mk1 — {state}");
+        match sysw::classify(r) {
+            sysw::record::Class::MdMk => {
+                let state = confirmation_state(mdmk_unconfirmed.contains(&i));
+                println!("public record {i}: md1/mk1 — {state}");
+            }
+            sysw::record::Class::Mt => {
+                let state = confirmation_state(mt_unconfirmed.contains(&i));
+                println!("public record {i}: mt1 chunk — {state}");
+            }
+            sysw::record::Class::Descriptor => print_descriptor_line(i, r),
+            other => print_classified_line(i, r, other),
+        }
     }
-    print_mt_confirmation(&records);
-    print_descriptor_confirmation(&records);
-    print_composer_confirmation(&records);
-    print_unclaimed_records(&records);
+    print_mt_sets(&records);
 }
 
-/// §5.2's record in `show`, per record — the surface §11 item 1 assumes.
+/// The shared confirmation vocabulary for a chunked record. md1/mk1 and mt1
+/// said the same two things in two places; a reader must not have to decide
+/// whether a wording difference meant a state difference.
+fn confirmation_state(unconfirmed: bool) -> &'static str {
+    if unconfirmed {
+        "unconfirmed — engraveable, but the device REPLACES the legend"
+    } else {
+        "confirmed"
+    }
+}
+
+/// A `tx:` record, keyed on the PREFIX rather than on `classify`.
+///
+/// `classify` is strict, so a record admitted by `--allow-unsigned-inputs`
+/// reads back as `Class::Unknown` -- and `show` listing nothing at all for a
+/// record the container demonstrably holds is worse than either verdict.
+fn print_tx_line(i: usize, r: &str) {
+    use mnemonic_engrave::sysw;
+    let Ok(b) = sysw::record::decode_body(r) else {
+        println!("public record {i}: `tx:` record whose body is not lowercase hex");
+        return;
+    };
+    let Ok(t) = sysw::tx::parse(&b) else {
+        println!("public record {i}: `tx:` record whose body is not a transaction");
+        return;
+    };
+    if t.every_input_signed {
+        println!(
+            "public record {i}: raw signed transaction — txid {}, {} bytes",
+            t.txid_display, t.size
+        );
+        return;
+    }
+    println!(
+        "public record {i}: raw transaction with UNSIGNED input(s) — txid {}, {} \
+         bytes; {} carr{} neither a scriptSig nor a witness, so a plate cut from \
+         this can never be broadcast. It was packed with --allow-unsigned-inputs.",
+        t.txid_display,
+        t.size,
+        name_inputs(&t.unsigned_inputs),
+        if t.unsigned_inputs.len() == 1 {
+            "ies"
+        } else {
+            "y"
+        },
+    );
+}
+
+/// §5.2's record in `show` for a `Descriptor`.
 ///
 /// Before S2 a `Descriptor` record printed NOTHING here: `show` listed
 /// `Class::MdMk` and `Class::Mt` and went silent on the one record `--as
@@ -2271,199 +2351,110 @@ fn print_mdmk_confirmation(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header
 /// identification block `pack` printed to stderr, which is what makes `show`
 /// re-runnable a week later when that stderr is gone. There is no
 /// confirmed/unconfirmed state to report — a descriptor is not chunked, so
-/// presence IS completeness for it (the same fact `--expect`'s completeness
-/// walk relies on).
-///
-/// **ADDITIVE.** Classification is the guard: a record that does not classify
-/// `Class::Descriptor` prints nothing, so every container that existed before
-/// S2 shows byte-identically.
-/// Every record that no printer above claimed (F-598).
-///
-/// `show` is documented as "Print what a container holds, and its digest." It
-/// was built as FOUR printers that each filter by class -- MdMk, Mt,
-/// Descriptor, and the composer's key:/hash:/now:/phrase: -- so coverage was
-/// IMPLICIT: a class no printer claimed was simply invisible, with no record
-/// line, no count, no "N withheld" and exit 0. Eight classes were in that
-/// position, including every secret one except `Phrase`.
-///
-/// Measured on the fork's tracked `cmd/emu/sysw_test_payload.bin`: five header
-/// lines and nothing else, for a container holding a cleartext BIP-39 mnemonic
-/// and a passphrase -- about which the DEVICE says "A SECRET is stored
-/// unencrypted in flash".
-///
-/// THE MATCH BELOW IS EXHAUSTIVE ON PURPOSE -- NEVER ADD A WILDCARD ARM. It is
-/// the single place that decides whether a class is seen, so adding a
-/// `Class` variant must fail to compile until someone says which it is. A
-/// wildcard would restore exactly the silence this function exists to end.
-///
-/// Lines name the CLASS and never the material, as the `Phrase` arm does: the
-/// defect was that records were invisible, not that contents were withheld, so
-/// closing it must not open a disclosure surface.
-fn print_unclaimed_records(records: &[String]) {
-    use mnemonic_engrave::sysw;
-    use mnemonic_engrave::sysw::record::Class as C;
-    for (i, r) in records.iter().enumerate() {
-        let c = sysw::classify(r);
-        match c {
-            // Claimed above, each with detail this function cannot produce
-            // (confirmation state, the decoded descriptor block, the mt set
-            // summary, the digest and kind).
-            C::MdMk | C::Mt | C::Descriptor | C::Key | C::Hash | C::Now | C::Phrase => {}
-            // Unclaimed, and secret: named, never shown.
-            C::Mnemonic | C::Codex32Secret | C::Passphrase | C::Preimage => {
-                println!("secret record {i}: {} — not shown", class_name(c));
-            }
-            // Unclaimed, not secret. `Unknown` is the one an operator most
-            // needs: a record this build cannot classify is still IN the
-            // container and still counts toward what they are carrying.
-            C::FreeText | C::Tx | C::Address | C::Unknown => {
-                println!("public record {i}: {}", class_name(c));
-            }
-        }
-    }
+/// presence IS completeness for it.
+fn print_descriptor_line(i: usize, r: &str) {
+    // Classification proved the cascade parses it, so the block is always
+    // `Some` here; the `else` is a total function rather than an `unwrap`
+    // on an operator path.
+    let Some(block) = mnemonic_engrave::descriptor::identification_block(r, None) else {
+        println!("public record {i}: descriptor — this build could not re-read it");
+        return;
+    };
+    println!("public record {i}: descriptor — complete in one record\n      {block}");
 }
 
-fn print_descriptor_confirmation(records: &[String]) {
-    use mnemonic_engrave::sysw;
-    for (i, r) in records.iter().enumerate() {
-        if sysw::classify(r) != sysw::record::Class::Descriptor {
-            continue;
-        }
-        // Classification proved the cascade parses it, so the block is always
-        // `Some` here; the `else` is a total function rather than an `unwrap`
-        // on an operator path.
-        let Some(block) = mnemonic_engrave::descriptor::identification_block(r, None) else {
-            println!("public record {i}: descriptor — this build could not re-read it");
-            continue;
-        };
-        println!("public record {i}: descriptor — complete in one record\n      {block}");
-    }
-}
-
-/// `key:`/`hash:`/`now:` records, one line each (SPEC_wallet_policy_composer.md
-/// §6a). Malformed ones never reach a container -- `pack` refuses them -- so a
-/// record that fails to parse here is simply not one of ours.
-fn print_composer_confirmation(records: &[String]) {
+/// Every remaining class: the composer's `key:`/`hash:`/`now:`/`phrase:`, and
+/// F-598's sweep over the classes no printer used to claim.
+///
+/// THE MATCH IS EXHAUSTIVE ON PURPOSE -- NEVER ADD A WILDCARD ARM. It is the
+/// single place that decides whether a class is SEEN, so adding a `Class`
+/// variant must fail to compile until someone says which it is. A wildcard
+/// would restore exactly the silence F-598 ended: eight classes invisible, no
+/// record line, no count, no "N withheld", exit 0 -- measured on a container
+/// holding a cleartext BIP-39 mnemonic and a passphrase.
+///
+/// Lines name the CLASS and never the material: the defect was that records
+/// were invisible, not that contents were withheld, so closing it must not open
+/// a disclosure surface.
+fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::record::Class) {
     use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
-    for (i, r) in records.iter().enumerate() {
-        // Not a composer record. Another printer may claim it -- and if none
-        // does, `print_unclaimed_records` below is what guarantees it is still
-        // seen. This arm must stay narrow: it is the composer's printer.
-        let Some(Ok(rec)) = parse(r) else { continue };
-        match rec {
-            ComposerRecord::Key(k) => {
-                println!("public record {i}: cosigner key (key:) — {}", k.text)
+    use mnemonic_engrave::sysw::record::Class as C;
+    match class {
+        // Claimed by a printer above; unreachable here, and named rather than
+        // wildcarded so the exhaustiveness stays real.
+        C::MdMk | C::Mt | C::Descriptor => {}
+        C::Key | C::Hash | C::Now | C::Phrase => {
+            let Some(Ok(rec)) = parse(r) else {
+                // Classified as a composer record but unparseable: say so
+                // rather than printing nothing.
+                println!("public record {i}: {}", class_name(class));
+                return;
+            };
+            match rec {
+                ComposerRecord::Key(k) => {
+                    println!("public record {i}: cosigner key (key:) — {}", k.text)
+                }
+                ComposerRecord::Hash(h) => {
+                    // NAME THE KIND. This said "sha256 hashlock" under every
+                    // kind, which is what let a tag-stripped hash256 record read
+                    // as confirmation that stripping it was right.
+                    //
+                    // And slice from the END, not from 56: that literal is one
+                    // of spec §10's six 64-hex assumptions, and a 40-hex
+                    // ripemd160 digest through it PANICS.
+                    //
+                    // THE FULL DIGEST, on its own line (F-552): the elided form
+                    // matches what the device draws, which is what makes a
+                    // side-by-side comparison possible -- but `show` was the
+                    // ONLY payload reader and the full value appeared nowhere.
+                    // A `hash:` record is PUBLIC; the secret is the preimage.
+                    let hx = hex(h.digest());
+                    println!(
+                        "public record {i}: {} hashlock (hash:) — {}..{}",
+                        h.kind().token(),
+                        &hx[..8],
+                        &hx[hx.len() - 8..]
+                    );
+                    println!("    {}:{}", h.kind().token(), hx);
+                }
+                ComposerRecord::Phrase(_) => {
+                    // SECRET and BEARER. `show` names the class and the method
+                    // and NEVER the phrase, the derived preimage or its digest:
+                    // a confirmation line goes to a terminal whose scrollback
+                    // outlives the run.
+                    println!("secret record {i}: hashlock phrase (phrase:) — not shown");
+                }
+                ComposerRecord::Now { seconds, height } => {
+                    // `show` cannot tell an auto-appended pack time from an
+                    // operator-supplied bound, so it names neither provenance.
+                    let when = match height {
+                        Some(h) => format!("{seconds} (seconds), height {h}"),
+                        None => format!("{seconds} (seconds)"),
+                    };
+                    println!(
+                        "public record {i}: pack time (now:) — {when}: a lower bound on the \
+                         present the device echoes beside a time lock; never a locktime"
+                    );
+                }
             }
-            ComposerRecord::Hash(h) => {
-                // NAME THE KIND. This said "sha256 hashlock" under every kind,
-                // which is what let a tag-stripped hash256 record read as
-                // confirmation that stripping it was right (P1 journey, F-C1).
-                //
-                // And slice from the END, not from 56: that literal is one of
-                // spec §10's six 64-hex assumptions, and a 40-hex ripemd160
-                // digest through it PANICS.
-                // THE FULL DIGEST, on its own line (F-552). The elided form
-                // matches what the device draws, which is what makes a
-                // side-by-side comparison possible -- but `show` was the ONLY
-                // payload reader and the full value appeared nowhere, so an
-                // operator whose policy card is the thing they lost could
-                // confirm a candidate and still not retype it into
-                // `md compose`. It sat in the container in the clear the whole
-                // time (`strings payload.bin`), so this publishes nothing new.
-                //
-                // A `hash:` record is PUBLIC -- the digest is what the script
-                // commits to. The secret is the preimage, and the Phrase and
-                // Preimage arms below still print neither.
-                let hx = hex(h.digest());
-                println!(
-                    "public record {i}: {} hashlock (hash:) — {}..{}",
-                    h.kind().token(),
-                    &hx[..8],
-                    &hx[hx.len() - 8..]
-                );
-                println!("    {}:{}", h.kind().token(), hx);
-            }
-            ComposerRecord::Phrase(_) => {
-                // The record is SECRET and BEARER. `show` names the class and
-                // the method and NEVER the phrase, the derived preimage or its
-                // digest: a confirmation line is printed to a terminal whose
-                // scrollback outlives the run.
-                println!("secret record {i}: hashlock phrase (phrase:) — not shown");
-            }
-            ComposerRecord::Now { seconds, height } => {
-                // `show` cannot tell an auto-appended pack time from an
-                // operator-supplied bound, so it names neither provenance.
-                let when = match height {
-                    Some(h) => format!("{seconds} (seconds), height {h}"),
-                    None => format!("{seconds} (seconds)"),
-                };
-                println!(
-                    "public record {i}: pack time (now:) — {when}: a lower bound on the present the \
-                     device echoes beside a time lock; never a locktime"
-                );
-            }
+        }
+        C::Mnemonic | C::Codex32Secret | C::Passphrase | C::Preimage => {
+            println!("secret record {i}: {} — not shown", class_name(class));
+        }
+        C::FreeText | C::Tx | C::Address | C::Unknown => {
+            println!("public record {i}: {}", class_name(class));
         }
     }
 }
 
-/// `[mt-decode]` in `show`: per mt1 record, whether its chunk set confirmed —
-/// and per confirmed SET, the transaction it carries, because the txid is what
-/// the operator can check against `mt encode`'s own report.
-fn print_mt_confirmation(records: &[String]) {
+/// The mt SET lines, after every per-record line. A set is not a record and has
+/// no index to sort by.
+///
+/// PER SET, and the unconfirmed ones say WHY -- ruling 2026-08-25 requires
+/// `show` to carry the same diagnosis `pack` printed, because a stderr line is
+/// gone in a week and this is the one an operator can re-run.
+fn print_mt_sets(records: &[String]) {
     use mnemonic_engrave::sysw;
-    let unconfirmed = sysw::mt::mt_unconfirmed(records);
-    for (i, r) in records.iter().enumerate() {
-        if sysw::classify(r) != sysw::record::Class::Mt {
-            continue;
-        }
-        let state = if unconfirmed.contains(&i) {
-            "unconfirmed — engraveable, but the device REPLACES the legend"
-        } else {
-            "confirmed"
-        };
-        println!("public record {i}: mt1 chunk — {state}");
-    }
-    for (i, r) in records.iter().enumerate() {
-        // Keyed on the PREFIX, not on `classify`. `classify` is strict, so a
-        // record admitted by `--allow-unsigned-inputs` reads back as
-        // `Class::Unknown` -- and `show` listing nothing at all for a record
-        // the container demonstrably holds is worse than either verdict.
-        // A reader may disagree with the writer; it may not go quiet.
-        if !r.starts_with(sysw::record::TX_PREFIX) {
-            continue;
-        }
-        let Ok(b) = sysw::record::decode_body(r) else {
-            println!("public record {i}: `tx:` record whose body is not lowercase hex");
-            continue;
-        };
-        let Ok(t) = sysw::tx::parse(&b) else {
-            println!("public record {i}: `tx:` record whose body is not a transaction");
-            continue;
-        };
-        if t.every_input_signed {
-            println!(
-                "public record {i}: raw signed transaction — txid {}, {} bytes",
-                t.txid_display, t.size
-            );
-        } else {
-            println!(
-                "public record {i}: raw transaction with UNSIGNED input(s) — txid {}, {} \
-                 bytes; {} carr{} neither a scriptSig nor a witness, so a plate cut from \
-                 this can never be broadcast. It was packed with --allow-unsigned-inputs.",
-                t.txid_display,
-                t.size,
-                name_inputs(&t.unsigned_inputs),
-                if t.unsigned_inputs.len() == 1 {
-                    "ies"
-                } else {
-                    "y"
-                },
-            );
-        }
-    }
-    // PER SET, and the unconfirmed ones say WHY -- ruling 2026-08-25 requires
-    // `show` to carry the same diagnosis `pack` printed, because a stderr line
-    // is gone in a week and this is the one an operator can re-run.
     for (csid, idxs, problem) in sysw::mt::set_problems(records) {
         let set: Vec<String> = idxs.iter().map(|&i| records[i].clone()).collect();
         match problem {

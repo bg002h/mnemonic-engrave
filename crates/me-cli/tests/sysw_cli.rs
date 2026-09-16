@@ -2709,3 +2709,84 @@ fn show_reports_exactly_one_descriptor_record_for_each_of_the_four_formats() {
         "the four rows must cover the four formats, not one format four times: {formats:?}"
     );
 }
+
+/// F-609: `show` was FIVE passes — MdMk, Mt, Descriptor, the composer's
+/// records, and F-598's unclaimed sweep — each iterating every record. Output
+/// was therefore ordered by PRINTER, not by record, so a container whose
+/// classes interleave printed `record 0, record 2, record 1` and a reader
+/// comparing the list against a payload had to sort it themselves.
+///
+/// THE PRE-S2 GOLDEN DID NOT CATCH THIS and still passes unchanged: none of its
+/// five containers interleaves classes. That is exactly why this test exists —
+/// the fix has no coverage from the golden, and a passing golden would have read
+/// as proof it was unnecessary.
+///
+/// MUTATION: restore any per-class pass -> the order assertion fails.
+#[cfg(unix)]
+#[test]
+fn show_lists_records_in_record_order_when_classes_interleave() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("mixed.bin");
+    // md1, text, md1 — the text record sits BETWEEN two cards of another class.
+    me().args(["sysw", "pack", "--no-passphrase", "--no-now"])
+        .args(["--out", f.to_str().unwrap()])
+        .write_stdin(format!("{MD1}\n{TEXT}\n{MD1}\n"))
+        .assert()
+        .success();
+
+    let out = me().args(["sysw", "show"]).arg(&f).output().unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let order: Vec<usize> = stdout
+        .lines()
+        .filter_map(|l| l.split("record ").nth(1))
+        .filter_map(|rest| rest.split(':').next())
+        .filter_map(|n| n.trim().parse::<usize>().ok())
+        .collect();
+    assert_eq!(
+        order,
+        vec![0, 1, 2],
+        "records are not listed in record order:\n{stdout}"
+    );
+}
+
+/// F-609's second half, and it was a defect the five-pass shape HID.
+///
+/// `classify` is strict, so a `tx:` record admitted by
+/// `--allow-unsigned-inputs` reads back as `Class::Unknown`. The mt pass keyed
+/// on the PREFIX and described it in full; F-598's unclaimed pass then called
+/// the same record "unrecognised record". Two lines for one record, the second
+/// contradicting the first.
+///
+/// MUTATION: drop the `tx:` prefix check that precedes `classify` -> the record
+/// falls to the unclaimed arm and is called unrecognised, failing both
+/// assertions.
+#[cfg(unix)]
+#[test]
+fn an_unsigned_tx_record_gets_exactly_one_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("utx.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "--allow-unsigned-inputs"])
+        .args(["--out", f.to_str().unwrap()])
+        .write_stdin(format!("tx:{TX_STRIPPED}\n"))
+        .assert()
+        .success();
+
+    let out = me().args(["sysw", "show"]).arg(&f).output().unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let lines: Vec<&str> = stdout.lines().filter(|l| l.contains("record 0")).collect();
+    assert_eq!(
+        lines.len(),
+        1,
+        "record 0 got {} lines, want exactly 1:\n{stdout}",
+        lines.len()
+    );
+    assert!(
+        lines[0].contains("UNSIGNED input"),
+        "the one line must be the description, not the dismissal:\n{}",
+        lines[0]
+    );
+    assert!(
+        !stdout.contains("unrecognised record"),
+        "show describes the record in full AND calls it unrecognised:\n{stdout}"
+    );
+}
