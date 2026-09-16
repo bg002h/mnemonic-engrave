@@ -17824,81 +17824,59 @@ against itself passes forever.
 
 Owning phase: none (fork, `gui/` and `md/`).
 
-### F-533 — two taproot key-reuse policies still derive on-device where the primary refuses
+### F-533 — CLOSED — two taproot key-reuse policies derived on-device where the primary refused
 
-**Status:** OPEN
-Filed 2026-09-13, measured while closing F-531. Not introduced by it; F-531
-narrowed the divergence from three vectors to two and made the remaining two
-visible.
+**Status:** CLOSED 2026-09-16 — fork `476249f`..`e84c610` (4 commits), plan
+`design/PLAN_F533_bip388_reuse_predicate.md` GREEN at R0 round 4. Corpus
+verified by the controller against the merged tree AND A/B against the
+unchanged one.
 
-`scripts/policy-generate.py --corpus` reports, at fork `a4760e1`:
-
-```
-  ok/refused       2
-```
-
-which is two vectors the **device derives an address for and the Rust primary
-refuses**: `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a`. Both are
 `tr(K, multi_a(…K…))` — one key at the taproot internal key AND inside a leaf.
+The device derived an address; the Rust primary refused under BIP 388. Two
+corpus vectors sat in that gap: `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a`.
 
-**Why they survived F-531's refusal.** The refusal is built on
-`md.DuplicateKeySlot`, and that predicate answers **Core's** question on
-purpose: its own doc says so, and it scopes to "one expression", under which an
-internal key sits outside every leaf and so repeats nothing. Core 25.0.0
-ACCEPTS both, measured. BIP 388 asks a different question and forbids them, and
-the Rust CLI refuses them under it (`Finding::SamePathExpression` /
-`KeyAtDisjointUseSites`, `crates/md-cli/src/parse/reuse.rs`).
+**Why it happened.** `md.DuplicateKeySlot` dispatched `tagTr` to
+`duplicateInTapTree(*b.tree)`, and the internal key is `trBody.keyIndex`, a
+SIBLING of `tree`. No path reached it, so the internal key participated in no
+count. That was deliberate: the predicate answered **Core's** question, and Core
+25.0.0 does accept these shapes.
 
-So the device has **one predicate serving two rules**, and it is the wrong one
-for the refusal: a warning should say what Core will do, a refusal should say
-what BIP 388 permits.
+**What closed it — one WIDER predicate, not a second one.** The entry previously
+called for a second predicate, and R0 round 1 showed that was unsound *in this
+wire format*: md1 cannot express one key slot at two use-sites with disjoint
+multipath (`readSparseTLVIdx`; the primary records it as
+`Finding::MultipathDisjoint`, *"md1 cannot express it, F-417"*), so
+Core-duplicate is a STRICT SUBSET of BIP-388-forbidden. One predicate therefore
+still serves both consequences, which is what `gui/policy_address.go` asked for
+on drift grounds. The taproot arm now counts `keyIndex` when `!isNums` and
+returns a new kind, `DuplicateTaprootInternalKey`, so the Core-voiced sentences
+stay on the Core kinds and the new case gets BIP 388's voice.
 
-**The operator's own reason points at these harder than at the multisig case.**
-The 2026-09-13 wording was *"one key signing two different messages can
-sometimes leak private key material"*. In a repeated-seat multisig both seats
-sign the SAME sighash. A taproot key that is both the internal key and a leaf
-key signs a key-path sighash and a script-path sighash — two genuinely different
-messages. The shape F-531 refused is the weaker instance of the reason; these
-two are the stronger one.
-
-**Not a wrong address.** Both derive correctly for the policy they carry, and
-they match the vendored conformance data. The divergence is which wallets the
-device will serve at all — a policy question, not a correctness one, which is
-why it is filed rather than folded into F-531.
-
-**What closing it needs** (and why it is not a one-line widening): a second
-predicate in `md` expressing BIP 388's reuse rule rather than Core's sanity
-rule, ported from the primary's taxonomy — convergence, so exempt from
-Rust-first. Then the refusal moves onto it while the F-514 warning stays on
-`md.DuplicateKeySlot`, because the warning's two sentences are Core verdicts and
-would become false on the new predicate. Note `keyed_tr_multi_a` and
-`keyed_tr_sortedmulti_a` are two of the three key-reuse vectors F-529 says a
-re-vendor would delete.
-
-Owning phase: none (fork, `md/` and `gui/`).
-
-**Re-measured 2026-09-16 at fork `ec11fab`, 30 commits after the original —
-still exactly two, still the same two.** `scripts/policy-generate.py --corpus`:
+**Measured, before and after** (`scripts/policy-generate.py --corpus`):
 
 ```
-corpus: 70 vectors
-  expand           1
-  ok/agrees       45
-  ok/refused       2
-  source          22
-every vector matches the baseline
+before:  ok/agrees 45   ok/refused 2   source 22   expand 1
+after:   ok/agrees 45   ok/refused —   source 24   expand 1
 ```
 
-and the baseline names them: `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a`. So
-this is not decaying and not self-healing — 30 commits of hashlock-kinds work
-moved neither vector, which is the expected result (the divergence is about
-taproot key reuse, not hash kinds) and is now measured rather than assumed.
+`ok/agrees` unchanged at 45 is the over-refusal guard: any vector wrongly refused
+leaves that bucket. Only the two targets MOVED. A/B control: the same command
+against the unchanged checkout still prints `ok/refused 2`.
 
-The same run also showed the corpus had grown to 70 while the baseline held 67;
-the three additions were this cycle's `..._hash160` / `..._hash256` /
-`..._ripemd160` presets, all `ok/agrees`. Baselined in the same commit as this
-note, with the verdicts reconciled rather than invented: 42 agrees + 3 = 45,
-refused unchanged at 2, nothing MOVED and nothing GONE.
+**What the cycle cost, and what it bought.** Four R0 rounds on the plan
+(2C → 1C → 0C/1I → GREEN) before a line was written, then a GREEN whole-diff
+review. Between them they caught a predicate that would have falsely refused
+valid NUMS taproot wallets, a refusal placed where the device does not call it,
+a corpus assertion that could not fail, and a mutation gate that could not pass.
+Executing it then found an EIGHTH place the four rounds had not:
+`gui/policy_address_test.go`'s `refusedByPolicy` map — added there rather than
+`stillUnsupported`, deliberately, so cross-language address conformance keeps
+running beneath the gate.
+
+Residue filed separately: [[F-612]] (a `tr` nested inside a tapleaf),
+[[F-613]] (`stillUnsupported` lacks the deriver check), [[F-614]]
+(`md/policy_shape_test.go` bypasses the pin), [[F-615]] (`forkbuilt/`
+undocumented).
 
 ### F-537 — CLOSED — SPEC_hashlock_kinds carries 16 dangling bare-path citations
 
@@ -18752,3 +18730,48 @@ So the fix is a sentence in `--help` and probably one on stderr, not a change to
 the codec. **Worse than saying nothing?** Weakly — a coordinator that compares
 the xpub string byte-for-byte against a signer's own export will mismatch, and
 nothing currently tells the operator why.
+
+### F-612 — `countKeySlots` never walks `trBody`, so a `tr` nested inside a tapleaf hides its internal key
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Minor.** Found by the F-533 whole-diff review (2026-09-16), `review-F533-wholediff-round1.md`,
+with a constructed case: a `tr` nested inside a tapleaf reports `DuplicateNone`
+even when its own internal key repeats a slot.
+
+**PRE-EXISTING and currently unreachable.** `emitFragment` has no `tagTr` case,
+so no deriving policy can carry a nested `tr` — the review confirmed that before
+grading it Minor rather than Important. It is recorded because the unreachability
+is a property of a *different* function: if `emitFragment` ever learns `tagTr`,
+this becomes live silently, and nothing connects the two.
+
+The fix is one arm in `countKeySlots`. The tripwire, if it is not taken now, is a
+test asserting `emitFragment` has no `tagTr` case, so adding one fails loudly here.
+
+### F-613 — `stillUnsupported` lacks the deriver check that `refusedByPolicy` carries
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** From the same review. `gui/policy_address_test.go`'s `refusedByPolicy`
+map proves the deriver still works beneath the gate — that a vector is refused by
+POLICY and not for want of a capability. `stillUnsupported` has no equivalent, so
+a vector parked there because the device genuinely cannot derive it would look
+identical to one parked there by mistake.
+
+### F-614 — `md/policy_shape_test.go` bypasses the pinned-vector gate
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** From the same review. F-533 pinned `keyed_tr_multi_a` and
+`keyed_tr_sortedmulti_a` fork-side (`md/testdata/forkbuilt/`) with a drift gate
+that reddens on a one-character change. `md/policy_shape_test.go` builds its own
+strings instead of reading the pins, so a drift would leave it green.
+
+### F-615 — `md/testdata/forkbuilt/` is undocumented in the testdata README
+
+**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+
+**Nit.** From the same review. The directory arrived with F-533 (fork `476249f`)
+and carries locally-pinned corpus vectors so the work does not depend on F-529's
+timing. A future reader finds two `.md1.txt` files with no note saying why they
+are pinned or when they may be deleted.

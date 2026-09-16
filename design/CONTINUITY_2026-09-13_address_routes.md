@@ -103,9 +103,16 @@ class, both worth remembering before adding any warning to a device screen:
 
 ## Also open
 
-- **F-533** (new this session): `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a`
-  still derive on-device while the primary refuses them — the corpus gate's
-  remaining `ok/refused 2`. They survive because the refusal rides
+- **F-533 — CLOSED 2026-09-16** (fork `476249f`..`e84c610`). *Written as open in
+  this session; corrected here rather than left to mislead — the whole-diff
+  review caught that this passage still said `ok/refused 2` after the bucket had
+  gone.* `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a` no longer derive
+  on-device: `md.DuplicateKeySlot`'s taproot arm now counts the internal key when
+  `!isNums` and returns a new kind. The corpus reads `ok/refused` absent,
+  `source` 22→24, `ok/agrees` 45 unchanged. The original text follows, because
+  its REASONING is why the change happened:
+
+  They survived because the refusal rides
   `md.DuplicateKeySlot`, which answers CORE's question by design. The operator's
   stated reason for refusing fits these HARDER than the shape F-531 fixed: both
   seats of a repeated-seat multisig sign the same sighash, whereas a key that is

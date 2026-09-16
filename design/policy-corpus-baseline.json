@@ -163,16 +163,14 @@
   "rust": "agrees"
  },
  "keyed_tr_multi_a": {
-  "device": "ok",
-  "rust": "refused"
+  "device": "source"
  },
  "keyed_tr_pathological": {
   "device": "ok",
   "rust": "agrees"
  },
  "keyed_tr_sortedmulti_a": {
-  "device": "ok",
-  "rust": "refused"
+  "device": "source"
  },
  "keyed_tr_with_leaf": {
   "device": "ok",
