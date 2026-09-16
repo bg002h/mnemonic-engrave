@@ -1,111 +1,93 @@
-# PLAN — F-533: refuse taproot key reuse on a BIP-388 predicate
+# PLAN — F-533: refuse taproot internal-key reuse
 
-**Status: DRAFT, awaiting R0.** No code until this is 0C/0I. Risk set: this
-changes which wallets the device will serve (admission), and it is address- and
-funds-adjacent.
+**Status: DRAFT round 2, awaiting R0.** No code until 0C/0I. Risk set: admission,
+address- and funds-adjacent.
 
-**Baseline.** fork `e4ab97d`, engrave `f295b439`, dm `d8bb6d2d`. Re-measure
-before implementing; a GREEN earned against a moved tree is a claim about a tree
-nobody is building on.
+**Baseline.** fork `e4ab97d`, engrave `c6ed5e87`, dm `d8bb6d2d`.
 
-## The defect, re-measured today
+**Round 1 was NOT GREEN (2C/3I/3M/1N)** — `design/agent-reports/plan-F533-R0-round1.md`,
+persisted verbatim in `c6ed5e87`. Its answer to the load-bearing question inverted
+this plan's design, so round 2 is a rewrite rather than a patch.
 
-`scripts/policy-generate.py --corpus` at fork `e4ab97d`:
+## The question round 1 settled: NO
 
-```
-corpus: 70 vectors
-  ok/agrees       45
-  ok/refused       2
-  source          22
-  expand           1
-every vector matches the baseline
-```
+> Can one key slot carry two use-sites with DISJOINT multipath in the md1 wire?
 
-The two are `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a` — `tr(K, multi_a(…K…))`,
-one key at the taproot internal key AND inside a leaf. The device derives an
-address; the Rust primary refuses. Unchanged across the 30 commits since the
-original measurement, which is expected: the divergence is about taproot key
-reuse, not about anything this cycle touched.
+**It cannot.** Use-site is per-`@N` — `descriptor.useSite` plus strictly-ascending
+per-idx TLV overrides (`readSparseTLVIdx`, `md/md.go:657-671`) — and a tree
+occurrence carries only an index. The primary already records this:
+`Finding::MultipathDisjoint`, *"md1 cannot express it, F-417"*.
 
-## Why the current predicate cannot see it — located, not inferred
+**Consequence, and it is the whole design:** in this wire format
+**Core-duplicate is a STRICT SUBSET of BIP-388-forbidden**. Round 1's plan
+claimed the opposite and built a two-predicate design on it. There is no policy
+that is Core-duplicate and BIP-388-legal, so:
 
-`md.DuplicateKeySlot` (`md/duplicate_keys.go:92`) dispatches on `tagTr` to
-`duplicateInTapTree(*b.tree)`. The taproot internal key is **`trBody.keyIndex`**
-(`md/md.go:114-118`), a SIBLING of `tree`, and no path from `duplicateInTapTree`
-reaches it. So the internal key participates in no count, and
-`tr(K, multi_a(…K…))` repeats nothing under this predicate.
+* there is no case where the refusal lifts while a duplicate remains, so the
+  deleted warning block on the address branch **stays deleted**; and
+* **one predicate still serves both consequences**, which is what
+  `gui/policy_address.go:71-76` asks for in as many words: *"Two predicates would
+  drift, and the drift would show up as a screen that warns and derives, or one
+  that refuses in silence."*
 
-That is deliberate. The function answers **Core's** question, and its own comment
-records the measurement behind it: Core 25.0.0 rejects miniscript under `tr`
-outright, so a tapleaf `multi_a` never reaches `CheckDuplicateKey` and all three
-of `tr(A,multi_a(2,B,B))`, `tr(A,sortedmulti_a(2,B,B))`, `tr(A,multi_a(2,A,A,B))`
-are ACCEPTED. The doc also records that an earlier version claimed
-`DuplicateRefusedByCore` here and was wrong.
+That comment and F-533's entry disagreed — the entry called for a second
+predicate, the code argued against one. The nesting result reconciles them: the
+predicate gets **wider**, not doubled.
 
-**So the device has one predicate serving two rules.** A warning should say what
-Core will do; a refusal should say what BIP 388 permits.
+## The change
 
-## THE TWO RULES ARE NOT NESTED — the load-bearing question for this plan
+1. **Widen `md.DuplicateKeySlot`'s `tagTr` arm** to consider the taproot internal
+   key, `trBody.keyIndex`, **only when `!isNums`**. SPEC §7: `is_nums=true` means
+   the internal key is the NUMS H-point and not a placeholder reference —
+   `md/canonicalize.go:109-116` already skips registration on exactly that
+   condition, and round 1's C1 showed that counting it unconditionally falsely
+   refuses `keyed_compose_tr_sole_sortedmulti_a` and
+   `keyed_compose_tr_unsorted_sole_leaf`, both `ok/agrees` today.
 
-It is tempting to assume BIP 388 ⊇ Core's rule, in which case moving the refusal
-onto BIP 388 would only widen refusals and change nothing else. **That is wrong
-in one direction and it matters:**
+2. **Return a NEW kind** for this case (working name
+   `DuplicateTaprootInternalKey`), so the refusal is one line and the COPY can
+   differ. No call site moves — the F-531 gate stays in `complexAddressSource`
+   (`gui/policy_address.go:77`), which is what `gatheredDescriptorFlow` actually
+   calls (`gui/md1_gather.go:205`). Round 1's C2: naming `policyAddressAt` would
+   have reopened F-531 *and* produced a FALSE GREEN, because `cmd/policyprobe`
+   wraps the router while the device takes the branch.
 
-* Core's predicate counts key SLOTS inside one expression and ignores use-site
-  multipath. BIP 388 explicitly PERMITS one key at several use sites when their
-  multipath sets are DISJOINT (`@0/<0;1>` and `@0/<2;3>`).
-* So a policy can be Core-duplicate and BIP-388-legal. On that policy the
-  refusal lifts and the address branch becomes reachable **while still carrying a
-  duplicate** — which is exactly the state `gui/wallet_policy.go:340-350` says it
-  is not prepared for: *"IF A DUPLICATE EVER DERIVES AGAIN … this block has to
-  come back, and it will have no coverage."*
+3. **Copy, per kind.** The existing Core-voiced sentences stay on the Core kinds
+   and are still true there. The new kind needs its own, in BIP 388's voice, and
+   the screens a refused card lands on — *"This device can't derive addresses"*
+   and *"Complex policy - display only"* — must not be what it gets (round 1 I1;
+   the repo already records both as defects).
 
-**R0 MUST ANSWER THIS FIRST:** can such a policy be expressed in the md1 wire at
-all? Multipath in the fork lives in the **expand/use-site layer**
-(`md/expand.go:33-42`, `UseSite.HasMultipath` + `[]UseSiteAlt`), not per
-occurrence in the tree, and `DuplicateKeySlot` walks the TREE. If one slot cannot
-carry two different use-sites in this wire format, the reachable-warning case is
-empty and step 3 below is unnecessary — and saying so with evidence is worth more
-than writing the code defensively.
+4. **No `KeyAtDisjointUseSites` port** (round 1 I2). A tree-only predicate cannot
+   compute it, and the shape it names is expressible and derives correctly today.
+   This plan ports one rule: a key slot may not appear at both the taproot
+   internal key and inside the taptree.
 
-## The change, in order
+## Acceptance — written so it can fail in BOTH directions
 
-1. **New predicate, `md` package.** `BIP388ReusedSlot(tree node) (uint8, bool)`:
-   counts key-slot occurrences over the WHOLE expression, including
-   `trBody.keyIndex`, and returns the lowest slot seen twice. It does NOT reuse
-   `duplicateInExpression`'s per-expression scoping — that scoping is Core's
-   answer and is the thing being replaced. Ported from the primary's taxonomy
-   (`dm crates/md-cli/src/parse/reuse.rs`, `Finding::SamePathExpression` and
-   `KeyAtDisjointUseSites`) — **convergence, so exempt from Rust-first.**
+Round 1's I3 was that `ok/refused 0` plus a same-commit baseline rewrite cannot
+fail in the over-refusal direction, and that my claim the script "demands"
+hand-checked verdicts was **false**: `--write-baseline` overwrites and exits 0.
 
-2. **Move the refusal.** `policyAddressAt` refuses on `BIP388ReusedSlot`;
-   `md.DuplicateKeySlot` keeps the F-514 WARNING, whose two sentences are Core
-   verdicts and would become false on the new predicate.
+* **Must refuse:** `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a` → corpus
+  `ok/refused` goes 2 → 0.
+* **Must STILL derive**, named individually and asserted BEFORE any baseline
+  rewrite: `keyed_compose_tr_sole_sortedmulti_a`,
+  `keyed_compose_tr_unsorted_sole_leaf`, and the three
+  `keyed_compose_preset_hashlock_gated_*` vectors baselined today. The count
+  `ok/agrees` must go **45 → 47**, not merely "not fewer".
+* **The probe must exercise the DEVICE path.** Before trusting any corpus number,
+  confirm `cmd/policyprobe` reaches `complexAddressSource` for these vectors —
+  its own header warns that wrapping the wrong branch "manufactures device
+  findings".
+* **Mutation:** drop the `!isNums` guard → the two NUMS vectors above must go red.
+  Drop the internal-key term → `ok/refused` returns to 2.
+* Fork gates: `./sysw/`, non-gui packages, `./gui/` sharded ×24 (all 1338),
+  `gofmt -l .` against the five-file baseline.
 
-3. **Only if R0 answers the question above "yes":** restore the warning block on
-   the address branch of `walletPolicyAddressLines`, WITH coverage. It was
-   deleted deliberately, because "a test asserting coverage of code that cannot
-   run is worse than no test — mutating it away left 1312/1312 green."
-
-4. **Copy.** The refusal sentence must say BIP 388, not Core. Today's
-   `composerCopyDuplicateKeys` is written in Core's voice.
-
-## Acceptance
-
-* The corpus check reports `ok/refused 0`, with the baseline rewritten in the
-  same commit and each verdict hand-checked (the script demands this).
-* `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a` refuse on-device, with a
-  message naming BIP 388.
-* A control vector that is Core-duplicate but BIP-388-legal either refuses
-  correctly or is shown not to exist in this wire format.
-* Fork gates: `./sysw/`, non-gui packages, `./gui/` sharded ×24 (all 1338), and
-  `gofmt -l .` against the recorded five-file baseline.
-* Mutation: disable the internal-key term in the new predicate → the two vectors
-  derive again and the corpus check goes red.
-
-## Noted, not resolved
+## Sequencing
 
 `keyed_tr_multi_a` and `keyed_tr_sortedmulti_a` are two of the three key-reuse
-vectors **F-529** says a re-vendor would delete. If that re-vendor lands first,
-this plan's acceptance evidence disappears with them. Sequence F-529 against this
-before implementing, or pin the two vectors locally.
+vectors **F-529** says a re-vendor would delete, taking this plan's evidence with
+them. Settle F-529 first or pin the two vectors locally — round 1 judged the
+earlier mitigation inadequate.
