@@ -1,0 +1,3 @@
+# The assembled bundle, including an 11 MB wasm. Built by build.sh, never
+# committed -- the fork gitignores emu.wasm for the same reason.
+dist/

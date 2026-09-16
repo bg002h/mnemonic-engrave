@@ -1,0 +1,152 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SeedHammer II — try it in your browser</title>
+<link rel="stylesheet" href="app.css">
+<div class="wrap">
+  <span class="tag">SeedHammer II</span>
+  <h1>Build a Bitcoin wallet policy on a device that isn't here.</h1>
+  <p class="lead">
+    Below is the <b>actual firmware</b> — the same Go code that runs on the
+    machine, compiled to WebAssembly. Not a mock, not a video, not a
+    reimplementation of the screens. Tap it and it behaves exactly as the
+    hardware does, because it <em>is</em> the hardware's software.
+  </p>
+
+  <h2>Pick something to build</h2>
+  <p class="lead">Each one ends with a <b>Template-ID</b>: a 128-bit fingerprint of your policy's shape.</p>
+  <div class="cards" id="cards"></div>
+
+  <div class="note">
+    <b>Everything here is throwaway test data.</b> The seeds, shares and
+    passphrases on this page are published test vectors. Nothing on this page
+    touches money, and nothing you do here can.
+  </div>
+
+  <h2>Then try it on your own machine</h2>
+  <p>
+    The device is one half. The other half is a set of command-line tools that
+    compose the same policies, turn them into engravable strings, and check the
+    device's work. Two of them are worth ten minutes of your time.
+  </p>
+
+  <h3>Install</h3>
+  <p class="lead">Needs <a href="https://rustup.rs">Rust</a>. Takes a few minutes to compile.</p>
+  <div class="code"><pre><code><span class="c"># the descriptor tool — the published build is fine</span>
+cargo install md-cli
+
+<span class="c"># the seed tool — from git, NOT crates.io, and the reason matters:</span>
+<span class="c"># the published 0.14.0 can only take a seed as a command-line argument.</span>
+<span class="c"># Current builds add a private channel (--in FILE) and actively refuse argv.</span>
+cargo install --git https://github.com/bg002h/mnemonic-secret ms-cli</code></pre></div>
+
+  <h3>1 &nbsp;Split a seed three-of-five, then prove two isn't enough</h3>
+  <p>
+    <code>codex32</code> (BIP-93) is Shamir's secret sharing over the bech32
+    alphabet. Five shares; any three rebuild the seed; two rebuild nothing.
+  </p>
+  <div class="code"><pre><code><span class="c"># A published all-zeros test vector. Never do this with a real seed.</span>
+echo "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" > seed.txt
+
+ms split --in seed.txt -k 3 -n 5 --group-size 0 > shares.txt
+<span class="o"># 5 lines, each starting ms13... — different every run, they're randomised</span>
+
+<span class="c"># any three of them</span>
+sed -n '1p;3p;5p' shares.txt > three.txt
+ms combine --in three.txt
+<span class="o">entropy: 00000000000000000000000000000000</span>
+<span class="o">phrase: abandon abandon ... about</span>
+
+<span class="c"># now only two</span>
+sed -n '1p;3p' shares.txt > two.txt
+ms combine --in two.txt
+<span class="o">error: not enough shares: have 2, need 3</span></code></pre></div>
+
+  <h3>2 &nbsp;Scratch a plate and watch it heal</h3>
+  <p>
+    That string below is a real wallet policy — the <b>zen-hodl</b> wallet from
+    the third mission, one key that cannot spend anything younger than 32,768
+    blocks. Metal gets scratched, so the encoding carries error correction:
+    it repairs up to four wrong characters and tells you exactly which.
+  </p>
+  <div class="code"><pre><code><span class="c"># four characters damaged (positions 5, 11, 18, 25)</span>
+md decode md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
+<span class="o">md: codec error: codex32 decode error: BCH checksum verification failed</span>
+
+md repair md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
+<span class="o"># Repair report</span>
+<span class="o">#   md1 chunk 0: 4 corrections at position 5: 'q' -&gt; 's', position 11: 'p' -&gt; 'c',</span>
+<span class="o">#                position 18: 'z' -&gt; 'q', position 25: 'r' -&gt; '6'</span>
+<span class="o">md1yqfdsssjuqqcr5e55uqqqgqqq6qqvf4d7h59r2</span></code></pre></div>
+
+  <h3>3 &nbsp;Check the device's work against a second implementation</h3>
+  <p>
+    The repaired string is that same zen-hodl wallet. Ask the command-line tool
+    for its identity, and compare it with what the device showed you after
+    mission 3. The device's firmware is <b>Go</b>; this tool is <b>Rust</b>.
+    They were written to the same specification and never share a line of code.
+  </p>
+  <div class="code"><pre><code>md inspect md1yqfdsssjuqqcr5e55uqqqgqqq6qqvf4d7h59r2
+<span class="o">template: tr(50929b74...ac0,and_v(v:pk(@0/&lt;0;1&gt;/*),older(32768)))</span>
+<span class="o">wallet-descriptor-template-id: 73c33a5dea17b45376a6246995df0cbb</span>
+<span class="o">wallet-policy-id:              891b6c372c99c033c98bc80604deb6f0</span></code></pre></div>
+  <p class="lead">
+    Two independent implementations agreeing, to the bit, on what your wallet
+    <em>is</em>. That is the whole point of a template identity.
+  </p>
+
+  <h3>Bonus &nbsp;Try to do it the dangerous way</h3>
+  <p class="lead">
+    This one is meant to fail. Paste it and the tool refuses before it parses
+    anything — the command is complete on purpose, so the refusal is real.
+  </p>
+  <div class="code"><pre><code>ms split --phrase "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" -k 3 -n 5
+<span class="o">ms: argument 3 on ARGV is a BIP-39 mnemonic, 93 characters long.</span>
+<span class="o">      Refused BEFORE the command line was parsed; nothing was read</span>
+<span class="o">      and nothing was written.</span>
+<span class="o">      ... `ps` shows it, and your shell has ALREADY written the line</span>
+<span class="o">      to its history.</span></code></pre></div>
+
+  <div class="note warn">
+    <b>A word on what this is.</b> SeedHammer II engraves wallet backups into
+    steel. The policies you build here are real BIP-388 wallet policies; the
+    plate strings are real; the error correction is real. What's emulated is the
+    <em>machine</em> — the screen, the buttons, the motion of the cutter.
+  </div>
+</div>
+
+<script type="module">
+  import { MISSIONS } from "./missions.js";
+  const cards = document.getElementById("cards");
+  cards.innerHTML = MISSIONS.map(m => `
+    <a class="card" href="mission.html?m=${encodeURIComponent(m.id)}">
+      <div class="t">${m.title}</div>
+      <div class="d">${m.blurb}</div>
+      <div class="m">${m.measured
+        ? `<b>${m.taps} taps</b> · ${m.wrapper}${m.long ? " · the long one" : ""}`
+        : "tap count not measured yet"}</div>
+    </a>`).join("");
+
+  // Copy buttons. Copies the commands only -- comments and expected output are
+  // annotations, and pasting them back into a shell is noise at best.
+  for (const box of document.querySelectorAll(".code")) {
+    const pre = box.querySelector("pre");
+    const btn = document.createElement("button");
+    btn.textContent = "copy";
+    btn.addEventListener("click", async () => {
+      const cmds = [...pre.querySelectorAll("code")].map(c => {
+        const clone = c.cloneNode(true);
+        clone.querySelectorAll(".c, .o").forEach(n => n.remove());
+        return clone.textContent;
+      }).join("").split("\n").map(l => l.trimEnd()).filter(l => l.trim()).join("\n");
+      try {
+        await navigator.clipboard.writeText(cmds);
+        btn.textContent = "copied"; btn.classList.add("done");
+      } catch {
+        btn.textContent = "select it"; // clipboard blocked (http, or permissions)
+      }
+      setTimeout(() => { btn.textContent = "copy"; btn.classList.remove("done"); }, 1800);
+    });
+    box.appendChild(btn);
+  }
+</script>

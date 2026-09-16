@@ -1,0 +1,93 @@
+/* Shared by the landing and mission pages. Dark, to sit beside the emulator's
+   own page (#1a1a1c) without a jarring seam, and phone-first: most of the room
+   will open this on a handset from a QR code. */
+:root {
+  --bg: #141416; --panel: #1d1d20; --ink: #e6e6e6; --dim: #9a9aa2;
+  --line: #2e2e33; --accent: #f7931a; --ok: #4ec9a0; --warn: #e5c07b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 780px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+h1 { font-size: 1.5rem; line-height: 1.25; margin: .25rem 0 .5rem; }
+h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+h3 { font-size: 1rem; margin: 1.25rem 0 .35rem; }
+p { margin: .6rem 0; }
+.lead { color: var(--dim); }
+.tag {
+  display: inline-block; font: 600 11px/1 ui-monospace, monospace;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent); border: 1px solid var(--accent);
+  border-radius: 3px; padding: .3em .5em; margin-bottom: .75rem;
+}
+a { color: var(--accent); }
+/* ---- mission cards ---- */
+.cards { display: grid; gap: .75rem; margin: 1rem 0; }
+.card {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: .9rem 1rem;
+}
+.card:hover, .card:focus-visible { border-color: var(--accent); }
+.card .t { font-weight: 650; }
+.card .d { color: var(--dim); font-size: .9rem; margin-top: .15rem; }
+.card .m {
+  font: 600 11px/1 ui-monospace, monospace; color: var(--dim);
+  margin-top: .5rem; letter-spacing: .04em;
+}
+.card .m b { color: var(--ok); font-weight: 700; }
+/* ---- code with a copy button ---- */
+.code { position: relative; margin: .6rem 0; }
+.code pre {
+  margin: 0; overflow-x: auto; background: #0e0e10; border: 1px solid var(--line);
+  border-radius: 8px; padding: .8rem 1rem; padding-right: 4.5rem;
+  font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; color: #d6d6dc;
+}
+.code pre .c { color: var(--dim); }      /* comment */
+.code pre .o { color: var(--ok); }       /* expected output */
+.code button {
+  position: absolute; top: .5rem; right: .5rem;
+  font: 600 11px/1 ui-monospace, monospace; letter-spacing: .05em;
+  color: var(--dim); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 5px;
+  padding: .45em .6em; cursor: pointer;
+}
+.code button:hover { color: var(--ink); border-color: var(--accent); }
+.code button.done { color: var(--ok); border-color: var(--ok); }
+/* ---- notes ---- */
+.note {
+  border-left: 3px solid var(--line); padding: .1rem 0 .1rem .85rem;
+  margin: .9rem 0; color: var(--dim); font-size: .93rem;
+}
+.note.warn { border-left-color: var(--warn); }
+.note b { color: var(--ink); }
+/* ---- mission page ---- */
+.steps { counter-reset: step; list-style: none; padding: 0; margin: .5rem 0 0; }
+.steps li {
+  counter-increment: step; position: relative;
+  padding: .45rem 0 .45rem 2.1rem; border-top: 1px solid var(--line);
+}
+.steps li::before {
+  content: counter(step); position: absolute; left: 0; top: .5rem;
+  width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--line);
+  font: 600 11px/1.45rem ui-monospace, monospace; text-align: center; color: var(--dim);
+}
+.steps kbd {
+  font: 600 12px/1 ui-monospace, monospace; color: var(--ink);
+  background: #000; border: 1px solid var(--line); border-radius: 4px;
+  padding: .25em .45em; white-space: nowrap;
+}
+.frame { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #1a1a1c; }
+.frame iframe { display: block; width: 100%; height: 78vh; min-height: 520px; border: 0; }
+.bar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: .75rem 0; }
+.bar button, .bar a.btn {
+  font: 600 13px/1 -apple-system, system-ui, sans-serif; text-decoration: none;
+  color: var(--ink); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 7px; padding: .6em .9em; cursor: pointer;
+}
+.bar button:hover, .bar a.btn:hover { border-color: var(--accent); }

@@ -1,0 +1,82 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mission — SeedHammer II</title>
+<link rel="stylesheet" href="app.css">
+<div class="wrap">
+  <p style="margin:0 0 .5rem"><a href="index.html">&larr; all missions</a></p>
+  <h1 id="title">…</h1>
+  <p class="lead" id="blurb"></p>
+  <p id="why"></p>
+  <div id="unmeasured"></div>
+
+  <div class="bar">
+    <button id="toggle">hide steps</button>
+    <span class="lead" id="taps" style="font-size:.9rem"></span>
+  </div>
+  <ol class="steps" id="steps"></ol>
+
+  <h2>The device</h2>
+  <p class="lead" id="hint">
+    Tap the screen to drive it. The buttons are on the edges: <b>confirm</b> is
+    bottom-right, <b>back</b> is top-right, <b>next / page</b> is middle-right,
+    and <b>previous</b> is middle-left.
+  </p>
+  <div class="frame"><iframe id="emu" src="emu/index.html" title="SeedHammer II emulator"></iframe></div>
+  <div class="bar">
+    <button id="reload">start over</button>
+    <a class="btn" href="emu/index.html" target="_blank" rel="noopener">open full screen</a>
+  </div>
+
+  <div id="extra"></div>
+
+  <div class="note">
+    Stuck? Every step above was driven against this exact build and the screen
+    read back afterwards — so if a step doesn't match what you see, you're on a
+    different screen, not looking at a broken instruction. <b>start over</b>
+    puts the device back to boot.
+  </div>
+</div>
+
+<script type="module">
+  import { MISSIONS } from "./missions.js";
+  const id = new URLSearchParams(location.search).get("m");
+  const m = MISSIONS.find(x => x.id === id) || MISSIONS[0];
+
+  document.title = `${m.title} — SeedHammer II`;
+  document.getElementById("title").textContent = m.title;
+  document.getElementById("blurb").textContent = m.blurb;
+  document.getElementById("why").innerHTML = m.why;
+  document.getElementById("steps").innerHTML = m.steps.map(s => `<li>${s}</li>`).join("");
+  document.getElementById("taps").textContent =
+    m.measured ? `${m.taps} taps, start to finish` : "";
+
+  if (!m.measured && m.note) {
+    document.getElementById("unmeasured").innerHTML =
+      `<div class="note warn"><b>Unverified.</b> ${m.note}</div>`;
+  }
+
+  const extra = [];
+  if (m.ends) extra.push(`<h3>What you end up with</h3><p>${m.ends}</p>`);
+  if (m.id === "sealed") {
+    extra.push(`<h3>The passphrase</h3>
+      <div class="code"><pre><code>mosquito neither reopen morning canoe find tiny brand resist satisfy gun ball</code></pre></div>
+      <p class="lead">A fixed test literal, built into the emulator only. A real
+      device never ships with a known passphrase — this payload and the code that
+      serves it exist solely in the browser build.</p>`);
+  }
+  document.getElementById("extra").innerHTML = extra.join("");
+
+  const steps = document.getElementById("steps"), toggle = document.getElementById("toggle");
+  toggle.addEventListener("click", () => {
+    const hidden = steps.hasAttribute("hidden");
+    if (hidden) steps.removeAttribute("hidden"); else steps.setAttribute("hidden", "");
+    toggle.textContent = hidden ? "hide steps" : "show steps";
+  });
+
+  // Reload the iframe rather than the page, so the steps stay where they are.
+  document.getElementById("reload").addEventListener("click", () => {
+    const f = document.getElementById("emu");
+    f.src = f.src;
+  });
+</script>
