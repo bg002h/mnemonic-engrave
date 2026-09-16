@@ -20,11 +20,27 @@ text read back after each step. Nothing here is inferred from source.
 - Hold-to-confirm = `shPress(CONFIRM)`, 1300 ms, `shRelease(CONFIRM)`.
 - `shScreen()` returns whitespace-stripped text; compare squashed.
 
-## Carousel order (11 entries, measured)
+## Carousel order (12 entries, measured) — and it goes BOTH ways
 
-`Backup Wallet, BIP-39 Password, Engrave Text, Account Xpub, Engrave Bundle,
-Engrave Single-Sig, Engrave Multisig, Wallet Policy, Engrave Transaction,
-Load Payload, BIP-85 Child Seed`
+| i | entry | | i | entry |
+|---|---|---|---|---|
+| 0 | Backup Wallet | | 6 | Engrave Multisig |
+| 1 | BIP-39 Password | | 7 | **Wallet Policy** |
+| 2 | Engrave Text | | 8 | Engrave Transaction |
+| 3 | Account Xpub | | 9 | Load Payload |
+| 4 | Engrave Bundle | | 10 | BIP-85 Child Seed |
+| 5 | Engrave Single-Sig | | 11 | **Sealed Payload** |
+
+**Forward is `[455,160]`, BACKWARD is `[25,160]`** (measured by probing; the
+left-top and left-bottom positions do nothing). The carousel wraps both ways,
+so take the short way round:
+
+- **Sealed Payload: 1 tap BACKWARD** from the start screen, not 11 forward.
+- **Wallet Policy: 5 taps backward**, versus 7 forward.
+
+Entry 11 is the conditional `unlockPayload`. I first reported it ABSENT — wrong:
+my enumeration loop ran exactly 11 times and stopped one short. The negative
+inherited the scope of the loop, not the device.
 
 **Wallet Policy is index 7.** `Engrave Multisig` (index 6) is a DIFFERENT flow —
 it asks "Supply or build a policy?" and is not the composer. Easy to land on by
@@ -45,7 +61,7 @@ firmware UX follow-up — page 1 gives no hint page 2 exists.
 | # | taps | action |
 |---|---|---|
 | 1 | 2 | Boot offer "A systemwide payload is present. Load it?" -> select **SKIP**, CONFIRM |
-| 2 | 7 | Carousel-next to **Wallet Policy** (index 7) |
+| 2 | 5 | Carousel **backward** (`[25,160]`) to **Wallet Policy** |
 | 3 | 1 | CONFIRM to enter |
 | 4 | 2 | **Build a new policy** (row 1 of 2; row 0 is "Scan cards") |
 | 5 | 2 | **Taproot (tr)** (row 0 of 4: tr / wsh / sh-wsh / sh) |
@@ -199,3 +215,22 @@ k-of-n across md1 policy plates — lose a whole plate, still recover. Legitimat
 and useful, but it is new header semantics + wire format + Rust/Go parity +
 test vectors: risk-set work needing a full spec->plan->gate cycle. File it, do
 not improvise it.
+
+## NOT YET WALKED
+
+- **Sealed Payload unlock** (mission 5: md1 + mk1 + ms1 plates). The entry is
+  confirmed reachable (1 tap backward) and the payload is confirmed to hold
+  3 codex32 shares + 6 mk1 + 6 md1, but the unlock itself types a 12-word
+  passphrase on the keyboard and its tap cost is UNMEASURED. Do not put a
+  number on it until it has been driven.
+- **plain-multisig**: same shape as decaying-multisig, preset row 1. Expected
+  ~19 taps but not separately measured.
+
+## Other beats found while walking
+
+- **Payload Digest screen** (boot -> LOAD): "Compare this against
+  `me sysw show <file>` on the host: 55adb8006ec6a06694f36a0e900ac8d5". A second
+  independent cross-check, same shape as the Template-ID one.
+- The load flow then shows **"A SECRET is stored unencrypted in flash"**, a
+  Keep/Unload choice, and a census: "Loaded. It holds: 1 BIP-39 mnemonic,
+  1 free text, 1 passphrase."
