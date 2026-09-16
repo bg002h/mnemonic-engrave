@@ -17801,3 +17801,110 @@ misled the same way.
 The shape of the fix was already built: `HashKind::digest` plus the same
 four-digest listing. Owning phase was: **phase 3** (`me-cli`), or this cycle's
 follow-up sweep if phase 3 does not touch the verb.
+
+---
+
+## The two hashkinds journey walks (F-547 … F-577) — filed 2026-09-16, late
+
+**These entries were reported on 2026-09-15 and never filed here.** They lived
+only in `agent-reports/hashkinds-journeys-host.md` and
+`agent-reports/hashkinds-journeys-device.md`, and fourteen of them were folded
+straight from those reports into code without ever passing through this ledger.
+That is the defect this block exists to correct: the burndown rule is *"record
+the owning phase in each follow-up entry so reconciliation is a grep"*, and a
+grep for `F-573` returned nothing outside a report nobody re-reads. Numbers
+F-558 … F-569 were never assigned — the gap is real, not a missing entry.
+
+### Closed by the fold that followed the reports
+
+Each was folded directly; the commit is the record.
+
+| # | what it was | fixed in |
+| --- | --- | --- |
+| F-547 | `md descriptor`/`md address` refused a keyless hashlock and prescribed a flag they did not accept | dm `f01a74ef` |
+| F-548 | `md decompose --emit commands` said "ready to run" and emitted commands that were not | dm `f82435c2` |
+| F-549 | `me sysw pack`'s kind-tag note told a `ripemd160`/`hash160` operator something false | me `77c4026e` |
+| F-550 | F-539's guard directed the operator into a silent wrong result at `--hex` | ms `cd18b42` |
+| F-551 | `md compose`'s hash-kind refusals were the weakest of the three CLIs | dm `f82435c2` |
+| F-552 | `me sysw show` elided the digest, with no `--json` and no full form | me `77c4026e` |
+| F-553 | the `ms hashlock` EXAMPLES pipeline omitted `--kind` | ms `cd18b42` |
+| F-554 | the card's `for md compose:` line used a bare `...` that failed opaquely when pasted | ms `cd18b42` |
+| F-555 | F-534 was fixed but still read as open here | me `77c4026e` |
+| F-556 | `me sysw pack` accepted a payload whose `hash:` kind contradicted its `phrase:` record | me `77c4026e` |
+| F-557 | `me bundle`'s plate count claimed completeness while omitting the preimage plate | me `77c4026e` |
+| F-570 | re-entering the hex pad at a narrower kind truncated the draft SILENTLY | fork `a263076` |
+| F-571 | the phrase arm named the kind on no screen | fork `a263076` |
+| F-572 | the 20-byte warning claimed nothing had seen a preimage, in a payload holding one | fork `a263076` |
+
+F-576 (the pad draws hex uppercase) was **withdrawn by its own reporter** and
+never carried a finding. It is listed here only so a future reader who finds the
+number in the device report does not go looking for the entry.
+
+### F-573 — the payload's own material is a dead end for three of the four kinds
+
+**Minor. Owning phase: post-release UX.** Classification: **documentation only**
+(or a row annotation), on the reporter's own reading.
+
+Both material-bearing bands are hard-wired to sha256 —
+`gui/composer_hash.go:412` and `gui/composer_hashlock.go:147` both call
+`hashlockLockOf(md.KindSha256, &x)`. So on a `hash256`/`ripemd160`/`hash160`
+payload the `preimage N` row assigns the **wrong kind** (the relation line
+`no hash: record in the payload has this digest` does fire — measured), while
+the correct `hash:` row assigns the right kind but holds **no material**, so no
+preimage plate is offered at Done even though the preimage is in flash. The two
+rows draw unrelated digests and `(in payload)` cannot appear, because
+`composerHashInPayload` compares locks across kinds.
+
+The only device route to a non-sha256 lock *with* material is retyping the
+phrase by hand on the phrase arm, and no screen says so.
+
+### F-574 — the census names the kind on the rows it cuts and not on the rows it does not
+
+**Minor. Owning phase: post-release UX.** Classification: **default**.
+
+`gui/composer_copy.go:962` and `:967` draw `preimage <first8last8>: not on any
+path, will not be cut` and `…: declined, will not be cut`, while the accepted
+row (`composerCopyPreimagePlateRow`) was given the kind precisely so that two
+plates for one preimage under two kinds are not described identically. Measured
+output with a hash160 plate accepted, a sha256 plate declined and a ripemd160
+preimage on no path:
+
+```
+path 1  hash160 5741af53..774b6515  phrase, hardened, QR
+preimage b867db87..edbc96cb: declined, will not be cut
+preimage 23caccda..e67afe11: not on any path, will not be cut
+```
+
+Worse than saying nothing? Weakly yes — these rows are the operator's only
+account of the preimages they are walking away without.
+
+### F-575 — no screen between assignment and the Done consent answers "which kind did I pick?"
+
+**Minor. Owning phase: post-release UX.** Classification: **default**.
+
+`composerPathLine` (`gui/composer_state.go:413`) renders `Path 1: hash only`
+for all four kinds (measured). Re-opening `Path N hash` draws a fresh
+`Which hash?` whose rows describe the *payload*, not the path's current
+assignment — so "let me check" means entering a screen where selecting a row
+reassigns the hash, and the only non-destructive exit is Back.
+
+The Done consent screen does name the kind before anything is cut, so nothing is
+lost; what is lost is the chance to catch a mis-tap before seating every key.
+`Path 2: 2-of-3 + hash160` is the obvious shape, and it needs a row-width
+measurement at `sh2DisplaySize` first — `ripemd160` is the long token.
+
+### F-577 — the digest-shaped-phrase notice is one screen short, and the Back it asks for is destructive
+
+**Nit. Owning phase: post-release UX, with F-571.** Classification:
+**documentation only**.
+
+`composerCopyPhraseLooksLikeDigest` (shipped as F-539) tells the operator to go
+back and use the `Type a digest` row, which is **two** Backs away, and the first
+Back drops the typed phrase. Measured at kind = hash160: decline the notice →
+phrase screen with the 40 characters intact → Back → kind screen → Back →
+`Which hash?`, where the row is.
+
+Worse than saying nothing? No — the text being dropped is text the operator has
+just been advised not to use. Recorded because it shares F-571's mechanism and
+should be re-read when F-571 is folded: if the phrase starts surviving Back,
+only the screen count is left to fix.
