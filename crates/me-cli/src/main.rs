@@ -2863,13 +2863,13 @@ fn report_preimage_admission(records: &[String]) {
         let checked = checked.join(", ");
         match class {
             C::Phrase => eprintln!(
-                "me: WARNING — record {i} (records count from 0) is a hashlock phrase whose \
+                "me: WARNING — record {i}, as given (records count from 0) is a hashlock phrase whose \
                  digest matches no `hash:` record in this payload (checked: {checked}). Check \
                  the method selector and the text after the first comma — a space after the \
                  comma is part of the phrase and derives a different preimage."
             ),
             _ => eprintln!(
-                "me: WARNING — record {i} (records count from 0) is a preimage whose digest \
+                "me: WARNING — record {i}, as given (records count from 0) is a preimage whose digest \
                  matches no `hash:` record in this payload (checked: {checked}). Nothing here \
                  tells the device which policy it unlocks, and the Hashlock plates flow will \
                  print the digest alone."
@@ -3299,7 +3299,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 _ => "a hashlock PREIMAGE plate (kind 0x03)",
             };
             format!(
-                "record {i} (records count from 0) is {what}, not a seed record; this \
+                "record {i}, as given (records count from 0) is {what}, not a seed record; this \
                  payload did not ask for one. A preimage backs a hashlock spend path, not \
                  a wallet — keep it with the policy it unlocks, and do not re-encode it as \
                  entropy. Re-run with --pack-preimage if that is what you intend."
@@ -3310,20 +3310,20 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
             use mnemonic_engrave::sysw::UnknownReason as U;
             match why {
                 U::NonHexBody(prefix) => format!(
-                    "record {i} (records count from 0) begins `{prefix}`, but its body is \
+                    "record {i}, as given (records count from 0) begins `{prefix}`, but its body is \
                      not lowercase hex. That prefix is RESERVED, so a body it cannot \
                      decode is refused rather than quietly engraved as free text \
                      (§5.3.1). Encode the body first:\n      \
                      printf '%s' 'your text here' | xxd -p -c 256"
                 ),
                 U::NotATransaction(e) => format!(
-                    "record {i} (records count from 0) begins `tx:` and its body is hex, \
+                    "record {i}, as given (records count from 0) begins `tx:` and its body is hex, \
                      but the bytes are not one serialized Bitcoin transaction ({e}). The \
                      prefix is RESERVED for a raw signed transaction — produce the record \
                      with `mt encode --qr` rather than by hand"
                 ),
                 U::UnsignedInputs(idx) => format!(
-                    "record {i} (records count from 0) is a `tx:` record whose transaction \
+                    "record {i}, as given (records count from 0) is a `tx:` record whose transaction \
                      parses but whose {} carries NEITHER a scriptSig NOR a witness — it is \
                      unsigned, or its signatures were stripped in transit.\n      \
                      This is refused because the txid does NOT change when signatures are \
@@ -3341,7 +3341,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 // the two length sets are shape, never content — the record
                 // itself is a seed and is never echoed.
                 U::TagKindMismatch => format!(
-                    "record {i} (records count from 0) is an ms1 string whose 4-character \
+                    "record {i}, as given (records count from 0) is an ms1 string whose 4-character \
                      id and kind byte disagree; it is refused rather than read by either \
                      field (SPEC_ms_hashlock §1 rule 2). A damaged or forged plate — \
                      re-encode it from the source rather than editing the string."
@@ -3415,14 +3415,14 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                         ""
                     };
                     format!(
-                        "record {i} (records count from 0) is a kind-0x03 preimage payload \
+                        "record {i}, as given (records count from 0) is a kind-0x03 preimage payload \
                          {id_clause}{x_clause}. A preimage plate is kind 0x03 under the id \
                          `hash` followed by exactly 32 bytes (SPEC_ms_hashlock §1 rule 2), and \
                          --pack-preimage admits only that. {remedy}{collision}"
                     )
                 }
                 U::Bip93OutsideTheProfile(len) => format!(
-                    "record {i} (records count from 0) is a VALID BIP-93 codex32 string — the \
+                    "record {i}, as given (records count from 0) is a VALID BIP-93 codex32 string — the \
                      checksum is good — but not a constellation `ms1` record, so this \
                      container cannot place it.\n      \
                      `ms1` is a two-gate PROFILE over BIP-93: the whole string must be \
@@ -3436,7 +3436,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                     ms_codec::consts::VALID_MNEM_STR_LENGTHS,
                 ),
                 U::Unrecognised => format!(
-                    "record {i} (records count from 0) is not a form this container can \
+                    "record {i}, as given (records count from 0) is not a form this container can \
                      place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
                      a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:`/`phrase:` record. Addresses are not \
                      classifiable here, \
@@ -3449,7 +3449,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                 // operator is holding. With no verb emitting a `phrase:` record
                 // (§13), this text and `pack`'s help ARE the producer.
                 U::Composer(e) => format!(
-                    "record {i} (records count from 0) is a `key:`/`hash:`/`now:`/`phrase:` \
+                    "record {i}, as given (records count from 0) is a `key:`/`hash:`/`now:`/`phrase:` \
                      record whose body fails its rule ({}).\n      {}\n      Build the record \
                      with `me sysw pack`'s helpers: a key record is `key:` + the hex of \
                      `[fingerprint/path]xpub` exactly as `md decompose` prints it; a hash record \
@@ -3469,7 +3469,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
         }
         E::TooLarge(n) => format!("{n} bytes exceeds the flash region"),
         E::SecondNow(i) => format!(
-            "record {i} (records count from 0) is a second now: record.\n      record {i}: a second \
+            "record {i}, as given (records count from 0) is a second now: record.\n      record {i}: a second \
              now: record; only one is allowed. Remove one."
         ),
         E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),

@@ -2846,3 +2846,86 @@ fn pack_does_not_print_a_digest_for_a_write_that_failed() {
     );
     assert!(f.exists(), "the file was not written");
 }
+
+/// F-590: `me sysw pack`'s record indices and `me sysw show`'s disagree, and
+/// nothing said which numbering either used.
+///
+/// MECHANISM, measured rather than guessed. `pack` indexes the INPUT list. The
+/// container partitions records into a PUBLIC and a SECRET section, and the
+/// auto-appended `now:` goes on the end of the public one — so a `phrase:`
+/// (secret) sits after it, and its container index is one higher than its input
+/// index:
+///
+/// ```text
+/// input:  text*10, hash:, phrase:        -> pack warns "record 11"
+/// show:   …, public record 11: now:, secret record 12: phrase
+/// ```
+///
+/// NOT AN OFF-BY-ONE TO BE "FIXED" BY SHIFTING A NUMBER. Both are correct about
+/// their own list; the defect was that neither said which list. `pack` now says
+/// "as given" — the EXACT phrasing three of its own messages already shipped,
+/// `record N, as given (records count from 0)`. A fourth phrasing was drafted
+/// first and reverted: it read `record N (as given; records count from 0)`,
+/// which splits the literal `(records count from 0)` that nine assertions and
+/// `descriptor_seam.rs`'s outcome classifier match on, so the seam gate went
+/// red with five refusal rows reclassified as `unclassified`.
+///
+/// MUTATION: drop "as given" from the phrase warning -> the first assertion
+/// fails. The divergence assertion is what keeps this test honest: if the two
+/// numberings are ever unified, it fails and this test should be rewritten
+/// rather than deleted.
+#[cfg(unix)]
+#[test]
+fn pack_says_its_record_numbering_is_the_input_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let f = dir.path().join("p.bin");
+    let mut stdin = String::new();
+    for i in 0..10 {
+        stdin.push_str(&format!("text:{i:02x}{i:02x}\n"));
+    }
+    // A hash: record is what makes pack append `now:` at all.
+    stdin.push_str("hash:2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\n");
+    stdin.push_str(&format!(
+        "phrase:{}\n",
+        hex_of("hardened,correct horse battery staple")
+    ));
+
+    let packed = me()
+        .args(["sysw", "pack", "--no-passphrase", "--pack-preimage"])
+        .args(["--out", f.to_str().unwrap()])
+        .write_stdin(stdin)
+        .output()
+        .unwrap();
+    assert!(
+        packed.status.success(),
+        "pack failed: {}",
+        String::from_utf8_lossy(&packed.stderr)
+    );
+    let perr = String::from_utf8_lossy(&packed.stderr);
+    assert!(
+        perr.contains("as given"),
+        "pack numbers records without saying which list it is counting:\n{perr}"
+    );
+
+    // And the two numberings really do diverge here, which is why saying so
+    // matters. If this ever stops being true, rewrite the test — do not delete
+    // the assertion.
+    let shown = me().args(["sysw", "show"]).arg(&f).output().unwrap();
+    let sout = String::from_utf8_lossy(&shown.stdout);
+    assert!(
+        sout.contains("secret record 12: hashlock phrase"),
+        "the container index for the phrase moved; re-read F-590:\n{sout}"
+    );
+    assert!(
+        perr.contains("record 11, as given (records count from 0)"),
+        "pack's input index for the phrase moved; re-read F-590:\n{perr}"
+    );
+}
+
+fn hex_of(s: &str) -> String {
+    use std::fmt::Write as _;
+    s.bytes().fold(String::new(), |mut acc, b| {
+        let _ = write!(acc, "{b:02x}");
+        acc
+    })
+}

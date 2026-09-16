@@ -80,7 +80,7 @@ fn no_flag_refuses_both_carriers_by_index() {
         assert!(!o.status.success(), "carrier {i} packed without the flag");
         let e = stderr(&o);
         assert!(
-            e.contains("record 0 (records count from 0)"),
+            e.contains("record 0, as given (records count from 0)"),
             "refusal does not carry the index: {e}"
         );
         assert!(
@@ -276,7 +276,7 @@ fn the_no_op_warning_is_silent_when_a_carrier_shaped_record_is_present() {
             "§8.2.2 fired above the refusal for {what}, and the two contradict each other:\n{e}"
         );
         assert!(
-            e.contains("record 0 (records count from 0)"),
+            e.contains("record 0, as given (records count from 0)"),
             "{what} drew no refusal at all:\n{e}"
         );
     }
