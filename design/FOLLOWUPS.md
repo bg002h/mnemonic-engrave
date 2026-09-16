@@ -18427,7 +18427,7 @@ only the screen count is left to fix.
 
 ### F-618 — the ledger has four closure conventions and 318 entries with none, so no grep answers "what is open?"
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-16 — me `ea04ecab`, which pinned the `**Status:**` notation, converted all 419 entries and added `scripts/followups-status.sh` as the gate
 **Important. Owning phase: process tooling (ownerless residue — burn down with
 the next follow-up sweep).** Filed 2026-09-16, from three occurrences of one
 class in a single session.
