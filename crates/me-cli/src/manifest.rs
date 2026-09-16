@@ -74,6 +74,14 @@ pub struct Manifest {
     pub tool: &'static str,
     pub version: &'static str,
     pub wallet_plates: usize,
+    /// Hash-fragment kinds found in the decoded policy, deduplicated (F-557).
+    ///
+    /// The checklist's count is a COMPLETENESS CLAIM, and for a hashlock wallet
+    /// the plate it omits is the one that opens the hashed path. Empty for a
+    /// policy with no hashlock, so the note costs nothing where it does not
+    /// apply.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hashlock_kinds: Vec<&'static str>,
     pub ms1_required: bool,
     pub sets: Vec<SetEntry>,
     pub plates: Vec<PlateEntry>,
@@ -92,6 +100,20 @@ impl Manifest {
             self.wallet_plates,
             self.wallet_plates.saturating_sub(1)
         );
+        // F-557: the count above is complete about the POLICY and silent about
+        // the WALLET. A hashlock path needs its preimage -- a phrase written
+        // down, or a preimage plate cut by `ms hashlock`/the device -- and that
+        // is not among these plates and is not counted here. An operator who
+        // gathers exactly this many plates for a keyless hashlock wallet has
+        // everything except the thing that opens it.
+        if !self.hashlock_kinds.is_empty() {
+            out.push_str(&format!(
+                "me: NOTE — this policy has a hashlock path ({}). Its preimage is NOT one of \
+                 these plates and is not counted above: keep the phrase or the preimage plate \
+                 apart, or the hashed path cannot be spent.\n",
+                self.hashlock_kinds.join(", ")
+            ));
+        }
         // Which origins are shared by MORE THAN ONE CARD.
         //
         // Scanned per CARD (by chunk-set id), never per PLATE: every chunk of a
@@ -243,6 +265,7 @@ mod tests {
         let m = Manifest {
             tool: "me",
             version: "x.y.z",
+            hashlock_kinds: Vec::new(),
             wallet_plates: 3,
             ms1_required: true,
             sets: vec![SetEntry {
@@ -297,5 +320,50 @@ mod tests {
         assert!(c.contains("plate 3/3"), "{c}");
         assert!(c.contains("TYPE ON DEVICE"), "{c}");
         assert!(c.contains("CODEX32"), "{c}");
+    }
+
+    /// F-557: the checklist's count is a COMPLETENESS CLAIM, and for a hashlock
+    /// wallet the plate it omits is the only one that opens the hashed path.
+    ///
+    /// An operator who gathers exactly "8 plates" for a keyless hashlock wallet
+    /// has everything except the thing that spends it. A count presented as the
+    /// backup's requirement is trusted as one.
+    ///
+    /// MUTATION: drop the `hashlock_kinds` block from `checklist` -> the first
+    /// row fails. MUTATION: make the note unconditional -> the second fails,
+    /// because a wallet with no hashlock must not be told to keep a preimage it
+    /// does not have.
+    #[test]
+    fn the_checklist_says_the_preimage_is_not_among_the_plates() {
+        let m = Manifest {
+            tool: "me",
+            version: "x.y.z",
+            hashlock_kinds: vec!["ripemd160"],
+            wallet_plates: 3,
+            ms1_required: true,
+            sets: Vec::new(),
+            plates: Vec::new(),
+        };
+        let c = m.checklist();
+        assert!(
+            c.contains("hashlock path") && c.contains("ripemd160"),
+            "a hashlock policy's checklist does not mention the hashlock:\n{c}"
+        );
+        assert!(
+            c.contains("not counted above") || c.contains("NOT one of"),
+            "the note does not say the preimage is outside the count:\n{c}"
+        );
+
+        let plain = Manifest {
+            hashlock_kinds: Vec::new(),
+            ..m
+        };
+        let c = plain.checklist();
+        assert!(
+            !c.contains("hashlock path"),
+            "a policy with NO hashlock is told to keep a preimage it does not have:\n{c}"
+        );
+        // The count itself is unchanged in both cases.
+        assert!(c.contains("backup needs"), "{c}");
     }
 }

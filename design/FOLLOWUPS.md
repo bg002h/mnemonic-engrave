@@ -17765,7 +17765,7 @@ plate itself (§13.1, shipped in phase 2), and `ms hashlock`'s card tells the
 operator to write the hash line down beside the method line. What is missing is
 only the record→plate hand-off, and that hand-off lives on the device.
 
-### F-534 — `ms decode`'s preimage route answers only for sha256, and does not say so
+### F-534 — CLOSED — `ms decode`'s preimage route answered only for sha256
 
 Filed 2026-09-15 from the phase-2 plan's R0 round 3 (M-2), which correctly
 placed it outside that phase's letter.
@@ -17785,6 +17785,19 @@ the fallback exists precisely because a plate cut before this cycle carries no
 kind, and `ms decode` is the other tool an operator reaches for with such a
 plate in hand.
 
-The shape of the fix is already built: `HashKind::digest` plus the same
-four-digest listing. Owning phase: **phase 3** (`me-cli`), or this cycle's
+**CLOSED 2026-09-16** (mnemonic-secret `0e34d20`). `ms decode` prints the
+digest under each of the four kinds plus *"(a preimage carries no hash kind;
+match the one your wallet uses)"*, and `--json` gains `digests_by_kind` and
+`digest_kind` while KEEPING `digest` — a consumer parsing that object predates
+the other three kinds. Two existing shape gates ("exactly three lines", "exactly
+kind, preimage_hex, digest") were updated to the new exact shape rather than
+loosened to `contains`: the line-count gate exists to keep seed words out of a
+preimage rendering, and `contains` would stop doing that job while still passing.
+
+Filed as still-open by the host journey walk (F-555) because this entry read as
+open after the fix landed — recorded here so the next reader of the list is not
+misled the same way.
+
+The shape of the fix was already built: `HashKind::digest` plus the same
+four-digest listing. Owning phase was: **phase 3** (`me-cli`), or this cycle's
 follow-up sweep if phase 3 does not touch the verb.

@@ -1543,6 +1543,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // EVERY pack, not just --pack-preimage: a payload may carry a
             // tagged `hash:` record and no preimage carrier at all.
             report_hash_kind_inertness(&recs);
+            report_phrase_record_kind_disagreement(&recs);
             if *pack_preimage {
                 report_preimage_admission(&recs);
             }
@@ -2297,6 +2298,18 @@ fn print_composer_confirmation(records: &[String]) {
                 // And slice from the END, not from 56: that literal is one of
                 // spec §10's six 64-hex assumptions, and a 40-hex ripemd160
                 // digest through it PANICS.
+                // THE FULL DIGEST, on its own line (F-552). The elided form
+                // matches what the device draws, which is what makes a
+                // side-by-side comparison possible -- but `show` was the ONLY
+                // payload reader and the full value appeared nowhere, so an
+                // operator whose policy card is the thing they lost could
+                // confirm a candidate and still not retype it into
+                // `md compose`. It sat in the container in the clear the whole
+                // time (`strings payload.bin`), so this publishes nothing new.
+                //
+                // A `hash:` record is PUBLIC -- the digest is what the script
+                // commits to. The secret is the preimage, and the Phrase and
+                // Preimage arms below still print neither.
                 let hx = hex(h.digest());
                 println!(
                     "public record {i}: {} hashlock (hash:) — {}..{}",
@@ -2304,6 +2317,7 @@ fn print_composer_confirmation(records: &[String]) {
                     &hx[..8],
                     &hx[hx.len() - 8..]
                 );
+                println!("    {}:{}", h.kind().token(), hx);
             }
             ComposerRecord::Phrase(_) => {
                 // The record is SECRET and BEARER. `show` names the class and
@@ -2568,14 +2582,84 @@ fn report_hash_kind_inertness(records: &[String]) {
     kinds.sort_unstable();
     kinds.dedup();
     let list: Vec<&str> = kinds.iter().map(|k| k.token()).collect();
+    // THE "STRIPPING SUCCEEDS SILENTLY" CLAUSE IS hash256's ALONE (F-549).
+    //
+    // It used to be stated of every tagged record, and it is false for the
+    // 20-byte kinds: stripping `ripemd160:` leaves 40 hex, which this very tool
+    // REFUSES ("hash: sha256 needs exactly 64 lowercase hex characters", exit
+    // 4). Only hash256 shares sha256's width and so strips to a legal record
+    // committing the payload to a different digest.
+    //
+    // Over-warning is not harmless here: it teaches a false rule about the
+    // 40-hex kinds and undermines a correct refusal the operator will meet if
+    // they try it. `ms hashlock` already scopes its equivalent paragraph to
+    // hash256 only; this brings the two into agreement.
+    let silent_strip = kinds.contains(&RecordHashKind::Hash256);
     eprintln!(
         "me: note — this payload carries a kind-tagged hash record ({}). A device whose \
          firmware has no hashlock-kind support does not understand that tag: it counts the \
          record in the door's \"not understood\" total and builds NO hashlock path from it. \
-         Do not strip the tag to make it parse — an untagged record is read as sha256, and a \
-         hash256 digest is also 64 hex, so stripping it succeeds silently and commits the \
-         payload to a different digest than the wallet.",
-        list.join(", ")
+         Do not strip the tag to make it parse.{}",
+        list.join(", "),
+        if silent_strip {
+            " A hash256 digest is also 64 hex, so stripping THAT tag succeeds \
+             silently and commits the payload to a different digest than the \
+             wallet. Stripping a ripemd160 or hash160 tag leaves 40 hex, which \
+             this tool refuses."
+        } else {
+            " An untagged record is read as sha256; stripping a ripemd160 or \
+             hash160 tag leaves 40 hex, which this tool refuses rather than \
+             misreads."
+        }
+    );
+}
+
+/// F-556: a payload whose `hash:` kind contradicts what its `phrase:` record
+/// will derive on the device.
+///
+/// A `phrase:` record carries the derivation METHOD and no hash kind
+/// (SPEC_hashlock_kinds §7.1 route 4), so the device always derives a **sha256**
+/// lock from one. A payload holding a `ripemd160:` hash record AND a phrase
+/// record therefore asserts two different kinds, and `me` is the tool holding
+/// both: `ms` warns at emission, and nothing warned here.
+///
+/// **It asks rather than asserts.** The two records may legitimately belong to
+/// different paths — a ripemd160 lock on path 1 and a phrase-derived sha256
+/// lock on path 2 is a valid wallet. What the operator needs is to be told the
+/// two cannot be the same path, not to be told they made a mistake.
+///
+/// BOUNDED, and that is why it is a warning and not a refusal: the device
+/// catches a genuine mismatch at its reconciliation screen, so the cost is a
+/// wasted compose cycle rather than funds. Bounded is not free.
+///
+/// It does NOT derive. Doing so would mean running the hardened KDF at pack
+/// time to compare four digests, and the structural fact — a phrase record
+/// means sha256 — is enough to say the sentence honestly.
+fn report_phrase_record_kind_disagreement(records: &[String]) {
+    use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord, RecordHashKind};
+    let mut non_sha256: Vec<&'static str> = Vec::new();
+    let mut has_phrase = false;
+    for r in records {
+        match parse(r) {
+            Some(Ok(ComposerRecord::Hash(h))) if h.kind() != RecordHashKind::Sha256 => {
+                non_sha256.push(h.kind().token());
+            }
+            Some(Ok(ComposerRecord::Phrase(_))) => has_phrase = true,
+            _ => {}
+        }
+    }
+    if non_sha256.is_empty() || !has_phrase {
+        return;
+    }
+    non_sha256.sort_unstable();
+    non_sha256.dedup();
+    eprintln!(
+        "me: note — this payload carries a {} hash record AND a phrase: record. A phrase \
+         record has no kind field, so the device derives a SHA256 lock from it. If both are \
+         meant for the SAME path, one of them is wrong and the device will say so at its \
+         reconciliation screen — after you have composed. If they are different paths, this \
+         is fine.",
+        non_sha256.join(" and ")
     );
 }
 

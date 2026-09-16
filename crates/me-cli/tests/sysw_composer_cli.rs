@@ -264,3 +264,112 @@ fn the_rejected_hash_record_advice_does_not_tell_you_to_strip_the_kind_tag() {
          loses to a refusal that looks like an instruction:\n{se}"
     );
 }
+
+/// F-549: the "stripping succeeds silently" clause belongs to hash256 alone.
+///
+/// It was stated of every tagged record and is FALSE for the 20-byte kinds:
+/// stripping `ripemd160:` leaves 40 hex, which this very tool refuses. Only
+/// hash256 shares sha256's width and so strips to a legal record committing the
+/// payload to a different digest.
+///
+/// Over-warning is not harmless — it teaches a false rule about the 40-hex
+/// kinds and undermines a correct refusal the operator meets if they try it.
+///
+/// MUTATION: make the clause unconditional again -> the ripemd160 row fails.
+#[test]
+fn the_silent_strip_warning_is_scoped_to_the_kind_it_is_true_of() {
+    let dir = tempfile::tempdir().unwrap();
+    for (record, silent) in [
+        (
+            "hash:hash256:98a20fc25dbcdf236fb0307e3f82cad47fca2e807f3ef82c31993549641cd488",
+            true,
+        ),
+        (
+            "hash:ripemd160:09e7bb5051d89788fb4e4b374126721dbcc2946b",
+            false,
+        ),
+    ] {
+        let (_, o) = pack_to(&dir, &[], &[record]);
+        assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+        let err = String::from_utf8_lossy(&o.stderr).to_string();
+        assert_eq!(
+            err.contains("stripping THAT tag succeeds"),
+            silent,
+            "{record}: the silent-strip clause fired={}, want {silent}\n{err}",
+            !silent
+        );
+        if !silent {
+            assert!(
+                err.contains("which this tool refuses"),
+                "a 40-hex kind must be told that stripping is REFUSED, not silent:\n{err}"
+            );
+        }
+        // Both keep the part that is true of every tagged record.
+        assert!(
+            err.contains("Do not strip the tag"),
+            "{record}: the instruction itself is gone:\n{err}"
+        );
+    }
+}
+
+/// F-552: `me sysw show` prints the FULL digest of a public hash record.
+///
+/// It printed only `09e7bb50..bcc2946b`, and `show` is the only payload reader
+/// — so an operator whose policy card is the thing they lost could confirm a
+/// candidate and still not retype it into `md compose`. The value sat in the
+/// container in the clear the whole time, so this publishes nothing new.
+///
+/// The elided line STAYS: it is what makes a side-by-side comparison with the
+/// device's own screen possible.
+///
+/// MUTATION: delete the full-digest println -> the second assertion fails.
+#[test]
+fn show_prints_the_full_digest_of_a_public_hash_record() {
+    let dir = tempfile::tempdir().unwrap();
+    const D: &str = "09e7bb5051d89788fb4e4b374126721dbcc2946b";
+    let (path, o) = pack_to(&dir, &[], &[&format!("hash:ripemd160:{D}")]);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let s = shown(&path);
+    assert!(
+        s.contains("09e7bb50..bcc2946b"),
+        "the elided form is what matches the device screen; it must stay:\n{s}"
+    );
+    assert!(
+        s.contains(&format!("ripemd160:{D}")),
+        "the full digest is not printed, so a lost policy card cannot be retyped:\n{s}"
+    );
+    // A PHRASE record is SECRET and must still show neither its phrase nor a
+    // digest. It rides WITH the public record and through --in: a secret record
+    // needs a seal (so no --no-passphrase), and the argv guard refuses a phrase
+    // record on the command line -- both of those are the guards working.
+    let recs = dir.path().join("recs.txt");
+    std::fs::write(
+        &recs,
+        format!(
+            "hash:ripemd160:{D}\nphrase:{}\n",
+            hex("hardened,correct horse battery staple")
+        ),
+    )
+    .unwrap();
+    let out2 = dir.path().join("phrase.bin");
+    let o = me()
+        .args([
+            "sysw",
+            "pack",
+            "--in",
+            recs.to_str().unwrap(),
+            "--out",
+            out2.to_str().unwrap(),
+            "--passphrase-stdin",
+        ])
+        .write_stdin("a-test-passphrase\n")
+        .output()
+        .unwrap();
+    if o.status.success() {
+        let s = shown(&out2);
+        assert!(
+            !s.contains("correct horse"),
+            "show printed a SECRET phrase record's content:\n{s}"
+        );
+    }
+}

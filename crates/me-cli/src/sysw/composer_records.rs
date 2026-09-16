@@ -291,7 +291,7 @@ fn hex_lower(b: &[u8]) -> String {
 /// Strict: even length, every character in `0-9a-f`. Uppercase is NOT hex here
 /// (section 5.3: the section is hashed in its canonical lowercase form).
 fn unhex_lower(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0
+    if !s.len().is_multiple_of(2)
         || !s
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))

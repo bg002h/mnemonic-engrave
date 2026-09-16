@@ -193,6 +193,39 @@ use std::collections::BTreeMap;
 
 /// Validate the public strings of one or more wallet backups and build a manifest.
 /// Pure: no I/O. Refuses ms1. See `design/SPEC_me_bundle_phaseA.md`.
+/// Every hash-fragment kind in a decoded policy, by token.
+///
+/// F-557: `me bundle`'s checklist says "backup needs N plates", and an operator
+/// reads a count presented as a requirement as the requirement. For a keyless
+/// hashlock wallet the plate NOT in that count is the only one that opens the
+/// hashed path — so the count was complete about the policy and silent about
+/// the wallet.
+fn descriptor_hash_kinds(d: &md_codec::Descriptor) -> Vec<&'static str> {
+    use md_codec::tag::Tag;
+    use md_codec::tree::{Body, Node};
+    fn walk(n: &Node, out: &mut Vec<&'static str>) {
+        match n.tag {
+            Tag::Sha256 => out.push("sha256"),
+            Tag::Hash256 => out.push("hash256"),
+            Tag::Ripemd160 => out.push("ripemd160"),
+            Tag::Hash160 => out.push("hash160"),
+            _ => {}
+        }
+        // EVERY body that can hold children, not just Children -- a hashlock
+        // under a thresh or a multi-family node is still a hashlock, and a walk
+        // that saw one shape would be a completeness claim with a hole in it,
+        // which is the defect this whole function exists to close.
+        match &n.body {
+            Body::Children(kids) => kids.iter().for_each(|k| walk(k, out)),
+            Body::Variable { children, .. } => children.iter().for_each(|k| walk(k, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    walk(&d.tree, &mut out);
+    out
+}
+
 pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     let raw: Vec<&str> = input
         .lines()
@@ -241,11 +274,18 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         }
     }
 
+    let mut hashlock_kinds: Vec<&'static str> = Vec::new();
     let mut sets: Vec<SetEntry> = Vec::new();
     let mut plates: Vec<PlateEntry> = Vec::new();
 
     // 1) Unchunked md1 policy plates (bch-only).
     for s in &md1_singles {
+        // Decoded for the SAME reason as the chunked path below; a one-plate
+        // wallet can carry a hashlock too, and a check that covered only the
+        // chunked shape would be a completeness claim with a hole in it.
+        if let Ok(d) = md_codec::decode::decode_md1_string(s) {
+            hashlock_kinds.extend(descriptor_hash_kinds(&d));
+        }
         plates.push(PlateEntry {
             plate: 0,
             of: 0,
@@ -264,8 +304,13 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     for (id, mut chunks) in md1_groups {
         chunks.sort_by_key(|(i, _)| *i);
         let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
-        md_codec::chunk::reassemble(&refs)
+        let d = md_codec::chunk::reassemble(&refs)
             .map_err(|e| BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e))?;
+        // F-557: the checklist makes a COMPLETENESS claim ("backup needs N
+        // plates"), and for a hashlock wallet the plate it does not count is
+        // the one that opens the hashed path. The reassemble above already
+        // hands us the tree, so noticing costs nothing.
+        hashlock_kinds.extend(descriptor_hash_kinds(&d));
         let total = chunks.len() as u8;
         sets.push(SetEntry {
             kind: Kind::Md1,
@@ -371,6 +416,11 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     Ok(Manifest {
         tool: "me",
         version: env!("CARGO_PKG_VERSION"),
+        hashlock_kinds: {
+            hashlock_kinds.sort_unstable();
+            hashlock_kinds.dedup();
+            hashlock_kinds
+        },
         wallet_plates: total_plates,
         ms1_required: true,
         sets,
