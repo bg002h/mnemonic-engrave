@@ -18,14 +18,34 @@ each. A `ripemd160` policy can be encoded, engraved, restored and derived today.
 
 It cannot be **composed**. One layer above the codec:
 
+**CITATIONS IN THIS DOCUMENT ARE AT THE PRE-CYCLE BASELINES, named here so a
+reader can check them (F-537).** The table below says *today*, meaning the state
+when this spec was written — and this cycle then changed most of those very
+lines, so opening the files at HEAD shows something else and reads as drift.
+Every line number here was re-verified at:
+
+| repo | baseline | example, verified |
+| --- | --- | --- |
+| `seedhammer` (fork) | `0562e81` | `gui/composer_consent.go:94` → `for _, d := range b.Sha256Digests {` |
+| `descriptor-mnemonic` | `40c400de` | `crates/md-codec/src/compose/lowering.rs:78` → `tag: Tag::Sha256,` |
+| `mnemonic-secret` | `7a0e96f` | `crates/ms-codec/src/hashlock.rs:59` → `pub fn digest(preimage: &[u8; 32]) -> [u8; 32] {` |
+| `mnemonic-engrave` | `9524a1e9` | `crates/me-cli/Cargo.toml:53` → `ms-codec = "0.9"` |
+
+Use `git show <baseline>:<path>`. The paths were bare — a file name and a line,
+with no directory — and resolved under no root at all; they are repo-relative now, so
+`scripts/plan-cite-check.sh` can reach them — but note what that checker says of
+itself: it proves the line EXISTS, never what is on it. At HEAD these lines
+exist and say something else, which is precisely the F-279 shape, so the
+baseline is the load-bearing half of this note.
+
 | surface | file | today |
 | --- | --- | --- |
-| composer field | `md-codec` `compose/mod.rs:151`, fork `md/compose.go:167` | a bare 32-byte digest |
-| lowering | `compose/lowering.rs:78`, fork `md/compose.go:403` | always `Tag::Sha256` |
+| composer field | `descriptor-mnemonic crates/md-codec/src/compose/mod.rs:151`, fork `md/compose.go:167` | a bare 32-byte digest |
+| lowering | `crates/md-codec/src/compose/lowering.rs:78`, fork `md/compose.go:403` | always `Tag::Sha256` |
 | `md compose` CLI | `md-cli` | only a `sha256=` option |
-| `hash:` record | `me-cli/sysw/composer_records.rs` | `hash:` + exactly 64 hex, sha256 implied |
+| `hash:` record | `crates/me-cli/src/sysw/composer_records.rs` | `hash:` + exactly 64 hex, sha256 implied |
 | device pad | fork `gui/composer_hash.go` | 64 hex only |
-| phrase digest | fork `hashlock/hashlock.go:85`, `ms-codec/hashlock.rs:59` | sha256 only |
+| phrase digest | fork `hashlock/hashlock.go:85`, `crates/ms-codec/src/hashlock.rs:59` | sha256 only |
 
 **Zero tests and zero vectors compose a non-sha256 hashlock anywhere, in any
 language** — confirmed by content search, not filenames. Every test this cycle
@@ -153,7 +173,7 @@ this constellation already uses for Rust↔Go. Go genuinely has one definition:
 `sha256`. Tokens are the lowercase miniscript fragment names.
 
 **Case is rejected, never folded.** `HASH160` and `Hash160` are refused, exactly
-as the hex body already refuses uppercase (`composer_records.rs:178-192`,
+as the hex body already refuses uppercase (`crates/me-cli/src/sysw/composer_records.rs:178-192`,
 `sysw/composer_records.go:178-190`, pinned by the corpus's `hash-uppercase` row).
 Stated as a rule rather than left to "obviously lowercase", which is how two
 parsers come to disagree.
@@ -310,14 +330,14 @@ never composed, so this is a decode-side behaviour change and is declared as one
 predicates" and cited one of them a line off. All re-key off **`Hashlock`** —
 "does this path have a hash of any kind" — rather than `len(Sha256Digests)`:
 
-- `composer_consent.go:94` — the display loop that draws the digests.
-- `composer_consent.go:97` — a `hash160`-locked sole unsorted path today prints
+- `gui/composer_consent.go:94` — the display loop that draws the digests.
+- `gui/composer_consent.go:97` — a `hash160`-locked sole unsorted path today prints
   `UNSORTED (EXPERIMENTAL)` and after this change does not. **A regression if
   left implicit; announced and tested here.**
-- `composer_consent.go:199` — a decoded `ripemd160` policy today is consented to
+- `gui/composer_consent.go:199` — a decoded `ripemd160` policy today is consented to
   **without** the 32-byte-preimage rule ever stated, and after this change states
   it. A fix.
-- **`composer_selfcheck.go:134,136,138` — the compose→decode round trip, and the
+- **`gui/composer_selfcheck.go:134,136,138` — the compose→decode round trip, and the
   most important of the four.** It is the only place in the system where a
   SAME-WIDTH kind divergence can be caught structurally: a `hash256` digest that
   should have been `sha256`, or the reverse, changes no length and no type, so
@@ -375,15 +395,15 @@ Four repos, and the order is **not** free. An earlier draft claimed phases 1-3
 were mutually independent; that was false and is corrected here.
 
 `me-cli` computes every hashlock digest through `ms_codec::hashlock::digest`
-(`me-cli/src/main.rs:2636,2641`), and `ms-codec = "0.9"`
-(`me-cli/Cargo.toml:53`) resolves today from crates.io. So phase 3 has a real
+(`crates/me-cli/src/main.rs:2636,2641`), and `ms-codec = "0.9"`
+(`crates/me-cli/Cargo.toml:53`) resolves today from crates.io. So phase 3 has a real
 **code** dependency on phase 2's new API.
 
 **It is not a publish gate, and an earlier draft wrongly said it was.** The
 absence of a `[patch]` or path dep is a fact about the file today, not a
 constraint on what phase 3 may write in it — and this very `Cargo.toml` already
 carries the counter-example twelve lines below, with its rationale written out
-(`me-cli/Cargo.toml:54-74`): `mt-codec` is an unpublished sibling consumed **by
+(`crates/me-cli/Cargo.toml:54-74`): `mt-codec` is an unpublished sibling consumed **by
 git rev pin**, precisely so that *"publishing is irreversible; pinning a rev is
 not"*. Phase 3 does the same for `ms-codec`.
 
@@ -505,11 +525,11 @@ All net new (§1).
 | §8 spec rows for every new string | `SPEC_wallet_policy_composer.md` |
 | the modal fit gate, incl. the new screens | `gui/modal_fits_test.go` |
 | `TestWhichHashRowsDrawOnOneLine` | `gui/composer_hash_test.go:239` |
-| the literal `"Type 64 hex"`, in code **and** test | `gui/composer_hash.go:348`, `composer_hash_test.go:257` |
+| the literal `"Type 64 hex"`, in code **and** test | `gui/composer_hash.go:348`, `gui/composer_hash_test.go:257` |
 | `TestWhichHashPageHoldsFiveRows` | `gui/composer_hashlock_test.go:1433` |
 | `composerHexEntry`'s three 64/32 constants | `gui/composer_hash.go:79-105` |
 | `hashlockFirst8Last8` — **invisible to the `[56:]` grep** the six-count came from; its arithmetic is already length-relative but its PARAMETER is `[32]byte` | `gui/composer_hashlock.go:247` |
-| five sha256-hardcoded operator-facing strings in `me-cli` | `main.rs:2275,2685,3196`, `sysw/composer_records.rs:144` |
+| five sha256-hardcoded operator-facing strings in `me-cli` | `crates/me-cli/src/main.rs:2275,2685,3196`, `crates/me-cli/src/sysw/composer_records.rs:144` |
 | the JS bridge and its documented API contract | `cmd/emu/composer_js.go:15,35-37,54` |
 | the walk's 64-hex helper | `cmd/emu/walk_hashlock_phrase.js:71,333` |
 | the compose→decode self-check | `gui/composer_selfcheck.go:134,136,138` |
@@ -521,7 +541,7 @@ All net new (§1).
 | the preimage plate's **locator row** — the `hash` row §13.1 appends the kind to | `hashlockPlateLocator`, `gui/composer_preimage_plate.go:232-238` |
 | the preimage plate **fit gate and its goldens** — §13.1's placement is a layout claim and must be measured, not asserted | the fork's plate layout tests |
 | the masked plate-pick lead, which prints a bare `method:` | `gui/composer_copy.go:717-725` |
-| `me-cli`'s hashlock help text | `me-cli/src/main.rs:195,197` |
+| `me-cli`'s hashlock help text | `crates/me-cli/src/main.rs:195,197` |
 | the §8.3 census row | the composer's plate inventory |
 | `me bundle`'s plate checklist | `me-cli` |
 | both provenance pin files | — |
@@ -531,11 +551,10 @@ belt-and-braces `len(raw) != 32`, unreachable only because the pad's own cap and
 the `len(frag) == 64` check make it so. Widening the pad to accept 40 characters
 removes that guarantee, so the comment must be re-derived rather than carried.
 
-`composer_records.rs:144` is pinned verbatim by `SPEC_wallet_policy_composer.md`
+`crates/me-cli/src/sysw/composer_records.rs:144` is pinned verbatim by
+`SPEC_wallet_policy_composer.md`
 §8n **and** by `host_line` rows in `record_class_vectors.json`, so editing that
-string is re-pin work in two places. The compose-vector pin generator also prints a stale count in its own
-`_comment` (156 against 161). Both the generator
-(`seedhammer/scripts/vendor-compose-vectors.sh:29`) and the file it writes
+string is re-pin work in two places. The compose-vector pin generator used to print a stale count in its `_comment` (156, against a gate asserting 161, and it stayed wrong through a re-vendor to 176 — then a review read 156 out of it and a commit message repeated it, three readers deep). **Fixed**: the generator records `file_count` in the pin and its comment points at that, so the number lives in one place. The hardcoded number in `md/compose_vectors_pin_test.go` stays, deliberately — that one is the tripwire, and it fired when the corpus grew
 (`seedhammer/md/testdata/compose_vectors.provenance.json:6`) live in the **fork**,
 and the re-pin is run from there — so this is a **phase 4** item, not phase 1 as
 an earlier draft said. It is fixed in this cycle rather than filed, because the
