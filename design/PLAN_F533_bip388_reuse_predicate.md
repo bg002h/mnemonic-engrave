@@ -1,7 +1,13 @@
 # PLAN — F-533: refuse taproot internal-key reuse
 
-**Status: DRAFT round 2, awaiting R0.** No code until 0C/0I. Risk set: admission,
-address- and funds-adjacent.
+**Status: GREEN (0C/0I) at R0 round 4, 2026-09-16 — CLEARED FOR IMPLEMENTATION.**
+Risk set: admission, address- and funds-adjacent.
+
+Four rounds, each finding something real: 2C → 1C → 0C/1I → GREEN. Reports in
+`design/agent-reports/plan-F533-R0-round{1,2,3,4}.md`, each persisted verbatim in
+its own commit before the fold that answered it. **A GREEN expires:** if the fork
+moves before this is implemented, re-validate against *"what did that change
+falsify here?"* rather than re-reviewing from scratch.
 
 **Baseline.** fork `e4ab97d`, engrave `c6ed5e87`, dm `d8bb6d2d`.
 
@@ -140,10 +146,13 @@ would print a sentence the repo has already disproved.
 
 * Add the branch, in BIP 388's voice, naming the internal-key-and-leaf shape.
 * **The gates enumerate kinds BY HAND and would stay green.** They are
-  `gui/composer_copy_test.go:112` and `:114` (one row per existing kind) and the
-  fit gate in `gui/modal_fits_test.go`; `gui/duplicate_seat_address_test.go` and
-  `gui/composer_flow_test.go` also name the kinds. Add the new kind to each, or
-  the copy ships unmeasured.
+  `gui/composer_copy_test.go:112` and `:114` (one row per existing kind), the fit
+  gate in `gui/modal_fits_test.go`, and `gui/composer_flow_test.go`. Add the new
+  kind to each, or the copy ships unmeasured.
+  **NOT `gui/duplicate_seat_address_test.go`** — round 4 checked: it derives its
+  expectations dynamically rather than enumerating kinds, so it needs no edit.
+  Telling an implementer to touch a file that needs no touching is how a plan
+  spends attention it has not earned.
 * The function is `if kind == md.DuplicateFewerKeys { … }` followed by an
   unconditional return, so the new kind needs its own branch BEFORE that return
   — not a reworded fallthrough. Its replacement must be MEASURED for line count
