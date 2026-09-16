@@ -18527,7 +18527,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-581 — the argv-secret guard prescribes a remedy that does not work for the verb and secret it just named
 
-**Status:** CLOSED 2026-09-16 — ms `HEAD~`. The remedy is per-verb and per-material, and every prescribed channel was RUN before being written. New `argv_remedy_runs.rs` EXECUTES what the guard prints rather than matching its text — the third occurrence of this class (see me's `ms_remedy_runs.rs`, F-301).
+**Status:** CLOSED 2026-09-16 — ms `c83434f`. The remedy is per-verb and per-material, and every prescribed channel was RUN before being written. New `argv_remedy_runs.rs` EXECUTES what the guard prints rather than matching its text — the third occurrence of this class (see me's `ms_remedy_runs.rs`, F-301).
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18569,7 +18569,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-588 — the `me-preview` sidecar goes stale on every `me` upgrade and `cargo install` does not fix it
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — me `199e3e3d`. The refusal now names `build-preview.sh`, the copy step and the real resolved destination, and says why a `cargo install` of `me` did not fix it. Both lines were RUN first. New test rather than a tightened one: reverting the message leaves `mismatched_version_exit_2` green and fails only the new one.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
