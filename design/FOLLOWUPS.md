@@ -18573,13 +18573,19 @@ NOT a documentation-only Nit after all, which is why reproducing before writing 
 
 ### F-592 — `md verify`'s conflict error prints a usage line containing the conflict
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at descriptor-mnemonic `fe69d08c`. The conflict error's own Usage line printed the two alternatives side by side (`--in <FILE> [STRINGS]...`), as if supplying both were the shape being asked for. Fixed with the mechanism `md compose` already used for `--path`/`--preset` — a clap `ArgGroup` — so the line now reads `<STRINGS|--in <FILE>>`.
+
+Applied to all FIVE reading verbs with this shape (verify, decode, inspect, bytecode, decompose), not only the one the journey hit. NOT applied to `md encode`: it has a third source (`--from-policy`) and its own hand-written "TEMPLATE required" message, and a non-required group there changed the rendering not at all — measured, then reverted rather than left as inert configuration. All four argv/`--in`/both/neither states re-checked per verb.
+
+The entry's second half — that `--in` means a TEMPLATE on `encode` and md1 STRINGS on the reading verbs — is already stated in each subcommand's own `--in` help text, verified per verb. No change earned there.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-593 — two policy files for one fixture differ only in the account index, and the README's numbers match neither journey
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at `8bf2deb0`. Measured: `tr.policy` and `wsh.policy` are account `0'`; `design/journeys/inputs-rcw/policy-tr.txt` is `8'` and `policy-wsh.txt` is `9'`. Machine-checked the "otherwise identical" claim rather than asserting it — normalising the account index makes both pairs diff clean.
+
+The fixture README now opens with the table, because that is the file an operator opens first and its addresses will never appear in a journey run. The `.policy` files cannot carry the note themselves: `md encode --in` takes the file as ONE template and rejects a `#` comment line (`miniscript parse failed: invalid character`), unlike `md decompose --in`, which skips them.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18597,13 +18603,23 @@ NOT a documentation-only Nit after all, which is why reproducing before writing 
 
 ### F-596 — preview text block left margin is inconsistent across wrapped lines
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** WITHDRAWN 2026-09-16 — not a defect, and the reason is worth keeping.
+
+The inset is upstream's, and it is deliberate: `third_party/seedhammer/backup/backup.go` sets `offx = holeChars * charWidth` on any line whose vertical position falls inside the plate's SCREW HOLE margin (`holeLine`), and narrows lines that overlap the QR block (`isQRLine`). Lines 1–2 inset and 3–4 flush is the text routing around the physical plate's holes.
+
+`me`'s preview passes a `backup.Paragraph` to `backup.EngraveText` and does no layout of its own, so there is nothing here to change. "Fixing" the margin would make the preview disagree with what the machine engraves — and would put text where a screw hole is. The journey's own verdict was *not our concern / cosmetic*; this records WHY, so the next reader does not re-open it.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-597 — sibling CLIs spell the same concept differently
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at mnemonic-secret `65a0784`. The narrow half was a real hazard and is fixed; the wide half earned no change.
+
+FIXED: `ms derive --phrase-stdin` drew *"tip: a similar argument exists: '--passphrase-stdin'"* — a DIFFERENT SECRET. `--passphrase-stdin` is the BIP-39 passphrase, so following the tip pipes a seed phrase into it and derives a different wallet silently. `derive` has no stdin channel for a raw phrase at all, so there was nothing right to suggest. `--phrase-stdin` is now a hidden flag that exists only to be refused, with the two-step recipe (`ms encode --in` → `ms derive --in`) that the test RUNS rather than matches.
+
+Second half, found by the suite: `gui-schema` reflected the new flag and the flag-count gate went 70 → 71. Hidden args are now skipped — the schema mirrors the program's SURFACE, and a GUI control whose every outcome is an error is not one. Emitted schema is byte-identical to before (6465 bytes), so `SCHEMA_VERSION` does not move.
+
+NO CHANGE: `md --fingerprint @i=HEX` vs `mk --origin-fingerprint HEX` vs `mk --origin-path`. The journey's verdict was *"Worse than saying nothing? NO — the tips work"*, and it is right: clap's suggestion recovers both, and renaming flags across three shipped CLIs to converge spelling is a breaking change bought with nothing.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18639,7 +18655,9 @@ NOT a documentation-only Nit after all, which is why reproducing before writing 
 
 ### F-603 — `md compose --json` numbers paths 1-based in `experimental[]` and 0-based in `slots[].path`, so one object contradicts itself
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at descriptor-mnemonic `fe69d08c`. Reproduced: on a three-path wallet `experimental` says "path 2 has no key" while `slots[].path == 2` carries key slots @3 and @4. Both fields are right about their own numbering; the object is not.
+
+Fixed ADDITIVELY. `experimental[]` keeps its exact prose — it IS the stderr sentence, where "path 1" means the first path — and a new `experimental_paths: [{kind, path}]` carries the 0-based index that joins `slots[].path`. Nothing that reads the old array breaks and `"schema": "md-cli/1"` stays honest, since `docs/json-schema-v1.md` bumps the version only on breaking changes. That doc had no `compose --json` section at all; it now has one, measured off real output, with the join rule stated.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18708,7 +18726,11 @@ Whoever takes F-609 should expect to merge the passes, not reorder one.
 
 ### F-611 — `md descriptor --help` promises "real xpubs" while the BIP-32 metadata is placeholder
 
-**Status:** OPEN — owning phase: post-release UX (documentation only)
+**Status:** CLOSED 2026-09-16 at descriptor-mnemonic `fe69d08c`. `--help` now says "real keys" and carries the depth-0 warning explicitly: the xpub STRING will not match a signer's own export byte-for-byte, so match on the key ORIGIN, not the xpub text.
+
+Measured both ends rather than trusting the entry: the fixture key is depth 4 (parent fp `1cf29716`, child `80000002`) and what comes back is depth 0 with both fields zeroed, point and chain code intact.
+
+The test pins the FACT, not the sentence — it parses the emitted key and asserts depth 0. A help-text-only test would stay green if the codec ever carried real metadata, leaving the warning in place and wrong.
 
 **Nit.** Split out of F-601 on 2026-09-16 rather than folded into it, because
 the two halves have different answers.
@@ -18754,7 +18776,9 @@ test asserting `emitFragment` has no `tagTr` case, so adding one fails loudly he
 
 ### F-613 — `stillUnsupported` lacks the deriver check that `refusedByPolicy` carries
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at seedhammer `0c4de85`. `stillUnsupported` now carries the exact mirror of `refusedByPolicy`'s deriver check: if the policy expands AND `complexAddressDeriver` produces an address, the entry is a misfiling and belongs in `refusedByPolicy`, where the conformance check still runs against Rust instead of being silently retired.
+
+The map is EMPTY today, so the branch had never executed — a gate that has never run is a hypothesis. Verified by parking `keyed_tr_multi_a` in it: the check fires and names the fix. Reverted after measuring.
 
 **Nit.** From the same review. `gui/policy_address_test.go`'s `refusedByPolicy`
 map proves the deriver still works beneath the gate — that a vector is refused by
@@ -18764,7 +18788,9 @@ identical to one parked there by mistake.
 
 ### F-614 — `md/policy_shape_test.go` bypasses the pinned-vector gate
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at seedhammer `0c4de85`. `md/policy_shape_test.go` read `testdata/vectors/<name>.phrase.txt` directly, and `keyed_tr_sortedmulti_a` is one of the two vectors F-529 says a re-vendor would DELETE. Swept every consumer of the two pinned names: every other one already went through a pin-preferring loader (`md.vectorChunksFor`, `gui.loadVectorChunks`); this was the last that did not. Now uses `vectorChunksFor`.
+
+Verified by moving the vendored file aside: the subtest RUNS and PASSES through the pin, and FAILS (`md: empty chunk set`) against the old loader in the same state. Checked with `-v` that the subtest executed — a `-run` filter matching nothing also prints `ok`.
 
 **Nit.** From the same review. F-533 pinned `keyed_tr_multi_a` and
 `keyed_tr_sortedmulti_a` fork-side (`md/testdata/forkbuilt/`) with a drift gate
@@ -18773,7 +18799,9 @@ strings instead of reading the pins, so a drift would leave it green.
 
 ### F-615 — `md/testdata/forkbuilt/` is undocumented in the testdata README
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 at seedhammer `0c4de85`. `md/testdata/README.md` now documents `md/testdata/forkbuilt/`: the two different reasons a file sits there (a PIN of a vendored vector vs a FORK-NATIVE fixture no encoder can produce), their two different retirement conditions, the two gates in `md/f533_pinned_vectors_test.go` that keep the pins honest, and the read-through-a-pin-preferring-loader rule that F-614 was a violation of.
+
+Every claim in the table was checked against the tree rather than described: both pins diff IDENTICAL to their vendored twins.
 
 **Nit.** From the same review. The directory arrived with F-533 (fork `476249f`)
 and carries locally-pinned corpus vectors so the work does not depend on F-529's
