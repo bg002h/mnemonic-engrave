@@ -18515,13 +18515,13 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-579 — `ms encode` and `ms split` panic on a valid English mnemonic; the fixture's own tier-3 seed is one
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — ms `e5dff6f`. `entropy_in_language()` replaces `Mnemonic::to_entropy`, which re-detected the language and unwrapped. Entropy verified against an independent Python computation from the wordlist, not merely round-tripped; both known BIP-39 vectors unchanged. Rust-primary check done: the Go port has one wordlist and no detection, so nothing to converge.
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-580 — `me bundle`'s "backup needs N plates" is not a set the device will accept
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** OPEN — owning phase: the next device phase. The HOST half is CLOSED 2026-09-16 by me `fa35301c` (the plate count no longer states a seed number it cannot know, and the ms1 reminder is no longer numbered as a plate). What remains is the device half: the public set as named is refused with "The supplied descriptor has no public keys to match", which needs the emulator to confirm and fix.
 
 **Critical.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
