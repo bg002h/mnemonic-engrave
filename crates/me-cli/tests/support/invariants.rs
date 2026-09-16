@@ -59,7 +59,7 @@ pub fn assert_bundle_ms_line_refused(s: &str) {
         .any(|l| classify(l) == Ok(Format::Ms));
     if has_ms_line {
         assert!(
-            matches!(run_bundle(s), Err(BundleError::RefusedSecret)),
+            matches!(run_bundle(s), Err(BundleError::RefusedSecret { .. })),
             "run_bundle must refuse an input containing an ms line with RefusedSecret: {s:?}"
         );
     }

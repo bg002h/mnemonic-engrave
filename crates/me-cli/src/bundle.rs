@@ -14,7 +14,12 @@ pub enum BundleError {
     /// No input strings at all.
     Empty,
     /// An `ms1` line was present — refused before any further processing.
-    RefusedSecret,
+    RefusedSecret {
+        /// True when the ms1 is a hashlock PREIMAGE plate (`hash`, 0x03), not
+        /// seed entropy. Metadata only -- read from `ms_codec::inspect`, which
+        /// never yields the secret body (F-586).
+        preimage: bool,
+    },
     /// An `mt1` line was present. A signed transaction is not part of a wallet
     /// backup bundle; it travels via `me sysw pack` (and the device's Engrave
     /// Transaction program), where its chunk set is decode-confirmed.
@@ -40,7 +45,7 @@ impl BundleError {
     pub fn exit_code(&self) -> i32 {
         match self {
             BundleError::Empty => 2,
-            BundleError::RefusedSecret => 3,
+            BundleError::RefusedSecret { .. } => 3,
             _ => 4,
         }
     }
@@ -50,10 +55,27 @@ impl std::fmt::Display for BundleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BundleError::Empty => write!(f, "no input strings (expected newline-separated md1/mk1)"),
-            BundleError::RefusedSecret => write!(
+            // F-586: this said "ms1 is secret seed entropy … New > Input Seed >
+            // CODEX32" for EVERY ms1, including a hashlock PREIMAGE plate. It
+            // is not seed entropy, CODEX32 seed entry is the wrong screen, and
+            // `ms inspect` names the kind exactly ("tag: hash, prefix_byte:
+            // 0x03"). A refusal that misidentifies what it refused sends the
+            // operator to a screen that cannot accept what they hold.
+            //
+            // The refusal itself is correct either way and stays: both kinds
+            // are secret, and neither belongs on this tool.
+            BundleError::RefusedSecret { preimage: false } => write!(
                 f,
                 "refusing to process ms1 over this tool: ms1 is secret seed entropy — \
                  enter it by hand on the device (New > Input Seed > CODEX32), never via NFC/this tool"
+            ),
+            BundleError::RefusedSecret { preimage: true } => write!(
+                f,
+                "refusing to process ms1 over this tool: this is a hashlock PREIMAGE plate \
+                 (`ms inspect` calls it `tag: hash`), not seed entropy — it is secret and \
+                 BEARER, so whoever reads it can spend the hashed path. It is not entered \
+                 through CODEX32 seed entry. Keep it apart from the policy plates; \
+                 `me bundle` never carries it"
             ),
             // A1/F1: NEVER interpolate the raw input string (`s`) here — a
             // mangled-HRP ms1 (`msx1…`) would print its intact secret body to
@@ -110,7 +132,14 @@ pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
     let s = s.trim();
     let fmt = classify::classify(s).map_err(|e| BundleError::Classify(s.to_string(), e))?;
     if fmt == Format::Ms {
-        return Err(BundleError::RefusedSecret);
+        // Metadata only: `inspect` reports the prefix byte's kind and the body
+        // never leaves this expression. On any error we fall back to the seed
+        // wording, which is the fail-safe direction -- it tells the operator to
+        // keep it off this tool either way.
+        let preimage = ms_codec::inspect::inspect(s)
+            .map(|r| r.kind == ms_codec::inspect::InspectKind::Preimage)
+            .unwrap_or(false);
+        return Err(BundleError::RefusedSecret { preimage });
     }
     if fmt == Format::Mt {
         return Err(BundleError::RefusedTransaction);
@@ -262,7 +291,12 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     // pre-scan, so no line's content is BCH-validated if an ms1 is present.
     for line in &raw {
         if classify::classify(line) == Ok(Format::Ms) {
-            return Err(BundleError::RefusedSecret);
+            // F-586: same kind lookup as `parse_line`. Metadata only; the body
+            // never leaves this expression.
+            let preimage = ms_codec::inspect::inspect(line)
+                .map(|r| r.kind == ms_codec::inspect::InspectKind::Preimage)
+                .unwrap_or(false);
+            return Err(BundleError::RefusedSecret { preimage });
         }
     }
     let parsed: Vec<Parsed> = raw
@@ -523,7 +557,13 @@ mod tests {
     #[test]
     fn exit_codes_match_spec() {
         assert_eq!(BundleError::Empty.exit_code(), 2);
-        assert_eq!(BundleError::RefusedSecret.exit_code(), 3);
+        // Both kinds refuse with the same exit code -- the kind changes the
+        // GUIDANCE, never the verdict (F-586).
+        assert_eq!(
+            BundleError::RefusedSecret { preimage: false }.exit_code(),
+            3
+        );
+        assert_eq!(BundleError::RefusedSecret { preimage: true }.exit_code(), 3);
         assert_eq!(BundleError::Mk1SingleString("mk1x".into()).exit_code(), 4);
     }
 
@@ -551,7 +591,10 @@ mod tests {
 
     #[test]
     fn refuses_ms1_line() {
-        assert!(matches!(parse_line(MS1), Err(BundleError::RefusedSecret)));
+        assert!(matches!(
+            parse_line(MS1),
+            Err(BundleError::RefusedSecret { .. })
+        ));
     }
 
     #[test]
@@ -655,7 +698,7 @@ mod tests {
         let input = lines(&[MK1_A, MS1, MK1_B]);
         assert!(matches!(
             run_bundle(&input),
-            Err(BundleError::RefusedSecret)
+            Err(BundleError::RefusedSecret { .. })
         ));
     }
 
@@ -680,6 +723,70 @@ mod tests {
             run_bundle(&input),
             Err(BundleError::SetIncompleteMk(..))
         ));
+    }
+
+    /// F-586: `me bundle` refused EVERY ms1 with "ms1 is secret seed entropy —
+    /// enter it by hand on the device (New > Input Seed > CODEX32)", including
+    /// a hashlock PREIMAGE plate. It is not seed entropy, CODEX32 seed entry is
+    /// the wrong screen, and `ms inspect` names the kind exactly
+    /// ("tag: hash, prefix_byte: 0x03"). A refusal that misidentifies what it
+    /// refused sends the operator to a screen that cannot accept what they
+    /// hold.
+    ///
+    /// The refusal itself is correct for both and does not move: both kinds are
+    /// secret, neither belongs on this tool, and both exit 3.
+    ///
+    /// The two ms1 strings below are throwaway test values -- a preimage of
+    /// `sha256("y"*32)` and the all-but-one-zero entropy card -- generated for
+    /// this test and used by no wallet. A committed preimage is bearer access
+    /// to whatever uses it, so these must never be reused.
+    ///
+    /// MUTATION: collapse the two arms back into one message -> the preimage
+    /// assertions fail. MUTATION: report every ms1 as a preimage -> the seed
+    /// control fails.
+    #[test]
+    fn a_preimage_plate_is_not_refused_as_seed_entropy() {
+        const PREIMAGE_MS1: &str =
+            "ms10hashsqwruttf3qhwlesecux6mnh2ddtlm06n6ldqm3e72schwypgux9u4s3kqd63fe8r49f";
+        const SEED_MS1: &str =
+            "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzr3hcpkas7yqr8";
+
+        let pre = run_bundle(PREIMAGE_MS1).expect_err("a preimage ms1 must still be refused");
+        let msg = pre.to_string();
+        assert!(
+            msg.contains("PREIMAGE plate"),
+            "a preimage plate is not named as one:\n{msg}"
+        );
+        // The message DOES name CODEX32 -- to say the plate does not go there,
+        // because that is where the old text sent it and where an operator
+        // who read it once will go. What must not survive is the INSTRUCTION.
+        assert!(
+            !msg.contains("New > Input Seed > CODEX32"),
+            "a preimage plate is still sent to CODEX32 seed entry, which cannot accept it:\n{msg}"
+        );
+        assert!(
+            msg.contains("not entered through CODEX32"),
+            "the preimage message does not correct the screen the old text named:\n{msg}"
+        );
+        assert_eq!(pre.exit_code(), 3, "the refusal verdict must not change");
+
+        // The control: a real seed card keeps the original wording, or the fix
+        // is just a reworded blanket message.
+        let seed = run_bundle(SEED_MS1).expect_err("a seed ms1 must still be refused");
+        let smsg = seed.to_string();
+        assert!(
+            smsg.contains("secret seed entropy") && smsg.contains("CODEX32"),
+            "a seed card lost its (correct) guidance:\n{smsg}"
+        );
+        assert_eq!(seed.exit_code(), 3);
+
+        // Neither message may carry the secret body.
+        for m in [&msg, &smsg] {
+            assert!(
+                !m.contains("hashsqwrutt") && !m.contains("entrsqqqq"),
+                "a refusal echoed the ms1 body:\n{m}"
+            );
+        }
     }
 
     /// F-602: a key-less md1 is a TEMPLATE -- it carries the policy and NONE of
