@@ -298,7 +298,7 @@ that has a phrase-set hash (the drop order below names this same destination):
 hash  <kind> <first8>..<last8>
 method: <m>   chars: <n>
 Before you cut plates, run ms hashlock --kind <kind>
-with this phrase and method on the host and check the
+--method <m> with this phrase on the host and check the
 digest matches. If they differ, do not fund this
 wallet: build it again.
 ```
@@ -312,6 +312,17 @@ distinguished them, and the label was never printed: an operator complying
 exactly discarded a correct wallet and re-cut five plates. Naming the kind in
 the body is not enough on its own; **the sentence must name the flag**, because
 what the operator types is what decides which digest comes back.
+
+**AND THE SAME RULE BINDS `--method`, which the first fold left as prose.** The
+asymmetry is the point: in the host, omitting `--kind` lists *every* kind's
+digest, so it fails **safe**; omitting `--method` runs
+`unwrap_or(Method::Hardened)` (`ms-cli/src/cmd/hashlock.rs`), so it fails
+**silently wrong**. The screen was therefore naming the flag that cannot hurt
+the operator and inferring the one that can — and on a `method: sha256` wallet,
+an operator typing the printed command exactly got a mismatch and was told by
+this same screen to destroy a correct wallet. The rule applies to every axis the
+command takes, not to the axis a given cycle happens to be about. §12 item 7 is
+the acceptance that executes it.
 
 - `chars: <n>` is the phrase's byte count — the one signal that shows a stray
   space when the operator later reconciles against the host card's
