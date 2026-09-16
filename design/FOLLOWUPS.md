@@ -17462,6 +17462,40 @@ sed (a citation that resolves to the wrong line reads as `ok`, F-279).
 **Do them in one pass, with the output of the checker read line by line**, not
 counted. Owning phase: this cycle's follow-up sweep.
 
+### F-540 — two spellings of the method, two screens apart, on the colliding axis
+
+**Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
+walk (M-1), which classified it **documentation only** — recorded here rather
+than changed, on that reviewer's own reading.
+
+The method pick draws `SHA-256`; the reconcile screen and the `--method` flag it
+now prints both spell it `sha256`. One flow, one value, two spellings — and it
+sits at the closest approach of the two axes this cycle exists to separate, two
+screens after the kind picker offered a row also reading `sha256`.
+
+**Why it is not simply fixed:** making them spell identically makes the two axes
+*look* more alike, not less. The walk's own reasoning for leaving it: the title
+and lead say "method", and the brainwallet confirm behind that row is loud
+enough to catch a mis-pick while the phrase is still intact. Any change here
+should come from watching an operator, not from tidying strings.
+
+### F-541 — Back from the hex pad silently discards the typed digest
+
+**Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
+walk (M-3).
+
+`composerHexEntry` builds a fresh keyboard on re-entry, so stepping back off the
+pad drops however many hex characters were typed, with no warning. SPEC_hashlock
+_kinds §7.1 spells out the equivalent cost on the phrase arm ("What that does not
+buy") and says nothing about this one.
+
+**Its severity dropped during the fold that found it.** The walk rated it as
+compounding I-2 — stepping back was the *only* way to check which kind the pad
+belonged to, because the pad named none. The pad now names the kind in its
+title, so the reason to step back mid-entry is largely gone. What remains is the
+plain case: an operator who mistypes near the end and reaches for Back loses the
+lot.
+
 ### F-539 — the phrase screen's hex guard is 64-only, and this cycle made 40 hex a digest
 
 **Owning phase: the phase-4 review (before the fork ships).** Filed 2026-09-15
