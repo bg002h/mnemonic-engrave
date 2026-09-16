@@ -18527,13 +18527,13 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-581 — the argv-secret guard prescribes a remedy that does not work for the verb and secret it just named
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — ms `HEAD~`. The remedy is per-verb and per-material, and every prescribed channel was RUN before being written. New `argv_remedy_runs.rs` EXECUTES what the guard prints rather than matching its text — the third occurrence of this class (see me's `ms_remedy_runs.rs`, F-301).
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-582 — `md verify` MISMATCHes a correct plate set, and the obvious fix produces the unseatable one
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — dm `d8bb6d2d`. A size mismatch with no `--fingerprint` supplied and a card larger than the template now names the flag and warns against the dangerous fix (re-minting without it yields the unseatable set).
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18557,13 +18557,13 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-586 — `me bundle` refuses a preimage plate as "secret seed entropy" and points at CODEX32 seed entry
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** CLOSED 2026-09-16 — me `cde148d7`. A preimage plate is named as one instead of "secret seed entropy"; the verdict and exit code are unchanged, only the guidance. Both refusal sites fixed.
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
 ### F-587 — `mk 0.13.0` cannot bind a key card to this wallet's md1
 
-**Status:** OPEN — owning phase: this cycle's follow-up sweep
+**Status:** WITHDRAWN 2026-09-16 — NOT A DEFECT. The `mk` on PATH was STALE: binary built 2026-08-31, repo tip 2026-09-01, and `37a9524` (mk-cli chunk_set_id mismatch warning) touched that very check in between. Rebuilt `mk` from source and the reported "wire-format version mismatch: got 9, expected 4" does not occur: `mk encode --from-md1` over the complete 6-chunk set emits mk1 cards and a "3 cosigner(s); 1 of them carded here" note. The reporting agent flagged exactly this possibility and could not resolve it, because the dispatch brief said md/ms/me were rebuilt and never mentioned mk — my omission. See [[keep-local-binaries-current]].
 
 **Important.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/rcw-hashlock-journey-2026-09-16.md`, persisted verbatim.
 
