@@ -18665,7 +18665,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-604 — `mk encode --from-md1` cannot consume a chunked md1 set, and reports it as a wire-format version mismatch
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** WITHDRAWN 2026-09-16 — NOT A DEFECT, same stale `mk` as [[F-587]]. Retested with a rebuilt `mk`: the full 6-chunk set is consumed and emits mk1 cards, and a SINGLE chunk now fails with the correct reason — `chunk set incomplete: got 1 chunks, expected 6` — not `wire-format version mismatch: got 9, expected 4`. Both halves of the claim are gone. Two findings from one stale binary, and the omission was mine: the dispatch brief named md/ms/me as rebuilt and never mentioned mk.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
