@@ -18677,7 +18677,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-606 — `md verify`'s MISMATCH message cites two identical numbers as its evidence
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — dm `bb970cda`. The equal-size case, which F-582's hint deliberately did not cover, now says the byte counts are not the difference and names the first differing byte offset. Verified at runtime (the arm returns a reference to a `format!` temporary, so a clean build proves nothing), with the F-582 branch and the OK path re-checked.
 
 **Minor.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
