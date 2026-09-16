@@ -18016,7 +18016,7 @@ runnable in one line. Related: [[F-546]], and see the walk-copy anchors gate in
 
 ### F-546 — bump me-cli's ms-codec pin so the wire follows the phrase screen
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-16 — me `61376326` and fork `e4ab97d`, the two halves of the lockstep in separate commits. Pin 9dcd2e0 → e5dff6f; `phrase-64-hex` flips Unknown → Phrase; fixture regenerated to sha `14a1c563…04e73` and re-vendored; the fork's LooksLikeDigest refusal removed. All three predicted steps, no fourth.
 **Owning phase: the next Rust release cycle.** Filed 2026-09-16 from F-539's
 fold.
 
