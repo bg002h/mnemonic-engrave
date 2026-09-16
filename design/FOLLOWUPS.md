@@ -18673,7 +18673,7 @@ to it — a second format defeats the single reader it exists to be.)*
 
 ### F-609 — `me sysw show` prints records out of numerical order when classes mix
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — me `4653aeb9`. The five passes are one record-ordered loop. It also fixed two defects the five-pass shape hid, both introduced by F-598: an unsigned `tx:` record printed TWICE (described in full, then called "unrecognised"), and `print_unclaimed_records` had been inserted between `print_descriptor_confirmation`'s doc comment and its `fn`, stealing it with no lint firing. The pre-S2 golden still passes unchanged — none of its containers interleaves classes — which is why the two new tests exist.
 
 **Nit.** Reproduction, measured output and the *"worse than saying nothing?"* verdict are in `design/agent-reports/pathological-wallet-journey-2026-09-16.md`, persisted verbatim.
 
@@ -18733,7 +18733,7 @@ nothing currently tells the operator why.
 
 ### F-612 — `countKeySlots` never walks `trBody`, so a `tr` nested inside a tapleaf hides its internal key
 
-**Status:** OPEN — owning phase: post-release UX (ownerless residue)
+**Status:** CLOSED 2026-09-16 — fork `77adafa`. `countKeySlots` gained its `trBody` arm (`!isNums`, per SPEC §7) AND a tripwire: `TestEmitFragmentHasNoTaprootCase` asserts `script_emit.go` does not handle `tagTr`, so the accident that made this unreachable is now a wire between the two functions rather than a coincidence. Matches on a word boundary because `tagTrue` contains `tagTr`.
 
 **Minor.** Found by the F-533 whole-diff review (2026-09-16), `review-F533-wholediff-round1.md`,
 with a constructed case: a `tr` nested inside a tapleaf reports `DuplicateNone`
