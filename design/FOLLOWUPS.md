@@ -17442,7 +17442,7 @@ re-vendor would delete.
 
 Owning phase: none (fork, `md/` and `gui/`).
 
-### F-537 — SPEC_hashlock_kinds carries 16 dangling bare-path citations
+### F-537 — CLOSED — SPEC_hashlock_kinds carries 16 dangling bare-path citations
 
 Filed 2026-09-15 from the phase-1 R0 round 1 fold, which measured them and did
 not fix them.
@@ -17461,6 +17461,8 @@ sed (a citation that resolves to the wrong line reads as `ok`, F-279).
 
 **Do them in one pass, with the output of the checker read line by line**, not
 counted. Owning phase: this cycle's follow-up sweep.
+
+**CLOSED 2026-09-16.** me `5a099dbc` — *"spec: every citation resolves, at a named baseline"*. All 16 qualified against a baselines table.
 
 ### F-542 — CLOSED — SPEC_hashlock_kinds §7.4 claimed a behaviour flip that does not happen
 
@@ -17501,7 +17503,7 @@ not by the mechanism it credited.
 `3 key(s), custom` rather than `2-of-3` is pre-existing and not this cycle's
 doing. Worth a look if anyone is in `policy_shape.go` for another reason.
 
-### F-543 — §13.5's first CLI gap was never filed: `me bundle` is kind-blind
+### F-543 — CLOSED — §13.5's first CLI gap was never filed: `me bundle` is kind-blind
 
 **Owning phase: post-cycle CLI work.** Filed 2026-09-16 from the phase-4
 spec-coverage review.
@@ -17517,6 +17519,8 @@ bookkeeping rather than behaviour.
 The gap itself, in §13.5's words: `me bundle` *"emits byte-identical six-plate
 output for a sha256 card and a `ripemd160` card, names no preimage plate, and
 cannot cut one at all."*
+
+**CLOSED 2026-09-16.** me `77c4026e`, via F-557 which escalated it — `me bundle` learned `descriptor_hash_kinds`, and the manifest carries `hashlock_kinds`.
 
 ### F-544 — §13.5's second CLI gap was never filed: the composer emits no restore document
 
@@ -17598,7 +17602,7 @@ binding a second repo through `FIXTURE_SHA256`, and because two journey agents
 were probing this exact surface when it was measured — changing it under them
 would have made their reports unreproducible.
 
-### F-540 — two spellings of the method, two screens apart, on the colliding axis
+### F-540 — CLOSED — two spellings of the method, two screens apart, on the colliding axis
 
 **Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
 walk (M-1), which classified it **documentation only** — recorded here rather
@@ -17615,7 +17619,9 @@ and lead say "method", and the brainwallet confirm behind that row is loud
 enough to catch a mis-pick while the phrase is still intact. Any change here
 should come from watching an operator, not from tidying strings.
 
-### F-541 — Back from the hex pad silently discards the typed digest
+**CLOSED 2026-09-16.** fork `af3b937` — *"the method spells itself once"*.
+
+### F-541 — CLOSED — Back from the hex pad silently discards the typed digest
 
 **Owning phase: post-release UX.** Filed 2026-09-15 from the phase-4 journey
 walk (M-3).
@@ -17632,7 +17638,9 @@ title, so the reason to step back mid-entry is largely gone. What remains is the
 plain case: an operator who mistypes near the end and reaches for Back loses the
 lot.
 
-### F-539 — the phrase screen's hex guard is 64-only, and this cycle made 40 hex a digest
+**CLOSED 2026-09-16.** fork `af3b937` + `a263076` — *"Back stops eating the entry"*.
+
+### F-539 — CLOSED — the phrase screen's hex guard is 64-only, and this cycle made 40 hex a digest
 
 **Owning phase: the phase-4 review (before the fork ships).** Filed 2026-09-15
 while wiring §7.1's kind screen.
@@ -17670,7 +17678,9 @@ check is a `grep`, not a hunt.
 **Reproduction:** type any 40 hex characters into `Hashlock phrase`. Accepted
 today at every kind; `ValidatePhrase` returns nil.
 
-### F-538 — no in-tree gate closes SPEC §12 item 1's Core-measured addresses
+**CLOSED 2026-09-16.** ms `9131427` + `61904c5` + `cd18b42` and fork `b7b6153` — both halves. A digest-shaped phrase WARNS and is confirmable, and is never refused; the corpus gained `digest_shaped`/`digest_shaped_negative`.
+
+### F-538 — CLOSED — no in-tree gate closes SPEC §12 item 1's Core-measured addresses
 
 Filed 2026-09-15 from the phase-1 R0 round 1 review, which tried to close it and
 could not.
@@ -17696,7 +17706,9 @@ starts from "the node was unreachable" rather than from scratch.
 
 Owning phase: **phase 4** (which re-pins the corpus anyway), or the cycle sweep.
 
-### F-536 — six pre-existing card lines are hazard notices by the boundary's own rule
+**CLOSED 2026-09-16.** dm `de629c85` — *"bitcoind differential: Core measures all four hash kinds"*. The gate now exists: 17→20 shapes, 170→200 checks.
+
+### F-536 — CLOSED — six pre-existing card lines are hazard notices by the boundary's own rule
 
 Filed 2026-09-15 from the phase-2 R0 round 7 fold. **Scope corrected twice:
 round 8 (I-3) and round 9 (I-1).** The corrections are recorded because the
@@ -17750,6 +17762,8 @@ exactly the PrivateKeyMaterial advisory. Dropping that clause is R0 round 8's
 I-1 — how a notice put 485 bytes on a stream pinned to one line.
 
 Owning phase: **this cycle's follow-up sweep.**
+
+**CLOSED 2026-09-16.** ms `4f4b5a7` — *"six hazard notices stop dying with the engraving card"*. All six moved below the card/notice boundary, each carrying `!(args.json && args.no_engraving_card)`.
 
 ### F-535 — the `phrase:` record carries the METHOD axis and not the KIND axis
 
