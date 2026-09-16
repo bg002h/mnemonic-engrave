@@ -1143,9 +1143,23 @@ fn wire_previews(
     match preview::sidecar_version(&sidecar) {
         Ok(found) if found == expected => {}
         Ok(found) => {
+            // F-588: the refusal was accurate and loud, and the RECOVERY was
+            // undiscoverable from it -- `scripts/build-preview.sh` writes to
+            // `target/release/`, while discovery is "alongside the `me`
+            // executable" ($PATH is deliberately not searched), so the copy
+            // step is the part nobody guesses.
+            //
+            // Both lines below were RUN before being printed here: the script
+            // rebuilt 0.7.0 -> 0.10.0, the copy put it beside `me`, and the
+            // command that had just been refused rendered plate-1.png.
             eprintln!(
                 "me: me-preview version mismatch: sidecar is {found:?}, expected {expected:?}; \
-                 refusing to render (install the matching me-preview)"
+                 refusing to render.\n      \
+                 The sidecar is found ALONGSIDE the `me` executable, not on $PATH, so it does \
+                 not follow a `cargo install` of `me`. From the mnemonic-engrave checkout:\n      \
+                 \x20   ./scripts/build-preview.sh\n      \
+                 \x20   cp target/release/me-preview {}",
+                sidecar.display()
             );
             return Some(EXIT_USAGE);
         }

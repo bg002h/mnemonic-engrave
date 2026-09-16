@@ -750,6 +750,61 @@ mod preview {
         fs::remove_dir_all(&outdir).ok();
     }
 
+    /// F-588: the mismatch refusal was accurate, loud and exit-2 -- and the
+    /// RECOVERY was undiscoverable from it. `scripts/build-preview.sh` writes to
+    /// `target/release/`, while discovery is "alongside the `me` executable"
+    /// ($PATH deliberately not searched), so the copy step is the part nobody
+    /// guesses. `mismatched_version_exit_2` above asserts only that the word
+    /// "version" appears, which the old message satisfied.
+    ///
+    /// Both prescribed lines were RUN before being written into the message:
+    /// the script rebuilt 0.7.0 -> 0.10.0, the copy put it beside `me`, and the
+    /// command that had just been refused rendered plate-1.png.
+    ///
+    /// MUTATION: drop the two-line remedy -> this fails while
+    /// `mismatched_version_exit_2` still passes, which is why it is a separate
+    /// test rather than a tightened assertion there.
+    #[test]
+    fn mismatched_version_names_the_recovery_not_just_the_problem() {
+        let bindir = unique_dir("mismatch-remedy-bin");
+        write_fake(&bindir, "0.0.0-not-the-crate-version");
+        let outdir = unique_dir("mismatch-remedy-out");
+
+        let out = Command::cargo_bin("me")
+            .unwrap()
+            .env("ME_PREVIEW_BIN", bindir.join("me-preview"))
+            .arg("bundle")
+            .arg("--preview")
+            .arg(&outdir)
+            .write_stdin(input())
+            .output()
+            .unwrap();
+        let err = String::from_utf8_lossy(&out.stderr);
+
+        assert!(
+            err.contains("build-preview.sh"),
+            "the refusal does not name the script that rebuilds the sidecar:\n{err}"
+        );
+        assert!(
+            err.contains("cp target/release/me-preview"),
+            "the refusal does not name the copy step, which is the undiscoverable part:\n{err}"
+        );
+        // The DESTINATION must be the real resolved path, not a placeholder --
+        // "alongside the me executable" is exactly what an operator cannot
+        // guess, so the message interpolates it.
+        assert!(
+            err.contains(&bindir.join("me-preview").display().to_string()),
+            "the refusal does not name where to copy it TO:\n{err}"
+        );
+        assert!(
+            err.contains("not on $PATH"),
+            "the refusal does not say why a `cargo install` of `me` did not fix it:\n{err}"
+        );
+
+        fs::remove_dir_all(&bindir).ok();
+        fs::remove_dir_all(&outdir).ok();
+    }
+
     #[test]
     fn absent_sidecar_degrades_exit_0_with_note_and_manifest() {
         // No ME_PREVIEW_BIN opt-in and no co-located sidecar (the `me` test binary
