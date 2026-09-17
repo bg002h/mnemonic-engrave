@@ -127,6 +127,32 @@ md repair md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
         : "tap count not measured yet"}</div>
     </a>`).join("");
 
+  // Copy, with a fallback that survives plain HTTP.
+  //
+  // navigator.clipboard is gated on a SECURE CONTEXT: https, or localhost. Serve
+  // this from a LAN address over http -- which is exactly how it gets shown off a
+  // laptop -- and the API is not merely blocked, it is ABSENT, so a bare
+  // `navigator.clipboard.writeText(...)` throws TypeError. Measured at
+  // http://10.1.4.64:8392: isSecureContext false, navigator.clipboard undefined.
+  //
+  // execCommand("copy") is deprecated and still the only thing that works there.
+  async function copyText(text) {
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(text); return true; } catch { /* fall through */ }
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);   // iOS wants the explicit range
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    ta.remove();
+    return ok;
+  }
+
   // Copy buttons. Copies the commands only -- comments and expected output are
   // annotations, and pasting them back into a shell is noise at best.
   for (const box of document.querySelectorAll(".code")) {
@@ -139,12 +165,9 @@ md repair md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
         clone.querySelectorAll(".c, .o").forEach(n => n.remove());
         return clone.textContent;
       }).join("").split("\n").map(l => l.trimEnd()).filter(l => l.trim()).join("\n");
-      try {
-        await navigator.clipboard.writeText(cmds);
-        btn.textContent = "copied"; btn.classList.add("done");
-      } catch {
-        btn.textContent = "select it"; // clipboard blocked (http, or permissions)
-      }
+      const ok = await copyText(cmds);
+      btn.textContent = ok ? "copied" : "copy failed";
+      if (ok) btn.classList.add("done");
       setTimeout(() => { btn.textContent = "copy"; btn.classList.remove("done"); }, 1800);
     });
     box.appendChild(btn);
