@@ -21,7 +21,7 @@ set -euo pipefail
 
 HOST=""; DRY=0; ROLLBACK=0
 REMOTE_DIR=/opt/quantoshi/sh2
-NGINX_CONF=/etc/nginx/sites-available/quantoshi.conf
+NGINX_CONF=/etc/nginx/sites-enabled/quantoshi
 while [ $# -gt 0 ]; do
   case "$1" in
     --host) HOST="$2"; shift 2 ;;

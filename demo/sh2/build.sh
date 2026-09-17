@@ -27,6 +27,24 @@ rm -rf dist && mkdir -p dist/emu
 cp src/index.html src/mission.html src/app.css src/missions.js dist/
 cp "$EMU/index.html" "$EMU/emu.wasm" "$EMU/wasm_exec.js" dist/emu/
 
+# ---- cache-bust the assets whose CONTENT changes between deploys -----------
+#
+# A browser that fetched one of these while it was being served with the wrong
+# MIME type keeps the bad copy until its max-age expires, and the page stays
+# broken for that visitor no matter what the server now says. Measured live:
+# the same URL returned `application/javascript` under `cache: "no-store"` and
+# `text/html` from cache, in the same browser, at the same moment.
+#
+# Waiting out an expiry is not an answer when people are scanning a QR code, so
+# the URL changes whenever the bytes do: a content hash makes a stale entry
+# unreachable rather than merely stale. The wasm is deliberately NOT stamped --
+# it is 11 MB, cached hard on purpose, and its name already changes per release.
+STAMP="$( { cat dist/missions.js dist/app.css; } | sha256sum | cut -c1-12 )"
+for f in dist/index.html dist/mission.html; do
+  sed -i "s|\./missions\.js|./missions.js?v=${STAMP}|g; s|"app\.css"|"app.css?v=${STAMP}"|g" "$f"
+done
+echo "== asset stamp: ${STAMP}"
+
 # A favicon, only because its absence is the one console error the emulator
 # page produces and it reads as a fault when someone opens devtools.
 printf '' > dist/favicon.ico

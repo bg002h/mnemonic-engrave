@@ -143,7 +143,8 @@ md repair md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
       <div class="t">${m.title}</div>
       <div class="d">${m.blurb}</div>
       <div class="m">${m.measured
-        ? `<b>${m.taps} taps</b> · ${m.wrapper}${m.long ? " · the long one" : ""}`
+        ? [`<b>${m.taps} taps</b>`, m.wrapper, m.long ? "the long one" : null]
+            .filter(Boolean).join(" · ")
         : "tap count not measured yet"}</div>
     </a>`).join("");
 
