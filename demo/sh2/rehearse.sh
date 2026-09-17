@@ -99,7 +99,11 @@ grep -q 'have 2, need 3' <<<"$err" && ok "2 shares are refused, by that exact wo
 
 # Mutation check: the loop above must be READING the shares, not printing ok.
 # Damaging share 2 must fail exactly the six triples that contain it.
-cp "$tmp/s.txt" "$tmp/s.bak"; sed -i '2s/./q/40' "$tmp/s.txt"
+cp "$tmp/s.txt" "$tmp/s.bak"
+# Flip char 40 to a DIFFERENT bech32 char. A fixed 's/./q/40' is a no-op ~1/32
+# of the time (when char 40 is already 'q'), which would leave share 2 valid and
+# make this mutation check flake -- teaching the opposite of its point.
+old40=$(sed -n 2p "$tmp/s.txt" | cut -c40); sed -i "2s/./$([ "$old40" = q ] && echo p || echo q)/40" "$tmp/s.txt"
 m_ok=0
 for t in 123 124 125 134 135 145 234 235 245 345; do
   sed -n "$(echo "$t" | sed 's/./&p;/g')" "$tmp/s.txt" > "$tmp/pick.txt"
@@ -113,6 +117,38 @@ cp "$tmp/s.bak" "$tmp/s.txt"
 echo "== 5 the argv refusal"
 err=$(ms split --phrase "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" -k 3 -n 5 2>&1 >/dev/null)
 grep -q 'ARGV' <<<"$err" && ok "a seed on argv is refused" || bad "argv guard did not fire" "$(head -1 <<<"$err")"
+
+echo "== 6 john the ripper -> passphrase search"
+# John is an OPTIONAL attendee install, so a bare machine skips rather than fails.
+if ! command -v john >/dev/null; then
+  echo "  -- skipped: john not on PATH (brew install john-jumbo | apt install john | pacman -S john)"
+else
+  jseed='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+  jxpub=xpub6CvHDtn5otAu9fjb7mPpbfizn2A31pQkwLsogfkHaMfsnoGVCwRidN6rZryTBE6G8b6MF152XgJSKiEBpgt3Jx7udU43auRCHB1hvJTRuBu
+  printf 'Satoshi\nhodl\nbitcoin\n' > "$tmp/roots.lst"
+  cat > "$tmp/mangle.rules" <<'RULES'
+[List.Rules:Demo]
+:
+l
+u
+c
+c $1
+c $!
+l $2 $0 $0 $9
+RULES
+  gen=$(john --config="$tmp/mangle.rules" --wordlist="$tmp/roots.lst" --rules=Demo --stdout 2>/dev/null)
+  n=$(printf '%s\n' "$gen" | grep -c .)
+  [[ $n -eq 18 ]] && ok "john generates 18 candidates from 3 roots" || bad "john candidate count" "got $n, want 18"
+  ln=$(printf '%s\n' "$gen" | grep -nx satoshi | cut -d: -f1)
+  [[ "$ln" == "4" ]] && ok "the real passphrase 'satoshi' is generated (line 4)" || bad "satoshi not at the demoed line" "grep gave '$ln'"
+  # the shipped promise: john --stdout piped in (nothing on disk) finds it
+  res=$(printf '%s' "$jseed" | mnemonic xpub-search passphrase-of-xpub --phrase-stdin \
+          --target-xpub "$jxpub" \
+          --passphrase-candidates-file <(john --config="$tmp/mangle.rules" --wordlist="$tmp/roots.lst" --rules=Demo --stdout 2>/dev/null) 2>&1)
+  grep -q "candidate on line 4 derives the target xpub at m/84'/0'/0'" <<<"$res" \
+    && ok "piped john output -> search reports the matching line + path" \
+    || bad "john->search pipeline" "$(grep -iE 'match|no match|error' <<<"$res" | head -1)"
+fi
 
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [[ $fail -eq 0 ]] || exit 1

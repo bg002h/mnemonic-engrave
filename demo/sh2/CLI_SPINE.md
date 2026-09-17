@@ -180,7 +180,9 @@ done; echo
 
 ```sh
 cp shares.txt shares.bak
-sed -i '2s/./q/40' shares.txt      # damage share 2, then re-run the first loop
+# scratch one character of share 2 -- flip it to a DIFFERENT bech32 char, so it
+# always changes (a fixed 's/./q/40' is a no-op ~1/32 of the time)
+old=$(sed -n 2p shares.txt | cut -c40); sed -i "2s/./$([ "$old" = q ] && echo p || echo q)/40" shares.txt
 ```
 ```
 123 FAIL  124 FAIL  125 FAIL  134 ok  135 ok  145 ok  234 FAIL  235 FAIL  245 FAIL  345 ok
@@ -280,8 +282,64 @@ searched: 140 candidate paths per passphrase
 > NUMBER, not the passphrase**: your secret does not go to stdout unless you ask
 > for `--json`. Five candidates took 31 ms.
 
-**Say what it cannot do**, because someone will ask: it does not GENERATE
-candidates, and it targets an xpub rather than an address. Both are filed.
+**Where does the candidate list come from?** Not from `mnemonic` -- generating
+guesses is not its job, and it says so. It is the job of **John the Ripper**,
+which everyone in this room has heard of as a password cracker but which here is
+just a candidate *generator*: `--stdout` mode prints guesses and computes no
+hashes, cracks nothing. You give it the roots you half-remember and the habits
+you actually use; its mangling rules expand them.
+
+```sh
+# install the "jumbo" build: brew install john-jumbo  |  apt-get install john
+#                            |  pacman -S john
+
+printf 'Satoshi\nhodl\nbitcoin\n' > roots.lst   # the words you half-remember
+cat > mangle.rules <<'RULES'
+[List.Rules:Demo]
+:
+l
+u
+c
+c $1
+c $!
+l $2 $0 $0 $9
+RULES
+john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout
+```
+```
+Satoshi        satoshi        Satoshi1      Satoshi!      satoshi2009
+hodl           SATOSHI        Hodl1         Hodl!         hodl2009
+bitcoin        HODL           Bitcoin1      Bitcoin!      bitcoin2009
+               BITCOIN
+               Hodl
+               Bitcoin
+```
+
+> Three roots and seven habits -> 18 candidates: as-is, lowercased, upcased,
+> capitalised, with a `1`, with a `!`, lowercased-plus-a-year. The stock
+> rulesets (`--rules=Jumbo`, `--rules=Single`) generate thousands more on their
+> own; the seven-line file just keeps this legible and its output stable.
+
+Now pipe that straight into the search -- **process substitution, so the list
+of guesses never touches disk**:
+
+```sh
+printf '<your 12 words>' | mnemonic xpub-search passphrase-of-xpub \
+  --phrase-stdin --target-xpub <your xpub> \
+  --passphrase-candidates-file <(john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout)
+```
+```
+match: candidate on line 4 derives the target xpub at m/84'/0'/0' (template=bip84, account=0)
+searched: 140 candidate paths per passphrase
+```
+
+> Line 4 is `satoshi` -- the lowercase mangle of the "Satoshi" you'd have typed.
+> Two tools composing: John generates, `mnemonic` verifies, and neither the
+> guess list nor the winning passphrase is ever written down. This is your own
+> wallet and your own forgotten word; that is the whole point.
+
+**What `mnemonic` still cannot do**, because someone will ask: it targets an
+xpub rather than an address. That one is filed.
 
 ### "I have three cosigner cards and no idea which slot is which"
 

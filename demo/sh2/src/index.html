@@ -126,7 +126,9 @@ done; echo
   <div class="note">
     <b>Prove the check isn't hollow.</b> A test that can only pass proves
     nothing. Damage one share &mdash;
-    <code>cp shares.txt shares.bak &amp;&amp; sed -i '2s/./q/40' shares.txt</code>
+    <code>cp shares.txt shares.bak</code> and flip one character of share 2 to a
+    different one &mdash;
+    <code>old=$(sed -n 2p shares.txt|cut -c40); sed -i "2s/./$([ "$old" = q ] &amp;&amp; echo p || echo q)/40" shares.txt</code>
     &mdash; and re-run the first loop. Exactly the six triples containing share
     2 flip to <code>FAIL</code>, and the four that avoid it
     (<code>134 135 145 345</code>) still say <code>ok</code>. That is the loop
@@ -190,6 +192,42 @@ printf '&lt;your 12 words&gt;' | mnemonic xpub-search passphrase-of-xpub   --phr
     not the passphrase</b> &mdash; your secret never reaches stdout unless you
     ask for <code>--json</code>.
   </p>
+  <p class="lead">
+    Where does that candidate list come from? Not from <code>mnemonic</code>
+    &mdash; generating guesses is a job for <b>John the Ripper</b>. You know it
+    as a password cracker; here it is only a candidate <em>generator</em>, and
+    its <code>--stdout</code> mode computes no hashes and cracks nothing. Give
+    it the roots you half-remember and the habits you actually use, and its
+    mangling rules expand them.
+  </p>
+  <div class="code"><pre><code><span class="c"># the jumbo build: brew install john-jumbo | apt-get install john | pacman -S john</span>
+printf 'Satoshi\nhodl\nbitcoin\n' &gt; roots.lst
+cat &gt; mangle.rules &lt;&lt;'RULES'
+[List.Rules:Demo]
+:
+l
+u
+c
+c $1
+c $!
+l $2 $0 $0 $9
+RULES
+john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout
+<span class="o">18 candidates from 3 roots: as-is, lowercased, upcased, capitalised,</span>
+<span class="o">+1, +!, +year. Stock rulesets (--rules=Jumbo) generate thousands more.</span></code></pre></div>
+  <p class="lead">
+    Then pipe it straight in &mdash; process substitution, so the list of
+    guesses never touches disk:
+  </p>
+  <div class="code"><pre><code>printf '&lt;your 12 words&gt;' | mnemonic xpub-search passphrase-of-xpub   --phrase-stdin --target-xpub &lt;your xpub&gt;   --passphrase-candidates-file &lt;(john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout)
+<span class="o">match: candidate on line 4 derives the target xpub at m/84'/0'/0'</span></code></pre></div>
+  <p class="lead">
+    Line 4 is <code>satoshi</code> &mdash; the lowercase mangle of the
+    &ldquo;Satoshi&rdquo; you would have typed. John generates,
+    <code>mnemonic</code> verifies, and neither the guess list nor the winning
+    passphrase is ever written to disk. Your own wallet, your own forgotten
+    word.
+  </p>
 
   <h3 style="font-size:.95rem;margin-top:1.25rem">&ldquo;Which cosigner am I?&rdquo;</h3>
   <p class="lead">
@@ -234,10 +272,11 @@ printf '&lt;your 12 words&gt;' | mnemonic xpub-search passphrase-of-xpub   --phr
   </div>
 
   <div class="note">
-    <b>What these cannot do yet.</b> The passphrase search needs you to supply
-    the candidate list &mdash; it does not generate one &mdash; and it matches
-    against an xpub rather than an address. Both are recorded as open work
-    rather than glossed over.
+    <b>What this cannot do yet.</b> The passphrase search matches against an
+    xpub rather than an address &mdash; recorded as open work rather than
+    glossed over. Generating the candidate list is not on that list: that is
+    John the Ripper's job, shown above, and not something the toolkit needs to
+    reimplement.
   </div>
 
   <h3>Bonus &nbsp;The refusal &mdash; and the door out of it</h3>
