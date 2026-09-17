@@ -115,6 +115,79 @@ md repair md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
     <em>is</em>. That is the whole point of a template identity.
   </p>
 
+  <h3>4 &nbsp;Two recoveries, for when something has gone wrong</h3>
+  <p>
+    These come from <code>mnemonic-toolkit</code>, the constellation's larger
+    tool. They answer the questions people actually turn up with.
+  </p>
+
+  <h3 style="font-size:.95rem;margin-top:1.25rem">&ldquo;I forgot my passphrase&rdquo;</h3>
+  <p class="lead">
+    You have the seed and the wallet's xpub, and a shortlist of what the
+    passphrase might have been.
+  </p>
+  <div class="code"><pre><code><span class="c"># one candidate per line -- this file is SECRET, it holds guesses at your passphrase</span>
+printf 'hunter2\ncorrect horse\nbitcoin\nsatoshi\nnakamoto\n' &gt; candidates.txt
+
+printf '&lt;your 12 words&gt;' | mnemonic xpub-search passphrase-of-xpub   --phrase-stdin --passphrase-candidates-file candidates.txt   --target-xpub &lt;your xpub&gt;
+<span class="o">match: candidate on line 4 derives the target xpub at m/84'/0'/0'</span>
+<span class="o">searched: 140 candidate paths per passphrase</span></code></pre></div>
+  <p class="lead">
+    It tries each line against the standard path templates across an account
+    range and stops at the first hit. Note what it prints: <b>the line number,
+    not the passphrase</b> &mdash; your secret never reaches stdout unless you
+    ask for <code>--json</code>.
+  </p>
+
+  <h3 style="font-size:.95rem;margin-top:1.25rem">&ldquo;Which cosigner am I?&rdquo;</h3>
+  <p class="lead">
+    A keyless multisig template engraves the wallet <em>type</em> &mdash; one
+    plate serves thousands of wallets, and the keys are supplied at restore. But
+    which key belongs in which slot? Guess wrong and you get a different wallet
+    with no error. So give it the one thing you do have: an address you know is
+    yours.
+  </p>
+  <div class="code"><pre><code>printf '&lt;your 12 words&gt;' | mnemonic restore --from phrase=-   --md1 &lt;template-md1&gt; --account 0   --cosigner &lt;xpub&gt; --cosigner &lt;xpub&gt;   --search-address &lt;an address you know is yours&gt; --count 1
+<span class="o">multisig wallet completed from template:</span>
+<span class="o">  first recv: bc1q4vxm2xewpdj2ycxyh9c4w923pjyl0e8dnf0y0gvwz2daxg36mecqhzarw0</span>
+<span class="o">  your seed completes cosigner slot @0</span></code></pre></div>
+  <p class="lead">
+    The cosigners went in unpositioned and in the wrong order. It searched the
+    key&rarr;slot assignments for the one whose output script matches your
+    address &mdash; and it will not guess: it returns an answer only after
+    proving no <em>second</em> assignment also matches.
+  </p>
+
+  <h3 style="font-size:.95rem;margin-top:1.25rem">&ldquo;I only wrote down the wallet-id&rdquo;</h3>
+  <p class="lead">
+    The same search runs off the recorded <b>wallet-id</b> alone &mdash; no
+    address needed. The template engraving prints one precisely so you can.
+  </p>
+  <div class="code"><pre><code>printf '&lt;your 12 words&gt;' | mnemonic restore --from phrase=-   --md1 &lt;template-md1&gt; --account 0   --cosigner &lt;xpub&gt; --cosigner &lt;xpub&gt;   --expect-wallet-id 72d94d49b0aca695 --count 1
+<span class="o">  first recv: bc1q4vxm2xewpdj2ycxyh9c4w923pjyl0e8dnf0y0gvwz2daxg36mecqhzarw0</span>
+<span class="o">✓ wallet-id (completed): 72d94d49b0aca695055b3de0a1f13bea</span>
+<span class="o">  your seed completes cosigner slot @0</span></code></pre></div>
+
+  <div class="note">
+    <b>It refuses to guess, and that is the point.</b> It sizes the search space
+    and demands enough identifier that a collision is impossible:
+    <code>72d9</code> and even <code>72d94d49</code> are <b>refused as too
+    weak</b>; 16 hex characters are accepted. A <em>wrong</em> id returns
+    <code>✗ NO MATCH</code> and exit 4 &mdash; never a plausible wrong wallet.
+    <br><br>
+    Have both? Use both. The address pins the key <em>set</em>; the wallet-id
+    pins the <em>labelling</em>. Together the answer is fully determined &mdash;
+    which matters for <code>sortedmulti</code>, where the script sorts keys at
+    every index, so swapping two cosigners' labels yields the identical wallet.
+  </div>
+
+  <div class="note">
+    <b>What these cannot do yet.</b> The passphrase search needs you to supply
+    the candidate list &mdash; it does not generate one &mdash; and it matches
+    against an xpub rather than an address. Both are recorded as open work
+    rather than glossed over.
+  </div>
+
   <h3>Bonus &nbsp;Try to do it the dangerous way</h3>
   <p class="lead">
     This one is meant to fail. Paste it and the tool refuses before it parses

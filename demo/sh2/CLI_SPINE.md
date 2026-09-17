@@ -177,6 +177,125 @@ ms: argument 3 on ARGV ... is a BIP-39 mnemonic, 93 characters long.
 
 ---
 
+## 3b · Two recoveries the toolkit can already do
+
+`mnemonic` (mnemonic-toolkit v0.97.0) is the constellation's swiss-army tool.
+Two of its searches are worth showing, because they answer questions people
+actually arrive with. **Both were run to produce the output below.**
+
+### "I forgot my passphrase"
+
+You have the seed. You have the wallet's xpub. You have *some idea* what the
+passphrase was.
+
+```sh
+printf 'hunter2\ncorrect horse\nbitcoin\nsatoshi\nnakamoto\n' > candidates.txt
+
+printf '<your 12 words>' | mnemonic xpub-search passphrase-of-xpub \
+  --phrase-stdin --passphrase-candidates-file candidates.txt \
+  --target-xpub xpub6CvHDtn5otAu9fjb7mPpbfizn2A31pQkwLsogfkHaMfsnoGVCwRidN6rZryTBE6G8b6MF152XgJSKiEBpgt3Jx7udU43auRCHB1hvJTRuBu
+```
+```
+match: candidate on line 4 derives the target xpub at m/84'/0'/0' (template=bip84, account=0)
+searched: 140 candidate paths per passphrase
+```
+
+> It tries each line against BIP-44/49/84/86 + BIP-48 across an account range —
+> 140 paths per candidate — and stops at the first hit. **It reports the LINE
+> NUMBER, not the passphrase**: your secret does not go to stdout unless you ask
+> for `--json`. Five candidates took 31 ms.
+
+**Say what it cannot do**, because someone will ask: it does not GENERATE
+candidates, and it targets an xpub rather than an address. Both are filed.
+
+### "I have three cosigner cards and no idea which slot is which"
+
+A keyless multisig template engraves the wallet TYPE — one plate serves
+thousands of wallets. The keys are supplied at restore. But which key is `@0`?
+Guess wrong and you get a different wallet, silently. `mnemonic` says so:
+
+```
+warning: explicit --cosigner @N= mode builds the wallet from the ASSERTED
+         key→slot assignment WITHOUT verifying it. A wrong assignment produces
+         a wrong wallet silently.
+```
+
+So give it the one thing you do have — **an address you know is yours**:
+
+```sh
+printf '<your 12 words>' | mnemonic restore --from phrase=- --md1 <template-md1> \
+  --account 0 --cosigner <xpubC> --cosigner <xpubB> \
+  --search-address bc1q4vxm2xewpdj2ycxyh9c4w923pjyl0e8dnf0y0gvwz2daxg36mecqhzarw0 --count 1
+```
+```
+multisig wallet completed from template:
+  first recv: bc1q4vxm2xewpdj2ycxyh9c4w923pjyl0e8dnf0y0gvwz2daxg36mecqhzarw0
+  your seed completes cosigner slot @0
+```
+
+> The cosigners went in **unpositioned and in the wrong order**. It searched the
+> key→slot assignments for the one whose scriptPubKey matches your address, and
+> told you which slot your own seed fills. 30 ms.
+>
+> It refuses to guess: a `Unique` answer is only returned after proving there is
+> no SECOND assignment that also matches — it scans the whole space rather than
+> stopping at the first hit. Large spaces hit a cost ceiling that requires
+> `--accept-search-time` to proceed.
+
+### "I only wrote down the wallet-id"
+
+The same search runs off the **wallet-id** alone — no address needed. This is
+the one to reach for when the engraving records an id (the template form prints
+one precisely so you can):
+
+```sh
+printf '<your 12 words>' | mnemonic restore --from phrase=- --md1 <template-md1> \
+  --account 0 --cosigner <xpub> --cosigner <xpub> \
+  --expect-wallet-id 72d94d49b0aca695 --count 1
+```
+```
+  first recv: bc1q4vxm2xewpdj2ycxyh9c4w923pjyl0e8dnf0y0gvwz2daxg36mecqhzarw0
+✓ wallet-id (completed): 72d94d49b0aca695055b3de0a1f13bea
+  your seed completes cosigner slot @0
+```
+
+**And it refuses to guess — show this, it is the best part:**
+
+| you supply | what happens |
+| --- | --- |
+| `72d9` (4 hex) | **refused**: "prefix too weak" |
+| `72d94d49` (8 hex) | **refused**: still too weak for this space |
+| `72d94d49b0aca695` (16 hex) | accepted → the right wallet |
+| `deadbeef…` (wrong) | **`✗ NO MATCH`**, exit 4 |
+
+> It sizes the search space and demands enough identifier that a collision is
+> not possible, rather than accepting whatever you typed and hoping. A wrong id
+> produces NO wallet — never a plausible wrong one. That is the behaviour you
+> want from anything that reconstructs a wallet from parts.
+
+**USE BOTH TOGETHER when you have both.** The address pins the key SET; the
+wallet-id pins the LABELLING. Together the answer is fully determined:
+
+```sh
+... --search-address <addr> --expect-wallet-id 72d94d49b0aca695055b3de0a1f13bea
+```
+
+**One honest caveat if anyone is paying close attention:** with `sortedmulti`
+the script sorts the keys, so the address is order-independent and more than one
+assignment reproduces it. The completed wallet-id therefore need not equal the
+one from an explicit placement — as observed here, `d3c8c613…` vs `72d94d49…`
+with an identical address. For sortedmulti that IS the same wallet -- verified: identical
+address, identical spending. But do not claim it recovered "the original
+order", and do not let a differing id alarm anyone: under BIP-67 the script
+sorts the derived pubkeys at EVERY index, so swapping two cosigners' labels
+gives byte-identical scripts forever. Measured, for the bound: with unsorted
+`wsh-multi` the two orderings give DIFFERENT addresses
+(bc1q734855... vs bc1q9mxq6v9...), so this ambiguity exists for sortedmulti
+ONLY. Supplying --expect-wallet-id removes it entirely, which is why the
+section above exists.
+
+---
+
 ## 4 · Close
 
 > Everything you just watched runs on a device with no camera, no network and
