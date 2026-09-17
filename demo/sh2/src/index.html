@@ -87,21 +87,22 @@ chmod +x md ms</code></pre></div>
     the binary is <code>mnemonic</code>.
   </p>
   <div class="code"><pre><code><span class="c"># macOS Intel (swap macos-amd64 -> macos-arm64 on Apple Silicon)</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.98.0/mnemonic-0.98.0-macos-amd64.tar.gz
-tar -xzf mnemonic-0.98.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
-<span class="c"># Windows: mnemonic-0.98.0-windows-amd64.zip from the same v0.98.0 release</span>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.100.0/mnemonic-0.100.0-macos-amd64.tar.gz
+tar -xzf mnemonic-0.100.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
+<span class="c"># Windows: mnemonic-0.100.0-windows-amd64.zip from the same v0.100.0 release</span>
 <span class="c"># Linux x86-64 (static musl):</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.97.0/mnemonic-0.97.0-x86_64-linux-musl.tar.gz
-tar -xzf mnemonic-0.97.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.100.0/mnemonic-0.100.0-x86_64-linux-musl.tar.gz
+tar -xzf mnemonic-0.100.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
   <div class="note">
-    <b>One version wrinkle, and it is harmless.</b> The macOS and Windows
-    binaries are <b>v0.98.0</b> (the release that first built them); the Linux
-    <code>musl</code> binary is <b>v0.97.0</b>. Same tool, same behaviour on
-    everything the demo does &mdash; v0.98.0 differs only by gaining the Windows
-    build. A v0.98.0 Linux build is on the way; until then the v0.97.0 musl is
-    the one to grab, and it is <em>signed and reproducible</em> like every musl
-    release. On macOS clear Gatekeeper once with
+    <b>One version, every platform.</b> macOS, Windows and Linux
+    <code>musl</code> all ship from <b>v0.100.0</b> &mdash; the version-split
+    that used to send Linux users to v0.97.0 is gone. The musl builds are
+    <em>signed and reproducible</em>. On macOS clear Gatekeeper once with
     <code>xattr -d com.apple.quarantine ./mnemonic</code>.
+    <br><br>
+    <span class="muted">Use v0.100.0 or newer for this page: the short-id
+    behaviour in §3b below is v0.100.0's. On an older binary a short
+    <code>--expect-wallet-id</code> is refused outright rather than listing.</span>
   </div>
 
   <h3>1 &nbsp;Split a seed three-of-five, then prove any three is sufficient and any two isn't enough</h3>
