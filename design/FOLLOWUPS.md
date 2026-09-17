@@ -18824,7 +18824,15 @@ Journey review I-3. If `KEY_VALID` comes back with a wrong bit set, the gate rep
 
 ### F-619 — "all three BOOT_FLAGS1 copies agree" compares a majority vote against two raw rows
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN — deliberately NOT fixed blind 2026-09-17.
+**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17 — but NOT by the prescribed remedy, which was measured to be a no-op.
+
+**`-c 1` does nothing.** Measured on SH2 #3 (`0xdb2010f935ed25b8`) in BOOTSEL: `picotool otp get -n 0x04b` and `picotool otp get -n -c 1 0x04b` produce **byte-identical** output, and `-c 3` returned an unrelated row (`OTP_DATA_CHIPID3`) alongside the target. Applying the review's prescribed fix would have closed this entry while changing nothing — a strictly worse state than leaving it open, because the weakness would then be believed fixed.
+
+**The asymmetry is real but is not where the defect lives.** Row `0x04b` does resolve to a NAMED redundant row (picotool prints `OTP_DATA_BOOT_FLAGS1 (RBIT-3)`) while `0x04c`/`0x04d` print bare, and `-r` does not change that. So the A/B/C comparison genuinely cannot be the guarantee.
+
+**The actual defect was wider than reported:** `read_row_raw24` had **no WARNING trap at all**, unlike `otp_field` (`:180`) and `read_rows` (`:208`) — and it is the function that reads the page-lock rows, CRIT1 ×8 and BOOT_FLAGS1 ×3, i.e. every majority-vote-encoded row in the precheck. An inconsistent redundant read was being parsed as a clean value in precisely the places redundancy is the thing under test. Fixed by adding the same trap, and the A/B/C comment now states what it can and cannot see.
+
+**Verified three ways:** (1) `--sh2-precheck` re-run against real hardware passes with no false positive; (2) mutation test — stubbed picotool output carrying `(WARNING - REDUNDANT ROWS AREN'T EQUAL)` with an otherwise *identical* `VALUE` makes the new function die (rc 42), which is exactly the degraded-but-voting-correctly case a value comparison cannot detect; (3) the same mutation against the pre-fix function extracted from `b1e7e7c8` returns `000001` and rc 0, reproducing the defect.
 
 `picotool otp get` does offer `-c <copies>` ("Read multiple redundant values"), confirmed from its help text. But the review PRESCRIBED `-c 1` without reproducing what it returns, and a prescribed remedy is not authoritative — shipping an unverified change to a gate would replace a known-weak check with an unknown one. No board was in BOOTSEL when the other four were closed, so the semantics could not be measured. **Do this with a board attached, read-only:** compare `picotool otp get -n 0x04b` against `picotool otp get -n -c 1 0x04b`, confirm the three-copy read returns three independently-sourced values, and make the parser assert it got three values so a shape change dies instead of passing.
 

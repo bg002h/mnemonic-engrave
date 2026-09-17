@@ -362,6 +362,17 @@ read_row_raw24() {
   local sel="$1" out v
   out="$(picotool otp get -n "$sel" 2>&1)" || die "OTP read failed for $sel:
 $out"
+  # F-619: this function had NO warning trap, unlike otp_field and read_rows.
+  # It is what reads the page-lock rows and the BOOT_FLAGS1/CRIT1 copies -- all
+  # majority-vote-encoded -- so an inconsistent redundant read was being parsed
+  # as a clean value in exactly the places redundancy is the thing being
+  # checked. Measured on real silicon 2026-09-17: `0x04b` resolves to the NAMED
+  # row (picotool prints `OTP_DATA_BOOT_FLAGS1 (RBIT-3)`) while `0x04c`/`0x04d`
+  # print bare, so the three reads are NOT symmetric and the A/B/C comparison
+  # below cannot be the thing that catches a degraded row. This trap is.
+  printf '%s' "$out" | grep -qi 'WARNING' \
+    && die "picotool reported a warning reading row $sel (redundant rows disagree or ECC invalid):
+$out"
   v="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' | tail -1 \
        | grep -oiE '0x[0-9a-f]+' | sed 's/^0[xX]//' | tr 'A-F' 'a-f')"
   [ -n "$v" ] || die "could not parse a VALUE line for row $sel:
@@ -814,8 +825,20 @@ do NOT start re-signing -- your key hash is already proven correct above."
     [ $((16#$KI)) -eq 0 ] || die "KEY_INVALID is 0x$KI -- a key has been revoked. STOP."
     ok "no key revoked"
 
-    # All three BOOT_FLAGS1 copies must agree. A degraded-but-voting-correctly
-    # row is exactly what the old bare check could not see.
+    # All three BOOT_FLAGS1 copies must agree.
+    #
+    # WHAT THIS CHECK CAN AND CANNOT SEE (F-619, measured 2026-09-17). Row
+    # `0x04b` is a NAMED redundant row to picotool and `0x04c`/`0x04d` are not,
+    # so this compares one interpreted read against two bare ones and is blind
+    # in the case where `0x04b` is itself the odd copy. It is kept as a cheap
+    # second opinion, NOT as the guarantee.
+    #
+    # The guarantee is the WARNING trap, which now fires in all three of
+    # otp_field, read_rows AND read_row_raw24: picotool emits
+    # `(WARNING - REDUNDANT ROWS AREN'T EQUAL)` whenever the copies of a
+    # redundant row disagree, and every reader here dies on it. `-c 1` was
+    # PRESCRIBED as the fix for this and was measured to be a no-op -- byte
+    # identical output -- so it is deliberately not used.
     A="$(read_row_raw24 0x04b)"; B="$(read_row_raw24 0x04c)"; C="$(read_row_raw24 0x04d)"
     if [ "$A" != "$B" ] || [ "$B" != "$C" ]; then
       die "BOOT_FLAGS1 redundant copies DISAGREE: 0x$A / 0x$B / 0x$C.

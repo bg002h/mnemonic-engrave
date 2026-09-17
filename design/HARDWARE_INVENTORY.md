@@ -24,6 +24,7 @@ picotool info -a                # or: picotool info -a --bus N --address M
 | --- | --- | --- | --- | --- | --- |
 | `0x77c483b745abf55c` | **SeedHammer II #1** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — own key (slot 1) | the original machine; burned 2026-08-03 |
 | `0x09f50bf63e8d6f46` | **SeedHammer II #2** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — own key (slot 1) | spare control board; received AND burned 2026-09-17 |
+| `0xdb2010f935ed25b8` | **SeedHammer II #3** | RP2350**B**, QFN80 | 16 MB | **1** — SeedHammer only | spare control board; prechecked 2026-09-17, NOT burned |
 | `0x66d3d60ff20abf2f` | Pico 2 (rehearsal) | RP2350A, QFN60 | 4 MB | 1 — rehearsal key | boot-key rehearsal, 2026-08-03 |
 | `0xb3d19289d3ec3f0e` | **Pico 2 W** | RP2350A, QFN60, rev A2 | 4 MB | **0** | blank; WiFi; LED differs — see below |
 
