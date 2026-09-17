@@ -440,12 +440,11 @@ section above exists.
 
 ## Notes for the 2017 Intel Mac
 
-- **`mnemonic` (mnemonic-toolkit) has no Mac/Windows binary yet** -- it ships
-  Linux musl only, so on the demo Mac it is a source build. `cargo install
-  --locked --git https://github.com/bg002h/mnemonic-toolkit --tag
-  mnemonic-toolkit-v0.97.0 mnemonic-toolkit` (crate `mnemonic-toolkit`, binary
-  `mnemonic`). **Do it before you travel**, not in the room. `md`/`ms` are
-  prebuilt for every platform; only the toolkit needs building.
+- **`mnemonic` (mnemonic-toolkit) is now prebuilt for macOS and Windows** as of
+  the v0.98.0 release (crate `mnemonic-toolkit`, binary `mnemonic`); no source
+  build in the room. macOS/Windows are v0.98.0; the Linux `musl` binary is
+  v0.97.0 for now (same tool -- v0.98.0 only adds the Windows build) with a
+  v0.98.0 Linux build on the way. Nothing needs `cargo` anymore.
 - Both tools are `x86_64` native there; nothing needs Rosetta.
 - If the network is hostile, the emulator runs from `dist/` with
   `python3 -m http.server` — already on macOS — and the CLI half needs no
