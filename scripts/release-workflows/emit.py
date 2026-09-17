@@ -7,26 +7,35 @@ PORTABLE3 = ["macos-x86_64","macos-aarch64","windows-x86_64"]
 MACOS_ONLY = ["macos-x86_64","macos-aarch64"]
 
 SMOKE = {
- # A REAL round trip, through PRIVATE CHANNELS -- `ms` refuses hex entropy and
- # ms1 strings on argv (its own guard), so the obvious one-liner does not work
- # and was caught locally before it reached CI.
- "ms": '''          printf '00000000000000000000000000000000' > e.hex
+ "ms": '''          # A REAL acceptance pass, through PRIVATE CHANNELS -- ms refuses hex
+          # entropy and ms1 strings on argv, so the obvious one-liners do not work.
+          printf '00000000000000000000000000000000' > e.hex
           MS1="$("$BIN" encode --hex - --group-size 0 < e.hex | grep '^ms1')"
           printf '%s\\n' "$MS1" > card.ms1
           DEC="$("$BIN" decode --in card.ms1)"
           case "$DEC" in *abandon*) ;; *) echo "::error::round trip failed"; exit 1 ;; esac
-          echo "round trip ok: $MS1"
+
+          # Shamir: 3-of-5 rebuilds, 2 does not. The threshold, on this platform.
+          printf 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about\\n' > seed.txt
+          "$BIN" split --in seed.txt -k 3 -n 5 --group-size 0 > shares.txt
+          n=$(grep -c '^ms1' shares.txt); [ "$n" = "5" ] || { echo "::error::split gave $n shares"; exit 1; }
+          grep -o '^ms1[a-z0-9]*' shares.txt | sed -n '1p;3p;5p' > three.txt
+          OUT="$("$BIN" combine --in three.txt)"
+          case "$OUT" in *abandon*) ;; *) echo "::error::3 shares did not rebuild"; exit 1 ;; esac
+          grep -o '^ms1[a-z0-9]*' shares.txt | sed -n '1p;3p' > two.txt
+          if "$BIN" combine --in two.txt >/dev/null 2>&1; then
+            echo "::error::2 shares rebuilt the secret -- the threshold does not hold here"; exit 1
+          fi
+          echo "acceptance ok on this platform: round trip + 3-of-5 + 2 refused"
 ''',
- # --help only. A real round trip needs a valid xpub/origin-path pair (mk checks
- # the xpub's depth and child against the path) and mk encodes to 2 chunks, so a
- # fixture belongs in the repo's own suite -- which the `test` job runs. This
- # step exists to prove the CROSS-BUILT ARTIFACT EXECUTES on this platform.
  "mk": '''          "$BIN" --help >/dev/null
-          echo "binary runs"
+          "$BIN" encode --help | grep -q -- '--policy-id-stub' || {
+            echo "::error::encode's flag surface is not what this platform built"; exit 1; }
+          echo "binary runs; flag surface intact"
 ''',
- # --help only, same reasoning: a transaction fixture belongs in the test job.
  "mt": '''          "$BIN" --help >/dev/null
-          echo "binary runs"
+          "$BIN" encode --help >/dev/null
+          echo "binary runs; subcommands resolve"
 ''',
 }
 
@@ -41,19 +50,15 @@ WHY = {
        "# `md-codec-unpublishable-while-patched-to-miniscript-master`.\n",
  "ms": "# THIS REPO ALREADY SHIPS LINUX. The musl workflow publishes static aarch64 +\n"
        "# x86_64 builds, a BETTER Linux artifact than a glibc-linked one, so this\n"
-       "# workflow adds macOS only.\n#\n"
-       "# NO WINDOWS TARGET, AND THAT IS DELIBERATE. `ms` pins secret-bearing heap\n"
-       "# pages with POSIX mlock(2) so they cannot be swapped to disk\n"
-       "# (crates/ms-cli/src/mlock.rs, SPEC_secret_memory_hygiene_v0_9_B.md). The\n"
-       "# module has no cfg(unix) gating and does not compile for MSVC: `cannot find\n"
-       "# function mlock in crate libc`, measured on this matrix.\n#\n"
-       "# The fix is NOT to cfg it out. That would ship a Windows binary whose seed\n"
-       "# material is swappable while every other platform pins it -- a silent\n"
-       "# downgrade in exactly the code where it matters most. Windows has\n"
-       "# VirtualLock/VirtualUnlock and a real port is possible, but mlock.rs is an\n"
-       "# INLINE COPY of mnemonic-toolkit\'s with a G6 CI invariant asserting the two\n"
-       "# are byte-equal, so the change lands in both repos or CI goes red. That is a\n"
-       "# spec cycle, not a build flag. Tracked in design/FOLLOWUPS.md.\n",
+       "# workflow adds macOS and Windows.\n#\n"
+       "# THE WINDOWS BINARY DOES NOT LOCK SECRET MEMORY, AND SAYS SO AT RUNTIME.\n"
+       "# `ms` pins secret-bearing heap pages with POSIX mlock(2) so they cannot be\n"
+       "# swapped to disk. Windows has no mlock; the non-POSIX arm reports a distinct\n"
+       "# ERRNO_UNSUPPORTED, which rides the SAME failure counting and report_at_exit\n"
+       "# a real EPERM rides, so every run prints that the regions were left unpinned\n"
+       "# and that the OS may write them to the page file. Operator decision, taken\n"
+       "# knowingly: a warned build beats no build, and it is never silent.\n"
+       "# A real VirtualLock port is tracked in design/FOLLOWUPS.md.\n",
  "mk": "# THIS REPO ALREADY SHIPS LINUX. `musl-binaries.yml` publishes static aarch64 +\n"
        "# x86_64 musl builds, which are a BETTER Linux artifact than a glibc-linked one.\n"
        "# So this workflow adds only what was missing: macOS and Windows. Every platform\n"
@@ -61,11 +66,34 @@ WHY = {
  "mt": "# This repo shipped NO binaries at all, so this workflow covers all five targets.\n",
 }
 
-MD_SMOKE = '''          # A real round trip, not just --version.
+MD_SMOKE = '''          # A REAL acceptance pass, on this platform, using the commands the
+          # demo hands to people. Deterministic on every target: same policy,
+          # same md1, same Template-ID, same corrections.
           MD1="$("$BIN" encode 'wpkh(@0/<0;1>/*)' --group-size 0 | grep '^md1')"
           DEC="$("$BIN" decode "$MD1")"
-          case "$DEC" in *'wpkh(@0'*) ;; *) echo "::error::round trip failed"; exit 1 ;; esac
-          echo "round trip ok: $MD1"
+          case "$DEC" in *'wpkh(@0'*) ;; *) echo "::error::round trip failed: $DEC"; exit 1 ;; esac
+
+          # compose -> the zen-hodl policy the demo builds on the device
+          ZEN="$("$BIN" compose --wrapper tr --path '1of1,older=32768' 2>/dev/null)"
+          case "$ZEN" in *'older(32768)'*) ;; *) echo "::error::compose failed: $ZEN"; exit 1 ;; esac
+
+          # BCH repair: four damaged characters, named and corrected
+          BADMD1=md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
+          GOODMD1=md1yqfdsssjuqqcr5e55uqqqgqqq6qqvf4d7h59r2
+          if "$BIN" decode "$BADMD1" >/dev/null 2>&1; then
+            echo "::error::the damaged string decoded; BCH detection is broken here"; exit 1
+          fi
+          REP="$("$BIN" repair "$BADMD1" || true)"
+          case "$REP" in *"$GOODMD1"*) ;; *) echo "::error::repair did not restore: $REP"; exit 1 ;; esac
+          case "$REP" in *'4 corrections'*) ;; *) echo "::error::correction count changed: $REP"; exit 1 ;; esac
+
+          # cross-implementation identity: must match what the DEVICE shows
+          ID="$("$BIN" inspect "$GOODMD1" | grep 'wallet-descriptor-template-id:' | awk '{print $2}')"
+          [ "$ID" = "73c33a5dea17b45376a6246995df0cbb" ] || {
+            echo "::error::Template-ID is $ID on this platform, not 73c33a5d... -- the"
+            echo "::error::identity hash is not platform-independent, which breaks the"
+            echo "::error::whole point of a template id"; exit 1; }
+          echo "acceptance ok on this platform: $MD1 / $ID"
 '''
 
 # mt's history-purge tests drive a REAL interactive zsh and fish on a pty, so
@@ -82,16 +110,22 @@ TEST_SETUP = {
 """,
 }
 
+# Which OSes can run each suite. md and mk use only PermissionsExt/mode(0o..),
+# which macOS has. ms hardcodes /usr/bin/script and mt hardcodes
+# /usr/bin/{zsh,fish,script,timeout}; those paths differ on macOS, so their
+# suites stay on Linux rather than being loosened to travel.
+TEST_OS = {"md": "[ubuntu-latest, macos-latest]", "mk": "[ubuntu-latest, macos-latest]"}
+
 REPOS = {
  "descriptor-mnemonic":  dict(bin_="md", pkg="md-cli", branch="main",   names=ALL5),
- "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=MACOS_ONLY),
+ "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=PORTABLE3),
  "mnemonic-key":         dict(bin_="mk", pkg="mk-cli", branch="main",   names=PORTABLE3),
  "mnemonic-transaction": dict(bin_="mt", pkg="mt-cli", branch="main",   names=ALL5),
 }
 
 for repo, kw in REPOS.items():
     b = kw["bin_"]
-    text = gen(why_subset=WHY[b], smoke=SMOKE.get(b, MD_SMOKE), test_setup=TEST_SETUP.get(b, ''), **kw)
+    text = gen(why_subset=WHY[b], smoke=SMOKE.get(b, MD_SMOKE), test_setup=TEST_SETUP.get(b, ''), test_os=TEST_OS.get(b, '[ubuntu-latest]'), **kw)
     p = pathlib.Path(f"/scratch/code/shibboleth/{repo}/.github/workflows/release.yml")
     p.write_text(text)
     import yaml

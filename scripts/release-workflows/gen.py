@@ -20,7 +20,7 @@ ARCHIVE = {
     "windows-x86_64": ("windows", "amd64"),
 }
 
-def gen(*, bin_, pkg, branch, names, why_subset, smoke, test_setup=""):
+def gen(*, bin_, pkg, branch, names, why_subset, smoke, test_setup="", test_os="[ubuntu-latest]"):
     matrix = "".join(
         f"""          - name: {n}
             os: {TARGETS[n][0]}
@@ -81,9 +81,25 @@ env:
   MINISIGN_PUBKEY: 'RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW'
 
 jobs:
+  # THE SUITE, ON EACH OS THAT CAN RUN IT.
+  #
+  # Running the real tests on a real Mac is the strongest functional evidence
+  # available short of owning the hardware -- stronger than any local VM, since
+  # this IS macOS. Which repos can do it is not uniform and the list is set per
+  # repo: a suite that hardcodes /usr/bin/zsh or /usr/bin/fish is Linux-bound
+  # and stays there rather than being weakened to travel.
+  #
+  # Windows is never in this list: these suites assert POSIX file modes via
+  # std::os::unix, which does not compile there. The per-platform acceptance
+  # check in the build job is what covers Windows, and it runs the commands the
+  # documentation actually hands to people.
   test:
-    name: test
-    runs-on: ubuntu-latest
+    name: test (${{{{ matrix.os }}}})
+    runs-on: ${{{{ matrix.os }}}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: {test_os}
     steps:
       - uses: actions/checkout@v4
         with:
