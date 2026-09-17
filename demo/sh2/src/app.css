@@ -91,3 +91,15 @@ a { color: var(--accent); }
   border: 1px solid var(--line); border-radius: 7px; padding: .6em .9em; cursor: pointer;
 }
 .bar button:hover, .bar a.btn:hover { border-color: var(--accent); }
+
+/* ---- download matrix ----
+   Wide content must scroll inside its own box rather than making the page
+   scroll sideways, which on a phone is what turns a table into a wall. */
+.dl { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; margin: .75rem 0 1rem; }
+.dl th, .dl td { border: 1px solid var(--line); padding: .4em .5em; text-align: left; white-space: nowrap; }
+/* The point of this table is reading the md and ms columns AGAINST each other,
+   so on a phone it must fit rather than hide one behind a scrollbar. */
+@media (max-width: 460px) { .dl { font-size: 11px; } .dl th, .dl td { padding: .35em .3em; } }
+.dl th { color: var(--dim); font-weight: 600; }
+.dl tr th:first-child { color: var(--ink); }
+.dl code { background: #000; border: 1px solid var(--line); border-radius: 4px; padding: .15em .4em; }

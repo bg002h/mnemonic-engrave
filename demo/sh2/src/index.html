@@ -33,9 +33,21 @@
   <h3>Install</h3>
   <p class="lead">
     Prebuilt binaries for macOS, Linux and Windows &mdash; no Rust, no compiling.
-    Swap <code>macos-amd64</code> for <code>macos-arm64</code> on Apple Silicon,
-    or <code>linux-amd64</code> / <code>windows-amd64</code>.
+    The block below is Intel macOS. <b>The two tools do not use the same suffix
+    on Linux</b> &mdash; <code>ms</code> ships a static musl build there and
+    <code>md</code> ships a glibc one &mdash; so take the exact platform token
+    from this table rather than swapping it by hand. Full name is
+    <code>md-0.15.0-&lt;token&gt;.tar.gz</code> /
+    <code>ms-0.19.0-&lt;token&gt;.tar.gz</code>, and <code>.zip</code> on Windows.
   </p>
+  <table class="dl">
+    <tr><th></th><th><code>md</code></th><th><code>ms</code></th></tr>
+    <tr><th>macOS x86</th><td><code>macos-amd64</code></td><td><code>macos-amd64</code></td></tr>
+    <tr><th>macOS arm64</th><td><code>macos-arm64</code></td><td><code>macos-arm64</code></td></tr>
+    <tr><th>Linux x86</th><td><code>linux-amd64</code></td><td><code>x86_64-linux-musl</code></td></tr>
+    <tr><th>Linux arm64</th><td><code>linux-arm64</code></td><td><code>aarch64-linux-musl</code></td></tr>
+    <tr><th>Windows</th><td><code>windows-amd64</code></td><td><code>windows-amd64</code></td></tr>
+  </table>
   <div class="code"><pre><code><span class="c"># the descriptor tool</span>
 curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-macos-amd64.tar.gz
 <span class="c"># the seed tool</span>
@@ -43,6 +55,13 @@ curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.1
 
 tar -xzf md-0.15.0-macos-amd64.tar.gz
 tar -xzf ms-0.19.0-macos-amd64.tar.gz
+chmod +x md ms</code></pre></div>
+
+  <p>Linux x86-64, ready to paste:</p>
+  <div class="code"><pre><code>curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-linux-amd64.tar.gz
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-x86_64-linux-musl.tar.gz
+tar -xzf md-0.15.0-linux-amd64.tar.gz
+tar -xzf ms-0.19.0-x86_64-linux-musl.tar.gz
 chmod +x md ms</code></pre></div>
 
   <div class="note warn">

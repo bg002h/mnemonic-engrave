@@ -387,3 +387,7 @@ section above exists.
 - If the network is hostile, the emulator runs from `dist/` with
   `python3 -m http.server` — already on macOS — and the CLI half needs no
   network at all once installed.
+- **If someone on Linux says the download 404s, they are not wrong.** The two
+  tools use different Linux suffixes: `md` ships glibc `linux-amd64`, `ms`
+  ships static `x86_64-linux-musl`. There is no `ms-*-linux-amd64`. The page's
+  table has both columns, and a ready-to-paste Linux x86-64 block under it.
