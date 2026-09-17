@@ -188,17 +188,52 @@ printf '&lt;your 12 words&gt;' | mnemonic xpub-search passphrase-of-xpub   --phr
     rather than glossed over.
   </div>
 
-  <h3>Bonus &nbsp;Try to do it the dangerous way</h3>
+  <h3>Bonus &nbsp;The refusal &mdash; and the door out of it</h3>
   <p class="lead">
     This one is meant to fail. Paste it and the tool refuses before it parses
-    anything — the command is complete on purpose, so the refusal is real.
+    anything &mdash; the command is complete on purpose, so the refusal is real.
   </p>
   <div class="code"><pre><code>ms split --phrase "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" -k 3 -n 5
-<span class="o">ms: argument 3 on ARGV is a BIP-39 mnemonic, 93 characters long.</span>
+<span class="o">ms: argument 3 on ARGV ... is a BIP-39 mnemonic, 93 characters long.</span>
 <span class="o">      Refused BEFORE the command line was parsed; nothing was read</span>
 <span class="o">      and nothing was written.</span>
 <span class="o">      ... `ps` shows it, and your shell has ALREADY written the line</span>
 <span class="o">      to its history.</span></code></pre></div>
+
+  <h3 style="font-size:.95rem;margin-top:1.25rem">When argv really is safe</h3>
+  <p>
+    A tool that only ever says <em>no</em> teaches people to route around it. On a
+    single-user air-gapped machine, an amnesic <b>Tails</b> session, or an offline
+    <b>Blockstream satellite</b> node there is no second user to read
+    <code>/proc</code>, no network, and no history that outlives the session. The
+    threat being modelled is not present &mdash; so the tool gets out of your way,
+    and says so in the refusal itself:
+  </p>
+  <div class="code"><pre><code>ms split --phrase "&lt;your words&gt;" -k 3 -n 5 --group-size 0 --allow-argv-secret
+<span class="o">share 1 of 5:</span>
+<span class="o">ms13zereq3arxz33xqwgeswner6uet85ncm6sgsukqw9yykxzy</span>
+<span class="o">...</span>
+<span class="o">warning: stdout carries private key material (can spend) — redirect or encrypt</span></code></pre></div>
+  <p class="lead">
+    Exit 0, five shares &mdash; and note the other warnings do <b>not</b> go
+    away. Opting out of one protection does not opt you out of the rest. The flag
+    is deliberately greppable, so <code>--allow-argv-secret</code> in a script is
+    something a reviewer can find. <code>md</code>, <code>mk</code>,
+    <code>mt</code> and <code>mnemonic</code> all accept it, with the same meaning.
+  </p>
+
+  <div class="note warn">
+    <b>Already typed it before reading this?</b> The refusal prints the cleanup,
+    and the part people get wrong is this: <b>match on the COMMAND, never on the
+    secret</b> &mdash; grepping your history for your own seed types it in a
+    second time.
+    <div class="code" style="margin-top:.6rem"><pre><code>zsh:  fc -W; sed -i '/\bms split\b/d' "$HISTFILE"; h=$HISTSIZE; HISTSIZE=0; HISTSIZE=$h; fc -R
+bash: history -w; sed -i '/\bms split\b/d' "$HISTFILE"; history -c; history -r
+fish: history clear-session</code></pre></div>
+    Run <em>all</em> the steps &mdash; the entry is still in the shell's memory,
+    so editing the file alone changes nothing and the shell writes it back when
+    you exit. And <code>shred -u</code> anything you pasted from.
+  </div>
 
   <div class="note warn">
     <b>A word on what this is.</b> SeedHammer II engraves wallet backups into

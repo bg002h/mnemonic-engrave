@@ -160,7 +160,7 @@ error: not enough shares: have 2, need 3
 
 > Any three rebuild it. Two rebuild nothing. Not a policy — arithmetic.
 
-**Then the one that always lands:**
+**Then the one that always lands — and then the part people actually need:**
 
 ```sh
 ms split --phrase "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" -k 3 -n 5
@@ -171,9 +171,54 @@ ms: argument 3 on ARGV ... is a BIP-39 mnemonic, 93 characters long.
       ... `ps` shows it, and your shell has ALREADY written the line to its history.
 ```
 
-> It refuses to let you put a seed on a command line, and tells you why. The
-> published build on crates.io is a year older and *only* accepts it that way —
-> which is why the install line points at git, and worth saying out loud.
+> It refuses to let you put a seed on a command line, and tells you why.
+
+### But sometimes argv really is safe — and then it must not fight you
+
+**This is the half worth showing.** A tool that only ever says no teaches people
+to route around it. On a single-user air-gapped box, an amnesic Tails session, or
+an offline Blockstream-satellite node there is no other user to read `/proc`, no
+network, and — on Tails — no history that survives the session. The threat the
+refusal is modelling is simply not present.
+
+`ms` says so itself, in the refusal, and gives you the door:
+
+```sh
+ms split --phrase "<your words>" -k 3 -n 5 --group-size 0 --allow-argv-secret
+```
+```
+share 1 of 5:
+ms13zereq3arxz33xqwgeswner6uet85ncm6sgsukqw9yykxzy
+...
+warning: stdout carries private key material (can spend) — redirect or encrypt
+```
+
+> Exit 0, five shares. **The other warnings do not go away** — it still tells you
+> stdout carries spendable material. Opting out of one protection does not opt
+> you out of the rest.
+>
+> The flag is deliberately **greppable**: `--allow-argv-secret` in a script is a
+> thing a reviewer can find, which is the point of spelling it out rather than
+> having an `ARGV_OK=1` environment variable nobody ever sees.
+
+**Same escape hatch across the constellation** — `md`, `mk`, `mt` and `mnemonic`
+all take `--allow-argv-secret`, with the same meaning.
+
+### And if you already typed it before reading any of this
+
+The refusal tells you how to clean up, and the instruction that matters is the
+one people get wrong: **match on the COMMAND, never on the secret** — grepping
+for your own seed types it into history a second time.
+
+```sh
+zsh:    fc -W; sed -i '/\bms split\b/d' "$HISTFILE"; h=$HISTSIZE; HISTSIZE=0; HISTSIZE=$h; fc -R
+bash:   history -w; sed -i '/\bms split\b/d' "$HISTFILE"; history -c; history -r
+fish:   history clear-session
+```
+
+> Run **all** of the steps: the entry is still in the shell's MEMORY, so editing
+> the history file alone changes nothing and the shell writes it back at exit.
+> And `shred -u` any file you pasted from.
 
 ---
 
