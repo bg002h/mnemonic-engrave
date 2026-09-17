@@ -22,7 +22,8 @@ picotool info -a                # or: picotool info -a --bus N --address M
 
 | chipid | board | part | flash | secure boot | notes |
 | --- | --- | --- | --- | --- | --- |
-| `0x77c483b745abf55c` | **SeedHammer II** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — own key | the real machine |
+| `0x77c483b745abf55c` | **SeedHammer II #1** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — own key (slot 1) | the original machine; burned 2026-08-03 |
+| `0x09f50bf63e8d6f46` | **SeedHammer II #2** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — SeedHammer only | spare control board, received 2026-09-17 |
 | `0x66d3d60ff20abf2f` | Pico 2 (rehearsal) | RP2350A, QFN60 | 4 MB | 1 — rehearsal key | boot-key rehearsal, 2026-08-03 |
 | `0xb3d19289d3ec3f0e` | **Pico 2 W** | RP2350A, QFN60, rev A2 | 4 MB | **0** | blank; WiFi; LED differs — see below |
 
@@ -54,6 +55,44 @@ continuity §5 item 2). Grab it on the next flash trip.
 
 **This is the only board that can close F-73**, which needs the payload region at
 `0x10E00000` — 14 MB in — to actually exist.
+
+### `0x09f50bf63e8d6f46` — SeedHammer II #2 (spare control board)
+
+Received 2026-09-17. Measured the same day via `picotool info -a`:
+
+```
+revision: A4   package: QFN80   secure boot: 1   debug enable: 1
+image type: ARM Secure          signature: verified
+flash size: 16384K
+```
+
+**Confirmed a genuine retail unit two independent ways:** `--sh2-precheck` read
+SeedHammer's production key out of OTP slot 0, and sha256 of the uncompressed
+pubkey embedded in its running factory image is
+`c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b` — exactly
+`signKeyHash` (`cmd/controller/platform_sh2.go:72`). Its SCSI inquiry reads
+`SH / SHII / 5`, byte-identical to #1.
+
+Pristine retail OTP state at receipt: `KEY_VALID = 0x1` (slot 0 only),
+`KEY_INVALID = 0`, slots 1–3 empty across all 16 rows each,
+`PAGE1/2_LOCK0 = 0x000000`, `PAGE1/2_LOCK1 = 0x040404`, CRIT1 ×8 and
+BOOT_FLAGS1 ×3 all agreeing.
+
+**USB serial is the chipid, uppercased:** `09F50BF63E8D6F46`. Use it to bind
+irreversible writes to this board — `picotool otp load … --ser 09F50BF63E8D6F46`.
+picotool `strcmp`s it, and a miss is a refusal (exit **249**), not a silent
+no-op. This matters because the slot-0 tripwire that proves "this is a
+SeedHammer" is satisfied by **both** boards, so CHIPID is the only discriminator
+left.
+
+**After it runs fork firmware, #1 and #2 render an identical version line** and
+the fork carries no board-unique field anywhere — so the enclosure label and this
+table are the only way to tell them apart by sight. Over USB, always check the
+chipid.
+
+Per-board rehearsal-script state lives in `~/.sh2/boards/<script-form-chipid>/`;
+export `SH2_DIR` to the right one before any `--sh2-*` mode. The script's
+word-reversed spelling of this chipid is `6f463e8d0bf609f5`.
 
 ### `0x66d3d60ff20abf2f` — Pico 2, boot-key rehearsal
 
