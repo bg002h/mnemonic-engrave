@@ -37,6 +37,16 @@ SMOKE = {
           "$BIN" encode --help >/dev/null
           echo "binary runs; subcommands resolve"
 ''',
+ "mnemonic": '''          # A REAL acceptance pass on this platform, on the demo's own recovery
+          # path: the published all-zeros seed + passphrase "satoshi" must derive
+          # the known account xpub. Deterministic on every target.
+          "$BIN" --version >/dev/null
+          SEED='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
+          XPUB=xpub6CvHDtn5otAu9fjb7mPpbfizn2A31pQkwLsogfkHaMfsnoGVCwRidN6rZryTBE6G8b6MF152XgJSKiEBpgt3Jx7udU43auRCHB1hvJTRuBu
+          OUT="$(printf '%s' "$SEED" | "$BIN" xpub-search passphrase-of-xpub --phrase-stdin --passphrase satoshi --target-xpub "$XPUB")"
+          case "$OUT" in *"m/84'/0'/0'"*) ;; *) echo "::error::passphrase-of-xpub did not match here: $OUT"; exit 1 ;; esac
+          echo "acceptance ok: passphrase-of-xpub derives the target xpub at m/84'/0'/0'"
+''',
 }
 
 WHY = {
@@ -64,6 +74,13 @@ WHY = {
        "# So this workflow adds only what was missing: macOS and Windows. Every platform\n"
        "# mnemonic-engrave supports is then covered.\n",
  "mt": "# This repo shipped NO binaries at all, so this workflow covers all five targets.\n",
+ "mnemonic": "# THIS REPO ALREADY SHIPS LINUX. reproducible-musl-build.yml publishes static\n"
+       "# aarch64 + x86_64 musl builds (PROVENANCE + per-arch SHA256SUMS), a better\n"
+       "# Linux artifact than a glibc-linked one, so this workflow adds only macOS\n"
+       "# and Windows. The binary is `mnemonic`; the crate is `mnemonic-toolkit`.\n#\n"
+       "# mlock is POSIX; the crate carries a cfg(not(unix)) arm (the G6 mirror of\n"
+       "# ms) so the Windows build compiles and warns at runtime that secret pages\n"
+       "# are left unlocked -- the same knowingly-taken operator decision as ms.\n",
 }
 
 MD_SMOKE = '''          # A REAL acceptance pass, on this platform, using the commands the
@@ -121,6 +138,7 @@ REPOS = {
  "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=PORTABLE3),
  "mnemonic-key":         dict(bin_="mk", pkg="mk-cli", branch="main",   names=PORTABLE3),
  "mnemonic-transaction": dict(bin_="mt", pkg="mt-cli", branch="main",   names=ALL5),
+ "mnemonic-toolkit":     dict(bin_="mnemonic", pkg="mnemonic-toolkit", branch="master", names=PORTABLE3),
 }
 
 for repo, kw in REPOS.items():
