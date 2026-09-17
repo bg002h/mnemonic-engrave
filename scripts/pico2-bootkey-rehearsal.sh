@@ -776,12 +776,29 @@ This is the row holding KEY_VALID/KEY_INVALID. STOP."
     KV="$(otp_field BOOT_FLAGS1.KEY_VALID)"
     if [ $((16#$KV)) -ne "$WANT" ]; then
       GOT=$(( 16#$KV )); EXTRA=$(( GOT & ~WANT )); MISSING=$(( WANT & ~GOT ))
-      if [ "$EXTRA" -ne 0 ]; then
+      if [ "$EXTRA" -ne 0 ] && [ "$MISSING" -eq 0 ]; then
         die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT").
 It has bits set that should NOT be: 0x$(printf '%x' "$EXTRA").
 This is NOT an interrupted write, and re-running \`otp set -s\` cannot fix it --
-that only ever SETS bits. Some other slot has been marked valid. Stop and work
-out which, and why, before doing anything else."
+that only ever SETS bits, and an OTP bit already burned cannot be cleared by
+anyone. Some other slot has been marked valid. Stop and work out which, and why,
+before doing anything else."
+      fi
+      if [ "$EXTRA" -ne 0 ] && [ "$MISSING" -ne 0 ]; then
+        # BOTH wrong. The extra bit is permanent, but the missing one is still
+        # settable -- and saying only "otp set -s cannot fix it" (as this did
+        # until F-617) tells the operator to give up on the half that IS
+        # recoverable, at the one moment they are most likely to do as told.
+        die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT"). BOTH are wrong:
+  extra bits   0x$(printf '%x' "$EXTRA")  -- PERMANENT. An OTP bit cannot be cleared.
+  missing bits 0x$(printf '%x' "$MISSING")  -- still settable, and you should set it.
+
+Two separate problems. The extra bit means some other slot was marked valid;
+find out which and why. The missing bit is an ordinary interrupted write and is
+fixed by re-running the identical set-bits command, which is safe to repeat:
+    picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x$(printf '%x' $((1 << SH2_SLOT)))
+Do NOT burn another slot, and do NOT re-sign -- the key hash is proven correct
+above. Resolve the extra bit before trusting this device."
       fi
       die "KEY_VALID is 0x$KV, expected 0x$(printf '%x' "$WANT") (slot 0 + slot $SH2_SLOT);
 missing bits 0x$(printf '%x' "$MISSING").

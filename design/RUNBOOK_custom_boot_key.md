@@ -105,6 +105,47 @@ Do not skip it.
 
 ---
 
+## State these gates depend on — and what deletes it (F-621)
+
+Two directories carry data the `--sh2-*` gates cannot work without, **both
+gitignored**, and one of which every other document in this project calls
+disposable. Deleting either does not weaken a gate silently — both fail closed —
+but it does strand you mid-procedure.
+
+| directory | holds | what breaks without it |
+| --- | --- | --- |
+| `rehearsal-work/` | the three rehearsal keys | `reject_rehearsal_key` dies `CANNOT CHECK`; it compares your key against **all three** and refuses to guess with one absent |
+| `$SH2_DIR` (see below) | the board's CHIPID pin | `--sh2-verify-slot` / `--sh2-verify-valid` die `no SeedHammer II pinned` |
+
+**Do not delete `rehearsal-work/` while any board remains to be burned.** It is
+disposable with respect to the *rehearsal*, not with respect to this runbook.
+(`ALLOW_UNCHECKED_KEY=1` exists as an escape hatch, but it turns a real guard off
+— prefer keeping the directory.)
+
+### One `SH2_DIR` per board — required from the second SeedHammer onward
+
+The CHIPID pin is what stops a different board answering for yours, and **every**
+`--sh2-*` mode refuses a mismatch — including `--sh2-precheck`, which creates the
+pin only when the file is *absent*. So a pin left over from board 1 blocks board
+2 at the very first read-only step.
+
+`SH2_DIR` is the only place that state lives, and it is env-overridable, so give
+each board its own directory rather than hand-deleting the pin:
+
+```sh
+export SH2_DIR=~/.sh2/boards/<script-form-chipid>     # e.g. 6f463e8d0bf609f5
+```
+
+Keep it outside any repo so a `git clean` cannot take it. Forgetting to export it
+fails closed (`no SeedHammer II pinned`), never silently.
+
+> **Two spellings of the same CHIPID, and they are not interchangeable.**
+> `picotool info -a` prints `0x09f50bf63e8d6f46`; this script reassembles OTP
+> rows into a **word-reversed** form `6f463e8d0bf609f5`; the USB serial that
+> `--ser` wants is the picotool form, uppercased, without `0x`.
+
+---
+
 ## Step 1 — Verify device state (READ ONLY, do this first)
 
 > **Honest status of these gates.** `--sh2-precheck` has been run against your
@@ -232,8 +273,23 @@ Generate and validate the OTP json (this touches **no device**):
 
 ```sh
 nix develop --command ../mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh \
-  --make-otp-json --key ~/.sh2/sh2-boot-key.pem --slot 1 --out ~/.sh2/my-otp.json
+  --make-otp-json --key ~/.sh2/sh2-boot-key.pem --slot 1 --out ~/.sh2/otp-bootkey-846aa289-slot1.json
 ```
+
+> **Name it after the KEY and SLOT, never after a board** (F-620). The file's
+> content is a boot-key hash plus a slot number — both board-independent — so
+> two boards burned with the same key into the same slot take *byte-identical*
+> files. A board-shaped filename implies a binding the file does not have, and
+> invites someone to trust the name instead of `--ser`. `846aa289` is the first
+> 4 bytes of the key fingerprint.
+>
+> **The ONLY thing that binds a write to a board is `--ser`** (F-618/I-2).
+> Append it to every irreversible command; the RP2350 exposes its CHIPID as the
+> USB serial, so `cat /sys/bus/usb/devices/<port>/serial` gives you the exact
+> uppercase string. A wrong serial is a refusal (exit 249), never a silent
+> write to the wrong board. This matters from the SECOND SeedHammer onward,
+> because the "slot 0 holds SeedHammer's key" tripwire is then satisfied by
+> every board you own and stops discriminating.
 
 That asserts, before the file can ever be loaded: exactly one top-level key, the
 correct slot, 32 entries, no `crit1`/`boot_flags1`, and byte-equality with an
@@ -245,7 +301,7 @@ single row had been verified.
 Now the first irreversible write:
 
 ```sh
-picotool otp load ~/.sh2/my-otp.json
+picotool otp load ~/.sh2/otp-bootkey-846aa289-slot1.json --ser <THIS BOARD'S SERIAL>
 ```
 
 > **This is the one command with an unrecoverable interruption window.** It
@@ -265,8 +321,21 @@ picotool otp load ~/.sh2/my-otp.json
 > source has no PD state machine at all, and reproduces the electrical
 > conditions under which the Pico rehearsal succeeded. This device already
 > logged one `device descriptor read/64, error -71` during enumeration.
-> Note also that `otp load` prints no "verified" confirmation of its own — the
-> absence of output is not success, which is why step 3 is mandatory.
+> **What `otp load` actually prints, and why it proves nothing** (corrected
+> 2026-09-17 from the board-2 burn, F-616 — this paragraph previously said the
+> output was *absent*, which is the opposite of what happens). Loading a JSON
+> file echoes the whole 32-byte key hash, like this:
+>
+> ```
+> bootkey1:
+>   0x84, 0x6a, 0xa2, 0x89, ... 0xab, 0xb4,
+> ```
+>
+> That dump is printed **before** the write and then the call returns past
+> picotool's own read-back, so it is *input being echoed*, not memory being
+> confirmed. Expect a confident-looking hex block exactly where you might expect
+> silence, and do not read it as success. **Step 3's `--sh2-verify-slot` is the
+> only thing that proves the rows landed.**
 
 ## Step 3 — Verify, then mark the slot valid (IRREVERSIBLE)
 

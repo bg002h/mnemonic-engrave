@@ -18810,7 +18810,7 @@ are pinned or when they may be deleted.
 
 ### F-616 — RUNBOOK step 2 says `otp load` prints nothing; it prints all 32 bytes
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook now shows the actual hex-echo output, states that it is printed BEFORE the write and returns past picotool's read-back, and names `--sh2-verify-slot` as the only proof the rows landed.
 
 From the journey review of the board-2 burn (`design/agent-reports/new-board-otp-burn-journey-review.md`, I-1). `RUNBOOK_custom_boot_key.md` tells the operator `otp load` "prints no 'verified' confirmation of its own — the absence of output is not success". Measured on the real burn 2026-09-17: loading a JSON file echoes the full 32-byte key hash **before** writing and then returns past picotool's own read-back. So the operator gets a confident hex dump exactly where the runbook promised silence, and that dump is *pre-write information* proving nothing.
 
@@ -18818,13 +18818,15 @@ Nobody was misled here because the controller labelled the output at the moment 
 
 ### F-617 — `--sh2-verify-valid`'s wrong-bit message rules out the remedy that fixes it
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The EXTRA-bit branch now splits: extra-only keeps the "cannot be cleared" wording, while extra-AND-missing reports them as two separate problems and gives the set-bits recipe for the recoverable half. `bash -n` clean; `--make-otp-json` runs unchanged on the edited script.
 
 Journey review I-3. If `KEY_VALID` comes back with a wrong bit set, the gate reports the extra bit and tells the operator that `otp set -s` cannot help — when OR-ing in the correct bit with `otp set -s` is exactly the fix (the wrong bit is unremovable, but the right one can still be added). A gate that names the wrong remedy at the one moment the operator is frightened is worse than one that stays quiet. Not hit on board 2: `0x2` was resolved against `picotool otp list` beforehand and `KEY_VALID` came back `0x3` first time.
 
 ### F-619 — "all three BOOT_FLAGS1 copies agree" compares a majority vote against two raw rows
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN — deliberately NOT fixed blind 2026-09-17.
+
+`picotool otp get` does offer `-c <copies>` ("Read multiple redundant values"), confirmed from its help text. But the review PRESCRIBED `-c 1` without reproducing what it returns, and a prescribed remedy is not authoritative — shipping an unverified change to a gate would replace a known-weak check with an unknown one. No board was in BOOTSEL when the other four were closed, so the semantics could not be measured. **Do this with a board attached, read-only:** compare `picotool otp get -n 0x04b` against `picotool otp get -n -c 1 0x04b`, confirm the three-copy read returns three independently-sourced values, and make the parser assert it got three values so a shape change dies instead of passing.
 
 Journey review I-6, and the sharpest finding of the two reviews. `--sh2-verify-valid`'s three-copy comparison reads rows `0x04b`/`0x04c`/`0x04d`, but `0x04b` resolves by name to `BOOT_FLAGS1`, so `read_row_raw24` returns the **majority vote** rather than that row's raw content. The A/B/C compare is therefore blind in exactly the case where `0x04b` itself is the odd row out. Remedy: read with `-c 1` so each copy is fetched raw.
 
@@ -18832,12 +18834,12 @@ Journey review I-6, and the sharpest finding of the two reviews. `--sh2-verify-v
 
 ### F-620 — the OTP json is named after a board it is not bound to
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook now generates `~/.sh2/otp-bootkey-<fp8>-slot<N>.json` — named after what the content actually is — and states that only `--ser` binds a write to a board. Canonical file generated and verified byte-identical to both board-named predecessors (all three sha256 `b474f23a...92cc9`), which is the demonstration that the name never carried a binding.
 
 Journey review M-1. `~/.sh2/otp-6f463e8d0bf609f5.json` carries a board's chipid in its name, but its **content is board-independent** — a boot-key slot stores only sha256(X‖Y) plus the slot number, and the file is byte-identical to board 1's `my-otp.json` (both sha256 `b474f23a86ef1e3c497fef1e8c75f756835b2fb271dd80ae91eb45bfb9792cc9`). The name implies a binding that does not exist, which invites someone to trust the filename instead of `--ser`. Either drop the chipid from the name or state in the runbook that the name is a provenance label, not a binding.
 
 ### F-621 — steps 2 and 4 depend on two `.gitignore`d directories, one documented as disposable
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook gained a "State these gates depend on" section: a table of what each directory holds and which gate dies without it, an explicit "do not delete `rehearsal-work/` while any board remains to be burned", and the per-board `SH2_DIR` convention with the two-CHIPID-spellings warning. Both dependencies were confirmed to fail CLOSED already (`CANNOT CHECK` / `no SeedHammer II pinned`), so this was a stranding risk, not a silent-weakening one.
 
 Journey review M-2. The `--sh2-*` gates depend on `sh2-state/` (or a per-board `SH2_DIR`) for the CHIPID pin and on `rehearsal-work/` for the rehearsal-key refusal list. Both are gitignored, and every document describes `rehearsal-work/` as disposable — so a tidy-up deletes the data that makes "this key is not a rehearsal key" and "this is the board you pinned" answerable. Mitigated on 2026-09-17 by moving pins to `~/.sh2/boards/<chipid>/` (outside any repo), but the rehearsal-key list still lives in the disposable directory.
