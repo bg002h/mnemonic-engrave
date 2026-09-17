@@ -53,15 +53,34 @@ same as the ones on this machine:
 
 Re-check both after any release, with the *installed* binary, not this tree's.
 
-## Deploying
-
-Nothing here is published until someone means it. When that time comes:
+## Deploying, and undoing it
 
 ```sh
-rsync -a --delete dist/ <host>:/opt/quantoshi/sh2/
-# then add nginx-SH2.conf's location block, reload nginx, and verify:
-curl -sI https://quantoshi.xyz/SH2/emu/emu.wasm | grep -i content-type
+./deploy.sh --host user@quantoshi --dry      # show every command, change nothing
+./deploy.sh --host user@quantoshi            # push dist/, back up the nginx conf
+./deploy.sh --host user@quantoshi --rollback # undo
 ```
 
-The `content-type: application/wasm` check is not optional — the wrong type
-fails at load with an error that reads like a corrupt build.
+**It is undoable by construction, not by luck.** The deploy writes one NEW
+directory (`/opt/quantoshi/sh2/`) and backs up the nginx config with a timestamp
+before anything touches it. Rolling back is `rm -rf` that directory plus
+restoring the backup — Quantoshi's own files are never written to.
+
+**`rsync --delete` is never used.** Pointed at a mistyped directory it removes
+everything there that is not in `dist/`, which would take out the app rather
+than the demo. A stale leftover file is a trivial problem; a wiped app directory
+is not. The script also refuses a target that exists and is not already an SH2
+deploy.
+
+**The nginx block is printed, not applied.** Editing a live web server's config
+from a script is how an unrelated site goes down. Paste it, then
+`sudo nginx -t && sudo systemctl reload nginx` — `nginx -t` validates *before*
+anything takes effect, and `reload` keeps the old config running if the new one
+is bad. Never `restart`.
+
+Then verify, because the MIME type is what silently breaks the page:
+
+```sh
+curl -sI https://quantoshi.xyz/SH2/emu/emu.wasm | grep -i content-type
+# expect: content-type: application/wasm
+```
