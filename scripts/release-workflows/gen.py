@@ -219,6 +219,14 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{{{ steps.meta.outputs.tag }}}}"
+          # THE VERSION, NOT THE TAG. Tags here are `ms-cli-v0.19.0` and
+          # `v0.10.0`; naming an archive `{bin_}-${{TAG}}-...` yields
+          # `ms-ms-cli-v0.19.0-...`, which stutters AND collides with a second
+          # convention, because the musl workflow uploading to the SAME release
+          # names its files `ms-0.18.0-x86_64-linux-musl.tar.gz`. One release
+          # should not ship two naming schemes.
+          VER="${{TAG##*-v}}"
+          [ "$VER" = "$TAG" ] && VER="${{TAG#v}}"
           mkdir -p release
           if [ "$SIGNED" = "true" ]; then
             cat > VERIFY.txt <<EOF
@@ -254,10 +262,10 @@ jobs:
             cp VERIFY.txt "$stage/"
             [ -f LICENSE ] && cp LICENSE "$stage/" || true
             if [ "$ext" = ".exe" ]; then
-              (cd "$stage" && zip -q "../release/{bin_}-${{TAG}}-${{a_os}}-${{a_arch}}.zip" ./*)
+              (cd "$stage" && zip -q "../release/{bin_}-${{VER}}-${{a_os}}-${{a_arch}}.zip" ./*)
             else
               chmod +x "$stage/{bin_}"
-              tar -czf "release/{bin_}-${{TAG}}-${{a_os}}-${{a_arch}}.tar.gz" -C "$stage" .
+              tar -czf "release/{bin_}-${{VER}}-${{a_os}}-${{a_arch}}.tar.gz" -C "$stage" .
             fi
           }}
 
