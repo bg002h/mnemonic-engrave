@@ -284,12 +284,32 @@ john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout
 <span class="o">  your seed completes cosigner slot @0</span></code></pre></div>
 
   <div class="note">
-    <b>It refuses to guess, and that is the point.</b> It sizes the requirement
-    to the search space and tells you the number it wants &mdash; for this
-    3-slot wallet that is <b>10 hex characters</b>. Below that it says so rather
-    than guessing: <code>72d9</code> and <code>72d94d49</code> are
-    <b>refused as too weak</b>. A <em>wrong</em> id returns
-    <code>✗ NO MATCH</code> and exit 4 &mdash; never a plausible wrong wallet.
+    <b>It never silently guesses &mdash; and that is the point.</b> It sizes the
+    requirement to the search space and tells you the number it wants: for this
+    3-slot wallet, <b>10 hex characters</b> proves the answer is unique. Supply
+    less and it does not shrug and pick one &mdash; it shows its work:
+    <table style="margin:.7rem 0 .2rem;border-collapse:collapse;font-size:.9em">
+      <tr><td style="padding:.15rem .8rem .15rem 0"><code>72</code> (2 hex)</td>
+          <td><b>refused</b> &mdash; below the floor; a 1-byte prefix over any real
+          space is a wall of matches that teaches nothing</td></tr>
+      <tr><td style="padding:.15rem .8rem .15rem 0"><code>72d9</code> &hellip; <code>72d94d49</code></td>
+          <td>several matches &rarr; <b>lists the candidates</b> and reconstructs
+          none; exactly one match &rarr; completes, with a loud
+          <code>UNIQUENESS NOT PROVEN</code> warning naming the bytes you gave
+          and the bytes it wanted</td></tr>
+      <tr><td style="padding:.15rem .8rem .15rem 0"><code>72d94d49b0ac</code>+ (10 hex)</td>
+          <td><b>accepted</b> &mdash; uniqueness proven, no caveat</td></tr>
+    </table>
+    A <em>wrong</em> id still returns <code>✗ NO MATCH</code> and exit 4 &mdash;
+    never a plausible wrong wallet. And a candidate list is deliberately
+    <b>not importable</b>: rows carry an id, the key&rarr;slot assignment and an
+    address, but <em>no descriptor</em>, so nothing downstream can act on a
+    guess.
+    <br><br>
+    <span class="muted">Changed in mnemonic-toolkit v0.100.0. Before it, a short
+    id was refused outright &mdash; which sounds safer and was not: it left an
+    operator who recorded four hex with a dead end, and pushed them toward
+    asserting cosigner positions by hand, which nothing verifies.</span>
   </div>
 
   <div class="note">
@@ -317,13 +337,15 @@ john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout
     derivation path is still inferred from the cosigners' metadata, so
     <code>--search-address</code> does not rescue it.
     <br><br>
-    <b>One or the other, not both.</b> Supply an address <em>or</em> an id.
-    Today the id search takes precedence and the address is simply ignored, so
-    pairing them buys nothing. They pin different things &mdash; the address
-    pins the key <em>set</em>, the id pins the <em>labelling</em> &mdash; and
-    for <code>sortedmulti</code> that difference is moot anyway, because the
-    script sorts keys at every index, so swapping two cosigners' labels yields
-    the identical wallet.
+    <b>One or the other &mdash; supplying both is now an error.</b> Since
+    v0.100.0 <code>--expect-wallet-id</code> and <code>--search-address</code>
+    are mutually exclusive and the tool refuses the combination by name. Before
+    that it accepted both and <em>silently ignored the address</em>, which is
+    why this page used to tell you to pair them. They pin different things
+    &mdash; the address pins the key <em>set</em>, the id pins the
+    <em>labelling</em> &mdash; and for <code>sortedmulti</code> that difference
+    is moot anyway, because the script sorts keys at every index, so swapping
+    two cosigners' labels yields the identical wallet.
   </div>
 
   <div class="note">

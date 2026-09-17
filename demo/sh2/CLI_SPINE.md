@@ -394,13 +394,25 @@ printf '<your 12 words>' | mnemonic restore --from phrase=- --md1 <template-md1>
 
 **And it refuses to guess — show this, it is the best part:**
 
-| you supply | what happens |
+| you supply | what happens (v0.100.0+) |
 | --- | --- |
-| `72d9` (4 hex) | **refused**: "prefix too weak — need ≥5 bytes" |
-| `72d94d49` (8 hex) | **refused**: still one byte short for this space |
-| `72d94d49b0ac` (10 hex) | accepted — this is the actual threshold here |
+| `72` (2 hex) | **refused** — below the 2-byte floor |
+| `72d9` (4 hex) | ≥2 matches → **lists candidates**, reconstructs none; 1 match → completes with `UNIQUENESS NOT PROVEN` |
+| `72d94d49` (8 hex) | same band as above |
+| `72d94d49b0ac` (10 hex) | **accepted** — the uniqueness threshold for this space |
 | `72d94d49b0aca695` (16 hex) | accepted → the right wallet |
 | `deadbeef…` (wrong) | **`✗ NO MATCH`**, exit 4 |
+
+> **Changed in v0.100.0.** A short id used to be refused outright. Verified
+> against the shipped binary: only a 1-byte prefix still refuses; 2 and 4 bytes
+> now enter the enumerate band. Demo it by supplying `72d9` and reading the
+> warning aloud — it names the bytes you gave AND the bytes it wanted, which is
+> the part operators remember.
+>
+> A candidate list is deliberately **not importable**: rows carry an id, the
+> key→slot assignment and an address, and NO descriptor. Under `--json` it emits
+> `candidates`, never `wallets`, so a script reading `.wallets[0].descriptor`
+> cannot silently pick up candidate #1.
 
 > It sizes the requirement to the search space and **tells you the number it
 > wants**, rather than accepting whatever you typed and hoping. For this 3-slot
@@ -447,16 +459,17 @@ cosigners' origin metadata in both modes, so a bare-xpub cosigner forces the
 same canonical BIP-48/account-0 fallback either way. Against a real-fingerprint
 template both modes return `NO MATCH`.
 
-**ONE OR THE OTHER — do NOT pair them.** Supply an address *or* an id.
-`restore.rs:2005` dispatches `if id_search { … } else if addr_search { … }`
-with no `conflicts_with`, so when both are given the **address is silently
-ignored** and the id search runs alone. Pairing them buys nothing today.
+**ONE OR THE OTHER — the tool now refuses the combination.** Since v0.100.0
+`--expect-wallet-id` and `--search-address` are mutually exclusive (clap
+`conflicts_with`, on `restore` AND `verify-bundle`), so supplying both is a
+usage error naming both flags.
 
-> Corrected 2026-09-17. This section previously read "USE BOTH TOGETHER when you
-> have both … together the answer is fully determined", which the dispatch above
-> falsifies. Filed against the tool as R0 finding I7 (`restore` should either
-> honour both or refuse the combination); until that lands, the demo teaches one
-> at a time.
+> Corrected 2026-09-17, twice. This section originally read "USE BOTH TOGETHER
+> … together the answer is fully determined". That was false: the dispatch is
+> `if id_search { … } else if addr_search { … }`, so the address was **silently
+> ignored**. Filed as R0 finding I7 and fixed in v0.100.0 — the silent-ignore is
+> now a refusal, which is why this section changed from "do not pair them" to
+> "the tool will not let you".
 
 What each pins still differs, and is worth saying:
 
