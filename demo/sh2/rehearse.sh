@@ -71,11 +71,44 @@ printf 'abandon abandon abandon abandon abandon abandon abandon abandon abandon 
 ms split --in "$tmp/seed.txt" -k 3 -n 5 --group-size 0 > "$tmp/shares.txt" 2>/dev/null
 n=$(grep -c '^ms1' "$tmp/shares.txt")
 [[ $n -eq 5 ]] && ok "split produced 5 shares" || bad "share count" "got $n"
-grep -o '^ms1[a-z0-9]*' "$tmp/shares.txt" | sed -n '1p;3p;5p' > "$tmp/three.txt"
-grep -q 'abandon abandon' < <(ms combine --in "$tmp/three.txt" 2>&1) \
-  && ok "any 3 shares rebuild the phrase" || bad "combine of 3 failed" ""
-err=$(ms combine --in <(grep -o '^ms1[a-z0-9]*' "$tmp/shares.txt" | sed -n '1p;3p') 2>&1 >/dev/null)
+grep -o '^ms1[a-z0-9]*' "$tmp/shares.txt" > "$tmp/s.txt"
+
+# The page claims ANY three and ANY two, so check ALL of them -- 5C3 and 5C2 are
+# ten each. Testing one triple and calling it "any" is the overclaim this gate
+# exists to catch.
+seed=$(cat "$tmp/seed.txt")
+t_ok=0
+for t in 123 124 125 134 135 145 234 235 245 345; do
+  sed -n "$(echo "$t" | sed 's/./&p;/g')" "$tmp/s.txt" > "$tmp/pick.txt"
+  got=$(ms combine --in "$tmp/pick.txt" 2>/dev/null | sed -n 's/^phrase: //p')
+  [[ "$got" == "$seed" ]] && t_ok=$((t_ok+1))
+done
+[[ $t_ok -eq 10 ]] && ok "all 10 triples rebuild the phrase exactly" \
+  || bad "a triple failed to rebuild" "$t_ok/10 rebuilt"
+
+p_ref=0
+for pr in 12 13 14 15 23 24 25 34 35 45; do
+  sed -n "$(echo "$pr" | sed 's/./&p;/g')" "$tmp/s.txt" > "$tmp/pick.txt"
+  ms combine --in "$tmp/pick.txt" >/dev/null 2>&1 || p_ref=$((p_ref+1))
+done
+[[ $p_ref -eq 10 ]] && ok "all 10 pairs are refused" \
+  || bad "a PAIR REBUILT SOMETHING" "$p_ref/10 refused"
+
+err=$(ms combine --in <(sed -n '1p;3p' "$tmp/s.txt") 2>&1 >/dev/null)
 grep -q 'have 2, need 3' <<<"$err" && ok "2 shares are refused, by that exact wording" || bad "threshold wording" "$err"
+
+# Mutation check: the loop above must be READING the shares, not printing ok.
+# Damaging share 2 must fail exactly the six triples that contain it.
+cp "$tmp/s.txt" "$tmp/s.bak"; sed -i '2s/./q/40' "$tmp/s.txt"
+m_ok=0
+for t in 123 124 125 134 135 145 234 235 245 345; do
+  sed -n "$(echo "$t" | sed 's/./&p;/g')" "$tmp/s.txt" > "$tmp/pick.txt"
+  got=$(ms combine --in "$tmp/pick.txt" 2>/dev/null | sed -n 's/^phrase: //p')
+  [[ "$got" == "$seed" ]] && m_ok=$((m_ok+1))
+done
+cp "$tmp/s.bak" "$tmp/s.txt"
+[[ $m_ok -eq 4 ]] && ok "damaging share 2 fails exactly the 6 triples using it" \
+  || bad "MUTATION INERT -- the sweep may not be reading the shares" "$m_ok/10 still ok, want 4"
 
 echo "== 5 the argv refusal"
 err=$(ms split --phrase "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" -k 3 -n 5 2>&1 >/dev/null)

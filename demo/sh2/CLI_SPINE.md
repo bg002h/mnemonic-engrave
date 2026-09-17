@@ -151,14 +151,44 @@ sed -n '1p;3p;5p' shares.txt > three.txt && ms combine --in three.txt
 entropy: 00000000000000000000000000000000
 phrase: abandon abandon ... about
 ```
+
+> That is one combination. The claim is about *any* three — so don't assert it,
+> check it. There are only twenty cases.
+
 ```sh
-sed -n '1p;3p' shares.txt > two.txt && ms combine --in two.txt
+for t in 123 124 125 134 135 145 234 235 245 345; do
+  sed -n "$(echo "$t" | sed 's/./&p;/g')" shares.txt > pick.txt
+  got=$(ms combine --in pick.txt 2>/dev/null | sed -n 's/^phrase: //p')
+  [ "$got" = "$(cat seed.txt)" ] && printf "%s ok  " "$t" || printf "%s FAIL  " "$t"
+done; echo
+
+for p in 12 13 14 15 23 24 25 34 35 45; do
+  sed -n "$(echo "$p" | sed 's/./&p;/g')" shares.txt > pick.txt
+  ms combine --in pick.txt >/dev/null 2>&1 && printf "%s LEAKED  " "$p" || printf "%s refused  " "$p"
+done; echo
 ```
 ```
-error: not enough shares: have 2, need 3
+123 ok  124 ok  125 ok  134 ok  135 ok  145 ok  234 ok  235 ok  245 ok  345 ok
+12 refused  13 refused  14 refused  15 refused  23 refused  24 refused  25 refused  34 refused  35 refused  45 refused
 ```
 
-> Any three rebuild it. Two rebuild nothing. Not a policy — arithmetic.
+> Twenty for twenty. **Any** three is sufficient; **any** two is not. And two
+> shares don't merely fail to be *accepted* — they don't contain the seed, so
+> there is nothing in them for anyone to extract. Not a policy — arithmetic.
+
+**If someone asks whether the loop is just printing `ok` — and someone will:**
+
+```sh
+cp shares.txt shares.bak
+sed -i '2s/./q/40' shares.txt      # damage share 2, then re-run the first loop
+```
+```
+123 FAIL  124 FAIL  125 FAIL  134 ok  135 ok  145 ok  234 FAIL  235 FAIL  245 FAIL  345 ok
+```
+
+> Exactly the six triples containing share 2 fail. The four that avoid it still
+> rebuild the seed. The loop is reading the shares.
+> Then `cp shares.bak shares.txt` to carry on.
 
 **Then the one that always lands — and then the part people actually need:**
 

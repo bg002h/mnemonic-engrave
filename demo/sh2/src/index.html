@@ -60,10 +60,12 @@ chmod +x md ms</code></pre></div>
     who made it. Of these, only <code>mnemonic-engrave</code> is signed.
   </div>
 
-  <h3>1 &nbsp;Split a seed three-of-five, then prove two isn't enough</h3>
+  <h3>1 &nbsp;Split a seed three-of-five, then prove any three is sufficient and any two isn't enough</h3>
   <p>
     <code>codex32</code> (BIP-93) is Shamir's secret sharing over the bech32
-    alphabet. Five shares; any three rebuild the seed; two rebuild nothing.
+    alphabet. Five shares; <em>any</em> three rebuild the seed, <em>any</em> two
+    rebuild nothing. Don't take the word &ldquo;any&rdquo; on trust &mdash;
+    there are only twenty cases, so check every one of them.
   </p>
   <div class="code"><pre><code><span class="c"># A published all-zeros test vector. Never do this with a real seed.</span>
 echo "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" > seed.txt
@@ -71,16 +73,47 @@ echo "abandon abandon abandon abandon abandon abandon abandon abandon abandon ab
 ms split --in seed.txt -k 3 -n 5 --group-size 0 > shares.txt
 <span class="o"># 5 lines, each starting ms13... — different every run, they're randomised</span>
 
-<span class="c"># any three of them</span>
+<span class="c"># one combination in full, so you can see what coming back looks like</span>
 sed -n '1p;3p;5p' shares.txt > three.txt
 ms combine --in three.txt
 <span class="o">entropy: 00000000000000000000000000000000</span>
 <span class="o">phrase: abandon abandon ... about</span>
+<span class="o">language: english (12 words)</span></code></pre></div>
 
-<span class="c"># now only two</span>
-sed -n '1p;3p' shares.txt > two.txt
-ms combine --in two.txt
-<span class="o">error: not enough shares: have 2, need 3</span></code></pre></div>
+  <p>
+    Now <b>every</b> combination there is. Five shares give exactly ten ways to
+    pick three and ten ways to pick two &mdash; small enough to be exhaustive
+    rather than illustrative:
+  </p>
+  <div class="code"><pre><code><span class="c"># all 10 ways to pick three — each must rebuild the seed byte for byte</span>
+for t in 123 124 125 134 135 145 234 235 245 345; do
+  sed -n "$(echo "$t" | sed 's/./&amp;p;/g')" shares.txt > pick.txt
+  got=$(ms combine --in pick.txt 2>/dev/null | sed -n 's/^phrase: //p')
+  [ "$got" = "$(cat seed.txt)" ] &amp;&amp; printf "%s ok  " "$t" || printf "%s FAIL  " "$t"
+done; echo
+<span class="o">123 ok  124 ok  125 ok  134 ok  135 ok  145 ok  234 ok  235 ok  245 ok  345 ok</span>
+
+<span class="c"># all 10 ways to pick two — each must rebuild nothing at all</span>
+for p in 12 13 14 15 23 24 25 34 35 45; do
+  sed -n "$(echo "$p" | sed 's/./&amp;p;/g')" shares.txt > pick.txt
+  ms combine --in pick.txt >/dev/null 2>&amp;1 &amp;&amp; printf "%s LEAKED  " "$p" || printf "%s refused  " "$p"
+done; echo
+<span class="o">12 refused  13 refused  14 refused  15 refused  23 refused  24 refused  25 refused  34 refused  35 refused  45 refused</span></code></pre></div>
+  <p class="lead">
+    Twenty for twenty. The threshold isn't a rule the software is choosing to
+    enforce &mdash; two shares do not <em>contain</em> the seed, so there is
+    nothing for any tool, or anyone holding them, to extract.
+  </p>
+  <div class="note">
+    <b>Prove the check isn't hollow.</b> A test that can only pass proves
+    nothing. Damage one share &mdash;
+    <code>cp shares.txt shares.bak &amp;&amp; sed -i '2s/./q/40' shares.txt</code>
+    &mdash; and re-run the first loop. Exactly the six triples containing share
+    2 flip to <code>FAIL</code>, and the four that avoid it
+    (<code>134 135 145 345</code>) still say <code>ok</code>. That is the loop
+    reading the shares, not printing a foregone conclusion.
+    <code>cp shares.bak shares.txt</code> to carry on.
+  </div>
 
   <h3>2 &nbsp;Scratch a plate and watch it heal</h3>
   <p>
