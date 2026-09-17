@@ -31,14 +31,34 @@
   </p>
 
   <h3>Install</h3>
-  <p class="lead">Needs <a href="https://rustup.rs">Rust</a>. Takes a few minutes to compile.</p>
-  <div class="code"><pre><code><span class="c"># the descriptor tool — the published build is fine</span>
-cargo install md-cli
+  <p class="lead">
+    Prebuilt binaries for macOS, Linux and Windows &mdash; no Rust, no compiling.
+    Swap <code>macos-amd64</code> for <code>macos-arm64</code> on Apple Silicon,
+    or <code>linux-amd64</code> / <code>windows-amd64</code>.
+  </p>
+  <div class="code"><pre><code><span class="c"># the descriptor tool</span>
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-macos-amd64.tar.gz
+<span class="c"># the seed tool</span>
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
 
-<span class="c"># the seed tool — from git, NOT crates.io, and the reason matters:</span>
-<span class="c"># the published 0.14.0 can only take a seed as a command-line argument.</span>
-<span class="c"># Current builds add a private channel (--in FILE) and actively refuse argv.</span>
-cargo install --git https://github.com/bg002h/mnemonic-secret ms-cli</code></pre></div>
+tar -xzf md-0.15.0-macos-amd64.tar.gz
+tar -xzf ms-0.19.0-macos-amd64.tar.gz
+chmod +x md ms</code></pre></div>
+
+  <div class="note warn">
+    <b>On macOS, the first run will be blocked.</b> These binaries are not
+    notarised by Apple, so Gatekeeper quarantines them on download. Clear it
+    once with <code>xattr -d com.apple.quarantine ./md ./ms</code> &mdash; or
+    right-click the file and choose Open. Nothing is wrong with the binary.
+  </div>
+
+  <div class="note">
+    <b>Check what you downloaded.</b> Each release ships
+    <code>SHA256SUMS.portable</code>:
+    <code>shasum -a 256 -c SHA256SUMS.portable --ignore-missing</code>.
+    A checksum proves the file arrived <em>intact</em> &mdash; it does not prove
+    who made it. Of these, only <code>mnemonic-engrave</code> is signed.
+  </div>
 
   <h3>1 &nbsp;Split a seed three-of-five, then prove two isn't enough</h3>
   <p>

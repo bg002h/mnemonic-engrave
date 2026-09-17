@@ -4,22 +4,42 @@ Roughly ten minutes, while the room taps the emulator. Every command below was
 RUN and its output pasted, not written from memory. Re-run `./rehearse.sh`
 before you travel: it executes all of it and diffs against what is recorded here.
 
-**Before you go — install BOTH from git, not crates.io:**
+**Before you go — download the binaries. No Rust, no compiling.**
+
+Every constellation CLI now ships prebuilt for linux (amd64/arm64), macOS
+(amd64/arm64) and Windows (amd64). For your 2017 Intel Mac, `macos-amd64` is the
+one:
 
 ```sh
-cargo install --git https://github.com/bg002h/descriptor-mnemonic md-cli
-cargo install --git https://github.com/bg002h/mnemonic-secret    ms-cli
+# md -- the descriptor tool
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-macos-amd64.tar.gz
+# ms -- the seed tool
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
+
+tar -xzf md-0.15.0-macos-amd64.tar.gz
+tar -xzf ms-0.19.0-macos-amd64.tar.gz
+chmod +x md ms && ./md --version && ./ms --version
 ```
 
-Measured, not assumed: **published `md-cli` 0.13.0 has no `compose` subcommand
-at all** (it answers *"tip: a similar subcommand exists: 'compile'"*), so §1
-below — the opening of the talk — does not run on it. Published `ms-cli` 0.14.0
-has no `--in` on `split` and does not refuse a seed on argv, so §3 does not run
-on it either.
+macOS Gatekeeper will quarantine an unsigned downloaded binary. Clear it with
+`xattr -d com.apple.quarantine ./md ./ms`, or right-click → Open once. **Say this
+out loud if anyone downloads on the day** — it is the single most likely thing
+to make a binary look broken.
 
-(The copy-paste blocks on the demo *web page* are a different set — only
-`decode`, `repair` and `inspect` — and those were verified to work on published
-`md-cli`. Don't confuse the two install stories.)
+Each release carries `SHA256SUMS.portable`; verify before running:
+
+```sh
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/SHA256SUMS.portable
+shasum -a 256 -c SHA256SUMS.portable --ignore-missing
+```
+
+Only `mnemonic-engrave` is signed (minisign); the others ship checksums alone,
+and their `VERIFY.txt` says plainly that a checksum proves integrity, **not
+origin**. Do not overstate it to the room.
+
+Building from source still works if anyone prefers it —
+`cargo install --git https://github.com/bg002h/descriptor-mnemonic md-cli` —
+but note published crates.io builds are OLDER and lack `md compose` entirely.
 
 ---
 
