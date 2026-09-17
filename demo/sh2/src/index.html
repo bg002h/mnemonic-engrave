@@ -284,16 +284,34 @@ john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout
 <span class="o">  your seed completes cosigner slot @0</span></code></pre></div>
 
   <div class="note">
-    <b>It refuses to guess, and that is the point.</b> It sizes the search space
-    and demands enough identifier that a collision is impossible:
-    <code>72d9</code> and even <code>72d94d49</code> are <b>refused as too
-    weak</b>; 16 hex characters are accepted. A <em>wrong</em> id returns
+    <b>It refuses to guess, and that is the point.</b> It sizes the requirement
+    to the search space and tells you the number it wants &mdash; for this
+    3-slot wallet that is <b>10 hex characters</b>. Below that it says so rather
+    than guessing: <code>72d9</code> and <code>72d94d49</code> are
+    <b>refused as too weak</b>. A <em>wrong</em> id returns
     <code>✗ NO MATCH</code> and exit 4 &mdash; never a plausible wrong wallet.
+  </div>
+
+  <div class="note">
+    <b>Short on id? Use the address instead &mdash; it is the better key anyway.</b>
+    If you wrote down fewer digits than it asks for, you are not stuck. Any known
+    receive address of the wallet answers the same question with no
+    prefix-length argument at all:
+    <div class="code" style="margin:.7rem 0 .2rem"><pre><code>printf '&lt;your 12 words&gt;' | mnemonic restore --from phrase=-   --md1 &lt;template-md1&gt; --account 0   --cosigner &lt;xpub&gt; --cosigner &lt;xpub&gt;   --search-address &lt;a known receive address&gt;</code></pre></div>
+    An address is matched on the <em>full scriptPubKey</em>, so unlike an id
+    prefix it is <b>collision-free</b> &mdash; the tool's own help calls it
+    &ldquo;recommended over <code>--expect-wallet-id</code>&rdquo;. It scans
+    receive indices 0&ndash;19 by default; <code>--search-addr-min</code> /
+    <code>--search-addr-max</code> widen the range and
+    <code>--search-chain</code> reaches the change branch.
     <br><br>
-    Have both? Use both. The address pins the key <em>set</em>; the wallet-id
-    pins the <em>labelling</em>. Together the answer is fully determined &mdash;
-    which matters for <code>sortedmulti</code>, where the script sorts keys at
-    every index, so swapping two cosigners' labels yields the identical wallet.
+    <b>One or the other, not both.</b> Supply an address <em>or</em> an id.
+    Today the id search takes precedence and the address is simply ignored, so
+    pairing them buys nothing. They pin different things &mdash; the address
+    pins the key <em>set</em>, the id pins the <em>labelling</em> &mdash; and
+    for <code>sortedmulti</code> that difference is moot anyway, because the
+    script sorts keys at every index, so swapping two cosigners' labels yields
+    the identical wallet.
   </div>
 
   <div class="note">

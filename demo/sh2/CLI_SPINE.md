@@ -396,22 +396,52 @@ printf '<your 12 words>' | mnemonic restore --from phrase=- --md1 <template-md1>
 
 | you supply | what happens |
 | --- | --- |
-| `72d9` (4 hex) | **refused**: "prefix too weak" |
-| `72d94d49` (8 hex) | **refused**: still too weak for this space |
+| `72d9` (4 hex) | **refused**: "prefix too weak — need ≥5 bytes" |
+| `72d94d49` (8 hex) | **refused**: still one byte short for this space |
+| `72d94d49b0ac` (10 hex) | accepted — this is the actual threshold here |
 | `72d94d49b0aca695` (16 hex) | accepted → the right wallet |
 | `deadbeef…` (wrong) | **`✗ NO MATCH`**, exit 4 |
 
-> It sizes the search space and demands enough identifier that a collision is
-> not possible, rather than accepting whatever you typed and hoping. A wrong id
-> produces NO wallet — never a plausible wrong one. That is the behaviour you
-> want from anything that reconstructs a wallet from parts.
+> It sizes the requirement to the search space and **tells you the number it
+> wants**, rather than accepting whatever you typed and hoping. For this 3-slot
+> wallet that number is 5 bytes = 10 hex; a bigger search space demands more. A
+> wrong id produces NO wallet — never a plausible wrong one. That is the
+> behaviour you want from anything that reconstructs a wallet from parts.
+>
+> Say the number out loud when demoing: the refusal message contains it
+> (`need ≥5 bytes … got 4`), so the tool is not just saying no, it is saying
+> exactly what would work.
 
-**USE BOTH TOGETHER when you have both.** The address pins the key SET; the
-wallet-id pins the LABELLING. Together the answer is fully determined:
+### Short on id? Reach for the address — it is the better key anyway
+
+If fewer digits were recorded than the tool asks for, that is not a dead end.
+A known receive address answers the same question with no prefix-length
+argument at all:
 
 ```sh
-... --search-address <addr> --expect-wallet-id 72d94d49b0aca695055b3de0a1f13bea
+printf '<your 12 words>' | mnemonic restore --from phrase=- --md1 <template-md1> \
+  --account 0 --cosigner <xpub> --cosigner <xpub> \
+  --search-address <a known receive address>
 ```
+
+An address matches on the **full scriptPubKey**, so unlike an id prefix it is
+collision-free. `restore --help` says so itself: *"Recommended over
+`--expect-wallet-id` (full-scriptPubKey match — collision-free)"*. Default scan
+is receive indices `0..20`; `--search-addr-min` / `--search-addr-max` widen it,
+`--search-chain` reaches the change branch.
+
+**ONE OR THE OTHER — do NOT pair them.** Supply an address *or* an id.
+`restore.rs:2005` dispatches `if id_search { … } else if addr_search { … }`
+with no `conflicts_with`, so when both are given the **address is silently
+ignored** and the id search runs alone. Pairing them buys nothing today.
+
+> Corrected 2026-09-17. This section previously read "USE BOTH TOGETHER when you
+> have both … together the answer is fully determined", which the dispatch above
+> falsifies. Filed against the tool as R0 finding I7 (`restore` should either
+> honour both or refuse the combination); until that lands, the demo teaches one
+> at a time.
+
+What each pins still differs, and is worth saying:
 
 **One honest caveat if anyone is paying close attention:** with `sortedmulti`
 the script sorts the keys, so the address is order-independent and more than one
