@@ -440,7 +440,12 @@ section above exists.
 
 ## Notes for the 2017 Intel Mac
 
-- `cargo install --git` builds from source: **do it before you travel**, not in the room.
+- **`mnemonic` (mnemonic-toolkit) has no Mac/Windows binary yet** -- it ships
+  Linux musl only, so on the demo Mac it is a source build. `cargo install
+  --locked --git https://github.com/bg002h/mnemonic-toolkit --tag
+  mnemonic-toolkit-v0.97.0 mnemonic-toolkit` (crate `mnemonic-toolkit`, binary
+  `mnemonic`). **Do it before you travel**, not in the room. `md`/`ms` are
+  prebuilt for every platform; only the toolkit needs building.
 - Both tools are `x86_64` native there; nothing needs Rosetta.
 - If the network is hostile, the emulator runs from `dist/` with
   `python3 -m http.server` — already on macOS — and the CLI half needs no

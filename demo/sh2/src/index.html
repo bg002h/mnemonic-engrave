@@ -79,6 +79,25 @@ chmod +x md ms</code></pre></div>
     who made it. Of these, only <code>mnemonic-engrave</code> is signed.
   </div>
 
+  <h3 style="font-size:.95rem;margin-top:1.25rem">One more tool: <code>mnemonic</code>, the Swiss-army knife</h3>
+  <p class="lead">
+    The recovery searches below &mdash; and the John the Ripper pipeline &mdash;
+    use <code>mnemonic</code> from <b>mnemonic-toolkit</b>. It ships a Linux
+    binary today; on macOS and Windows you build it once from source (a minute
+    of Rust, best done before you travel).
+  </p>
+  <div class="code"><pre><code><span class="c"># Linux x86-64: prebuilt, like md and ms above</span>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.97.0/mnemonic-0.97.0-x86_64-linux-musl.tar.gz
+tar -xzf mnemonic-0.97.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic
+<span class="c"># macOS / Windows: no prebuilt binary yet -- build from source (needs rustup)</span>
+cargo install --locked --git https://github.com/bg002h/mnemonic-toolkit --tag mnemonic-toolkit-v0.97.0 mnemonic-toolkit</code></pre></div>
+  <div class="note">
+    <b>Why source on a Mac?</b> <code>mnemonic-toolkit</code> is the only tool
+    here without cross-platform release binaries yet &mdash; it builds Linux
+    musl only. Its binary is named <code>mnemonic</code>; the crate is
+    <code>mnemonic-toolkit</code>, which is why the install line names both.
+  </div>
+
   <h3>1 &nbsp;Split a seed three-of-five, then prove any three is sufficient and any two isn't enough</h3>
   <p>
     <code>codex32</code> (BIP-93) is Shamir's secret sharing over the bech32
