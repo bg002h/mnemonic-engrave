@@ -216,13 +216,40 @@ and useful, but it is new header semantics + wire format + Rust/Go parity +
 test vectors: risk-set work needing a full spec->plan->gate cycle. File it, do
 not improvise it.
 
-## NOT YET WALKED
+## Mission: sealed-payload unlock — 60 taps, WALKED
 
-- **Sealed Payload unlock** (mission 5: md1 + mk1 + ms1 plates). The entry is
-  confirmed reachable (1 tap backward) and the payload is confirmed to hold
-  3 codex32 shares + 6 mk1 + 6 md1, but the unlock itself types a 12-word
-  passphrase on the keyboard and its tap cost is UNMEASURED. Do not put a
-  number on it until it has been driven.
+| taps | action |
+|---|---|
+| 2 | boot offer -> **SKIP**, confirm |
+| 1 | <b>previous</b> `[25,160]` once -> **Sealed Payload** (it is the last entry) |
+| 1 | confirm -> the passphrase notice |
+| 1 | confirm -> the BIP-39 keyboard, "Word 1 of 12" |
+| ~47 | 12 words: **3-4 letters each** plus one confirm per word |
+
+**The keyboard autocompletes and shows a live match count**, which is what makes
+this tractable: `m` -> "105 matches", `mo` -> "21 matches", `mos` -> **MOSQUITO,
+1 match**. Measured letters per word for this passphrase: 3,3,3,4,4,4,3,4,4,4,3,3
+= 42 letters + 12 confirms.
+
+BIP-39 word keyboard coordinates (machine-checked in the fork, and a DIFFERENT
+keyboard from the passphrase one in `walk_hashlock_phrase.js`): pitch 34, rows
+`qwertyuiop` x0=87 y=198, `asdfghjkl` x0=104 y=244, `zxcvbnm` x0=138 y=290.
+
+Opens straight onto the first plate: **"SECRET seed material / Cut this plate /
+Skip / ms1 1/3"**.
+
+The passphrase screen's own copy is worth quoting on the day: *"These words are
+the payload's passphrase. They are NOT a seed and no wallet is derived from
+them."*
+
+### A claim I could NOT verify, and corrected
+
+`cmd/emu/sealed_test_payload.go`'s provenance comment says Vector F is "3
+codex32 shares, 6 mk1 xpub cards, 6 md1 wallet-policy cards". Stepping the
+plates shows `ms1 1/3, 2/3, 3/3` then `mk1 1/3` — so the **3 shares check out**,
+but the counters are per-plate and do not obviously support "6 and 6". The
+demo page now says "three codex32 seed shares, then cosigner key cards" and
+states no number it has not measured. Resolve properly before quoting 6/6.
 - **plain-multisig**: same shape as decaying-multisig, preset row 1. Expected
   ~19 taps but not separately measured.
 
