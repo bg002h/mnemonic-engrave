@@ -23,7 +23,7 @@ picotool info -a                # or: picotool info -a --bus N --address M
 | chipid | board | part | flash | secure boot | notes |
 | --- | --- | --- | --- | --- | --- |
 | `0x77c483b745abf55c` | **SeedHammer II #1** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — own key (slot 1) | the original machine; burned 2026-08-03 |
-| `0x09f50bf63e8d6f46` | **SeedHammer II #2** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — SeedHammer only | spare control board, received 2026-09-17 |
+| `0x09f50bf63e8d6f46` | **SeedHammer II #2** | RP2350**B**, QFN80, rev A4 | 16 MB | **1** — own key (slot 1) | spare control board; received AND burned 2026-09-17 |
 | `0x66d3d60ff20abf2f` | Pico 2 (rehearsal) | RP2350A, QFN60 | 4 MB | 1 — rehearsal key | boot-key rehearsal, 2026-08-03 |
 | `0xb3d19289d3ec3f0e` | **Pico 2 W** | RP2350A, QFN60, rev A2 | 4 MB | **0** | blank; WiFi; LED differs — see below |
 
@@ -72,6 +72,15 @@ pubkey embedded in its running factory image is
 `c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b` — exactly
 `signKeyHash` (`cmd/controller/platform_sh2.go:72`). Its SCSI inquiry reads
 `SH / SHII / 5`, byte-identical to #1.
+
+**Boot key burned 2026-09-17**, same key as #1
+(`~/.sh2/sh2-boot-key.pem`, fingerprint `846aa289…cabb4`), OTP **slot 1**, using
+`--ser 09F50BF63E8D6F46` on both irreversible commands. Post-burn state verified
+by `--sh2-verify-valid 1`: slot 1 matches across all 16 rows, `KEY_VALID = 0x3`
+(slots 0 + 1), `KEY_INVALID = 0`, all three `BOOT_FLAGS1` copies `0x000003`.
+Slot 0 left valid, so official SeedHammer firmware remains a recovery path.
+Flashed `seedhammerii-v0.0.0-bgf5b068f.signed.uf2` (sha256 `7fb899cb…aaf0c`),
+the same artifact running on #1.
 
 Pristine retail OTP state at receipt: `KEY_VALID = 0x1` (slot 0 only),
 `KEY_INVALID = 0`, slots 1–3 empty across all 16 rows each,

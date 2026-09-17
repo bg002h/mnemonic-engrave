@@ -18807,3 +18807,37 @@ Every claim in the table was checked against the tree rather than described: bot
 and carries locally-pinned corpus vectors so the work does not depend on F-529's
 timing. A future reader finds two `.md1.txt` files with no note saying why they
 are pinned or when they may be deleted.
+
+### F-616 — RUNBOOK step 2 says `otp load` prints nothing; it prints all 32 bytes
+
+**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+
+From the journey review of the board-2 burn (`design/agent-reports/new-board-otp-burn-journey-review.md`, I-1). `RUNBOOK_custom_boot_key.md` tells the operator `otp load` "prints no 'verified' confirmation of its own — the absence of output is not success". Measured on the real burn 2026-09-17: loading a JSON file echoes the full 32-byte key hash **before** writing and then returns past picotool's own read-back. So the operator gets a confident hex dump exactly where the runbook promised silence, and that dump is *pre-write information* proving nothing.
+
+Nobody was misled here because the controller labelled the output at the moment it appeared, but the runbook still says the opposite of what happens. Fix the prose to say: expect a hex echo, it is printed before the write, and step 3's gate is the only proof.
+
+### F-617 — `--sh2-verify-valid`'s wrong-bit message rules out the remedy that fixes it
+
+**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+
+Journey review I-3. If `KEY_VALID` comes back with a wrong bit set, the gate reports the extra bit and tells the operator that `otp set -s` cannot help — when OR-ing in the correct bit with `otp set -s` is exactly the fix (the wrong bit is unremovable, but the right one can still be added). A gate that names the wrong remedy at the one moment the operator is frightened is worse than one that stays quiet. Not hit on board 2: `0x2` was resolved against `picotool otp list` beforehand and `KEY_VALID` came back `0x3` first time.
+
+### F-619 — "all three BOOT_FLAGS1 copies agree" compares a majority vote against two raw rows
+
+**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+
+Journey review I-6, and the sharpest finding of the two reviews. `--sh2-verify-valid`'s three-copy comparison reads rows `0x04b`/`0x04c`/`0x04d`, but `0x04b` resolves by name to `BOOT_FLAGS1`, so `read_row_raw24` returns the **majority vote** rather than that row's raw content. The A/B/C compare is therefore blind in exactly the case where `0x04b` itself is the odd row out. Remedy: read with `-c 1` so each copy is fetched raw.
+
+**This did not gate the board-2 burn, and here is why it did not need to.** The primary detection is independent and was verified in-session: `otp_field` (`scripts/pico2-bootkey-rehearsal.sh:180`) and `read_rows` (`:208`) both die on *any* picotool `WARNING`, and picotool emits `(WARNING - REDUNDANT ROWS AREN'T EQUAL)` whenever redundant rows disagree — `:771` documents `--sh2-verify-valid` depending on that. So a partial `otp set` fails closed through the warning path regardless. The three-copy compare is a second layer, and it is the second layer that is weak.
+
+### F-620 — the OTP json is named after a board it is not bound to
+
+**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+
+Journey review M-1. `~/.sh2/otp-6f463e8d0bf609f5.json` carries a board's chipid in its name, but its **content is board-independent** — a boot-key slot stores only sha256(X‖Y) plus the slot number, and the file is byte-identical to board 1's `my-otp.json` (both sha256 `b474f23a86ef1e3c497fef1e8c75f756835b2fb271dd80ae91eb45bfb9792cc9`). The name implies a binding that does not exist, which invites someone to trust the filename instead of `--ser`. Either drop the chipid from the name or state in the runbook that the name is a provenance label, not a binding.
+
+### F-621 — steps 2 and 4 depend on two `.gitignore`d directories, one documented as disposable
+
+**Owning phase:** SH2 board 3 bring-up. **Status:** OPEN.
+
+Journey review M-2. The `--sh2-*` gates depend on `sh2-state/` (or a per-board `SH2_DIR`) for the CHIPID pin and on `rehearsal-work/` for the rehearsal-key refusal list. Both are gitignored, and every document describes `rehearsal-work/` as disposable — so a tidy-up deletes the data that makes "this key is not a rehearsal key" and "this is the board you pinned" answerable. Mitigated on 2026-09-17 by moving pins to `~/.sh2/boards/<chipid>/` (outside any repo), but the rehearsal-key list still lives in the disposable directory.
