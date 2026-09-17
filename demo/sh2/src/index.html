@@ -305,6 +305,18 @@ john --config=mangle.rules --wordlist=roots.lst --rules=Demo --stdout
     <code>--search-addr-max</code> widen the range and
     <code>--search-chain</code> reaches the change branch.
     <br><br>
+    <b>On your own wallet, bring the mk1 cards.</b> The demo's cosigners are
+    plain xpubs with no recorded origin, so <code>--cosigner &lt;xpub&gt;</code>
+    completes it. A real engraved wallet usually records each cosigner's
+    fingerprint and path on an <code>mk1</code> card &mdash; and a bare xpub
+    supplies neither (it decodes to fingerprint <code>00000000</code> and an
+    empty origin), so the same command returns <code>✗ NO MATCH</code> even
+    when your id and address are perfectly correct. Pass the
+    <code>mk1</code> chunks to <code>--cosigner</code> instead. This is true in
+    both modes: a scriptPubKey is origin-independent, but your own key's
+    derivation path is still inferred from the cosigners' metadata, so
+    <code>--search-address</code> does not rescue it.
+    <br><br>
     <b>One or the other, not both.</b> Supply an address <em>or</em> an id.
     Today the id search takes precedence and the address is simply ignored, so
     pairing them buys nothing. They pin different things &mdash; the address

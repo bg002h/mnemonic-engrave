@@ -430,6 +430,23 @@ collision-free. `restore --help` says so itself: *"Recommended over
 is receive indices `0..20`; `--search-addr-min` / `--search-addr-max` widen it,
 `--search-chain` reaches the change branch.
 
+**ON A REAL WALLET, USE THE mk1 CARDS — this is the trap.** The demo's fixture
+has cosigners with **no recorded origin**, which is the only reason
+`--cosigner <xpub>` completes it (verified: the completed descriptor carries
+`[00000000]xpub...`, and rebuilding that fixture reproduces the demo's ids
+`72d94d49b0aca695055b3de0a1f13bea` and `d3c8c613ed3baa89e1fa4f7ae632919a`
+byte-for-byte). A bare xpub decodes to `fingerprint: Fingerprint::default()` +
+`origin: DerivationPath::master()` (`restore.rs:2160-2162`), so against a wallet
+whose cosigners DID record fingerprint+path it can never match — the operator
+gets `✗ NO MATCH` with a correct id and a correct address, and will reasonably
+conclude the id is wrong. Pass the `mk1` chunks to `--cosigner` instead.
+
+Measured: this is NOT rescued by `--search-address`. The scriptPubKey is
+origin-independent, but the OWN key's derivation path is inferred from the
+cosigners' origin metadata in both modes, so a bare-xpub cosigner forces the
+same canonical BIP-48/account-0 fallback either way. Against a real-fingerprint
+template both modes return `NO MATCH`.
+
 **ONE OR THE OTHER — do NOT pair them.** Supply an address *or* an id.
 `restore.rs:2005` dispatches `if id_search { … } else if addr_search { … }`
 with no `conflicts_with`, so when both are given the **address is silently
