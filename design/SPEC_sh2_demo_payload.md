@@ -126,18 +126,17 @@ wallet, and any **word** plate is self-labelling per §2.
 - ~~**Firmware size.**~~ **RETIRED.** The payload is flashed to its own region,
   not compiled into firmware, so it costs no firmware flash. Measured: 1024
   bytes for a one-card payload.
-- **Digest pinning.** Existing blobs pin a digest (`syswTestDigest`) precisely
-  so a published document cannot silently drift from the blob it photographs.
-  Does the demo payload need the same, and is it photographed anywhere?
-- **Record inventory.** `sysw_cards_payload.go` documents every record in-file
-  because a previous gap survived by not being stated. This payload must do the
-  same: which records, in what order, and which demo step strands without each.
-- **Template vs concrete selection.** Where does the choice live — a payload
-  property, or a picker on the device? `sysw_cards_payload.go` notes that a
-  wrapper choice was a TEMPLATE-PICKER concern and not a payload property; the
-  same question applies here and should not be assumed.
-- **Does the demo engrave words at all?** If it offers a seed-backup plate, §2's
-  self-labelling covers it directly. If not, §5 is the whole safety story.
+- ~~**Digest pinning.**~~ Not applicable: those digests pin blobs embedded in
+  emulator source. This payload is a flashed artifact, and `me seal` already
+  prints a **public data hash** the device echoes for tamper-detection — the
+  same property, delivered by the tool.
+- ~~**Record inventory.**~~ Still worth writing down, but in the payload's build
+  script rather than a Go doc comment, since there is no Go file.
+- ~~**Template vs concrete selection.**~~ **ANSWERED — see §9.** It already
+  exists on the device.
+- ~~**Does the demo engrave words at all?**~~ No. The payload carries `key:`
+  records, not seeds (§8), so §5's accepted risk is the whole safety story and
+  §2's self-labelling applies to the wallets the keys derive from.
 
 ## 7. Gates before code (tight)
 
@@ -205,3 +204,53 @@ the flag's absence.
 lives, and whether the composer already seats cosigners from payload `key:`
 records — `me seal --help` says they "feed the SeedHammer II's Wallet Policy
 composer", which would make this payload authoring rather than firmware work.
+
+## 9. ANSWERED — the device already offers the choice
+
+`gui/composer_engrave.go` defines three forms, offered by seating state
+(`composerFormsFor`):
+
+| form | engraves | offered when |
+| --- | --- | --- |
+| `composerFormConcrete` | the keyed policy — text/QR plates or keyed `md1` | every slot seated |
+| `composerFormTemplateAndCards` | keyless `md1` **with fingerprints**, plus one `mk1` per seated slot | partially seated |
+| `composerFormTemplateOnly` | a key-less composition; no form A, no cards | nothing seated |
+
+Single-sig offers the same choice explicitly — `gui/singlesig.go:194`,
+`["Full policy md1", "Template-only md1"]`, behind a warning screen.
+
+And `composerKeySources` (`gui/composer_sources.go:40`) "reads every `key:`
+record the payload holds", which is precisely the path a flashed demo payload
+feeds.
+
+**So this request is payload authoring, not firmware work:**
+
+1. build `key:` records for the demo wallets — `key:<hex of "[fingerprint/path]xpub">`;
+2. `me seal --plaintext key:… --out demo.uf2`;
+3. flash once.
+
+A visitor then composes from the seated demo keys and picks concrete or template
+at engrave time. **Zero firmware changes**, and the device offers a richer choice
+than the request asked for — the middle form carries fingerprints *and* cosigner
+cards.
+
+**One gap, recorded because it is easy to trip over later.**
+`templateizeMultisigBundle` — named in `gui/template_engrave.go` as the
+multisig counterpart and deferred there to "Task 7" — **does not exist**. That
+path strips a device-BUILT bundle to keyless. The composer's
+`composerFormTemplateOnly` is a different mechanism: composing keylessly from
+the start rather than stripping afterwards. Irrelevant to this demo, because the
+composer route is the one payload keys feed; it matters only if someone later
+wants "build a full multisig, then strip it to a template".
+
+## 10. What is actually left
+
+Nothing in firmware. The remaining work is a small authoring task:
+
+- choose the wallet shape the demo composes (a 2-of-3 from the three §2 seeds is
+  the obvious one, and gives every seating state a visitor can explore);
+- derive the `key:` records at the origins the composer expects, and record the
+  exact commands in the demo's build script so the payload is reproducible;
+- flash once and walk it, since §7's gates are machine checks and the only
+  untested claim left is that a visitor can actually reach both forms on
+  hardware — which no amount of reading settles.
