@@ -47,37 +47,62 @@ entropy beefbeef… -> same law room lava winner jelly wing water use wash use t
 phrase  beef ×12  -> entropy 140280500a0140280500a0140280500a                        self-labelling
 ```
 
-## 3. The invariant: ≤ 2 distinct words
+## 3. The invariant: ≤ 2 distinct words — PROVEN, not enforced
 
-> **Every seed in a device-shipped demo payload must have at most 2 distinct
-> words in its phrase.**
+> **Every seed in a device-shipped demo payload has at most 2 distinct words in
+> its phrase.**
 
 `abandon…about` = 2, `zoo…wrong` = 2, `beef×12` = 1. A real 12-word seed with
 ≤2 distinct words has probability ~(2/2048)¹² — it does not happen.
 
-This is chosen over an allowlist of known entropies because it encodes the
-property that actually protects a person: **someone reading the plate can tell
-it is fake.** An allowlist protects a list; this protects the reader. It also
-cannot be satisfied by adding a line to a constant.
+Chosen over an allowlist of known entropies because it encodes the property that
+protects a person: **someone reading the plate can tell it is fake.** An
+allowlist protects a list; this protects the reader.
 
-## 4. The confinement guard NARROWS, it does not go away
+**Proven at construction, not enforced at runtime** (operator ruling
+2026-09-17: *"We don't need to enforce the rule, we can have it be proven."*).
+The three seeds are literals in the generator, so the property is visible in the
+source and testable there directly. The chain that makes it a proof rather than
+a comment is the one the existing payloads already use:
 
-`cmd/emu/embed_confinement_test.go::TestEveryEmbeddedPayloadIsStructurallyConfined`
-today requires every `//go:embed` under `cmd/emu` to live in a `//go:build js`
-file, so no demo payload can reach a device build. A device payload breaks that
-by design.
+1. the generator (`cmd/buildpayloadcards`) takes the seed phrases as literals —
+   a test over those literals settles §3 with no decoding at all;
+2. the built artifact is pinned by a digest const, asserted by a host test that
+   opens the blob and hashes it (`sysw_cards_payload_host_test.go`);
+3. regeneration is an operator step the digest test names in its own failure
+   message (`go run ./cmd/buildpayloadcards | me sysw pack …`).
 
-It must be **narrowed, not deleted**:
+Enforcement WOULD be possible — the review confirmed a host test can open a
+payload with `sysw.Open` and recover its records, and two existing tests do. It
+is simply not needed when the inputs are literals and the output is pinned.
 
-- an embed in a non-`js` file remains forbidden **unless** it is the demo
-  payload and every seed it carries passes §3;
-- the guard keeps discovering embeds by AST rather than by name, which is why
-  the existing blobs could be added without editing it and why this one can be;
-- its INCONCLUSIVE arms (too few files parsed, no embeds found) stay — they are
-  what stop the guard silently protecting nothing.
+## 4. There is nothing to narrow — the vehicle is the flashed payload region
 
-Today the guard protects by keeping payloads OFF the device. After this it
-protects by **proving what is in them**, which is the stronger property.
+An earlier draft proposed narrowing
+`TestEveryEmbeddedPayloadIsStructurallyConfined` so a device build could carry
+one permitted `//go:embed`. **That was written against the wrong mechanism and
+is withdrawn.**
+
+Two facts settle it:
+
+- the guard discovers embeds under `cmd/emu` ONLY
+  (`embed_confinement_test.go:154`), and a device payload cannot live there —
+  `cmd/controller` cannot import a `main` package. The guard structurally
+  cannot see the file it would have had to permit;
+- the device **already has a payload mechanism**:
+  `cmd/controller/platform_sh2.go:576` — *"PayloadReader returns the real XIP
+  read over the §5 payload region (§10.1). This is the ONLY platform that has
+  one."*
+
+So the demo payload is a **flashed artifact in the existing payload region**,
+not an embed. The confinement guard governs `//go:embed` under `cmd/emu` and is
+untouched by this work: it keeps doing exactly what it does today, and no demo
+blob is compiled into firmware.
+
+This is strictly better than the narrowing it replaces. A guard that had to
+learn a content exception would have become a guard with a hole in it; instead
+it keeps its simple, structural property, and the demo payload takes the path
+the device already supports for payloads.
 
 ## 5. Accepted risk, recorded as a decision
 
@@ -96,7 +121,14 @@ wallet, and any **word** plate is self-labelling per §2.
 
 ## 6. Open questions for R0
 
-- **Firmware size.** The payload adds flash. Fork `main` measured 1,506,884 B
+- **HOW does the payload reach the region?** The review's I-2, and now the
+  central question: the device reads its payload region via `seal.XIPReader`,
+  but what WRITES one? `sh2-flash` flashes a signed firmware image; whether it
+  can place a payload, or whether that needs new tooling, is unresolved and
+  decides most of the implementation. Settle this before anything else.
+- **Firmware size.** A flashed payload may not cost firmware flash at all, which
+  would retire this question — but it occupies the payload region, which has its
+  own budget. Fork `main` measured 1,506,884 B
   flash / 62,592 B RAM at `321acb56`; the budget and the payload's cost must be
   measured before this is called done, not estimated.
 - **Digest pinning.** Existing blobs pin a digest (`syswTestDigest`) precisely
