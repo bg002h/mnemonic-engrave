@@ -1,8 +1,16 @@
 # SPEC — an on-device demo payload for the SH2
 
-**Status:** DRAFT, pre-R0. **Baseline:** fork `main` (see §7 for the pin).
-**Risk set:** (a) ships in device firmware, (b) carries key material, (c) changes
-what an embedded payload is allowed to be → **R0 gate to 0C/0I before code.**
+**Status:** DRAFT. **Baseline:** fork `main` (see §7 for the pin).
+
+**NOT funds-adjacent — operator ruling 2026-09-17: *"This is not funds adjacent.
+Keep the review tight."*** An earlier draft of this header classified the work
+risk-set on the grounds that it ships key material in firmware. That
+classification is withdrawn: the only keys involved are public test vectors, so
+there are no funds to put at risk that are not already forfeit by definition.
+One tight review, not the multi-lens R0 apparatus.
+
+The §5 residual risk is unchanged and already accepted; it is a property of the
+demo artifact, not a reason to re-inflate the process around it.
 
 ## 1. What and why
 
@@ -104,7 +112,10 @@ wallet, and any **word** plate is self-labelling per §2.
 - **Does the demo engrave words at all?** If it offers a seed-backup plate, §2's
   self-labelling covers it directly. If not, §5 is the whole safety story.
 
-## 7. Gates this spec must pass before code
+## 7. Gates before code (tight)
+
+These survive the narrowed scope because each is a machine check, not a review
+round — cheap to run and the only things here that can fail silently.
 
 - `TestEveryEmbeddedPayloadIsStructurallyConfined`, narrowed per §4, with a test
   proving it REFUSES a payload carrying a non-self-labelling seed. A guard that
