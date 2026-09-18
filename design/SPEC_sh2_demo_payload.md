@@ -153,7 +153,13 @@ round — cheap to run and the only things here that can fail silently.
 - baseline revision recorded here before R0, so `scripts/plan-staleness-check.sh`
   has something to compare against.
 
-## 8. ANSWERED — `me seal` already does this, and no tooling changes
+## 8. ANSWERED — no tooling changes, but it is `me sysw pack`, not `me seal`
+
+> **SUPERSEDED IN TWO PLACES, 2026-09-18, by building the payload.** The
+> conclusion — *no new tooling* — survives. The command and the region do not.
+> Both errors are recorded in full at §8a rather than edited away, because each
+> one would have cost a flash cycle and the reasoning that produced them is the
+> part worth keeping.
 
 Measured 2026-09-17, end to end. The feature is substantially cheaper than §4
 and §6 assumed.
@@ -205,6 +211,76 @@ lives, and whether the composer already seats cosigners from payload `key:`
 records — `me seal --help` says they "feed the SeedHammer II's Wallet Policy
 composer", which would make this payload authoring rather than firmware work.
 
+## 8a. The two corrections — MEASURED 2026-09-18 while building it
+
+**(1) `me seal` cannot carry a `key:` record. `me sysw pack` can.**
+
+§9 step 2 below prescribes `me seal --plaintext key:… --out demo.uf2`. Run, on
+both of `seal`'s channels:
+
+```console
+$ me seal --plaintext "key:6162" --out /tmp/t.uf2
+me: record 0 in the public section: unrecognised record:
+    unrecognized HRP 'key:6' (expected md, mk, ms, or mt)
+
+$ me seal --in records.txt --out demo.uf2
+me: record 0 in the secret section: unrecognised record:
+    unrecognized HRP 'key:5b37336335646' (expected md, mk, ms, or mt)
+```
+
+`me seal` carries constellation STRINGS — md1/mk1/ms1/mt1. The composer record
+classes (`key:`, `hash:`, `now:`) are a `me sysw pack` surface, and `pack --help`
+documents them by name. §8 measured the seal route with **mk1 chunks**, which it
+does carry, and generalised to `key:` records without running one.
+
+**(2) The region is `0x10D00000`, and §8's "correction" of it was wrong.**
+
+§8 carried a paragraph correcting the review's `0x10D00000` to `0x10E00000` as
+"the normative constant", citing `seal.PayloadAddr`. That citation is right and
+irrelevant: `0x10E00000` is the **Sealed Payload** region, and the composer reads
+the **systemwide** container — `ctx.sysw.takeAll(sysw.ClassKey)`
+(`gui/composer_sources.go`), whose region is `0x10D00000`–`0x10D10000`
+(`SPEC_systemwide_payloads.md` §4). The review was right the first time.
+
+The two are deliberately a megabyte apart, and `me sysw --help` states why: *"A
+different container from `seal`, in a different flash region, read by a different
+set of programs… no invocation should be able to produce a systemwide container
+while the operator believes they are producing a Sealed Payload one."* §8 did
+exactly what that separation exists to prevent, on paper — and §9's own code
+citation (`ctx.sysw`) contradicted §8's mechanism for a day without either
+noticing the other.
+
+**The route that works**, and the one `demo/sh2/build-payload.sh` now runs:
+
+```sh
+me sysw pack --in records.txt --no-passphrase --region --out demo-payload.bin
+picotool load --verify -t bin -o 0x10D00000 demo-payload.bin   # BOOTSEL, laptop power
+```
+
+`--region` pads to the full 64 KiB with `0xFF` (erased NOR), so the file is
+byte-for-byte what the sector looks like with only this container written.
+`sh2-flash` is NOT the tool: it signs and flashes FIRMWARE images (`-p` picks a
+commit to build), and has no payload path.
+
+**Built and verified, 2026-09-18.** 895 bytes of container padded to 65536;
+`me sysw show` classifies all three as `cosigner key (key:)` plus an appended
+`now:`. The three records were then parsed by the **device's own Go parser** —
+`sysw.ParseKeyRecord`, not the Rust host classifier — and all three returned
+`depth=4`, `origin=m/48h/0h/0h/2h`. That cross-language check is the one that
+matters: the host writes the payload and the firmware reads it, and only the
+firmware's answer decides whether a visitor sees three seatable keys or an empty
+composer.
+
+**Why the keys come from the mk1 CARDS and not from a printed descriptor.**
+`ParseKeyRecord` refuses a record whose BIP-32 header disagrees with its origin
+(`sysw/composer_records.go:399-408`): depth must be 3 or 4, must equal the
+origin's component count, and the child index must equal the origin's terminal
+component. Until md-codec 0.44.0 (2026-09-18) every rendered descriptor served
+depth-0 xpubs under depth-4 origins, so records built from one would have been
+refused by the device, one by one, with no diagnosis beyond a composer that
+offered nothing. The cards always carried real headers. This is why the payload
+was blocked on that fix, and it is the reason to keep reading keys off cards.
+
 ## 9. ANSWERED — the device already offers the choice
 
 `gui/composer_engrave.go` defines three forms, offered by seating state
@@ -226,8 +302,11 @@ feeds.
 **So this request is payload authoring, not firmware work:**
 
 1. build `key:` records for the demo wallets — `key:<hex of "[fingerprint/path]xpub">`;
-2. `me seal --plaintext key:… --out demo.uf2`;
-3. flash once.
+2. `me sysw pack --no-passphrase --region --out demo-payload.bin` (**not
+   `me seal`** — see §8a correction 1);
+3. flash once, at `0x10D00000` (**not `0x10E00000`** — see §8a correction 2).
+
+Steps 1 and 2 are done: `demo/sh2/build-payload.sh`.
 
 A visitor then composes from the seated demo keys and picks concrete or template
 at engrave time. **Zero firmware changes**, and the device offers a richer choice
@@ -245,12 +324,24 @@ wants "build a full multisig, then strip it to a template".
 
 ## 10. What is actually left
 
-Nothing in firmware. The remaining work is a small authoring task:
+Nothing in firmware, and the authoring is now done.
 
-- choose the wallet shape the demo composes (a 2-of-3 from the three §2 seeds is
-  the obvious one, and gives every seating state a visitor can explore);
-- derive the `key:` records at the origins the composer expects, and record the
-  exact commands in the demo's build script so the payload is reproducible;
-- flash once and walk it, since §7's gates are machine checks and the only
-  untested claim left is that a visitor can actually reach both forms on
-  hardware — which no amount of reading settles.
+- ~~choose the wallet shape~~ **DONE.** A 2-of-3 `wsh(sortedmulti)` over the
+  three §2 seeds, every cosigner at BIP-48 account 0, `m/48'/0'/0'/2'` — which is
+  `md.DefaultOrigin(wsh, 0)` on the device, so the keys seat into the composer's
+  own wsh presets. Its wallet-policy-id is `9db5d8b6d3a0bcbfd1998679da280f6e`.
+- ~~derive the `key:` records and record the commands~~ **DONE.**
+  `demo/sh2/build-payload.sh`, which re-checks §3's ≤2-distinct-words invariant
+  on the literals, reads each key off its mk1 card, packs, and prints both the
+  `me sysw show` verification and the `picotool` line. Built and verified
+  2026-09-18, including against the device's own Go `ParseKeyRecord` (§8a).
+- **flash once and walk it** — still the only step left, and still the only claim
+  reading cannot settle: that a visitor can actually reach both engrave forms on
+  hardware.
+
+**A note on reproducibility.** `me sysw pack` appends a `now:` record (the pack
+time) whenever the payload holds a `key:`, so two builds differ in that record
+and in the digest. That is wanted here — the device echoes it as a lower bound
+beside a time lock — but it means the blob is not byte-reproducible and must not
+be pinned by a digest const. `--no-now` makes it a pure function of its inputs if
+some later fixture needs that.
