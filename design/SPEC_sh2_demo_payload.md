@@ -121,16 +121,11 @@ wallet, and any **word** plate is self-labelling per §2.
 
 ## 6. Open questions for R0
 
-- **HOW does the payload reach the region?** The review's I-2, and now the
-  central question: the device reads its payload region via `seal.XIPReader`,
-  but what WRITES one? `sh2-flash` flashes a signed firmware image; whether it
-  can place a payload, or whether that needs new tooling, is unresolved and
-  decides most of the implementation. Settle this before anything else.
-- **Firmware size.** A flashed payload may not cost firmware flash at all, which
-  would retire this question — but it occupies the payload region, which has its
-  own budget. Fork `main` measured 1,506,884 B
-  flash / 62,592 B RAM at `321acb56`; the budget and the payload's cost must be
-  measured before this is called done, not estimated.
+- ~~**HOW does the payload reach the region?**~~ **ANSWERED — see §8.** `me seal`
+  already emits a UF2 addressed at the normative payload base; no new tooling.
+- ~~**Firmware size.**~~ **RETIRED.** The payload is flashed to its own region,
+  not compiled into firmware, so it costs no firmware flash. Measured: 1024
+  bytes for a one-card payload.
 - **Digest pinning.** Existing blobs pin a digest (`syswTestDigest`) precisely
   so a published document cannot silently drift from the blob it photographs.
   Does the demo payload need the same, and is it photographed anywhere?
@@ -158,3 +153,55 @@ round — cheap to run and the only things here that can fail silently.
 - a firmware size measurement against the budget (§6).
 - baseline revision recorded here before R0, so `scripts/plan-staleness-check.sh`
   has something to compare against.
+
+## 8. ANSWERED — `me seal` already does this, and no tooling changes
+
+Measured 2026-09-17, end to end. The feature is substantially cheaper than §4
+and §6 assumed.
+
+```console
+$ me seal --plaintext <mk1 chunk 1> --plaintext <mk1 chunk 2> --out demo.uf2
+me: wrote 1024 bytes to demo.uf2
+
+public data hash (2 records, UNSEALED):
+    8388 417c 38bb 6c24 8d25 39af be1e 9f6a
+RECORD THIS WHOLE LINE. The device shows the same value; if it
+differs, the payload has been altered or its encryption removed.
+```
+
+The UF2 is already addressed for the device — verified by DECODING its blocks,
+not inferred from the absence of an `--addr` flag:
+
+```text
+block 0/2  addr=0x10E00000  len=256  family=0xE48BFF58  magic_ok=True
+block 1/2  addr=0x10E00100  len=256  family=0xE48BFF58  magic_ok=True
+
+seal.PayloadAddr (seal/read_tinygo.go, normative) = 0x10E00000
+```
+
+**Four consequences, every one a simplification:**
+
+1. **No new tooling.** `me seal` emits a correctly-addressed, flashable UF2;
+   `sh2-flash` learns nothing.
+2. **No seeds in the payload.** The request was for a payload holding *keys*,
+   and `mk1` cards are keys. No BIP-39 mnemonic ships.
+3. **So the plaintext guard never engages.** `me` refuses a mnemonic on argv
+   outright (tested: *"argument 3 on ARGV is SECRET key material"*) — but we are
+   not carrying one, so nothing is carved out and nothing is weakened.
+4. **No passphrase ceremony.** With nothing secret inside, the container is
+   cleartext by construction: *"NOT SEALED — no record in this payload is secret
+   material, so there is nothing to encrypt."* A visitor-facing demo must not ask
+   for a passphrase, and now does not have to.
+
+**A correction to the review, recorded so it does not propagate.** The persisted
+report cites the payload region as `0x10D00000`. The normative constant is
+**`0x10E00000`**, and the difference is not cosmetic: `seal/read_tinygo.go`
+warns that a write past `0x11000000` wraps to `0x10000000` and destroys the
+firmware (RP2350 datasheet §5.5.2). That is why `me seal` has no `--addr` flag,
+and why the address here was verified by decoding blocks rather than trusting
+the flag's absence.
+
+**What is left** is only device-side: where the template-vs-concrete choice
+lives, and whether the composer already seats cosigners from payload `key:`
+records — `me seal --help` says they "feed the SeedHammer II's Wallet Policy
+composer", which would make this payload authoring rather than firmware work.
