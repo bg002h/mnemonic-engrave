@@ -37,7 +37,7 @@
     on Linux</b> &mdash; <code>ms</code> ships a static musl build there and
     <code>md</code> ships a glibc one &mdash; so take the exact platform token
     from this table rather than swapping it by hand. Full name is
-    <code>md-0.15.0-&lt;token&gt;.tar.gz</code> /
+    <code>md-0.16.0-&lt;token&gt;.tar.gz</code> /
     <code>ms-0.19.0-&lt;token&gt;.tar.gz</code>, and <code>.zip</code> on Windows.
   </p>
   <table class="dl">
@@ -49,18 +49,18 @@
     <tr><th>Windows</th><td><code>windows-amd64</code></td><td><code>windows-amd64</code></td></tr>
   </table>
   <div class="code"><pre><code><span class="c"># the descriptor tool</span>
-curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.16.0/md-0.16.0-macos-amd64.tar.gz
 <span class="c"># the seed tool</span>
 curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
 
-tar -xzf md-0.15.0-macos-amd64.tar.gz
+tar -xzf md-0.16.0-macos-amd64.tar.gz
 tar -xzf ms-0.19.0-macos-amd64.tar.gz
 chmod +x md ms</code></pre></div>
 
   <p>Linux x86-64, ready to paste:</p>
-  <div class="code"><pre><code>curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-linux-amd64.tar.gz
+  <div class="code"><pre><code>curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.16.0/md-0.16.0-linux-amd64.tar.gz
 curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-x86_64-linux-musl.tar.gz
-tar -xzf md-0.15.0-linux-amd64.tar.gz
+tar -xzf md-0.16.0-linux-amd64.tar.gz
 tar -xzf ms-0.19.0-x86_64-linux-musl.tar.gz
 chmod +x md ms</code></pre></div>
 
@@ -87,15 +87,15 @@ chmod +x md ms</code></pre></div>
     the binary is <code>mnemonic</code>.
   </p>
   <div class="code"><pre><code><span class="c"># macOS Intel (swap macos-amd64 -> macos-arm64 on Apple Silicon)</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.100.0/mnemonic-0.100.0-macos-amd64.tar.gz
-tar -xzf mnemonic-0.100.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
-<span class="c"># Windows: mnemonic-0.100.0-windows-amd64.zip from the same v0.100.0 release</span>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.101.0/mnemonic-0.101.0-macos-amd64.tar.gz
+tar -xzf mnemonic-0.101.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
+<span class="c"># Windows: mnemonic-0.101.0-windows-amd64.zip from the same v0.101.0 release</span>
 <span class="c"># Linux x86-64 (static musl):</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.100.0/mnemonic-0.100.0-x86_64-linux-musl.tar.gz
-tar -xzf mnemonic-0.100.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.101.0/mnemonic-0.101.0-x86_64-linux-musl.tar.gz
+tar -xzf mnemonic-0.101.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
   <div class="note">
     <b>One version, every platform.</b> macOS, Windows and Linux
-    <code>musl</code> all ship from <b>v0.100.0</b> &mdash; the version-split
+    <code>musl</code> all ship from <b>v0.101.0</b> &mdash; the version-split
     that used to send Linux users to v0.97.0 is gone. The musl builds are
     <em>signed and reproducible</em>. On macOS clear Gatekeeper once with
     <code>xattr -d com.apple.quarantine ./mnemonic</code>.

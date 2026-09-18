@@ -12,11 +12,11 @@ one:
 
 ```sh
 # md -- the descriptor tool
-curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.15.0/md-0.15.0-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.16.0/md-0.16.0-macos-amd64.tar.gz
 # ms -- the seed tool
 curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
 
-tar -xzf md-0.15.0-macos-amd64.tar.gz
+tar -xzf md-0.16.0-macos-amd64.tar.gz
 tar -xzf ms-0.19.0-macos-amd64.tar.gz
 chmod +x md ms && ./md --version && ./ms --version
 ```
@@ -256,7 +256,7 @@ fish:   history clear-session
 
 ## 3b · Two recoveries the toolkit can already do
 
-`mnemonic` (mnemonic-toolkit v0.97.0) is the constellation's swiss-army tool.
+`mnemonic` (mnemonic-toolkit v0.101.0) is the constellation's swiss-army tool.
 Two of its searches are worth showing, because they answer questions people
 actually arrive with. **Both were run to produce the output below.**
 
@@ -500,11 +500,14 @@ section above exists.
 
 ## Notes for the 2017 Intel Mac
 
-- **`mnemonic` (mnemonic-toolkit) is now prebuilt for macOS and Windows** as of
-  the v0.98.0 release (crate `mnemonic-toolkit`, binary `mnemonic`); no source
-  build in the room. macOS/Windows are v0.98.0; the Linux `musl` binary is
-  v0.97.0 for now (same tool -- v0.98.0 only adds the Windows build) with a
-  v0.98.0 Linux build on the way. Nothing needs `cargo` anymore.
+- **`mnemonic` (mnemonic-toolkit) is prebuilt for every platform** (crate
+  `mnemonic-toolkit`, binary `mnemonic`); no source build in the room, nothing
+  needs `cargo`. **The version split this paragraph used to describe is closed:**
+  macOS, Windows and both Linux `musl` builds all ship from the SAME release,
+  v0.101.0. It said "the Linux musl binary is v0.97.0 for now ... with a v0.98.0
+  Linux build on the way" through two releases after that was true, which is the
+  failure mode to watch for here -- a note written while something was pending
+  reads as current long after it lands.
 - Both tools are `x86_64` native there; nothing needs Rosetta.
 - If the network is hostile, the emulator runs from `dist/` with
   `python3 -m http.server` — already on macOS — and the CLI half needs no
