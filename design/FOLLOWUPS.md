@@ -18851,3 +18851,43 @@ Journey review M-1. `~/.sh2/otp-6f463e8d0bf609f5.json` carries a board's chipid 
 **Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook gained a "State these gates depend on" section: a table of what each directory holds and which gate dies without it, an explicit "do not delete `rehearsal-work/` while any board remains to be burned", and the per-board `SH2_DIR` convention with the two-CHIPID-spellings warning. Both dependencies were confirmed to fail CLOSED already (`CANNOT CHECK` / `no SeedHammer II pinned`), so this was a stranding risk, not a silent-weakening one.
 
 Journey review M-2. The `--sh2-*` gates depend on `sh2-state/` (or a per-board `SH2_DIR`) for the CHIPID pin and on `rehearsal-work/` for the rehearsal-key refusal list. Both are gitignored, and every document describes `rehearsal-work/` as disposable — so a tidy-up deletes the data that makes "this key is not a rehearsal key" and "this is the board you pinned" answerable. Mitigated on 2026-09-17 by moving pins to `~/.sh2/boards/<chipid>/` (outside any repo), but the rehearsal-key list still lives in the disposable directory.
+
+### F-622 — the Go md port's conformance snapshot still carries the depth-0 descriptor strings md-codec 0.44.0 corrected
+
+**Owning phase:** next fork md-port sync (Rust-primary convergence). **Status:** OPEN. **Tier:** `interop` / `records`.
+
+Filed 2026-09-18, from the descriptor-header fix in descriptor-mnemonic
+`24ca7225` (md-codec 0.44.0).
+
+**What changed upstream.** `to_miniscript::assemble_origin_and_xkey` used to
+build a key's origin from `origin_path` and its BIP-32 header from nothing, so
+every rendered xpub serialised at `depth 0 / parent-fp 00000000 / child 0` —
+a master-looking key under a depth-4 origin. Depth and child number are now
+read off the origin the card already carries; `parent_fingerprint` is
+`hash160(parent_point)[..4]`, is genuinely not on the md1 wire, and stays zero.
+The 44-file conformance corpus in `crates/md-codec/tests/vectors/` was
+regenerated: **176 `"descriptor"` lines changed, zero address or id lines.**
+
+**Why the fork is GREEN right now, and why that is not the same as converged.**
+`md/testdata/vectors/` is the fork's OWN committed snapshot, and the Go side
+reads only the `addresses` array out of those records — `md/conformance_keyed_
+test.go` declares `Chains[].Descriptor` and never references `rec.Chains` at
+all, while `gui/wsh_script_emit_test.go`, `gui/key_card_seating_test.go` and
+`gui/composer_policy_address_test.go` consume `Chains["0"].Addresses`. Since no
+address moved, nothing here went red. The snapshot is simply one generation
+behind on a field nothing asserts.
+
+**What to do at the next sync.** (1) Re-copy the corpus from the primary repo.
+(2) Decide whether the Go side should start asserting `Chains[].Descriptor` —
+the field has been carried in the struct and unread since R3, and an unread
+field is exactly where a cross-language divergence hides (cf. `cross-language-
+vectors-see-what-no-repo-test-can`). (3) If the Go/GUI has a path that
+serialises an xpub for display, check it for the same two-independent-sources
+shape; `gui/composer_review.go:14-16` already states the correct model — *"a
+key: record's origin proves the xpub's DEPTH and its LAST COMPONENT against the
+declared path"* — which is precisely the invariant the Rust render was
+violating, so the firmware's stated model was right before the codec was.
+
+**Not urgent, and deliberately deferred by the operator** (2026-09-18: fix
+md-codec only, defer the toolkit bump and the Go port). No address, wallet id
+or wire byte is affected in either language.
