@@ -18891,3 +18891,36 @@ violating, so the firmware's stated model was right before the codec was.
 **Not urgent, and deliberately deferred by the operator** (2026-09-18: fix
 md-codec only, defer the toolkit bump and the Go port). No address, wallet id
 or wire byte is affected in either language.
+
+### F-623 — the SH2 demo's install block pins versions in its URLs, so the page goes stale by construction
+
+**Owning phase:** next demo or release-workflow cycle. **Status:** OPEN. **Tier:** `docs` / `release`.
+
+Filed 2026-09-18, after the operator's directive *"/sh2 shouldn't mention
+versions in text."* The prose is now version-free. The **install block** is not,
+and cannot be with the assets as they are named.
+
+**Why it cannot.** GitHub serves `releases/latest/download/<asset>`, which is a
+permanently-correct URL — but only for an asset whose NAME is stable. Every
+release here embeds the version in the filename (`md-0.16.0-linux-amd64.tar.gz`,
+`mnemonic-0.101.0-x86_64-linux-musl.tar.gz`), so `latest/download` has nothing
+stable to point at and the page must name a version.
+
+**Why `scripts/install.sh` is not the answer**, though it is at a stable raw URL
+and returns 200: it installs via `cargo install`, and this page deliberately
+moved OFF source builds (`demo: toolkit install points at v0.98.0 binaries, no
+more source build`). Sending a visitor back to `cargo` to avoid a version string
+trades a stale link for a toolchain install in the room.
+
+**The fix, if it is wanted:** have each release workflow ALSO upload an
+unversioned alias per target (`md-linux-amd64.tar.gz` beside
+`md-0.16.0-linux-amd64.tar.gz`). Then the page can use
+`releases/latest/download/md-linux-amd64.tar.gz` and never need editing again.
+Two workflows, and the alias must be uploaded by the same job that uploads the
+versioned asset or the two can disagree — which is the failure this file already
+records under the release-upload-asymmetry entry.
+
+**Cost of not doing it**, measured today: the page advertised `md 0.15.0` for a
+day after `md-cli 0.16.0` existed, and had carried toolkit `v0.100.0` in prose
+while the install block said something else. Both were found by a question from
+the operator, not by a gate.
