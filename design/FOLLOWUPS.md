@@ -18894,7 +18894,28 @@ or wire byte is affected in either language.
 
 ### F-623 — the SH2 demo's install block pins versions in its URLs, so the page goes stale by construction
 
-**Owning phase:** next demo or release-workflow cycle. **Status:** OPEN. **Tier:** `docs` / `release`.
+**Owning phase:** next demo or release-workflow cycle. **Status:** OPEN for the alias/prevention half; DETECTION SHIPPED 2026-09-19. **Tier:** `docs` / `release`.
+
+**Detection shipped.** `demo/sh2/check-install-links.sh`, run by the required
+`test (rust + go)` job, fetches every install URL on the page and then compares
+each advertised release tag against that repo's LATEST release. Mutation-proven
+against the two real failures: rolling the page back to `md 0.15.0` is caught
+(`STALE`) **even though all six URLs still return 200** — which is the whole
+point, since a plain link-checker passes that case — and a mangled asset name is
+caught (`404`). Control run passes.
+
+**Why the alias fix was NOT taken now**, having priced it: the Linux `musl`
+archives this page links are built by a SIGNED, REPRODUCIBLE pipeline invoked
+from `man-pages.yml`, where a second copy of an artifact interacts with
+attestation, per-arch checksums and the repro digest contract. Covering the six
+advertised URLs means editing five workflows across three repos, two of them in
+that path, none of it testable locally. The gate costs one script in one repo
+and catches the same failures. Aliases remain the better END state.
+
+**Known limit, stated rather than discovered later:** the gate fires only when
+THIS repo runs CI, so a sibling release leaves the page stale silently until the
+next push here. A `schedule:` trigger would close that and would also start
+failing on a cadence nobody asked for — left as the operator's call.
 
 Filed 2026-09-18, after the operator's directive *"/sh2 shouldn't mention
 versions in text."* The prose is now version-free. The **install block** is not,
