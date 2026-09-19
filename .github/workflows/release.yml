@@ -162,6 +162,21 @@ jobs:
           go build ./...
           go test ./...
 
+      # F-623. The SH2 demo page hands visitors `curl` lines with a VERSION in
+      # them, and twice on 2026-09-18 that version was wrong -- once a full day
+      # stale, so every visitor installed a binary without that day's fix -- and
+      # a human found it both times, not a gate.
+      #
+      # NOT gated on docs_only: it costs six HEAD requests and three API reads,
+      # and the thing it guards is a page whose correctness depends on OTHER
+      # repos' releases rather than on this tree. Its known limit is the flip
+      # side of that -- it can only fire when this repo runs CI, so a sibling
+      # release makes the page stale silently until the next push here.
+      - name: SH2 demo install links resolve and are current
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./demo/sh2/check-install-links.sh
+
   # ---------------------------------------------------------------------------
   # me-preview (Go): ALL targets cross-compiled from ONE ubuntu runner.
   # CGO_ENABLED=0 keeps it pure-Go (the only CGO in the seedhammer tree is the
