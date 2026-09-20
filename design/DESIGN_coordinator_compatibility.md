@@ -199,11 +199,22 @@ filled, because:
    placeholder indices the branch references — then writes `br.Keys =
    len(keys)` and **discards the map**. `fp_partition` needs *which* slots,
    per path. So the ported `Branch` must retain the index set.
-2. **`KeyPathKind` is three-valued and none of them is an unspendable xpub.**
-   The fork has `KeyPathNone`, `KeyPathNUMS`, `KeyPathSpendable`
-   (`md/policy_shape.go:33-39`); an unspendable-xpub internal key falls into
-   `Spendable`, which is the wallet-identity distinction Nunchuk makes and
-   F-449 already records. The ported enum gains a fourth value.
+2. **`KeyPathKind` keeps THREE values, and the unspendable-xpub distinction
+   lives in a RULE, not the key.** An earlier draft said the ported enum
+   "gains a fourth value" for an unspendable xpub. Right that the distinction
+   matters — Nunchuk treats it as a different wallet and F-449 records it —
+   **wrong about where it lives**, and measured so during plan 1a:
+   `Body::Tr { is_nums, key_index, tree }` (`crates/md-codec/src/tree.rs:49-57`)
+   makes `is_nums` the only internal-key discriminant on the md1 wire, and an
+   unspendable xpub is an ordinary `key_index`, structurally identical to a
+   spendable one. Liana's `unspendable_internal_key(desc)` **derives** the key
+   from the descriptor rather than being a constant to match, so recognising
+   one means re-deriving a specific coordinator's function. That is a
+   coordinator computation, not a codec property. The enum is
+   `NotTaproot | Nums | Xpub` — `Xpub`, not the fork's `Spendable`, because
+   the walk verifies nothing about spendability — and the distinction is
+   evaluated by the coordinator's own rule, where a rule-vs-evidence
+   disagreement surfaces as a D1/D2 build failure.
 
 Both extensions land in **Rust**, and this is the rare direction: `policy_shape.go`
 is fork-native code with no Rust counterpart, so porting it *makes* Rust
