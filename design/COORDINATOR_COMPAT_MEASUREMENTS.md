@@ -57,3 +57,42 @@ Until it is measured, the Core RuleSet cannot claim a lower bound above 25,
 and the honest span for a tapscript-miniscript policy is "refused on 25.0,
 accepted on 31.1, boundary unmeasured" -- which under ruling 3 means the
 verdict is `Unproven` and the row stays silent rather than naming a version.
+
+## "md-codec already owns the canonicaliser" — TRUE IN PART, and I shipped it unchecked
+
+Measured 2026-09-20, after the design was sent for review and before the
+reviewer reported. I put this claim into the design on the architect's word
+without verifying it against the source, which is the one thing the standing
+rule says never to hand a reviewer. Recording the correction here rather than
+editing the artifact under review.
+
+**What IS already owned** (`crates/md-codec/src/render.rs:52`,
+`pub fn descriptor_to_template(d: &Descriptor) -> Result<String, RenderError>`):
+
+- the `@i` placeholder skeleton, with canonical numbering — the codec
+  canonicalises BIP-388 placeholder ordering at encode time, so a
+  decode-then-render round trip yields canonical numbering for free;
+- **origins already erased** — the renderer emits `@0/<0;1>/*`, placeholder
+  plus use-site path, never a key origin. The design's "origins erased" is
+  not work;
+- wrapper and fragment structure, which is the bulk of the skeleton.
+
+**What is NOT owned, and the design implies it is free:**
+
+- **lock values are LITERAL.** `render.rs:159` writes `older({v})` and `:171`
+  writes `after({v})`. The key needs `older(blocks#1)` / `after(time#2)`.
+- **digests are LITERAL.** `render_hash256` / `render_hash160` (`:287`,
+  `:306`) emit the hash bytes. The key needs `sha256(#)`.
+- **the fingerprint partition** does not exist anywhere; it is wholly new.
+
+**Consequence for the design's wording, not its architecture.** The claim
+*"the canonicaliser md-codec already owns **is** the key, so `md shape-key` is
+a formatter over it"* overstates. Accurate: **the skeleton renderer exists and
+gets us the structure, the canonical numbering and the origin erasure; the key
+additionally needs a rendering MODE that abstracts lock values and digests,
+plus a new fingerprint-partition computation.** That is small work — a flag
+threaded through `render_node`, or a sibling renderer — but it is work, and
+ruling 4's "Rust first is cheaper than the design implies" rests on it.
+
+Nothing here changes the choice of key. The skeleton is still the right key
+and still far better than `PolicyShape`. Only the cost estimate moves.
