@@ -186,24 +186,65 @@ The two tr vectors are pinned **today**, pre-implementation, so that hazard is
 live already and only needs the record side to move — which T3 does.
 
 Three occurrences of one shape is a wrong shape, so this plan does not add a
-third call-site edit. **Every read of a `keyed_*.conformance.json` record in
-`gui/` goes through `loadVectorRecord`, and a structural test enforces it**:
-it scans `gui/*_test.go` for a direct
-`filepath.Join(.., "md", "testdata", "vectors", …".conformance.json")` read
-outside the loader itself and fails, naming these three as the occurrences it
-exists to prevent a fourth of. A convention with no gate is worth about 25%
-compliance; the gate is what makes D5 a boundary.
+third call-site edit. **Every read of a `keyed_*.conformance.json` record goes
+through `loadVectorRecord`, and a structural test enforces it.**
+
+**D5b — the scan matches the STRING, not a call shape (r2 Q1).** The first
+draft said the gate scans for a
+`filepath.Join(.., "vectors", …".conformance.json")` read. That is defeated by
+a plain string literal — which is not a contrived spelling but the *existing*
+idiom for testdata paths in this very package
+(`gui/template_engrave_test.go:207`, `gui/composer_selfcheck_test.go:269` both
+write `"../md/testdata/..."` directly). Reproduced against a fully-routed,
+gate-passing tree: a fourth test reading
+`os.ReadFile("../md/testdata/vectors/" + vector + ".conformance.json")` and
+pairing it with `loadVectorChunks` compiles clean and the gate still PASSES —
+a live fourth occurrence of the C-1 shape, invisible to it. `os.DirFS`, a
+package-level `const` and `fs.ReadFile` evade it identically, none being a
+`filepath.Join` call.
+
+So the gate is a **text scan for the substring `conformance.json`** in any
+`*_test.go` outside the loader's own file, failing on any occurrence. No AST
+matching: the substring must appear however the path is spelled, so literal,
+concatenation, `const` and `DirFS` are all caught by construction.
+
+**D5c — the gate must prove it can fail (r2 Q2).** A source scan that matches
+nothing passes vacuously, and this one did: the natural first implementation
+matched call arguments only as bare literals (`*ast.BasicLit`), while every
+real call site writes `name+".conformance.json"` — a `BinaryExpr`. Built that
+way it examined 20+ files, was non-vacuous by file count, and still reported
+PASS on a tree carrying a real unrouted violation. **A file count does not
+prove the pattern can match anything.** The gate therefore asserts three
+things in order: that it examined a plausible number of files (the precedent is
+`gui/tinygo_split_test.go:105`, `if len(files) < 20 { t.Fatalf("INCONCLUSIVE:
+…") }`); that a synthetic known-bad string IS flagged by the same matcher; and
+only then that the real tree is clean.
+
+**D5d — the boundary covers `md/` too (r2 Q4).** The first draft scoped the
+scan to `gui/*_test.go` and then claimed `md/conformance_keyed_test.go:44` was
+"routed through the loader anyway". That was false: `loadVectorRecord` is a
+`gui` helper, `md`'s reader uses `loadPhraseChunks`, and no md-side gate
+existed. `md/` is safe **today** only by coincidence — its three record readers
+(`conformance_keyed_test.go`, `compose_pkh_emit_test.go`,
+`compose_stubs_test.go`) all pair the record with the non-pin-preferring
+`vectorPath`/`loadPhraseChunks`, so both halves move together; and the
+pin-preferring `vectorChunksFor` is used by three files
+(`duplicate_keys_test.go`, `policy_shape_test.go`,
+`f533_internal_key_reuse_test.go`), none of which reads a record. Coincidence
+is not a mechanism, and T2 is about to add three `forkbuilt/` records. The scan
+therefore covers `md/*_test.go` as well — a test in `gui` reads
+`../md/*_test.go` as plain file I/O, exactly as this package already does for
+`../md/testdata/`; it is only *compiling* against another package that it
+cannot do.
 
 Independently enumerated, the remaining record-readers do **not** intersect the
 F-529 three and stay correct either way: `gui/policy_address_test.go:261`
 (`vectorAddress`, driven with `keyed_tr_with_leaf` / `keyed_wsh_thresh`),
 `gui/key_card_seating_test.go:40,243` (`keyed_tr_with_leaf`,
-`seat_same_origin_two_masters`), `gui/composer_policy_address_test.go:48`
+`seat_same_origin_two_masters`), and `gui/composer_policy_address_test.go:48`
 (`keyed_compose_wsh_timelock_hashlock` — the compose variant, a different
-vector from the pinned one), and `md/conformance_keyed_test.go:44`, whose
-record and card both come from the vendored tier so they move together. They
-are routed through the loader anyway, because the structural gate admits no
-exceptions and an exception list is the next thing to rot.
+vector from the pinned one). They are routed through the loader anyway, because
+the gate admits no exceptions and an exception list is the next thing to rot.
 
 **D6 — the pins' anti-drift check pins a DIVERGENCE, not a deletion (R0 I-1).**
 `TestPinnedKeyReuseVectorsStillMatchTheVendoredCorpus` skips only when the
@@ -247,8 +288,10 @@ pre-re-vendor `keyed_wsh_timelock_hashlock` phrase to
 current `.conformance.json` of **all three** F-529 vectors to
 `md/testdata/forkbuilt/`. Add `loadVectorRecord` and route **every**
 `keyed_*.conformance.json` read in `gui/` through it — the three split sites in
-D5a's table first — then add the structural test that fails on a direct read
-outside the loader. Add a `pinnedDuplicateVectors`
+D5a's table first — then add the structural test per D5b/D5c/D5d: a substring
+scan over `gui/*_test.go` **and** `md/*_test.go`, asserting a plausible file
+count, then a synthetic known-bad catch, then a clean tree, so the gate cannot
+pass by matching nothing. Add a `pinnedDuplicateVectors`
 list and a shape test asserting the wsh pin carries a slot at two use sites
 under one miniscript — the existing
 `TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot*
