@@ -295,6 +295,33 @@ single-chain spelling.
   `error code: -12 … No bech32 addresses available.` Pass `bech32m`,
   `legacy` or `p2sh-segwit`. The 35 `wsh` wallets answer untyped.
 
+## The device and the host spell hardening differently — compare XPUBS, not checksums (F-627)
+
+The restore document the device shows reads `[73c5da0a/48h/0h/0h/2h]`; `md
+descriptor` on the host prints `[73c5da0a/48'/0'/0'/2']`. Same path, two
+spellings — and **the BIP-380 checksum covers the descriptor text, so it
+differs**:
+
+| spelling | where | checksum on the demo 2-of-3 |
+| --- | --- | --- |
+| `48'` apostrophe | host, `md descriptor` | `#k9z7pr9l` |
+| `48h` letter h | device restore document | `#c6ptw3rr` |
+
+Both are **correct for their own string** — recomputed from BIP-380, each
+verifies against the text it follows. The xpubs are byte-identical.
+
+**So: compare the xpubs and the fingerprint/path, and expect the checksums to
+differ.** A checksum mismatch here is not a defect and not a transcription
+error, and either string imports anywhere: `bip32`'s parser takes both
+spellings, as do Core, Nunchuk and Liana.
+
+Why it is left this way rather than unified: the device writes `h` because an
+apostrophe is a poor glyph to engrave and to read back off steel, and changing
+it would change engraved plate content for every wallet, not just this
+comparison. Printing both checksums would spend a line of a space-constrained
+document on a reconciliation the operator only needs once. Neither is worth it
+when "the xpubs match" is the check that actually proves the wallet.
+
 ## Nunchuk Desktop 2.1.1 — the demo payload's own wallet
 
 2-of-3 native segwit, the three demo seeds at `m/48'/0'/0'/2'`

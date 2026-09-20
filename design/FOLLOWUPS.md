@@ -19010,7 +19010,23 @@ because only the `wsh(sortedmulti(` prefix takes its multisig route
 
 ### F-627 — Device restore document spells hardened `h`, the host `'`; the BIP-380 checksums an operator compares by eye differ
 
-**Status:** OPEN — **Owning phase:** next restore-document pass (fork `gui/md1_expand.go:129-147`). **Tier:** `docs` / `ux`. **Found:** lens 3 M-1.
+**Status:** CLOSED 2026-09-20 — documented, spelling deliberately NOT unified. **Owning phase:** next restore-document pass (fork `gui/md1_expand.go:129-147`). **Tier:** `docs` / `ux`. **Found:** lens 3 M-1.
+
+**Ruling: compare the xpubs, not the checksums**, written up in
+`demo/sh2/WALKS.md` where the operator meets it. Both checksums were
+recomputed from BIP-380 independently of the report and each verifies against
+its own spelling — the demo 2-of-3 is `#k9z7pr9l` with `48'` and `#c6ptw3rr`
+with `48h`, reproducing the report's two values exactly. The xpub strings are
+byte-identical, and `bip32`'s parser, Core, Nunchuk and Liana all take either
+spelling.
+
+The other two options were declined with reasons. **Unifying the spelling**
+means the device emitting `'`, which changes engraved plate content for every
+wallet — an apostrophe is a poor glyph to engrave and to read back off steel,
+which is why `bip32.Path.Encode` writes `h`. **Printing both checksums** spends
+a line of a space-constrained document on a reconciliation the operator needs
+once. Neither earns its cost when "the xpubs match" is the check that actually
+proves the wallet.
 
 C01: device `…[73c5da0a/48h/0h/0h/2h]…#c6ptw3rr`, host `md descriptor`
 `…[73c5da0a/48'/0'/0'/2']…#k9z7pr9l`. Both checksums verify for their own
