@@ -261,3 +261,148 @@ states no number it has not measured. Resolve properly before quoting 6/6.
 - The load flow then shows **"A SECRET is stored unencrypted in flash"**, a
   Keep/Unload choice, and a census: "Loaded. It holds: 1 BIP-39 mnemonic,
   1 free text, 1 passphrase."
+
+
+# Third-party wallet import checks — the operator's live verification
+
+Measured 2026-09-20 against **Nunchuk Desktop 2.1.1** (libnunchuk built and
+run), **Liana 8.0** (built from `v8.0`) and **Bitcoin Core 25.0.0 / 31.1**.
+Every descriptor and every address below is pasted from the runs, not retyped.
+The frozen originals are `design/agent-reports/composer-fable-r0-nunchuk.md`
+and `…-liana-core.md` §"Operator runbook"; this file is the operator-facing
+copy and is what to follow at the bench (F-629).
+
+## THE RULE THAT DECIDES MOST OF THESE: paste the MULTIPATH form
+
+Always paste the `<0;1>/*` string that `md descriptor` prints. Never the
+single-chain spelling.
+
+- **Nunchuk refuses `--chain 1` for every shape** — 30 of 30 measured,
+  `Failed to verify wallet descriptor`. Its parser round-trips only
+  `EXTERNAL_ALL`, `EXTERNAL_INTERNAL`, `ANY`, `TEMPLATE`, never `INTERNAL_ALL`
+  (`src/descriptor.cpp:658-661`). The multipath form and `--chain 0` both
+  import, 20 of 20 each. (F-624)
+- **Core's `getdescriptorinfo` hands back only the `/0/*` half** in its
+  `descriptor` field, with the other half in `multipath_expansion`. Import
+  that field and you get a one-descriptor, receive-only wallet whose
+  `getrawchangeaddress` answers *"This wallet has no available keys"* — it
+  will send change somewhere it can only find again by rescanning after a
+  re-import. Use the `md descriptor` output as-is; it already carries the
+  multipath checksum. (Core 31.1; Liana's own `doc/RECOVER.md` documents the
+  v25 split but not this one.)
+- **Core needs an explicit address type on `tr`, `sh` and `sh(wsh)` wallets**:
+  `getnewaddress` / `getrawchangeaddress` untyped fail with
+  `error code: -12 … No bech32 addresses available.` Pass `bech32m`,
+  `legacy` or `p2sh-segwit`. The 35 `wsh` wallets answer untyped.
+
+## Nunchuk Desktop 2.1.1 — the demo payload's own wallet
+
+2-of-3 native segwit, the three demo seeds at `m/48'/0'/0'/2'`
+(`demo/sh2/build-payload.sh`).
+
+```
+wsh(sortedmulti(2,[73c5da0a/48'/0'/0'/2']xpub6DXuQW1Q2JpZxsEnFKrPvDuiRMmQgU4fzHU1wsvM5EqgGAWRJ3cmwbtS8u1HQjrEHg3YFb7XGnFovPydJ8qpaGNNd2hSEPoheWd27EABdGH/<0;1>/*,[3f635a63/48'/0'/0'/2']xpub6DXuQW1Q2JpZwZhyeFyRwoVcxxRQUvWjfWf5X5tre7aRCMTYwNR1DnwZAehowmtGsB2oEka2aWofzRgVnexutt2KVBZfRcPtuxS6JYwywD5/<0;1>/*,[66d455ea/48'/0'/0'/2']xpub6DXuQW1Q2JpZw2pTr5epQqR2dceAT9UAeRtrbqNAh24Mrg99k6spPvgiaDoCdEmvzqcka6r5Yfpa4asbrxqr6PbrJ6LVphjMPiZ1iJKrJPm/<0;1>/*))#k9z7pr9l
+```
+
+**Route.** Home → **Add wallet** → **Recover existing wallet** → **Recover via
+BSMS/descriptors** → pick a plain text file holding the line above → name it →
+confirm. ("Recover via QR code" feeds the same parser for a single-frame text
+QR.)
+
+**Expect** Multisig 2/3, Native SegWit; three keys with fingerprints
+`73c5da0a`, `3f635a63`, `66d455ea`, all at `m/48h/0h/0h/2h`. Keys that are not
+already yours show as hidden `import` signers — normal. Nunchuk's internal
+wallet id is `45m69s9l` (the checksum of its `/0/*` descriptor).
+
+**Receive 0, 1, 2 — must match exactly:**
+
+- `bc1qe84j8r5nucqgke0s53w695a7n4whv268mrnsp2p75u57s0q8zh9qcg4xky`
+- `bc1qneumn7xm855e9axkyj7t7vfpgrz0zmswe4djm5fk5v0f7r3v4sfqe0p00y`
+- `bc1qzw63ms59c4q20j0m6e499ulplmgulcflddks34tdu32n6phn95rse8m2hn`
+
+**Change 0, 1, 2:**
+
+- `bc1q3gy9fcmr3zfwujcrj7paehw627qye7kxemmny3k3w0ft9pt3pexsaccayh`
+- `bc1qhqvklrt6q87uqsjxu88te4xstuvf8g7gtj5flarchdu23tlg2w5sc7xvsp`
+- `bc1qemh77zk4fz2j3js02s3d29d5zyt94vrnh3rvt0ghhrx9vmp6c6dq2ysra5`
+
+These six are what the device (`policyprobe`), `md address`, Core v25, Core
+31.1 and libnunchuk all produced. **Any other string at index 0 = STOP, and
+report the string.**
+
+**A second wallet that Nunchuk accepts** — `preset-simple-timelocked-inheritance-tr`,
+internal key = slot 0:
+
+```
+tr([73c5da0a/48'/0'/0'/3']xpub6DXuQW1Q2JpZyweiMewTZuMPvjG8hKhV2qoF6wL9VFxsMBExtbfqAAoR4oMG4GyxFzVdfas1v2eAdfLxyjc4Ceo5B6w6zTpf7F2BuXCJ52i/<0;1>/*,and_v(v:pk([3f635a63/48'/0'/0'/3']xpub6DXuQW1Q2Jpa1hNtFUcghdx7Q8kTDsqo7b54YAqZBNCH8EuSvmNSAKbAvkZ4HspgftJ1aqSMeFiZ4sr2QNEGm9geaEre3zDwiJD7C5gx5VH/<0;1>/*),older(26280)))#l7d8tzd8
+```
+
+Expect **Miniscript / Taproot**, key path 1-of-1 (`73c5da0a`), one script path
+`and(pk(3f635a63), older(26280))`.
+
+**The expected refusal, for calibration** — `preset-kofn-recovery-tr` (the NUMS
+form): the app must toast **"Could not parse descriptor"**. If it imports, the
+desktop is not running the libnunchuk this was measured against.
+
+**Known cosmetic divergence (F-626).** An EXPERIMENTAL unsorted `wsh(multi(...))`
+imports and its addresses match, but Nunchuk labels it `MINISCRIPT 0-of-3` with
+one signing path rather than `MULTI_SIG 2-of-3` — only the `wsh(sortedmulti(`
+prefix takes its multisig route (`descriptor.cpp:596-598`). The wallet is
+correct; the label is not.
+
+## Liana 8.0 — expect the demo wallet to be REFUSED
+
+**The demo 2-of-3 is not a Liana wallet and cannot be made one by any
+spelling.** It lowers to `wsh(sortedmulti(2,…))`, which Liana's importer
+rejects before it looks for a recovery path (`analysis.rs:554-558`), and a
+Liana policy needs a timelocked recovery path anyway. In the GUI this surfaces
+only as **"Failed to read the descriptor"** with Next greyed out — the reason
+is discarded, so that one line is all the feedback there is.
+
+**Route.** Start Liana → pick the network → **"Add an existing Liana wallet"**
+→ on mainnet choose your own node (not Liana Connect) → **"Import the wallet"**
+→ paste into **Descriptor:** → observe the refusal. STOP; no setting changes
+the answer.
+
+### The nearest importable wallet from the same seeds — `preset-kofn-recovery-wsh`
+
+On the device: Wallet Policy → Build a new policy → preset **kofn-recovery**,
+2-of-3, `older` 26280 blocks, wrapper `wsh`; seat the three demo seeds in path
+1 and demo seed 0 (account 1) as the heir.
+
+```
+wsh(or_d(multi(2,[73c5da0a/48'/0'/0'/2']xpub6DXuQW1Q2JpZxsEnFKrPvDuiRMmQgU4fzHU1wsvM5EqgGAWRJ3cmwbtS8u1HQjrEHg3YFb7XGnFovPydJ8qpaGNNd2hSEPoheWd27EABdGH/<0;1>/*,[3f635a63/48'/0'/0'/2']xpub6DXuQW1Q2JpZwZhyeFyRwoVcxxRQUvWjfWf5X5tre7aRCMTYwNR1DnwZAehowmtGsB2oEka2aWofzRgVnexutt2KVBZfRcPtuxS6JYwywD5/<0;1>/*,[66d455ea/48'/0'/0'/2']xpub6DXuQW1Q2JpZw2pTr5epQqR2dceAT9UAeRtrbqNAh24Mrg99k6spPvgiaDoCdEmvzqcka6r5Yfpa4asbrxqr6PbrJ6LVphjMPiZ1iJKrJPm/<0;1>/*),and_v(v:pkh([73c5da0a/48'/0'/1'/2']xpub6DXuQW1Q2JpZxXTg7vTxJjBmWnLdfRbdYGgdLfbHHNf96dtK4UNwjDoqK89JkuyKFoctVsBrXj6jnqxfxbdugyrTQeJsDiUyRCYxgiPSpgC/<0;1>/*),older(26280))))#82sjmrzj
+```
+
+Paste it at the same screen and **Next** lights up. Expect: primary path 2 of 3
+keys `73c5da0a`, `3f635a63`, `66d455ea`; one recovery path after 26280 blocks
+with key `73c5da0a` — Liana identifies keys by fingerprint, so the heir shows
+as the same signer as the first primary key, which it is (seed 0 at account 1).
+
+**Receive 0, 1, 2:**
+
+- `bc1qwjzval06strhmknc74ysnhaee8h2wqrmafrn7fytwk6uvjnkx2aqtzjlm5`
+- `bc1qy40f2j3ldwkpqfe2hvv97kedrxl6hphkxnxkfuxhpe9vn06psphsyq876x`
+- `bc1qtwruevfx2jcmx2p43q45r87pwpdxsj036mtex9x4ypkudlwh8dtqcxca5v`
+
+**Change 0, 1, 2:**
+
+- `bc1quz0uma4vuzvtuqzsye99uq4agxlruj477e7f7m0hfsu2qvjdylss2rawn9`
+- `bc1qqmztlp4fxqvgqqf3678yln7peglatsatqhu948enu9dshftlt32quz3qz6`
+- `bc1qqxs6yvg7fkyqpr2jsqktr3d9d4vk7jrwnugqrq0p7vdjrw9tpsysx59gm0`
+
+With your own Core node, do **Settings → Node → rescan** from the wallet's
+birth height or Liana will not see earlier coins.
+
+### Which presets survive unedited (measured, `LianaDescriptor::from_str`)
+
+| preset | wsh | tr | why not |
+|---|---|---|---|
+| plain-multisig | no | no | `sortedmulti` / no recovery path (wsh); NUMS (tr) |
+| simple-timelocked-inheritance | **yes** | **yes** | — |
+| kofn-recovery | **yes** | no | NUMS internal key |
+| tiered-recovery | **yes** | no | NUMS internal key |
+| hashlock-gated | no | no | hash |
+| decaying-multisig | no | no | no unlocked path, and NUMS under tr |
+
+Four of the twelve preset x wrapper combinations.

@@ -685,6 +685,22 @@ path). 344 chars, headroom 146.
 > Key order is part of this wallet. Anyone restoring
 > it must keep the same order. Sorted keys need none.
 
+**Measured third-party consequence, recorded here rather than in the body
+(F-626, lens 2 N-2).** Nunchuk Desktop 2.1.1 imports `wsh(multi(2,K,K,K))` and
+derives matching addresses, but labels it `MINISCRIPT 0-of-3` with one signing
+path rather than `MULTI_SIG 2-of-3` — only the `wsh(sortedmulti(` prefix takes
+its multisig route (`descriptor.cpp:596-598`). The wallet is correct; the label
+is not.
+
+It is NOT in the body above, deliberately. The body is a four-line FIXED modal
+under §12 item 5's modal-fits assertion, and a fifth line naming one
+coordinator's labelling would spend the operator's attention at consent time on
+a cosmetic defect in someone else's UI — while dating the spec to whatever
+Nunchuk does this release. The operator-facing home for it is
+`demo/sh2/WALKS.md` §"Third-party wallet import checks", where the person
+actually looking at Nunchuk will be. A future copy pass may still decide
+otherwise; this note is what it needs to decide from.
+
 ### 8c. Lock echoes (SEVEN separate bodies)
 
 The blocks echo and the packed-HEIGHT bound were folded in at composer S3's
