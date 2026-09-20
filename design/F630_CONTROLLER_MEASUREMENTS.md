@@ -56,3 +56,16 @@ gate written as an exit-code check is red before it starts and will be
 
 Fold this into T4 with the round-4 findings; the plan is under review and must
 not move under the reviewer.
+
+## T1–T3 cannot move the firmware, so T4's size step is ceremony here
+
+Every file the plan edits is a `_test.go`, a `testdata/` fixture, or
+`scripts/vendor-compose-vectors.sh`. **Zero non-test Go files.** Test files are
+not linked into `./cmd/controller`, so the flash/RAM figures are invariant
+across T1–T3 by construction — no build needed to know it, and a measurement
+that cannot differ proves nothing.
+
+Keep the step only as a cheap guard against the plan's own scope claim being
+violated: if the firmware size DOES move, a non-test file was edited and the
+plan's "no normative Go behaviour changes" clause is broken. State it that way
+in T4, so the number is read as a scope check rather than a performance one.
