@@ -1,0 +1,29 @@
+== X16-wsh-kofn-older5: lianad up, version 8.0.0
+  addresses: bcrt1qeasydhww84x47kjd449wlcry4sg7glzevy5f6yzql4xwwecvtd3st54kcr eq core: [False, False, False] change eq core: None
+  primary: ok ok mempool: True sigs: {'primary': {'signed': [['3f635a63', 1], ['73c5da0a', 1]], 'sigs_count': 2, 'threshold': 2}, 'recovery': []}
+  recovery older=5: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+3": "ok", "createrecovery_tip=h+4": "ok", "spendinfo_unsigned": {"primary": {"signed": [], "sigs_count": 0, "threshold": 2}, "
+== X18-tr-inherit-older5: lianad up, version 8.0.0
+  addresses: bcrt1pnwvgp9mx79ylgmger6gv3qjsxhe7xc7y6cwxj4we5ms6zrx3hkhs0qpedh eq core: [True, True, True] change eq core: None
+  primary: ok ok mempool: True sigs: {'primary': {'signed': [['73c5da0a', 1]], 'sigs_count': 1, 'threshold': 1}, 'recovery': []}
+  recovery older=5: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+3": "ok", "createrecovery_tip=h+4": "ok", "spendinfo_unsigned": {"primary": {"signed": [], "sigs_count": 0, "threshold": 1}, "
+== X02-wsh-2of3-tworec: lianad up, version 8.0.0
+  addresses: bcrt1q4sesueeealf6hd5wfvzxu56dmhzarhwukp2hk48s78thl2ped0xq3m5ywa eq core: [False, False, False] change eq core: None
+  primary: ok ok mempool: True sigs: {'primary': {'signed': [['66d455ea', 1], ['3f635a63', 1]], 'sigs_count': 2, 'threshold': 2}, 'recovery': []}
+  recovery older=100: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+98": "ok", "createrecovery_tip=h+99": "ok", "spendinfo_unsigned": {"primary": {"signed": [], "sigs_count": 0, "threshold": 2},
+  recovery older=200: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+198": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h
+== X10-tr-1of1-tworec: lianad up, version 8.0.0
+  addresses: bcrt1pl4p26clle5cfklz3f7w8feavheus050a55qquvyhqhzf93wyn3eqgg77j4 eq core: [True, True, True] change eq core: None
+  primary: ok ok mempool: True sigs: {'primary': {'signed': [['73c5da0a', 1]], 'sigs_count': 1, 'threshold': 1}, 'recovery': []}
+  recovery older=100: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+98": "ok", "createrecovery_tip=h+99": "ok", "spendinfo_unsigned": {"primary": {"signed": [], "sigs_count": 0, "threshold": 1},
+  recovery older=200: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+198": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h
+== X13-wsh-2of2-2of2older: lianad up, version 8.0.0
+  addresses: bcrt1qajlac67aq4pk9f8fcy2cwm7uw8jxy7ac5ppepr4ga0ehnwsfyv9qrk9y6d eq core: [False, False, False] change eq core: None
+  primary: ok ok mempool: True sigs: {'primary': {'signed': [['3f635a63', 1], ['73c5da0a', 1]], 'sigs_count': 2, 'threshold': 2}, 'recovery': []}
+  recovery older=26280: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+26278": "Could not connect to \"/scratch/code/shibboleth/.tmp/fable-liana-lianad/X13-wsh-2of2-2of2older/regtest/lianad_rpc\": 
+== X24-wsh-2of3-1of1-unlocked-plus-rec: lianad up, version 8.0.0
+  addresses: bcrt1qppqk2d4z04gpsc8lgqyn2ktmnlcng3aqmpu49f3df8tay2td5u5sgnsurc eq core: [False, False, False] change eq core: None
+  primary: ok ok mempool: True sigs: {'primary': {'signed': [['3f635a63', 1], ['73c5da0a', 1]], 'sigs_count': 2, 'threshold': 2}, 'recovery': []}
+  recovery older=100: {"coin_seen": true, "createrecovery_immature_tip=h": {"code": -32602, "message": "No coin currently spendable through this timelocked recovery path."}, "createrecovery_tip=h+98": "ok", "createrecovery_tip=h+99": "ok", "spendinfo_unsigned": {"primary": {"signed": [], "sigs_count": 0, "threshold": 2},
+  X24 seed3 alone: {"createspend": "ok", "spendinfo_signed_seed3_only": {"primary": {"signed": [["b8688df1", 1]], "sigs_count": 1, "threshold": 2}, "recovery": []}, "updatespend": "ok", "broadcastspend": "ok", "in_mempool": true, "witness_sizes": [71, 33, 1, 0, 0, 0, 164]}
+done
+lianad exit=0

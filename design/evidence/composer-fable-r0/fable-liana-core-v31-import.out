@@ -1,0 +1,138 @@
+single-tr                                  import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+single-wsh                                 import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+plain-2of3-shwsh                           import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+plain-2of3-sh                              import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+plain-2of3-wsh-DEMO                        import ok; descs=2 recv==md [False, False, False] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+plain-2of3-tr                              import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+plain-2of3-wsh-UNSORTED                    import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+preset-simple-timelocked-inheritance-wsh   import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+preset-kofn-recovery-wsh                   import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+preset-tiered-recovery-wsh                 import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+preset-hashlock-gated-wsh                  import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+preset-decaying-multisig-wsh               import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+preset-simple-timelocked-inheritance-tr    import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+preset-kofn-recovery-tr                    import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+preset-tiered-recovery-tr                  import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+preset-hashlock-gated-tr                   import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+preset-decaying-multisig-tr                import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+keyless-hash-path-wsh                      getdescriptorinfo REFUSED: error code: -5
+error message:
+or_i(pkh([73c5da0a/48'/0'/0'/2']tpubDDuXvjq5jan2EfRdhWqV89F5kUs4frZjXv4KJRyVR9ba
+keyless-hash-older-path-wsh                getdescriptorinfo REFUSED: error code: -5
+error message:
+or_d(multi(2,[73c5da0a/48'/0'/0'/2']tpubDDuXvjq5jan2EfRdhWqV89F5kUs4frZjXv4KJRyV
+hash160-gated-wsh                          import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+ripemd160-gated-wsh                        import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+hash256-gated-wsh                          import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+hashlock-gated-tr-hash160                  import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+older-units-wsh                            import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+after-time-wsh                             import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+mixed-lock-bases-wsh                       import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+mixed-lock-bases-tr                        import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+same-seed-two-accounts-wsh                 import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+same-seed-two-paths-tr                     import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+nine-of-nine-wsh                           import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X01-wsh-1of1-2of3older                     import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X02-wsh-2of3-tworec                        import ok; descs=2 recv==md [False, False, False] chg==md [False, False, False] default getnewaddress=ok change-default=ok
+X03-wsh-2of3-tworec-samelock               import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X04-wsh-2of3-plus-1of1-unlocked            import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X05-wsh-1of1-plus-2of3-unlocked            import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X06-wsh-1of1-older-units                   import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X07-wsh-1of1-after-height                  import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X08-wsh-1of1-older-65535                   import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X09-tr-1of1-2of3older                      import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+X10-tr-1of1-tworec                         import ok; descs=2 recv==md [False, False, False] chg==md [False, False, False] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+X11-wsh-samefp-in-path                     import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X12-wsh-samefp-across-paths                import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X13-wsh-2of2-2of2older                     import ok; descs=2 recv==md [False, False, False] chg==md [False, False, False] default getnewaddress=ok change-default=ok
+X14-wsh-1of1-1of2older                     import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X15-wsh-hashlock-known                     import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X16-wsh-kofn-older5                        import ok; descs=2 recv==md [False, False, False] chg==md [False, False, False] default getnewaddress=ok change-default=ok
+X17-wsh-decaying-small                     import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X18-tr-inherit-older5                      import ok; descs=2 recv==md [False, False, False] chg==md [False, False, False] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+X19-tr-kofn-nums-older5                    import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+X20-tr-hashlock-known                      import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+X21-wsh-preset-decaying-default            import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X22-wsh-1of1-2of3older-tr-origins          import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X23-tr-1of1-1of1older-h-spelling           import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+X24-wsh-2of3-1of1-unlocked-plus-rec        import ok; descs=2 recv==md [False, False, False] chg==md [False, False, False] default getnewaddress=ok change-default=ok
+X25-wsh-1of1-2of3-unlocked-plus-rec        import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ok change-default=ok
+X26-tr-2of3-1of1-unlocked-plus-rec         import ok; descs=2 recv==md [True, True, True] chg==md [True, True, True] default getnewaddress=ERR:error code: -12
+error message:
+Error: No bech32 addresses av change-default=ERR:error code: -12
+error message:
+Error: No bech32 addresses av
+done v31 import
+import exit=0
