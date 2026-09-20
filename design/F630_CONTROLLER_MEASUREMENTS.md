@@ -69,3 +69,34 @@ Keep the step only as a cheap guard against the plan's own scope claim being
 violated: if the firmware size DOES move, a non-test file was edited and the
 plan's "no normative Go behaviour changes" clause is broken. State it that way
 in T4, so the number is read as a scope check rather than a performance one.
+
+## Three plan inaccuracies the implementation exposed (2026-09-20)
+
+Reported by the implementer, all independently re-measured by the controller.
+None blocking; all fold into the plan after the whole-diff review returns.
+
+**1. T4's scope check says "one non-test Go file". It is TWO.** Exporting
+`validChecksum` for D1″ necessarily edits both `bip380/checksum.go` and its
+call site `bip380/bip380.go`. Confirmed:
+
+    $ git diff --name-only 95716e97..HEAD | grep '\.go$' | grep -v '_test\.go$'
+    bip380/bip380.go
+    bip380/checksum.go
+
+A gate reading that sentence literally **fails on a correct implementation** —
+exactly the shape this cycle has been finding all day. The firmware is
+byte-identical with `bip380/` reverted, so the export reaches nothing on the
+device and the invariance argument still holds; only the count was wrong.
+
+**2. "The six record reads move to the loaders" — applying D5b's rule as
+stated reaches TEN.** Measured: 11 loader call sites across 8 files outside
+the fixtures files. The four extra are inert today and are precisely the
+"fourth site" shape D5a warns about — so the rule found more instances than
+the survey that motivated it, which is the argument for stating it as a rule
+rather than a list of sites.
+
+**3. A restore hazard the plan omits.** `git checkout -- md/testdata/` reverts
+the *uncommitted* re-vendor, so mutation-restore by git during T3 silently
+undoes the task. It bit the implementer once and was caught only because the
+restored run still printed FAIL; later mutations were restored from a
+filesystem snapshot verified with `diff -rq`. Worth a line in T3.
