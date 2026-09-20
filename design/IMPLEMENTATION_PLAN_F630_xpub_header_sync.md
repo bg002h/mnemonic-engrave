@@ -268,8 +268,18 @@ and a pin-preferring loader there would mask a missing vendored file whenever a
 pin exists — the gate hiding the drift the provenance test exists to find. It
 carries a `//go:vectortier vendored` marker the scan recognises. Never a list
 in another file: a list drifts silently, a marker is a visible line in the diff
-that adds it, and the gate reports how many markers it honoured so a second
-cannot appear unnoticed.
+that adds it.
+
+Three mechanics, each measured rather than assumed (r3 M-1, M-2, N-1):
+the marker is a **comment**, which the token scan skips by construction, so
+honouring it needs a second read (`scanner.ScanComments`, or raw text); a naive
+`strings.Contains(src, "//go:vectortier vendored")` matches **the gate's own
+source** and reported `honoured 1 marker` on a tree where the exempt file
+carried none, so the gate skips its own file; and the count must be
+**asserted** (`if markers != 1 { t.Errorf }`), not logged — a `t.Logf` in a
+passing test is invisible, which is not the stated property. Finally, `go/scanner`
+cannot be imported unaliased into package `gui`: `gui/scan.go:17` already
+declares `scanner`.
 
 **D5g — a PINNED record is a fork-maintained fixture, and D1 cannot hold for
 it (r3 C-1).** This is the correction the implementability walk forced, and it
@@ -347,7 +357,9 @@ Gate: `go test ./md/ -run TestKeyedConformance -v`.
    loader, and `eachKeyedVector` (glob + name derivation). **Move**
    `loadVectorChunks` out of `gui/taproot_script_path_test.go` into the new
    file — D5d measured that leaving it there blinds the gate to one of the
-   three split sites.
+   three split sites. The loaders return **`[]byte`**, not a decoded type: the
+   seven call sites unmarshal into four different anonymous struct shapes, and
+   a shared type would rewrite all seven for no gain (r3 M-3).
 2. Pin the fixtures: the pre-re-vendor `keyed_wsh_timelock_hashlock` phrase to
    `md/testdata/forkbuilt/…md1.txt`, and the current `.conformance.json` of
    **all three** F-529 vectors to `md/testdata/forkbuilt/`.
@@ -359,8 +371,11 @@ Gate: `go test ./md/ -run TestKeyedConformance -v`.
    existing cross-language gate green,
    `md/conformance_keyed_test.go`'s `loadPhraseChunks` → `vectorChunksFor`.
 4. Mark the single exemption in its own file (D5f).
-5. Add the structural gate per D5b/D5e: token scan, per-directory counts,
-   per-directory synthetic known-bad, then the clean-tree assertion.
+5. Add the structural gate per D5b/D5e, **named
+   `TestVectorRecordBoundaryHoldsInBothPackages`** so T2's `-run` filter
+   actually selects it — a name the filter misses makes the gate report `ok`
+   without running (r3 M-4). Token scan, per-directory counts, per-directory
+   synthetic known-bad, then the clean-tree assertion.
 6. Add `pinnedDuplicateVectors` and a shape test asserting the wsh pin carries
    a slot at two use sites under one miniscript — the existing
    `TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot*
@@ -376,8 +391,17 @@ Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned|ReachesAnAddress|TaprootScrip
 - `md/compose_vectors_pin_test.go:103` — `composeVectorNames` goes **36 → 50**
   names — and `:110-111` — the file literal **176 → 246**. Measured twice
   independently (controller and reviewer): 46 keyed vectors carrying five files
-  each plus 4 unkeyed `compose_*` carrying four = 246. The `:106` comment
-  becomes "46 keyed vectors carry five files, 4 unkeyed carry four: 246";
+  each plus 4 unkeyed `compose_*` carrying four = 246. Arithmetic check:
+  176 + 14×5 = 246, 36 + 14 = 50. The 14 added names are `keyed_tr_depth2`,
+  `keyed_tr_depth2_rightspine`, `keyed_tr_keyonly`, `keyed_tr_multi_a`,
+  `keyed_tr_pathological`, `keyed_tr_sortedmulti_a`, `keyed_tr_with_leaf`,
+  `keyed_wpkh`, `keyed_wsh_multi_2of3`, `keyed_wsh_or_b`,
+  `keyed_wsh_or_d_degrading`, `keyed_wsh_sortedmulti_2of3`,
+  `keyed_wsh_thresh`, `keyed_wsh_timelock_hashlock`. The `:106` comment
+  becomes "46 keyed vectors carry five files, 4 unkeyed carry four: 246".
+  **Count that list with `ast`, not `grep -o '"[^"]*"'`** — a comment inside
+  the composite literal quotes a phrase, so a naive grep returns 37 and the
+  list really holds 36 (r3 N-2; it caught the controller once already);
 - `isComposeVectorFile` (`:79-84`), which still returns false for anything not
   prefixed `compose_`/`keyed_compose_` and drives the **directory scan**. Left
   alone, the 14 newly-pinned vectors gain sha256 coverage and no directory
