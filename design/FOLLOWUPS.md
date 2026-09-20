@@ -15696,7 +15696,7 @@ backed by an xpub; a non-placeholder key is an invalid policy (bip-0388 l.139,
 `md-codec/src/tree.rs:51`) and both renderers spell it as the raw BIP-341 point
 `50929b74…e803ac0` (`render.rs:87-88`, `to_miniscript.rs:319-343`). Liana's
 importer requires an xpub internal key and refuses the raw hex
-(`liana/src/descriptors/analysis.rs:596-599`, `IncompatibleDesc`). Bitcoin
+(`liana/src/descriptors/analysis.rs:568-569 (v8.0; was :596-599 on master 2026-09-01)`, `IncompatibleDesc`). Bitcoin
 Core accepts the raw hex (BIP-387 examples l.69-77). Nunchuk EMITS the raw hex
 itself (`libnunchuk src/descriptor.cpp:193,299,459`) and IMPORTS either the raw
 hex or any xpub whose pubkey is `H` (`IsUnspendableXpub`, `:750-753`).
@@ -15704,7 +15704,7 @@ hex or any xpub whose pubkey is `H` (`IsUnspendableXpub`, `:750-753`).
 **There is no standard form to adopt.** Two recipes exist and produce
 DIFFERENT xpubs for the same wallet: (a) Liana — pubkey `H`, chaincode =
 sha256 of the leaf xpubs' pubkeys in left-to-right order, not sorted, not
-deduplicated (`analysis.rs:404-445`, delvingbitcoin thread 304 post #21);
+deduplicated (`analysis.rs:398-430 (v8.0; was :404-445 on master 2026-09-01)`, delvingbitcoin thread 304 post #21);
 (b) bitcoin/bips PR #1746 `unspendable()` — sorted and deduplicated before
 hashing, to remove `sortedmulti_a` order dependence (draft l.42-47, 95) —
 **closed unmerged 2025-09-17**, author: "I am no longer working on this BIP
@@ -19005,6 +19005,13 @@ the exact text to paste into Nunchuk Desktop 2.1.1 for the demo payload's
 wallet, the route ("Recover via BSMS/descriptors", multipath form) and the first
 three receive addresses per chain. It belongs in `demo/sh2/WALKS.md` next to the
 device walks, so the operator's live check is one file away.
+
+Lens 5 (`composer-fable-r0-liana-core.md`) adds the Liana half: §"Operator
+runbook" there (the demo 2-of-3 is REFUSED by Liana -- no recovery path -- and
+the nearest importable wallet from the same seeds is `preset-kofn-recovery-wsh`),
+plus two Core runbook traps (M-1: `getdescriptorinfo` returns only the `/0/*`
+half in `descriptor` -- import the multipath string; M-2: `getnewaddress` needs
+`bech32m`/`legacy`/`p2sh-segwit` on `tr`/`sh`/`sh(wsh)` wallets).
 
 ### F-630 — md-codec 0.44.0's xpub-header rewrite is unported in the fork, and the conformance gate cannot see it
 

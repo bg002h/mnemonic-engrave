@@ -134,7 +134,7 @@ A path is `KEYS` ∧ optional `HASH` ∧ optional `LOCK`, where:
 | --- | --- | --- | --- |
 | `older(n)`, blocks | n in 1..=65535 | n blocks, ≤ 455.1 days | BIP-68 l.30-40, 74-83 (bit 31 disable, bit 22 type, mask `0x0000ffff`); BIP-112 l.28-33; BIP-379 l.135 (`1 <= n < 2^31`) |
 | `older(n)`, time | n = 0x400000 + u, u in 1..=65535 | u × 512 s, ≤ 388.4 days | same; BIP-68 l.46 (zero units = no lock) |
-| `after(n)`, height | n in 1..=499,999,999 | block height | BIP-65 l.27, 243-250; Core `script.h:48` `LOCKTIME_THRESHOLD` |
+| `after(n)`, height | n in 1..=499,999,999 | block height | BIP-65 l.27, 243-250; Core `script/script.h` `LOCKTIME_THRESHOLD` (line 47 at v28.99, 48 at older releases) |
 | `after(n)`, time | n in 500,000,000..=2,147,483,647 | Unix time; the OPERAND floor is 1985-11-05 00:53:20 UTC, the DATE-ENTRY floor is 2009-01-03 (§6b) | BIP-379 l.135; rust-miniscript-fork `src/primitives/absolute_locktime.rs` line 10 |
 
 Every other operand miniscript would accept is either masked by consensus to a
@@ -1200,7 +1200,7 @@ table, so the glyph and modal-fits gates cover it.
    (`composerDescriptorCeilingChars`), never written down as a constant. C10's
    688-character two-path wallet therefore does NOT fit one text plate, which
    is why §7f's form B (template plus key cards) is the form that carries it.
-2. **Ledger registration of md's depth-0 xpubs.** Core, Liana and Sparrow accept
+2. **Ledger registration of md's zero-parent-fingerprint xpubs** (depth and child from the origin since md-codec 0.44; F-611). Core, Liana and Sparrow accept
    them (measured); Ledger's whole-xpub `memcmp` likely does not: UNVERIFIED,
    filed descriptor-mnemonic `md-descriptor-depth0-xpub-ledger-registration`.
 3. **Nunchuk import — MEASURED 2026-09-20** (composer fable review r0, lens 2,
@@ -1217,13 +1217,28 @@ table, so the glyph and modal-fits gates cover it.
    library's (Core's verbatim) and the runbook for the operator's live click-
    through is in the lens 2 report (F-629).
 4. **Import tests** into Core: MEASURED the same day (lens 1, lens 3): every
-   fully seated shape without a key-less path imports into Core v25/v31.1 with
-   addresses equal to the consent screen, and the spend conditions hold under
-   funded branch tests (84 on v31.1, 39 on v25). A key-less path makes the
-   WHOLE wallet un-importable in Core, Nunchuk and Liana ("witnesses without
-   signature exist"), keyed paths included -- §8a says so now. Liana's import
-   refuses any `after` or hashlock path regardless of head (second lowering
-   review), so F-449's acceptance wallet must be `older`-only.
+   fully seated shape without a key-less path imports into Core v31.1 as a
+   working wallet (54 of 56, lens 5: receive and change equal to `md`, every
+   spend path spent through `walletcreatefundedpsbt`/`walletprocesspsbt`), and
+   into v25 for `wsh`, `sh`, `sh(wsh)` and tree-less `tr` only (39 of 54: v25
+   refuses tapscript miniscript, "Miniscript expressions can only be used in
+   wsh", and has no BIP-389 multipath); the spend conditions hold under funded
+   branch tests (84 on v31.1, 39 on v25, lens 1). A key-less path makes the
+   WHOLE wallet un-importable in Core, Nunchuk and Liana, keyed paths included
+   -- §8a says so now (the string "witnesses without signature exist" is Core's
+   and libnunchuk's, which embeds Core; Liana says "Descriptor is not
+   compatible with a Liana spending policy" and its GUI shows only "Failed to
+   read the descriptor"). **Liana 8.0 imports 17 of 56 composable shapes**
+   (lens 5, RUN through `LianaDescriptor::from_str` at tag v8.0 and through
+   `lianad` + its signer for every accepted one): it requires `wsh` (not a
+   sole `sortedmulti`) or `tr` with a real internal key, exactly ONE unlocked
+   path, at least one recovery path, `older` only, in blocks, 1..=65535,
+   distinct lock values, and no hash of any kind; so F-449's acceptance wallet
+   must be `older`-only in blocks with one unlocked path. It also silently
+   re-reads `[k-of-n, 1 key, 1 key + older]` as one `k`-of-(n+1) primary path
+   (lens 5 I-2), so a single-key unlocked path after a multi-key one is not a
+   wallet Liana shows truthfully. The device names Liana's model on the
+   consent (§8x; fold of lens 5).
 5. **Recon results folded here were verified against Core v25 (single-chain
    forms; the local build lacks BIP-389 multipath and tapscript miniscript),
    Liana master and drongo HEAD**: brainstorm record section 3.11. A newer Core
