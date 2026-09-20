@@ -37,3 +37,12 @@ flash / 63,336 B RAM** (r0 tip 1,652,268 / 63,336; base `f5b068fa` 1,644,840 /
 - The addendum the implementer would have written does not exist; this file
   stands in for it, quoting the four commit messages it left.
 - N-3, above.
+
+## Post-verification residue (controller, after `composer-fable-r0-fold-fork-fold-r1-verification.md`)
+
+- `70b1c84` — the thief (`composerSeedDerivedSlots`) still wore the stolen
+  `composerSecretCards` block above its own doc; removed, its one still-true
+  sentence moved onto the owner, and both thieves added to `composerDocOwners`.
+  Gate: doc-comment test GREEN, shards 1373/1373.
+- N-1 remains untested by construction (the failure leg needs a derivation
+  error no harness fakes); recorded, not manufactured.
