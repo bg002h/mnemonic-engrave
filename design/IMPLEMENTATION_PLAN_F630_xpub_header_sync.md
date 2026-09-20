@@ -113,9 +113,37 @@ resolved to `c`. Measured before being written here — the reduction is exact o
 alone closes the class.
 
 Cost is a regex and a string compare — no descriptor rendering, so it works for
-every shape including the miniscript policies the fork cannot render. It is
-also cross-language rather than self-consistent, because `template` is already
-bound to the card by the existing `wallet_descriptor_template_id` assertion.
+every shape including the miniscript policies the fork cannot render.
+
+**Why this is an input↔output check and not two fields of one file (r5 I-1).**
+An earlier draft justified D1′ by claiming `template` is "bound to the card by
+the existing `wallet_descriptor_template_id` assertion". **That is false, and
+it was measured false**: the assertion computes the id from the *card* and
+compares it to the *JSON field*, never touching `rec.template`, which the fork
+asserts nowhere. Mutating `template` alone leaves the whole surface green.
+
+The real reason is stronger. `template` is the primary's **hand-authored input
+literal** (`crates/md-codec/src/test_vectors.rs:108`,
+`Vector { name: …, template: "wsh(multi(2,@0/48'/0'/0'/2'/<0;1>/*,…))", … }`),
+and the card, both ids, the addresses **and** the rendered `descriptor` are all
+derived from it by `parse_template`
+(`crates/md-cli/src/cmd/vectors.rs:54`), with that same literal emitted into
+the record at `:142`. So D1′ compares **the primary's source of truth against
+the primary's rendering of it** — input against output. The evidence that this
+buys real coverage is a whole-policy substitution that moved card, descriptor,
+ids and addresses *consistently*: only D1′ noticed.
+
+**D1′ compares STRICTLY — no hardening normalisation (r5 M-2).** D3 normalises
+`48h`↔`48'` because it compares *paths*; D1′ compares whole strings, and both
+variants are exact on 46 of 46, so strict is free and additionally catches a
+bracket spelling flip that the normalising variant lets through.
+
+**A slot lookup that is not single-valued must fail loudly (r5 M-5).** "The
+slot whose 65 bytes match" has no answer when two slots carry the same
+material; a map-based lookup silently picks one and produces a **false RED**
+wherever the template names the other. Measured 0 of 46 records at `b2c5d693`,
+so it costs nothing today — but the gate reports "ambiguous slot material" and
+stops, rather than guessing.
 
 **D1″ — the checksum, closed rather than recorded (r4 M-1).** The seventh
 mutation, a wrong BIP-380 checksum, survives both D1 and D1′ (the reduction
@@ -300,7 +328,16 @@ measurement of zero changed address lines. So:
 
 - **vendored tier** — full D1. All 46 must pass after T3.
 - **pinned tier** — the legacy header shape is asserted *exactly* (depth 0,
-  child 0, parent fp 0 under a non-empty origin), plus full D2a, D2b and D2c.
+  child 0, parent fp 0 under a non-empty origin), plus full D2a, D2b, D2c,
+  **D1′ and D1″**. Only the *header* arm of D1 relaxes; nothing else does
+  (r5 I-2). An earlier draft listed three clauses in a form that read as
+  exhaustive, and reproduced: with D1′ skipped on the pinned tier, a `/0/*` →
+  `/7/*` regression *inside* `forkbuilt/keyed_tr_multi_a.conformance.json` is
+  SILENT across the whole suite. These three are the fork's own fixtures — the
+  fork is their only custodian, and no upstream re-vendor will ever correct a
+  defect in them — so they need *more* scrutiny than the vendored tier, not
+  less. Measured: all three satisfy D1′ today, `keyed_tr_multi_a`'s repeated
+  `@0` included, and all 46 still pass with it applied everywhere.
   A pinned record whose header is **neither** the legacy shape **nor** the
   correct shape fails, so a third staleness cannot slip in, and one that
   becomes correct fails too — telling us the primary has re-shipped it.
@@ -320,7 +357,10 @@ from a red gate to a green one would be to pin the regression, and no test
 would object.
 
 So the gate enumerates `md/testdata/forkbuilt/*.conformance.json` and **fails
-unless that set is exactly the three F-529 names** — the same shape as the
+unless that set is exactly the three F-529 names** — as a `t.Errorf`, never a
+`t.Fatalf` (r5 M-1): at T1 the pinned set is legitimately empty, and a fatal
+assertion aborts before any vector is examined, hiding T1's own 44/2 acceptance
+behind a single unrelated line — the same shape as the
 count assertion the cut scanner's exemption marker used to carry. A fourth
 pinned record is a deliberate,
 visible act or it is a bug.
@@ -448,9 +488,11 @@ Gate: the full `./md/` and `./gui/` suites.
   ./gui/ 24`.
 - Firmware size — **as a SCOPE check, not a performance one.** Every file this
   plan edits is a `_test.go`, a `testdata/` fixture, or the vendor script:
-  **zero non-test Go files**, so flash and RAM are invariant by construction. If
-  the size moves, a non-test file was edited and the plan's "no normative Go
-  behaviour changes" clause has been broken.
+  **one non-test Go file**, and only one: `bip380/checksum.go`, where D1″ exports
+  `validChecksum` (r5 M-4). Exporting an identifier changes no behaviour and no
+  call site, so flash and RAM are still expected to be invariant. If the size
+  moves at all, something beyond that export was edited and the plan's "no
+  normative Go behaviour changes" clause has been broken.
 - Push via `scripts/push-via-staging.sh` with main frozen for the window.
 
 ## What this plan does NOT cover
@@ -469,6 +511,20 @@ Gate: the full `./md/` and `./gui/` suites.
   closes the header. Any *new* shape is residue again, so the mutation table in
   D1′ is the record of what has actually been probed — not a claim that nothing
   else exists.
+- **An `xprv` forged with the rendered xpub's header passes every clause**
+  (r5 M-3) — same version-swap, same depth/child/parent-fp, same chain code.
+  It is unreachable from the primary, since the md1 wire carries no private
+  material, and it is a **secret-handling** defect, which per the operator's
+  2026-08-27 ruling is never Critical and never Important. Filed as a
+  follow-up, not scheduled here.
+- **The three VENDORED records under pinned names get no descriptor coverage**
+  (r5 N-1). The gate reads the pin for those names, so a regression in
+  `md/testdata/vectors/keyed_tr_multi_a.conformance.json` — as distinct from
+  the `forkbuilt/` copy — is invisible, and D6's anti-drift check compares the
+  card and the template id, not descriptors. Arguably correct by design: those
+  vendored copies describe the reuse-**free** policy the primary replaced these
+  with, and no fork consumer reads them. Recorded because it is the one place
+  where "every keyed record's descriptor is checked" is not literally true.
 - F-529 is **narrowed, not closed**, by T2 + T3: its three vectors get fork-side
   card+record witnesses and the corpus stops diverging silently, but whether the
   device should carry reuse-free or reuse-bearing fixtures for F-514's warning

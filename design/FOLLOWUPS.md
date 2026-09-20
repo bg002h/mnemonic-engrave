@@ -19061,6 +19061,24 @@ change, or the next drift is invisible too. Related: md-codec 0.45.0's
 `validate()` precedence (the cap after `TooManySlots`/`LegacyWrapperShape`)
 and its four `precedence_*` vector cases must be ported at the same time.
 
+### F-632 — an `xprv` forged with a rendered xpub's header passes the whole F-630 descriptor gate
+
+**Status:** OPEN — **Owning phase:** none (opportunistic; secret-handling, non-gating). **Tier:** `secret-handling`. **Found:** F-630 plan r5 closing review (2026-09-20), Minor.
+
+Forge an `xprv` carrying a rendered xpub's exact header bytes — version
+`0488ade4`, the same depth, parent fingerprint 0, the same child number, the
+same chain code, then `00`‖privkey — substitute it for a slot's key in both
+chain descriptors and re-checksum: **every clause of the F-630 gate passes**
+(D1 reads the header, D2 compares the 65 bytes of chain code ‖ pubkey, D1′
+reduces by slot material, D1″ validates the checksum).
+
+Unreachable from the primary — the md1 wire carries no private material, so no
+re-vendor can introduce it — which is why it is residue rather than a defect.
+Per the operator's 2026-08-27 ruling a secret-handling failure is never
+Critical and never Important, so this is logged for future optimisation and
+holds no gate. Closing it is one clause: assert the version bytes are the
+public ones.
+
 ### F-631 — The Liana-model notice's class order between `after` and `older`-in-units is pinned by no test
 
 **Status:** OPEN — **Owning phase:** next composer test pass. **Tier:** `test-infra`. **Found:** composer fable review r0, lens 5 fold verification (2026-09-20), Minor.
