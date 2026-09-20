@@ -18827,7 +18827,7 @@ are pinned or when they may be deleted.
 
 ### F-616 — RUNBOOK step 2 says `otp load` prints nothing; it prints all 32 bytes
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook now shows the actual hex-echo output, states that it is printed BEFORE the write and returns past picotool's read-back, and names `--sh2-verify-slot` as the only proof the rows landed.
+**Status:** CLOSED 2026-09-17. The runbook now shows the actual hex-echo output, states that it is printed BEFORE the write and returns past picotool's read-back, and names `--sh2-verify-slot` as the only proof the rows landed. **Owning phase:** SH2 board 3 bring-up. Closed in `365ea1c4`.
 
 From the journey review of the board-2 burn (`design/agent-reports/new-board-otp-burn-journey-review.md`, I-1). `RUNBOOK_custom_boot_key.md` tells the operator `otp load` "prints no 'verified' confirmation of its own — the absence of output is not success". Measured on the real burn 2026-09-17: loading a JSON file echoes the full 32-byte key hash **before** writing and then returns past picotool's own read-back. So the operator gets a confident hex dump exactly where the runbook promised silence, and that dump is *pre-write information* proving nothing.
 
@@ -18835,13 +18835,13 @@ Nobody was misled here because the controller labelled the output at the moment 
 
 ### F-617 — `--sh2-verify-valid`'s wrong-bit message rules out the remedy that fixes it
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The EXTRA-bit branch now splits: extra-only keeps the "cannot be cleared" wording, while extra-AND-missing reports them as two separate problems and gives the set-bits recipe for the recoverable half. `bash -n` clean; `--make-otp-json` runs unchanged on the edited script.
+**Status:** CLOSED 2026-09-17. The EXTRA-bit branch now splits: extra-only keeps the "cannot be cleared" wording, while extra-AND-missing reports them as two separate problems and gives the set-bits recipe for the recoverable half. `bash -n` clean; `--make-otp-json` runs unchanged on the edited script. **Owning phase:** SH2 board 3 bring-up. Closed in `365ea1c4`.
 
 Journey review I-3. If `KEY_VALID` comes back with a wrong bit set, the gate reports the extra bit and tells the operator that `otp set -s` cannot help — when OR-ing in the correct bit with `otp set -s` is exactly the fix (the wrong bit is unremovable, but the right one can still be added). A gate that names the wrong remedy at the one moment the operator is frightened is worse than one that stays quiet. Not hit on board 2: `0x2` was resolved against `picotool otp list` beforehand and `KEY_VALID` came back `0x3` first time.
 
 ### F-619 — "all three BOOT_FLAGS1 copies agree" compares a majority vote against two raw rows
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17 — but NOT by the prescribed remedy, which was measured to be a no-op.
+**Status:** CLOSED 2026-09-17 — but NOT by the prescribed remedy, which was measured to be a no-op. **Owning phase:** SH2 board 3 bring-up.
 
 **`-c 1` does nothing.** Measured on SH2 #3 (`0xdb2010f935ed25b8`) in BOOTSEL: `picotool otp get -n 0x04b` and `picotool otp get -n -c 1 0x04b` produce **byte-identical** output, and `-c 3` returned an unrelated row (`OTP_DATA_CHIPID3`) alongside the target. Applying the review's prescribed fix would have closed this entry while changing nothing — a strictly worse state than leaving it open, because the weakness would then be believed fixed.
 
@@ -18859,19 +18859,32 @@ Journey review I-6, and the sharpest finding of the two reviews. `--sh2-verify-v
 
 ### F-620 — the OTP json is named after a board it is not bound to
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook now generates `~/.sh2/otp-bootkey-<fp8>-slot<N>.json` — named after what the content actually is — and states that only `--ser` binds a write to a board. Canonical file generated and verified byte-identical to both board-named predecessors (all three sha256 `b474f23a...92cc9`), which is the demonstration that the name never carried a binding.
+**Status:** CLOSED 2026-09-17. The runbook now generates `~/.sh2/otp-bootkey-<fp8>-slot<N>.json` — named after what the content actually is — and states that only `--ser` binds a write to a board. Canonical file generated and verified byte-identical to both board-named predecessors (all three sha256 `b474f23a...92cc9`), which is the demonstration that the name never carried a binding. **Owning phase:** SH2 board 3 bring-up.
 
 Journey review M-1. `~/.sh2/otp-6f463e8d0bf609f5.json` carries a board's chipid in its name, but its **content is board-independent** — a boot-key slot stores only sha256(X‖Y) plus the slot number, and the file is byte-identical to board 1's `my-otp.json` (both sha256 `b474f23a86ef1e3c497fef1e8c75f756835b2fb271dd80ae91eb45bfb9792cc9`). The name implies a binding that does not exist, which invites someone to trust the filename instead of `--ser`. Either drop the chipid from the name or state in the runbook that the name is a provenance label, not a binding.
 
 ### F-621 — steps 2 and 4 depend on two `.gitignore`d directories, one documented as disposable
 
-**Owning phase:** SH2 board 3 bring-up. **Status:** CLOSED 2026-09-17. The runbook gained a "State these gates depend on" section: a table of what each directory holds and which gate dies without it, an explicit "do not delete `rehearsal-work/` while any board remains to be burned", and the per-board `SH2_DIR` convention with the two-CHIPID-spellings warning. Both dependencies were confirmed to fail CLOSED already (`CANNOT CHECK` / `no SeedHammer II pinned`), so this was a stranding risk, not a silent-weakening one.
+**Status:** CLOSED 2026-09-17 in `365ea1c4`. The runbook gained a "State these gates depend on" section: a table of what each directory holds and which gate dies without it, an explicit "do not delete `rehearsal-work/` while any board remains to be burned", and the per-board `SH2_DIR` convention with the two-CHIPID-spellings warning. Both dependencies were confirmed to fail CLOSED already (`CANNOT CHECK` / `no SeedHammer II pinned`), so this was a stranding risk, not a silent-weakening one. **Owning phase:** SH2 board 3 bring-up.
 
 Journey review M-2. The `--sh2-*` gates depend on `sh2-state/` (or a per-board `SH2_DIR`) for the CHIPID pin and on `rehearsal-work/` for the rehearsal-key refusal list. Both are gitignored, and every document describes `rehearsal-work/` as disposable — so a tidy-up deletes the data that makes "this key is not a rehearsal key" and "this is the board you pinned" answerable. Mitigated on 2026-09-17 by moving pins to `~/.sh2/boards/<chipid>/` (outside any repo), but the rehearsal-key list still lives in the disposable directory.
 
 ### F-622 — the Go md port's conformance snapshot still carries the depth-0 descriptor strings md-codec 0.44.0 corrected
 
-**Owning phase:** next fork md-port sync (Rust-primary convergence). **Status:** OPEN. **Tier:** `interop` / `records`.
+**Status:** CLOSED 2026-09-20 by the F-630 cycle at fork main `a4246a2`. **Tier:** `interop` / `records`. **Owning phase:** next fork md-port sync (Rust-primary convergence).
+
+**THIS IS F-630 UNDER AN EARLIER NUMBER, and nobody noticed for two days.**
+Filed 2026-09-18; F-630 was filed 2026-09-20 as if new, describing the same
+defect less precisely. This entry already had the right diagnosis *and* the
+right remedy — "(1) re-copy the corpus. (2) decide whether the Go side should
+start asserting `Chains[].Descriptor` — the field has been carried in the
+struct and unread since R3, and an unread field is exactly where a
+cross-language divergence hides". Both were done at `a4246a2`.
+
+Worth recording as a records defect in its own right: the duplicate-number
+check in `scripts/followups-status.sh` catches one number used twice, and
+cannot catch two numbers describing one finding. This one surfaced only
+because a status-line format fix made the entry parseable again.
 
 Filed 2026-09-18, from the descriptor-header fix in descriptor-mnemonic
 `24ca7225` (md-codec 0.44.0).
@@ -18911,7 +18924,7 @@ or wire byte is affected in either language.
 
 ### F-623 — the SH2 demo's install block pins versions in its URLs, so the page goes stale by construction
 
-**Owning phase:** next demo or release-workflow cycle. **Status:** OPEN for the alias/prevention half; DETECTION SHIPPED 2026-09-19. **Tier:** `docs` / `release`.
+**Status:** OPEN for the alias/prevention half; DETECTION SHIPPED 2026-09-19. **Tier:** `docs` / `release`. **Owning phase:** next demo or release-workflow cycle.
 
 **Detection shipped.** `demo/sh2/check-install-links.sh`, run by the required
 `test (rust + go)` job, fetches every install URL on the page and then compares
@@ -19032,7 +19045,7 @@ half in `descriptor` -- import the multipath string; M-2: `getnewaddress` needs
 
 ### F-630 — md-codec 0.44.0's xpub-header rewrite is unported in the fork, and the conformance gate cannot see it
 
-**Status:** **CLOSED 2026-09-20** at fork main `a4246a2` (CI green, no bypass). **Tier:** `correctness` / `test-infra`. **Found:** composer fable review r0, fold B implementation report, §follow-ups (2026-09-20).
+**Status:** CLOSED 2026-09-20 at fork main `a4246a2` (CI green, no bypass). **Tier:** `correctness` / `test-infra`. **Found:** composer fable review r0, fold B implementation report, §follow-ups (2026-09-20).
 
 **Closed by** `design/IMPLEMENTATION_PLAN_F630_xpub_header_sync.md` — six plan
 review rounds to 0C/0I, one implementer, a whole-diff adversarial review and
