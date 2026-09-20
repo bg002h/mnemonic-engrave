@@ -266,6 +266,27 @@ Each step with its gate. Nothing starts in the fork.
    registry), asserting first-page rows and that a refusal is never off the
    first page.
 
+## Scope — this is more than one implementation plan
+
+Section 5's five steps are sequenced but they are not one plan. The natural
+split, each with its own gate and its own review:
+
+1. **md-codec + md-cli** (steps 1-2) — the canonicaliser, the verdict types,
+   the generated table, `md shape-key`, the CLI verdict and the none-case
+   refusal. Self-contained in the primary repo, and the only part ruling 4
+   forces to come first.
+2. **The harnesses** (step 3) — committing and re-running them. Independent of
+   both other plans, blocks nothing in plan 1, and blocks *everything* about
+   growth. It is also the plan that closes F-633, because re-measuring Liana at
+   v15.0 needs a committed harness to be repeatable.
+3. **The fork** (steps 4-5) — the Go port, the consent rows, the none-case
+   screen, retiring the five notices, the emulator walk. Cannot start until
+   plan 1 lands, per the Rust-primary rule.
+
+Writing one plan for all three would produce a document whose later half is
+written against a tree that does not exist yet — the staleness this cycle has
+already measured in a plan's own citations.
+
 ## Open, and blocking a spec
 
 - **The Core boundary release is unmeasured.** Ruling 1 requires it measured.
