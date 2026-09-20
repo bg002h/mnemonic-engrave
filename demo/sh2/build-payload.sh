@@ -81,7 +81,7 @@ check_distinct_words "$S0"; check_distinct_words "$S1"; check_distinct_words "$S
 #     if origin[len(origin)-1] != child  { return ErrKeyRecord }
 echo
 echo "cosigner keys (BIP-48 account 0, m/48'/0'/0'/2'):"
-BUNDLE=$(mnemonic bundle \
+BUNDLE=$(mnemonic bundle --allow-argv-secret \
   --template wsh-sortedmulti --threshold 2 \
   --multisig-path-family bip48 --account 0 --md1-form policy --network mainnet \
   --slot "@0.phrase=$S0" --slot "@1.phrase=$S1" --slot "@2.phrase=$S2" \
