@@ -17603,6 +17603,23 @@ it is worth keeping.
 
 Owning phase: none (cross-repo; blocks nothing until someone re-vendors).
 
+**CORRECTION 2026-09-20, from the F-630 R0 review.** This entry is accurate;
+the fork's *test comment* is not, and it built an escape hatch on the
+misreading. `md/f533_pinned_vectors_test.go` says "the three key-reuse vectors
+F-529 records a re-vendor from the primary would **DELETE**", and
+`TestPinnedKeyReuseVectorsStillMatchTheVendoredCorpus` skips only when the
+vendored file `os.ReadFile` fails. Measured at `b2c5d693`: the primary still
+ships all three, **changed, not removed**. So the skip never fires and the test
+FAILS instead — on the two existing pins, with no F-630 change at all — and its
+failure message then prescribes re-copying the vendored phrase over the pin,
+which would replace the reuse-bearing witnesses with reuse-free cards. The
+guard this entry praises is real (all four dependent sites fail loudly, not
+silently — measured), but the pins' own anti-drift check needs to pin a
+DIVERGENCE against the primary's new template ids (`8c1c0566`, `09903620`,
+`71ff3b74`) rather than wait for a deletion that will not come. Scheduled in
+`design/IMPLEMENTATION_PLAN_F630_xpub_header_sync.md` D6.
+
+
 ### F-530 — the `expandOK` address route shows addresses without the duplicate-key warning
 
 **Status:** OPEN
@@ -19016,6 +19033,21 @@ half in `descriptor` -- import the multipath string; M-2: `getnewaddress` needs
 ### F-630 — md-codec 0.44.0's xpub-header rewrite is unported in the fork, and the conformance gate cannot see it
 
 **Status:** OPEN — **Owning phase:** the next Go-port sync to md-codec 0.44/0.45 (Rust-primary rule: the Go port is downstream). **Tier:** `correctness` / `test-infra`. **Found:** composer fable review r0, fold B implementation report, §follow-ups (2026-09-20).
+
+**RESHAPED 2026-09-20 by recon + an R0 review; plan at
+`design/IMPLEMENTATION_PLAN_F630_xpub_header_sync.md`.** Three of the four
+prescribed steps did not survive measurement. **There is no rule to port:** the
+fork's render path (`bip380.Key.ExtendedKey()`) has always taken depth and
+child number from the origin it was given, and a probe reproduced dm
+`b2c5d693`'s corrected descriptor byte for byte, all 3 xpubs across both
+chains. **The 0.45.0 precedence cases are already in** — the keyless-cap test
+drives 8 cases and asserts all four precedence kinds. What remains is the gate
+(the conformance test still parses `.chains[].descriptor` into a field it never
+asserts) and a re-vendor that is not a one-liner: `vendor-compose-vectors.sh`
+reaches 32 of the 41 drifted records, and the re-vendor collides with F-529 —
+see the correction on that entry. Drift measured over 46 keyed records: 2
+identical, 41 descriptor-only (82 chain entries), 3 semantic; 88 chain entries
+across all 44.
 
 "A rendered xpub's header must agree with its origin" (md-codec 0.44.0, dm
 `24ca7225`) rewrote the xpubs in all 33 `keyed_compose_*.conformance.json`
