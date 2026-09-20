@@ -12,11 +12,11 @@ one:
 
 ```sh
 # md -- the descriptor tool
-curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.16.0/md-0.16.0-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.16.2/md-0.16.2-macos-amd64.tar.gz
 # ms -- the seed tool
 curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
 
-tar -xzf md-0.16.0-macos-amd64.tar.gz
+tar -xzf md-0.16.2-macos-amd64.tar.gz
 tar -xzf ms-0.19.0-macos-amd64.tar.gz
 chmod +x md ms && ./md --version && ./ms --version
 ```
@@ -256,7 +256,7 @@ fish:   history clear-session
 
 ## 3b · Two recoveries the toolkit can already do
 
-`mnemonic` (mnemonic-toolkit v0.101.0) is the constellation's swiss-army tool.
+`mnemonic` (mnemonic-toolkit v0.103.2) is the constellation's swiss-army tool.
 Two of its searches are worth showing, because they answer questions people
 actually arrive with. **Both were run to produce the output below.**
 
