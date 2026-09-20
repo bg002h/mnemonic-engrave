@@ -1,5 +1,14 @@
 # Implementation plan — F-630, the xpub-header corpus sync and the gate that can see it
 
+> **SHIPPED 2026-09-20 at fork main `a4246a2`** (CI green, no bypass). Three
+> corrections the implementation exposed, recorded rather than silently fixed:
+> T4's scope check says "one non-test Go file" and it is **two** (exporting the
+> checksum validator edits the function and its call site) — a gate reading
+> that literally fails on a correct implementation; D5b's rule as stated reaches
+> **ten** record reads, not six, the four extra being exactly the "fourth site"
+> shape D5a warns about; and `git checkout -- md/testdata/` reverts an
+> *uncommitted* re-vendor, a restore hazard that cost one mutation round.
+
 **Baseline revisions.** seedhammer (fork) main `95716e97`; descriptor-mnemonic
 main `b2c5d693` (md-codec 0.45.0 / md-cli 0.17.0); mnemonic-engrave master
 `ed4b98fc`. Every count below was measured against those trees on 2026-09-20,

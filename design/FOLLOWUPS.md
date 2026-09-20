@@ -19032,7 +19032,31 @@ half in `descriptor` -- import the multipath string; M-2: `getnewaddress` needs
 
 ### F-630 — md-codec 0.44.0's xpub-header rewrite is unported in the fork, and the conformance gate cannot see it
 
-**Status:** OPEN — **Owning phase:** the next Go-port sync to md-codec 0.44/0.45 (Rust-primary rule: the Go port is downstream). **Tier:** `correctness` / `test-infra`. **Found:** composer fable review r0, fold B implementation report, §follow-ups (2026-09-20).
+**Status:** **CLOSED 2026-09-20** at fork main `a4246a2` (CI green, no bypass). **Tier:** `correctness` / `test-infra`. **Found:** composer fable review r0, fold B implementation report, §follow-ups (2026-09-20).
+
+**Closed by** `design/IMPLEMENTATION_PLAN_F630_xpub_header_sync.md` — six plan
+review rounds to 0C/0I, one implementer, a whole-diff adversarial review and
+its fold. Measured at the merged tip: descriptor gate **46 of 46 (43
+correct-header + 3 pinned-legacy), 0 fail**; re-vendor byte-identical to
+descriptor-mnemonic `b2c5d693`'s 246-file/50-vector selection; `go vet` 10
+ArtifactDir and nothing else; `gofmt` the five-file baseline; **1374/1374**
+gui across 24 shards.
+
+**What it turned out to be, versus what it was filed as.** There was no rule
+to port — `bip380.Key.ExtendedKey()` always took depth and child number from
+the origin it was given, and 0.45.0's four `precedence_*` cases were already
+in. The real work was a gate: the conformance test parsed
+`.chains[].descriptor` into a field it never asserted, and the vendored corpus
+was stale in 41 records. **And the header rule alone would not have closed it**
+— D1 stops at the key, so six descriptor-only mutations (derivation suffix,
+`multi()` operand order, quorum, script wrapper, chain swap, checksum) passed
+the whole suite green, two of them funds-relevant. The clause that closes the
+class is D1′, which reduces a descriptor back to its own `template`. See
+[[assert-by-reduction-not-by-enumeration]].
+
+Residue, all non-gating: **F-632** (an `xprv` forged with the rendered xpub's
+header passes every clause — secret-handling), and the three *vendored* copies
+under pinned names, which the gate no longer reads.
 
 **RESHAPED 2026-09-20 by recon + an R0 review; plan at
 `design/IMPLEMENTATION_PLAN_F630_xpub_header_sync.md`.** Three of the four
