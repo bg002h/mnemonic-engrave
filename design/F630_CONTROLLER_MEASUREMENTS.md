@@ -38,3 +38,21 @@ artifact must not move under it. Fold this with the review findings.
 46 keyed conformance records: 2 identical, 41 descriptor-only (88 chain
 entries), 3 semantic (F-529's three, none a `keyed_compose_*`). Zero address
 lines and zero id lines move outside those 3.
+
+## T4 baselines, re-measured at fork main `95716e97` (2026-09-20)
+
+Both hold, and one needs a correction in the plan's T4 wording.
+
+**`gofmt -l .`** — exactly the five files `CLAUDE.md` records, no drift:
+`gui/transaction.go`, `gui/transaction_golden_test.go`,
+`gui/transaction_txrecord_test.go`, `mt/mt.go`, `mt/mt_test.go`.
+
+**`go vet ./...` EXITS 1 AT BASELINE.** Ten diagnostics, every one of them
+`testing.ArtifactDir requires go1.26 or later (file is go1.25)`; nothing else.
+So T4's gate is *"vet's diagnostic set equals the ten known ArtifactDir
+notices"* — **not** `go vet` exiting 0, which it never does on this tree. A
+gate written as an exit-code check is red before it starts and will be
+"fixed" by deleting it.
+
+Fold this into T4 with the round-4 findings; the plan is under review and must
+not move under the reviewer.
