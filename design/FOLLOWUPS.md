@@ -19028,3 +19028,13 @@ When the header change is ported, assert `.chains[].descriptor` in the same
 change, or the next drift is invisible too. Related: md-codec 0.45.0's
 `validate()` precedence (the cap after `TooManySlots`/`LegacyWrapperShape`)
 and its four `precedence_*` vector cases must be ported at the same time.
+
+### F-631 — The Liana-model notice's class order between `after` and `older`-in-units is pinned by no test
+
+**Status:** OPEN — **Owning phase:** next composer test pass. **Tier:** `test-infra`. **Found:** composer fable review r0, lens 5 fold verification (2026-09-20), Minor.
+
+§8x checks nine classes in Liana 8.0's order; the verification re-ran the
+mutations for classes 1, 3, 7 and 9 and every shape agreed with the measured
+Liana truth (55/56), but no test holds a policy carrying BOTH an `after` and
+an `older` in 512-second units, so an edit that swapped classes 5 and 6 would
+pass the suite. Add one compound fixture asserting "an absolute lock" wins.
