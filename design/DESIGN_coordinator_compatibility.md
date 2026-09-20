@@ -1,15 +1,30 @@
 # DESIGN — which wallet coordinators will take this policy
 
-**Status: DRAFT. Sections 1-2 approved, then REVISED under the fable architect
-review (4C/7I/4M/2N, `design/agent-reports/coordinator-compat-fable-architect.md`).
-Sections 3-5 written and awaiting approval.** Brainstorm in progress
-2026-09-20. Not a spec yet.
+**Status: DRAFT, second fold.** Reviewed twice: the fable architect
+(`design/agent-reports/coordinator-compat-fable-architect.md`, 4C/7I/4M/2N)
+and an opus spec review with an implementability walk
+(`design/agent-reports/coordinator-compat-spec-opus.md`, 4C/10I/5M/2N, which
+answered **"implementable as written: NO"**). Both are folded here.
+Brainstorm 2026-09-20. Not a spec yet.
 
-The architect's verdict was *"the family of architecture is right; the instance
-is not yet safe"* — the registry, the source-derived refusals, the
-measured-only positives and the coordinator-independent key all stand. Four
-measured routes to a false `Imports` on steel did not, and the revisions below
-are what closes them.
+The architect's verdict was *"the family of architecture is right; the
+instance is not yet safe"*, and it still stands — the registry, the
+source-derived refusals, the measured-only positives and the
+coordinator-independent key are unchanged.
+
+**What the second review found, and it was mostly the first fold's fault.**
+That fold folded the architect's *conclusions* and dropped a named clause of
+his *fix* in seven places, which is this repo's documented
+incomplete-propagation failure. It also introduced a defect of its own: it
+promoted an aside — that the `PolicyShape` port is "a display concern, not a
+normative one" — into normative text, deleting from the plan the exact walk
+the design's own rule template consumes. **The claim "no Go walk needs porting
+for the normative path" is retracted below**; it was the one line a plan would
+have been costed from.
+
+This fold therefore propagates *clauses*, not conclusions, and defines every
+type the data model names — five of them appeared exactly once each, inside
+the struct that used them.
 
 ## The ask
 
@@ -50,19 +65,107 @@ The unit is not a coordinator; it is a **coordinator at a version range**.
 struct Coordinator { id: CoordinatorId, name: &'static str, rules: &'static [RuleSet] }
 
 struct RuleSet {
-    since: Version,                      // inclusive, a version actually verified
-    until: Version,                      // inclusive, a version actually verified
+    span: Span,                          // both ends a version actually verified
     source_verified_at: &'static [Version],
     refuse: fn(&Skeleton) -> Option<Reason>,
 }
 
 enum Verdict {
-    Refuses { reason: Reason, span: Span },
-    ImportsAltered { as_read: Description, span: Span },
+    // `renderer` is on EVERY MEASURED verdict, not on `Imports` alone (r2 C-3).
+    Refuses { reason: Reason, span: Span, renderer: Option<RendererId> },
+    ImportsAltered { as_read: Description, span: Span, renderer: RendererId },
     Imports { span: Span, renderer: RendererId },
-    Unproven,
+    Unproven { reason: UnprovenReason, span: Option<Span> },
 }
 ```
+
+`renderer` is `Option` on `Refuses` alone, and the option is the whole point:
+`None` means the refusal is **rule-derived** (a claim about source at the
+versions read, spelling-independent); `Some` means **measured**, and then
+§3's renderer gate retires it exactly as it retires a positive. Nunchuk's
+refusals are entirely renderer-dependent — F-624 measured the `--chain 1`
+spelling refused 30/30 while multipath imported 20/20, same shape — so a
+measured refusal with no renderer would print a claim the evidence does not
+support.
+
+### 1A. Types — normative
+
+The review found `Skeleton`, `Span`, `RendererId`, `Description` and
+`CoordinatorId` each named once and never defined; an implementer cannot start
+without them.
+
+```rust
+/// Everything a rule may read. Computed from a DECODED md1 only.
+struct Skeleton {
+    template: String,          // canonical @i template, use-site KEPT (r2 I-2)
+    shape: PolicyShape,        // the semantic decomposition the rules read
+    fp_partition: Vec<Vec<u8>>,       // per path, slots sharing a fingerprint
+    key_partition: Vec<Vec<u8>>,      // whole-policy, slots sharing (xpub, derivation)
+    key_path: KeyPathKind,     // Nums | UnspendableXpub | Spendable  (r2 I-9)
+    keys_present: bool,        // false for a template-only payload (r2 C-2)
+}
+
+struct Span { since: Version, until: Version }   // both ends VERIFIED, closed
+struct Version(&'static str);   // opaque, ordered by the registry's declared order
+struct CoordinatorId(&'static str);
+struct RendererId { tool: &'static str, version: &'static str, form: Form }
+enum UnprovenReason { NoEvidence, KeysAbsent, OutsideEveryVerifiedSpan }
+
+/// Which rendering produced the descriptor a measurement was taken on.
+enum Form { Multipath, Chain0, Chain1 }
+
+/// A rule's refusal class: the coordinator's own order-of-refusal name, plus
+/// the source that establishes it. `cite` is what makes a rule auditable.
+struct Reason { class: &'static str, cite: &'static str }
+
+/// The three-way internal key (r2 I-9). NUMS and an unspendable xpub are
+/// different wallets to Nunchuk, and the rendered template cannot tell them
+/// apart.
+enum KeyPathKind { Nums, UnspendableXpub, Spendable, NotTaproot }
+
+/// The coordinator's OWN parsed reading, recorded by the harness — never
+/// hand-authored (r2 I-7).
+struct Description {
+    wallet_kind: String,       // e.g. "MULTI_SIG", "MINISCRIPT", "Liana"
+    threshold: Option<(u8, u8)>,
+    paths: Vec<String>,        // the coordinator's rendering of each spend path
+}
+```
+
+`PolicyShape` is the one type this design does **not** define: it is the
+fork's existing `md/policy_shape.go`, and step 1's first task is porting it.
+
+**`Skeleton` is a struct, not a string**, because the rules need the semantic
+decomposition and a rendered template cannot give it back without a second
+parse. `composerLianaOutsideModelClass`'s real signature is
+`(root md.ScriptKind, shape md.PolicyShape)` and its body reads
+`shape.KeyPath`, `shape.Branches`, `b.Locks[].Kind/.Value`, `b.Hashlocks` —
+none of which is recoverable from a template string.
+
+**`template` keeps `/<0;1>/*`** (r2 I-2): both `descriptor_to_template` and the
+committed evidence's `template` field carry the use-site, and dropping it in
+the key would make the key disagree with the artifact it is looked up against.
+The `--chain 0`/`--chain 1` *form* is correctly a renderer property, not a key
+property — one decoded card renders both.
+
+**`key_path` is three-way, not two** (r2 I-9): a NUMS point and an
+unspendable-xpub internal key are different wallets to Nunchuk, and the
+rendered template cannot distinguish them. F-449 already records this.
+
+**`kind#class` is defined** (r2 I-3): *kind* is the `LockKind` discriminant
+(`after-height`, `after-time`, `older-blocks`, `older-units`); *class* is a
+counter over **distinct values of that kind within this policy**, base 10,
+starting at 1, assigned in the canonical template's own left-to-right
+traversal order. `older(26280)` then `older(1000)` then `older(26280)` renders
+`older(older-blocks#1)`, `older(older-blocks#2)`, `older(older-blocks#1)`.
+Digests render as `sha256(#)` — kind only, no class, because no coordinator
+measured distinguishes two digests.
+
+**An absent fingerprint is its own singleton partition** (r2 I-4). md-codec has
+already ruled on this question for itself: `[0,0,0,0]` is the ABSENT sentinel,
+not a value. Two slots whose fingerprint is absent are **not** known to share a
+signer, so they never join a partition — grouping them would assert a
+key-identity relation nobody measured, which is C-1's failure in miniature.
 
 **Adding a version** is a new `RuleSet`; **adding a wallet** is a new
 `Coordinator`. Neither touches the classifier or the display. A coordinator's
@@ -86,10 +189,41 @@ canonical payload — placeholders renumbered by first appearance
 
 Too-coarse becomes structurally impossible, every measured shape stays
 matchable, and a foreign md1 with an unfamiliar fragment falls to `Unproven` —
-silence, the correct verdict for a policy nobody measured. It also makes
-ruling 4 *cheaper*: the canonicaliser md-codec already owns **is** the key, so
-`md shape-key` is a formatter over it and no Go walk needs porting for the
-normative path.
+silence, the correct verdict for a policy nobody measured.
+
+**RETRACTED: "no Go walk needs porting for the normative path."** That
+sentence was in the first fold and it is false — it was the one line a plan
+would have been costed from. Measured (r2 C-1, and independently by the
+controller at `b6e20412`):
+
+- **Genuinely already owned:** `render::descriptor_to_template(&Descriptor)`
+  (`crates/md-codec/src/render.rs:52`) takes the **decoded** descriptor, emits
+  `@i` placeholders and **erases origins**; placeholder renumbering is real
+  (`canonicalize::canonicalize_placeholder_indices`, `canonicalize.rs:168`).
+- **Not owned:** lock values and digests render **literally**
+  (`render.rs:159`, `:171`, and the two hash renderers) — the key needs a
+  rendering MODE that abstracts them. The **per-path** fingerprint partition
+  needs a spend-path decomposition that exists **nowhere in Rust**:
+  `compose::SpendPath` is the *input* model, `md decompose`'s `Occurrence`
+  carries no path index, and the branch split lives only in the fork's Go
+  `md/policy_shape.go`.
+
+So **porting `policy_shape.go` to Rust is the first task of step 1**, not a
+display concern deferred to the fork. Computing the partition from the
+compose-side `PathList` instead is rejected: it would be a second
+implementation of one key — the defect §2 exists to forbid — and a restored
+card has no `PathList` at all.
+
+**(a2) A template-only payload is `Unproven`, never `Imports` (r2 C-2).**
+`md compose` is keyless *by construction* — measured this session, it prints
+`note: stdout is a keyless descriptor template (no keys)` — so the key's
+identity components are **always** unknown on the most-used command in plan 1.
+The rule: when `keys_present` is false, every coordinator whose rule reads a
+key-identity component yields `Unproven { reason: KeysAbsent }`. A refusal
+that depends only on structure (wrapper, lock kind, hash presence) **still
+stands** — it is sound without keys — so a template-only policy can be refused
+but can never be claimed to import. The device's template-only consent is the
+same state on steel.
 
 **(b) The fingerprint partition is part of the key.** Liana refuses on a
 key-IDENTITY relation (X11, `DuplicateOriginSamePath`) that a structural key
@@ -133,12 +267,34 @@ real harness printed is at least as good as a rule at that version — it simply
 does not extend to other versions.
 
 **Rules and evidence meet at a table BUILD, never at runtime.** The generated
-`verdicts` table is the single artifact both consumers read. A disagreement
-between a rule and a measurement is **a build failure with a named class**,
-resolved by a person and committed — as a new verdict kind, a narrowed rule, or
-a re-measurement. Disagreements are not a flaw in the split; X24 is proof that
-a disagreement can be the most valuable row in the table. The flaw would be
-nobody being told.
+`verdicts` table is the single artifact both consumers read. A disagreement is
+**a build failure**, resolved by a person and committed. Disagreements are not
+a flaw in the split; X24 is proof that a disagreement can be the most valuable
+row in the table. The flaw would be nobody being told.
+
+**The classes are named** (r2 I-6), because "a named class" that names none is
+not a contract:
+
+| class | rule says | evidence says | resolution |
+| --- | --- | --- | --- |
+| **D1 false-refusal** | refuses | imported | narrow the rule, or re-read the source at that version |
+| **D2 missed-refusal** | admits | refused | widen the rule; the measured refusal stands meanwhile |
+| **D3 reason-drift** | refuses for X | refused for Y | re-attribute the class; the verdict is unaffected |
+| **D4 orphan-evidence** | no rule spans it | any | add a `RuleSet` for that version, or drop the row |
+
+**D3 is not hypothetical:** F-633 measured Liana v15 refusing the two key-less
+shapes for *"All spend paths must require a signature"* while our classifier
+names *"a hash lock"* — same verdict, different reason. Today nothing would
+classify that; under D3 it is a build failure with an obvious resolution.
+
+**`Description` is DERIVED, never hand-authored** (r2 I-7). It is the
+coordinator's own parsed reading of the policy, recorded by the harness —
+which is the architect's clause the first fold dropped: *the harness must
+record the coordinator's parsed policy*. So every harness emits, alongside its
+verdict, the structure the coordinator inferred (Liana's primary/recovery
+paths; Nunchuk's wallet type and `m`-of-`n`), and `ImportsAltered` fires
+**automatically** wherever that reading differs from the policy as built. A
+hand-marked field would fire only where a human remembered.
 
 **The shape key has exactly one implementation.** The generator computes keys
 by calling `md shape-key`, never by reimplementing the canonicaliser in Python.
@@ -195,6 +351,27 @@ Six mechanisms:
 6. **Evidence is a snapshot with a commit**, and re-measurement produces a diff
    of verdicts — the artifact a reviewer needs.
 
+**The version a verdict names is the one the APPLICATION displays** (r2 I-10),
+not the library revision. An operator can read "Nunchuk 2.1.1" off their own
+About screen; they cannot read `libnunchuk a7cfb498`. The library revision is
+kept as **provenance on the evidence row**, so the chain from a printed
+version to the bytes that produced it stays intact.
+
+**Which plan owns each mechanism** (r2 I-11) — the first fold assigned none:
+
+| mechanism | plan |
+| --- | --- |
+| 1 provenance in every verdict | 1 (md-codec) |
+| 2 no open-ended span | 1 (md-codec) |
+| 3 committed harnesses | 2 — **Liana's is done** (`harnesses/liana/`) |
+| 4 `KNOWN_RELEASES` + freshness gate | 2 — **red today**: Liana 8.0 verified vs 15.0 known, Nunchuk likewise |
+| 5 renderer gate | 2 |
+| 6 evidence snapshot + verdict diff | 2 |
+
+Mechanism 4 being red on the day it lands is intended: it is the gate that
+turns "we should re-measure" into a command that fails, and F-633 is the
+proof it would have fired.
+
 **What this design deliberately does NOT build:** a freshness threshold in days
 evaluated on the device. The device cannot tell the time (§6b says so in its
 own copy), and a verdict whose wording changes as a clock moves is a verdict
@@ -233,10 +410,20 @@ than by reasoning about it.
 
 ### `md` on the host
 
-`md shape-key` emits the key. `md compose` and `md descriptor` print the
-verdict, naming the form. The **none** case refuses with exit non-zero and
-names the flag that proceeds (ruling 5) — no TTY prompt, because this project
-has already shipped a tool that blocked on a TTY and looked like a hang.
+`md shape-key` emits the key. `md compose` and `md descriptor` both print the
+verdict, naming the form.
+
+**Only `md compose` refuses; `md descriptor` never does (r2 C-4).** The two
+commands are not the same kind of act. `md compose` **mints** a policy — that
+is the moment ruling 2's loud stop belongs, and it exits non-zero naming
+**`--md-only`** (r2 I-8) as the flag that proceeds. `md descriptor` **reads**
+an existing card, usually one already engraved: refusing there would deny an
+operator the descriptor for a wallet they already hold, which is a regression
+`validate.rs:449-458` documents in its own words. It prints the same notice on
+stderr and exits 0.
+
+The flag is on `md compose` alone, because it is the only command that can
+refuse.
 
 The none case on the device is **its own confirm-to-proceed screen** before the
 consent, in §8a's shape — bounded by construction because it has one body. It
@@ -247,13 +434,19 @@ this wallet, and md cannot sign."*
 
 Each step with its gate. Nothing starts in the fork.
 
-1. **`md-codec`** — the skeleton canonicaliser, the four `Verdict` kinds, the
-   generated `verdicts` table, vectors pinning every `(shape, coordinator,
-   version)` cell. *Gate:* the conformance test (`chunks -> key ==
+1. **`md-codec`** — **first task: port `policy_shape.go`'s branch split to
+   Rust** (r2 C-1); then the abstracting render mode, the `Skeleton` builder,
+   the four `Verdict` kinds, and the generated `verdicts` table with vectors
+   pinning every `(shape, coordinator, version)` cell. **The table generator
+   is a step-1 `xtask`, not `md shape-key`** (r2 I-1) — step 1's gate needs
+   the table, so it cannot be built by a step-2 binary; `md shape-key` in
+   step 2 is a thin CLI over the same library function, and a test asserts
+   the two agree. *Gate:* the conformance test (`chunks -> key ==
    descriptor -> key` for every evidence row) and the rule/evidence build.
 2. **`md-cli`** — `md shape-key`; the verdict on `md compose` and
-   `md descriptor`; the none-case refusal and its flag. *Gate:* CLI vectors
-   including the flag path and the template-only case.
+   `md descriptor`; `md compose`'s none-case refusal and `--md-only`.
+   *Gate:* CLI vectors including the flag path, the template-only case
+   (`Unproven { KeysAbsent }`), and `md descriptor` NOT refusing.
 3. **Harnesses committed**, then run once to regenerate the evidence
    byte-identically from the current tree — the reproducibility proof.
 4. **Fork** — the Go port of the canonicaliser with a provenance pin; the
