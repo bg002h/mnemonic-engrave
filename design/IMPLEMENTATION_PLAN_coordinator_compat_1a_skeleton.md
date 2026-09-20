@@ -62,7 +62,7 @@ something that runs.
 **Interfaces:**
 - Consumes: `md_codec::encode::Descriptor`, `md_codec::tree::{Node, Body}`,
   `md_codec::tag::Tag`.
-- Produces: `PolicyShape`, `Branch`, `KeyPathKind`, and
+- Produces: `RootKind`, `PolicyShape`, `Branch`, `KeyPathKind`, and
   `pub fn policy_shape(d: &Descriptor) -> PolicyShape`.
 
 **The extension, and why it is the first task.** The Go original
@@ -115,6 +115,7 @@ builder. Append:
 
 ```rust
 /// Build a template-only `Descriptor` around `tree` with `n` placeholders.
+/// (Tests are a separate crate, so `md_codec::` is correct HERE.)
 /// Template-only is deliberate: Task 1 tests structure, not key identity.
 pub fn descriptor_of(tree: Node, n: u8) -> md_codec::encode::Descriptor {
     md_codec::encode::Descriptor {
@@ -145,6 +146,15 @@ produces:
 
 ```rust
 // crates/md-codec/src/policy_shape.rs
+
+/// The top-level wrapper. SIX-valued, mirroring the fork's `ScriptKind`.
+/// NOT `compose::Wrapper` (`crates/md-codec/src/compose/mod.rs:73`): that is
+/// four-valued, is the compose-side input model the design forbids keying
+/// from, and cannot express a decoded singlesig `wpkh`/`pkh`/`sh(wpkh)` —
+/// all of which md1 encodes. `sh(wsh)` is not a variant here either; the
+/// `Skeleton` carries `inner_wsh: bool` beside this (design §1A).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootKind { Wpkh, Pkh, Sh, Wsh, Tr, ShWpkh }
 
 /// A taproot internal key. FOUR-valued: the Go original has three
 /// (`None`/`NUMS`/`Spendable`, `md/policy_shape.go:33-39`) and an
@@ -197,7 +207,10 @@ pub struct PolicyShape {
     pub tap_depth: u8,
 }
 
-pub fn policy_shape(d: &md_codec::encode::Descriptor) -> PolicyShape { todo!() }
+// NOTE: `crate::`, never `md_codec::` — this crate does not self-alias
+// (`lib.rs` has no `extern crate self as md_codec`). Integration tests under
+// `tests/` are a separate crate and correctly say `md_codec::`.
+pub fn policy_shape(d: &crate::encode::Descriptor) -> PolicyShape { todo!() }
 ```
 
 - [ ] **Step 5: Run the test until it passes**
@@ -485,7 +498,7 @@ mod common;
 use md_codec::skeleton::{skeleton, skeleton_key};
 
 #[test]
-fn the_same_policy_seated_and_unseated_share_a_key() {
+fn seated_and_unseated_do_not_share_a_key() {
     let unseated = common::kofn_recovery();
     let seated = common::seated(&[(0, [0xaa; 4]), (1, [0xbb; 4]), (2, [0xcc; 4]), (3, [0xdd; 4])]);
     // Distinct fingerprints => every slot its own group => same partition
@@ -539,7 +552,7 @@ Expected: FAIL to compile.
 ```rust
 // crates/md-codec/src/skeleton.rs
 pub struct Skeleton {
-    pub root: ScriptKind,
+    pub root: RootKind,
     pub inner_wsh: bool,
     pub template: String,
     pub shape: PolicyShape,
