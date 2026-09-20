@@ -162,9 +162,48 @@ Of the three ways out, two destroy evidence: moving the vectors into
 refusal covers (the test's own comment says so at
 `gui/policy_address_test.go:143-147`), and dropping the pin preference deletes
 the F-533 and F-514 witnesses outright. So the pin gains a record: a
-`loadVectorRecord(name)` helper mirroring `loadVectorChunks`, preferring
-`md/testdata/forkbuilt/<name>.conformance.json`, so record and card are always
-one policy.
+`loadVectorRecord(t, name)` helper mirroring `loadVectorChunks`, preferring
+`md/testdata/forkbuilt/<name>.conformance.json`.
+
+**D5a — the fix is a BOUNDARY, not three more call sites (fold-verify NEW-1).**
+The first draft of D5 wired `loadVectorRecord` into one test and then claimed,
+globally, that "record and card are always one policy". That sentence was
+false. Two more sites pair the pin-preferring card loader with a plain
+vendored record read, and both fail identically once T2+T3 land — measured, not
+projected:
+
+| site | record | card | F-529 vector reached |
+| --- | --- | --- | --- |
+| `gui/policy_address_test.go:125` | glob `keyed_*` | `:174` `loadVectorChunks` | all three |
+| `gui/taproot_script_path_test.go:30` | glob `keyed_tr_*` | `:55` `loadVectorChunks` | `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a` |
+| `gui/wsh_script_emit_test.go:31` | glob `keyed_wsh_*` | `:72` `loadVectorChunks` | `keyed_wsh_timelock_hashlock` |
+
+    keyed_tr_multi_a chain 0 index 0:
+      go:   bc1pf4aujydl48hah9qxvk4j0dcce737pl9svne7rmzcprrh7y92znsstul4rt
+      rust: bc1pgrupj0fjv79xtj05mzthds4dqzvdhcptx2gzpgzt90uzc86qzfes2a0yhh
+
+The two tr vectors are pinned **today**, pre-implementation, so that hazard is
+live already and only needs the record side to move — which T3 does.
+
+Three occurrences of one shape is a wrong shape, so this plan does not add a
+third call-site edit. **Every read of a `keyed_*.conformance.json` record in
+`gui/` goes through `loadVectorRecord`, and a structural test enforces it**:
+it scans `gui/*_test.go` for a direct
+`filepath.Join(.., "md", "testdata", "vectors", …".conformance.json")` read
+outside the loader itself and fails, naming these three as the occurrences it
+exists to prevent a fourth of. A convention with no gate is worth about 25%
+compliance; the gate is what makes D5 a boundary.
+
+Independently enumerated, the remaining record-readers do **not** intersect the
+F-529 three and stay correct either way: `gui/policy_address_test.go:261`
+(`vectorAddress`, driven with `keyed_tr_with_leaf` / `keyed_wsh_thresh`),
+`gui/key_card_seating_test.go:40,243` (`keyed_tr_with_leaf`,
+`seat_same_origin_two_masters`), `gui/composer_policy_address_test.go:48`
+(`keyed_compose_wsh_timelock_hashlock` — the compose variant, a different
+vector from the pinned one), and `md/conformance_keyed_test.go:44`, whose
+record and card both come from the vendored tier so they move together. They
+are routed through the loader anyway, because the structural gate admits no
+exceptions and an exception list is the next thing to rot.
 
 **D6 — the pins' anti-drift check pins a DIVERGENCE, not a deletion (R0 I-1).**
 `TestPinnedKeyReuseVectorsStillMatchTheVendoredCorpus` skips only when the
@@ -202,17 +241,19 @@ stale descriptors too, and an implementer who tunes the gate until exactly 41
 fail would exempt precisely the three vectors this cycle is most exposed on.
 Gate: `go test ./md/ -run TestKeyedConformance -v`.
 
-**T2 — fork-side pins, card AND record (D5, D6).** Copy the pre-re-vendor
-`keyed_wsh_timelock_hashlock` phrase to
+**T2 — fork-side pins, card AND record (D5, D5a, D6).** Copy the
+pre-re-vendor `keyed_wsh_timelock_hashlock` phrase to
 `md/testdata/forkbuilt/keyed_wsh_timelock_hashlock.md1.txt`, and copy the
 current `.conformance.json` of **all three** F-529 vectors to
-`md/testdata/forkbuilt/`. Add `loadVectorRecord` and point
-`TestEveryKeyedVectorReachesAnAddress` at it. Add a `pinnedDuplicateVectors`
+`md/testdata/forkbuilt/`. Add `loadVectorRecord` and route **every**
+`keyed_*.conformance.json` read in `gui/` through it — the three split sites in
+D5a's table first — then add the structural test that fails on a direct read
+outside the loader. Add a `pinnedDuplicateVectors`
 list and a shape test asserting the wsh pin carries a slot at two use sites
 under one miniscript — the existing
 `TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot*
 internal-key reuse and cannot cover it. Rework the anti-drift check per D6.
-Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned|ReachesAnAddress' -v`.
+Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned|ReachesAnAddress|TaprootScriptPathMatchesRust|WshWitnessScriptHashesToRustsAddress|VectorRecord' -v`.
 
 **T3 — widen the script and re-vendor (one action, D4).** `vendor-compose-vectors.sh`
 selects `^(keyed_|compose_)` minus `compose_refusal_`; update
