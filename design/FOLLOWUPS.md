@@ -19173,11 +19173,39 @@ If Liana grew more permissive, the notice fires where Liana would accept — a
 needless warning. If it grew stricter, the notice stays silent where it should
 fire, which is the worse direction.
 
-**Remedy** is §3 of the coordinator-compat design: provenance carried in every
-verdict, "as of <version>" in the copy rather than a bare present tense, and a
-freshness gate that fails when a coordinator's current release outruns the one
-the rules were verified against. Re-measuring against v15.0 is the immediate
-piece and does not need the rest of the design to land.
+**RE-MEASURED AT v15.0, 2026-09-20 — the notice is NOT wrong.** The harness
+is now committed (`harnesses/liana/`, which also closes the Liana half of the
+architect's C-4) and was run over the same 289 descriptors at v15.0:
+
+| | v8.0 vs v15.0 |
+| --- | --- |
+| verdicts | **289 / 289 identical** |
+| accepted: inferred policy | 73 / 73 identical |
+| accepted: receive + change addresses | 73 / 73 identical |
+| refusals: message | 206 / 216 identical |
+
+The ten differing refusals are **exactly two shapes x five variants**, both
+key-less (`keyless-hash-path-wsh`, `keyless-hash-older-path-wsh`), and **none
+changed verdict** — only the message, from the generic *"Descriptor is not
+compatible with a Liana spending policy."* to the specific *"Miniscript error:
+'All spend paths must require a signature'."* Liana v15 gives a better error
+and refuses the same things. (The harness source compiled against both v8.0
+and v15.0 **unmodified**, which is itself a measured fact about `from_str`'s
+API stability.)
+
+**One genuine consequence for §8x, narrower than the original worry.** For
+those two key-less shapes our classifier names class 4, *"a hash lock"*, while
+Liana v15 now says the disqualifier is the missing signature. Both refuse and
+the operator's outcome is identical, but our named reason is now less specific
+than Liana's own — a candidate for a class-order revisit, not a defect.
+
+**What stays OPEN, and it is the real defect:** the device makes an
+**unqualified present-tense claim** about third-party software. That it
+happens to still be true today is luck confirmed by measurement, not a
+property of the design — nothing would have told us otherwise. The remedy is
+§3 of the coordinator-compat design: provenance in every verdict, "as of
+<version>" in the copy, and a `KNOWN_RELEASES` gate that fails when a
+coordinator's newest release outruns every verified version.
 
 ### F-632 — an `xprv` forged with a rendered xpub's header passes the whole F-630 descriptor gate
 
