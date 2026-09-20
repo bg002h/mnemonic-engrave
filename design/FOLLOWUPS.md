@@ -19005,3 +19005,19 @@ the exact text to paste into Nunchuk Desktop 2.1.1 for the demo payload's
 wallet, the route ("Recover via BSMS/descriptors", multipath form) and the first
 three receive addresses per chain. It belongs in `demo/sh2/WALKS.md` next to the
 device walks, so the operator's live check is one file away.
+
+### F-630 — md-codec 0.44.0's xpub-header rewrite is unported in the fork, and the conformance gate cannot see it
+
+**Status:** OPEN — **Owning phase:** the next Go-port sync to md-codec 0.44/0.45 (Rust-primary rule: the Go port is downstream). **Tier:** `correctness` / `test-infra`. **Found:** composer fable review r0, fold B implementation report, §follow-ups (2026-09-20).
+
+"A rendered xpub's header must agree with its origin" (md-codec 0.44.0, dm
+`24ca7225`) rewrote the xpubs in all 33 `keyed_compose_*.conformance.json`
+records; the fork's corpus is still pinned at dm `745e0fd0`. The implementer
+MEASURED that a full re-vendor to `4de55155` imports the change and leaves
+`go test ./md/` GREEN, because `TestKeyedConformanceAgreesWithRust` parses
+`.chains[].descriptor` into a field it never asserts -- so the fold-B branch
+pins the new key-less vector SEPARATELY rather than re-vendoring the corpus.
+When the header change is ported, assert `.chains[].descriptor` in the same
+change, or the next drift is invisible too. Related: md-codec 0.45.0's
+`validate()` precedence (the cap after `TooManySlots`/`LegacyWrapperShape`)
+and its four `precedence_*` vector cases must be ported at the same time.
