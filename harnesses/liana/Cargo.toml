@@ -1,0 +1,13 @@
+[package]
+name = "liana-harness"
+version = "0.1.0"
+edition = "2021"
+
+# The liana crate is NOT vendored. Point this at a checkout of
+# https://github.com/wizardsardine/liana at the tag you are measuring:
+#   v8.0  -> path = "<checkout>"            (pre-workspace layout)
+#   v15.0 -> path = "<checkout>/liana"      (workspace member)
+# See README.md.
+[dependencies]
+liana = { path = "../../../.tmp/fable-liana-src-v15/liana" }
+serde_json = "1"
