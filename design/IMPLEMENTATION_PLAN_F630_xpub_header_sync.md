@@ -192,90 +192,116 @@ through `loadVectorRecord`, and a structural test enforces it.**
 **D5b — the scan matches the STRING, not a call shape (r2 Q1).** The first
 draft said the gate scans for a
 `filepath.Join(.., "vectors", …".conformance.json")` read. That is defeated by
-a plain string literal — which is not a contrived spelling but the *existing*
-idiom for testdata paths in this very package
-(`gui/template_engrave_test.go:207`, `gui/composer_selfcheck_test.go:269` both
-write `"../md/testdata/..."` directly). Reproduced against a fully-routed,
+a plain string literal — the *existing* idiom for testdata paths in this very
+package (`gui/template_engrave_test.go:207`,
+`gui/composer_selfcheck_test.go:269`). Reproduced against a fully-routed,
 gate-passing tree: a fourth test reading
 `os.ReadFile("../md/testdata/vectors/" + vector + ".conformance.json")` and
-pairing it with `loadVectorChunks` compiles clean and the gate still PASSES —
-a live fourth occurrence of the C-1 shape, invisible to it. `os.DirFS`, a
-package-level `const` and `fs.ReadFile` evade it identically, none being a
-`filepath.Join` call.
+pairing it with `loadVectorChunks` compiled clean while the gate PASSED.
 
-So the gate is a scan for the substring `conformance.json` in the **STRING
-TOKENS** of any `*_test.go` outside the loader's own file, failing on any
-occurrence. Not an AST call-shape match and not a raw text grep: `go/scanner`
-in its default mode yields string tokens and skips comments, which is exactly
-the discrimination needed. Every spelling that reads a record must put the
-substring in some string token — a literal, either half of a `name +
-".conformance.json"` concatenation, a `const`, a `DirFS` path — so all are
-caught by construction. (`".conformance" + ".json"` would evade; it is
-contrived, and the gate's own comment says so rather than pretending
-otherwise.)
+So the gate scans the **STRING TOKENS** of every `*_test.go` (`go/scanner`,
+whose default mode yields string tokens and skips comments) for the substring
+`conformance.json`. Measured on the tree: **18 occurrences across 9 files, 2 of
+them in comments** — which is why it is token-based and not a grep.
+(`".conformance" + ".json"` evades; contrived, and the gate says so rather than
+pretending otherwise.)
 
-**Measured before specifying it, because a rule that cannot be implemented is
-worse than none:** the two packages' test files hold **18** occurrences of the
-substring across 9 files, of which **2 are in comments**
-(`md/compose_vectors_pin_test.go:151`, `md/conformance_keyed_test.go:12`) — a
-raw grep would fail on both, which is why the scan is token-based.
+**D5c — the boundary is about PAIRS, and that is the rule (r3 C-2).** Stating
+it as "every record read goes through the loader" was wrong in a way that reds
+an existing gate. `md/conformance_keyed_test.go` globs `keyed_*` — all three
+F-529 names included — and takes its card from the non-pin-preferring
+`loadPhraseChunks`. Route only its *record* and the pinned record meets a
+re-vendored card: C-1's split, inverted, in the sibling package. Reproduced at
+real T2+T3 state:
 
-**D5e — one principled exemption, declared in the file itself.** Of the 16
-occurrences in code, one is not a pairing and must NOT be routed:
-`md/compose_vectors_pin_test.go:158` calls `vectorPath(name,
-"conformance.json")` under `os.Stat` **to audit the vendored tier itself**.
-Sending that through a pin-preferring loader would mask a missing vendored file
-whenever a pin exists — the gate would hide the very drift the provenance test
-exists to find.
+    keyed_tr_multi_a: wallet_policy_id
+      go:   fe4d264c6e40999b8695329adfe599d9      (re-vendored card)
+      rust: 1f26f9b7cdb8e745c898bb93f1134ba7      (pinned record)
 
-So the boundary admits exactly one exemption, and it is declared **in the
-exempt file** as a `//go:vectortier vendored` marker the scan recognises, never
-as a list living somewhere else. A list in another file drifts silently and is
-the shape this whole decision exists to avoid; a marker makes every exemption a
-visible, deliberate line in the diff that adds it, and the gate reports how
-many markers it honoured so a second one cannot appear unnoticed.
+**The rule is therefore: a file that reads a record must obtain its card from
+the pin-preferring loader too.** Concretely that is one line —
+`md/conformance_keyed_test.go`'s `loadPhraseChunks` → `vectorChunksFor`,
+verified to restore green — and the same obligation is latent in
+`md/compose_pkh_emit_test.go:37` and `md/compose_stubs_test.go:15`, inert today
+only because no `keyed_compose_*` name has a pin.
 
-`md/` also needs its own pin-preferring record loader (`vectorRecordFor`,
-mirroring `vectorChunksFor`) — `loadVectorRecord` is a `gui` helper and cannot
-be called from package `md`.
+**D5d — one file owns finding and loading a vector, which is what makes the
+scan enforceable (r3 I-2, I-3).** Of the 16 in-code occurrences, only **6** are
+record reads. The rest are 4 corpus-enumeration globs, 4 `strings.TrimSuffix`
+name derivations, and 1 `t.Fatal` message — none a read, all flagged, and the
+plan previously gave them no disposition. Banning the substring while nine
+legitimate uses remain would force an implementer to invent exemptions the plan
+forbids.
 
-**D5c — the gate must prove it can fail (r2 Q2).** A source scan that matches
-nothing passes vacuously, and this one did: the natural first implementation
-matched call arguments only as bare literals (`*ast.BasicLit`), while every
-real call site writes `name+".conformance.json"` — a `BinaryExpr`. Built that
-way it examined 20+ files, was non-vacuous by file count, and still reported
-PASS on a tree carrying a real unrouted violation. **A file count does not
-prove the pattern can match anything.** The gate therefore asserts three
-things in order: that it examined a plausible number of files (the precedent is
-`gui/tinygo_split_test.go:105`, `if len(files) < 20 { t.Fatalf("INCONCLUSIVE:
-…") }`); that a synthetic known-bad string IS flagged by the same matcher; and
-only then that the real tree is clean.
+So the enumeration moves too. A new file per package —
+`gui/vector_fixtures_test.go` and `md/vector_fixtures_test.go` — owns
+`loadVectorRecord`/`vectorRecordFor`, the card loaders, **and** the
+glob-plus-name-derivation helpers (`eachKeyedVector`). Every other test asks
+that file, so no other file has any reason to name the string, and "fails on
+any occurrence outside the fixtures file" becomes true rather than aspirational.
+The `t.Fatal` message is reworded to stop naming the file it is about.
 
-**D5d — the boundary covers `md/` too (r2 Q4).** The first draft scoped the
-scan to `gui/*_test.go` and then claimed `md/conformance_keyed_test.go:44` was
-"routed through the loader anyway". That was false: `loadVectorRecord` is a
-`gui` helper, `md`'s reader uses `loadPhraseChunks`, and no md-side gate
-existed. `md/` is safe **today** only by coincidence — its three record readers
-(`conformance_keyed_test.go`, `compose_pkh_emit_test.go`,
-`compose_stubs_test.go`) all pair the record with the non-pin-preferring
-`vectorPath`/`loadPhraseChunks`, so both halves move together; and the
-pin-preferring `vectorChunksFor` is used by three files
-(`duplicate_keys_test.go`, `policy_shape_test.go`,
-`f533_internal_key_reuse_test.go`), none of which reads a record. Coincidence
-is not a mechanism, and T2 is about to add three `forkbuilt/` records. The scan
-therefore covers `md/*_test.go` as well — a test in `gui` reads
-`../md/*_test.go` as plain file I/O, exactly as this package already does for
-`../md/testdata/`; it is only *compiling* against another package that it
-cannot do.
+`loadVectorChunks` **moves into that file too**, and this is load-bearing: the
+exclusion is file-granular, and `loadVectorChunks` lives today at
+`gui/taproot_script_path_test.go:136` — the same file as one of D5a's three
+split sites. Leaving it there and excluding its file drops the gate from 16
+flagged tokens to 14, blinding it to the very site it was built for. Measured.
 
-Independently enumerated, the remaining record-readers do **not** intersect the
-F-529 three and stay correct either way: `gui/policy_address_test.go:261`
-(`vectorAddress`, driven with `keyed_tr_with_leaf` / `keyed_wsh_thresh`),
-`gui/key_card_seating_test.go:40,243` (`keyed_tr_with_leaf`,
-`seat_same_origin_two_masters`), and `gui/composer_policy_address_test.go:48`
-(`keyed_compose_wsh_timelock_hashlock` — the compose variant, a different
-vector from the pinned one). They are routed through the loader anyway, because
-the gate admits no exceptions and an exception list is the next thing to rot.
+**D5e — the gate must prove the WALK can fail, not just the matcher (r3 I-4).**
+A source scan that matches nothing passes vacuously, and this one did: the
+natural first implementation matched bare literals (`*ast.BasicLit`) while
+every real call site writes `name+".conformance.json"` (a `BinaryExpr`). It
+examined 20+ files, was non-vacuous by file count, and still PASSED on a tree
+carrying a real violation.
+
+A file count is also not enough: `gui/` alone supplies 244 of the 281 files, so
+any aggregate threshold an implementer would pick is met with an entire package
+missing. The gate therefore asserts, in order: a **per-directory** file count
+for each scanned directory; that a synthetic known-bad placed **as a file
+inside each scanned directory** is flagged, so the walk itself is exercised and
+not merely the matcher; and only then that the real tree is clean.
+
+**D5f — exemptions are declared in the exempt file (r2, r3 I-2).** One
+survives the consolidation: `md/compose_vectors_pin_test.go:158` stats
+`vectorPath(name, "conformance.json")` **to audit the vendored tier itself**,
+and a pin-preferring loader there would mask a missing vendored file whenever a
+pin exists — the gate hiding the drift the provenance test exists to find. It
+carries a `//go:vectortier vendored` marker the scan recognises. Never a list
+in another file: a list drifts silently, a marker is a visible line in the diff
+that adds it, and the gate reports how many markers it honoured so a second
+cannot appear unnoticed.
+
+**D5g — a PINNED record is a fork-maintained fixture, and D1 cannot hold for
+it (r3 C-1).** This is the correction the implementability walk forced, and it
+is a real contradiction, not a wording slip. T2 freezes the three F-529
+records; those three are among the 44 that fail D1, because their
+`chains[].descriptor` carries the master xpub under a four-component origin —
+the exact 0.44.0 defect D1 detects:
+
+    keyed_tr_multi_a: tr([73c5da0a/48'/0'/0'/2']xpub661MyMwAqRbc…
+      decoded: depth 0, child 0   →  D1 wants depth 4, child 2'
+
+And **no corrected rendering exists or can be obtained**: the pin exists
+precisely because `b2c5d693` replaced the reuse-BEARING policy with a
+reuse-FREE one, so the primary ships no post-0.44.0 record of the policy being
+frozen. A gate reading records pin-preferringly reaches 43 of 46, not 46.
+
+The resolution is that the two tiers are not the same kind of artifact. A
+vendored record is the primary's current answer; a **pinned record is a
+fork-maintained fixture preserving a policy the primary dropped**, and its
+value is its addresses and ids — which 0.44.0 did not move, by its own
+measurement of zero changed address lines. So:
+
+- **vendored tier** — full D1. All 46 must pass after T3.
+- **pinned tier** — the legacy header shape is asserted *exactly* (depth 0,
+  child 0, parent fp 0 under a non-empty origin), plus full D2a, D2b and D2c.
+  A pinned record whose header is **neither** the legacy shape **nor** the
+  correct shape fails, so a third staleness cannot slip in, and one that
+  becomes correct fails too — telling us the primary has re-shipped it.
+
+T3's acceptance is therefore **43 of 46 under correct-header D1, plus 3 under
+the pinned-legacy shape**, not "46 of 46". Exempting the three outright is the
+one thing T1 already warns against; this pins their exact shape instead.
 
 **D6 — the pins' anti-drift check pins a DIVERGENCE, not a deletion (R0 I-1).**
 `TestPinnedKeyReuseVectorsStillMatchTheVendoredCorpus` skips only when the
@@ -301,11 +327,12 @@ next begins", which T1 contradicts by construction.)
 **T1 — the gate, RED first.** Extend `keyedConformanceRecord` in
 `md/conformance_keyed_test.go` with `Keys`, and add
 `TestKeyedConformanceDescriptorHeadersAgreeWithTheirOrigins` implementing D1,
-D2a, D2b, D2c and D3. Use the **pin-preferring** loader (`vectorChunksFor`,
-`md/duplicate_keys_test.go:16`) for the card and, once D5 lands, the
-pin-preferring record too — the plain `loadPhraseChunks` would silently pair a
-pinned card with a re-vendored record, which is C-1 in a second place. Run
-against the **stale** corpus and record the output in the commit message.
+D2a, D2b, D2c, D3 and D5g's two tiers. Cards and records both come from the
+pin-preferring loaders (D5c) — but those arrive with T2, and at T1 no pinned
+record exists yet, so **at T1 the pinned tier is empty and D5g's second arm is
+unreachable**. That is not a hole: T2 is what populates it, and T2's own gate
+re-runs this test. Run against the **stale** corpus and record the output in
+the commit message.
 
 *Acceptance: 44 of 46 fail, 2 pass* (`keyed_tr_keyonly`, `keyed_wpkh` — bare
 fingerprint origins, depth 0 already right). Not 41: the F-529 three carry
@@ -313,36 +340,61 @@ stale descriptors too, and an implementer who tunes the gate until exactly 41
 fail would exempt precisely the three vectors this cycle is most exposed on.
 Gate: `go test ./md/ -run TestKeyedConformance -v`.
 
-**T2 — fork-side pins, card AND record (D5, D5a, D6).** Copy the
-pre-re-vendor `keyed_wsh_timelock_hashlock` phrase to
-`md/testdata/forkbuilt/keyed_wsh_timelock_hashlock.md1.txt`, and copy the
-current `.conformance.json` of **all three** F-529 vectors to
-`md/testdata/forkbuilt/`. Add `loadVectorRecord` and route **every**
-`keyed_*.conformance.json` read in `gui/` through it — the three split sites in
-D5a's table first — then add the structural test per D5b/D5c/D5d: a substring
-scan over `gui/*_test.go` **and** `md/*_test.go`, asserting a plausible file
-count, then a synthetic known-bad catch, then a clean tree, so the gate cannot
-pass by matching nothing. Add a `pinnedDuplicateVectors`
-list and a shape test asserting the wsh pin carries a slot at two use sites
-under one miniscript — the existing
-`TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot*
-internal-key reuse and cannot cover it. Rework the anti-drift check per D6.
-Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned|ReachesAnAddress|TaprootScriptPathMatchesRust|WshWitnessScriptHashesToRustsAddress|VectorRecord' -v`.
+**T2 — the fixtures boundary, in both packages (D5, D5a, D5c–D5g, D6).**
 
-**T3 — widen the script and re-vendor (one action, D4).** `vendor-compose-vectors.sh`
-selects `^(keyed_|compose_)` minus `compose_refusal_`; update
-`md/compose_vectors_pin_test.go:103` (36 hardcoded names in
-`composeVectorNames`) and `:110-111` (the literal `176`) to the widened set.
+1. Create `gui/vector_fixtures_test.go` and `md/vector_fixtures_test.go`. Each
+   owns its record loader (`loadVectorRecord` / `vectorRecordFor`), its card
+   loader, and `eachKeyedVector` (glob + name derivation). **Move**
+   `loadVectorChunks` out of `gui/taproot_script_path_test.go` into the new
+   file — D5d measured that leaving it there blinds the gate to one of the
+   three split sites.
+2. Pin the fixtures: the pre-re-vendor `keyed_wsh_timelock_hashlock` phrase to
+   `md/testdata/forkbuilt/…md1.txt`, and the current `.conformance.json` of
+   **all three** F-529 vectors to `md/testdata/forkbuilt/`.
+3. Route **both packages** — `gui/` and `md/` (r3 I-1: the earlier draft routed
+   only `gui/` while gating both). Six record reads move to the loaders; the
+   nine globs, `TrimSuffix` calls and one diagnostic move into the fixtures
+   files or are reworded. **Every file that reads a record takes its card from
+   the pin-preferring loader too** — including the one line that keeps the
+   existing cross-language gate green,
+   `md/conformance_keyed_test.go`'s `loadPhraseChunks` → `vectorChunksFor`.
+4. Mark the single exemption in its own file (D5f).
+5. Add the structural gate per D5b/D5e: token scan, per-directory counts,
+   per-directory synthetic known-bad, then the clean-tree assertion.
+6. Add `pinnedDuplicateVectors` and a shape test asserting the wsh pin carries
+   a slot at two use sites under one miniscript — the existing
+   `TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot*
+   internal-key reuse and cannot cover it. Rework the anti-drift check per D6.
+
+Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned|ReachesAnAddress|TaprootScriptPathMatchesRust|WshWitnessScriptHashesToRustsAddress|KeyedConformance|VectorRecord|Boundary' -v`.
+
+**T3 — widen the script and re-vendor (one action, D4).** Three edits, not two
+(r3 I-5):
+
+- `scripts/vendor-compose-vectors.sh:16` → `^(keyed_|compose_)` minus
+  `compose_refusal_`;
+- `md/compose_vectors_pin_test.go:103` — `composeVectorNames` goes **36 → 50**
+  names — and `:110-111` — the file literal **176 → 246**. Measured twice
+  independently (controller and reviewer): 46 keyed vectors carrying five files
+  each plus 4 unkeyed `compose_*` carrying four = 246. The `:106` comment
+  becomes "46 keyed vectors carry five files, 4 unkeyed carry four: 246";
+- `isComposeVectorFile` (`:79-84`), which still returns false for anything not
+  prefixed `compose_`/`keyed_compose_` and drives the **directory scan**. Left
+  alone, the 14 newly-pinned vectors gain sha256 coverage and no directory
+  coverage — measured by smuggling in an unpinned `keyed_tr_smuggled.…json`,
+  which passes unflagged while a `keyed_compose_smuggled` one is caught.
+
 **T3 and the re-vendor are the same action** — the script copies and *then*
 hashes the destination (`scripts/vendor-compose-vectors.sh:18,20-22`), so there
 is no tree state in which the script is widened, the pin regenerated, and the
-corpus still stale. Capture the pre-state first (`git stash` or a copy) so the
-diff expectation below can be checked.
+corpus still stale. Capture the pre-state first (a copy of the vectors
+directory) so the diff expectation below can be checked afterwards.
 
 *Expected, and verified with a count before committing:* exactly 41 records
 change descriptor lines only (82 chain entries), 3 change wholesale, 0 address
-lines and 0 id lines outside those 3, 0 files added or removed (247 both
-sides). T1's gate must now be GREEN at 46 of 46.
+lines and 0 id lines outside those 3, 0 files added or removed. T1's gate must
+now read **43 of 46 correct-header plus 3 pinned-legacy** (D5g) — not 46 of 46,
+which is unreachable by construction.
 Gate: the full `./md/` and `./gui/` suites.
 
 **T4 — whole-surface gate and push.** `go vet` (ArtifactDir baseline only),
