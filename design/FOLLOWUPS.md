@@ -19126,6 +19126,59 @@ change, or the next drift is invisible too. Related: md-codec 0.45.0's
 `validate()` precedence (the cap after `TooManySlots`/`LegacyWrapperShape`)
 and its four `precedence_*` vector cases must be ported at the same time.
 
+### F-633 — §8x asserts a present-tense claim about Liana, verified against a release seven majors old
+
+**Status:** OPEN — **Owning phase:** the coordinator-compatibility cycle (`design/DESIGN_coordinator_compatibility.md` §3, staleness). **Tier:** `correctness` / `records`. **Found:** fable architect review of the coordinator-compat design, I-1 (2026-09-20).
+
+The shipped §8x notice says, in the present tense and naming no version:
+
+> OUTSIDE LIANA'S MODEL
+> Liana takes one unlocked path, at least one path locked by older in
+> blocks, and no hash. This policy: <class>. Bitcoin Core imports it.
+
+`composerLianaOutsideModelClass` reads its nine classes off `analysis.rs` at
+**Liana v8.0**, and every measurement behind it was taken there. Measured from
+the checkout's own tags, independently of the report:
+
+| tag | date |
+| --- | --- |
+| v8.0 (what we read) | 2024-11-08 |
+| v15.0 (current) | 2026-07-31 |
+
+Seven majors and ~21 months. The file itself moved
+(`src/descriptors/analysis.rs` → `liana/src/descriptors/analysis.rs`) and its
+content changed five times between.
+
+**One of those changes is semantic, and it is confirmed verbatim.** At v8.0 the
+import path checks the policy compiles unconditionally ("Make sure it is a
+valid Miniscript policy by (ab)using the compiler"). At v15.0 that check sits
+behind a `compile: bool` parameter and the import path passes:
+
+```rust
+// We don't compile the policy as we assume it compiles given we started with a descriptor.
+LianaPolicy::_new(prim_path, recovery_paths, is_taproot, /* compile = */ false)
+```
+
+So the import-time `InvalidPolicy` refusal class **no longer exists** at v15.0.
+
+**Why this is filed rather than fixed here.** Our nine classes are shape checks
+(wrapper, NUMS, locks, hash, unlocked-path counts), not compiler checks, so
+this particular change probably does not move any of them — *probably* being
+the operative word, and nobody has measured v15.0. The defect is not a known
+wrong class; it is that **the device makes an unqualified present-tense claim
+about third-party software from a 21-month-old reading**, and there is no
+mechanism that would ever tell us it had gone stale.
+
+If Liana grew more permissive, the notice fires where Liana would accept — a
+needless warning. If it grew stricter, the notice stays silent where it should
+fire, which is the worse direction.
+
+**Remedy** is §3 of the coordinator-compat design: provenance carried in every
+verdict, "as of <version>" in the copy rather than a bare present tense, and a
+freshness gate that fails when a coordinator's current release outruns the one
+the rules were verified against. Re-measuring against v15.0 is the immediate
+piece and does not need the rest of the design to land.
+
 ### F-632 — an `xprv` forged with a rendered xpub's header passes the whole F-630 descriptor gate
 
 **Status:** OPEN — **Owning phase:** none (opportunistic; secret-handling, non-gating). **Tier:** `secret-handling`. **Found:** F-630 plan r5 closing review (2026-09-20), Minor.
