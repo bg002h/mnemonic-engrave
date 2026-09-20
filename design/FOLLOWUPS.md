@@ -18945,3 +18945,63 @@ records under the release-upload-asymmetry entry.
 day after `md-cli 0.16.0` existed, and had carried toolkit `v0.100.0` in prose
 while the install block said something else. Both were found by a question from
 the operator, not by a gate.
+
+### F-624 — Nunchuk refuses the change-chain single-chain spelling of every composed wallet
+
+**Status:** OPEN — **Owning phase:** the SH2 demo runbook / `md descriptor` docs. **Tier:** `docs`. **Found:** composer fable review r0, lens 2 (Nunchuk), M-1, 2026-09-20.
+
+`md descriptor --chain 1` output (`…/1/*`) is refused by libnunchuk 2.1.1 for all
+30 shapes measured (`Failed to verify wallet descriptor`): `ParseDescriptors`
+round-trips only against `EXTERNAL_ALL`, `EXTERNAL_INTERNAL`, `ANY`, `TEMPLATE`
+(`src/descriptor.cpp:658-661`), never `INTERNAL_ALL`. The default multipath
+form and `--chain 0` both import (20/20 each). Documentation only: say "paste
+the multipath form" wherever a Nunchuk import is described.
+
+### F-625 — Nunchuk's one xpub-string equality could call an md-rendered key "not one of yours"
+
+**Status:** OPEN — UI-level UNVERIFIED. **Owning phase:** a Nunchuk UI walk, when one is scheduled. **Tier:** `docs`. **Found:** lens 2 M-3.
+
+Nunchuk parses `md 0.16.2`'s zero-parent-fingerprint xpub rendering, stores it
+verbatim and derives identical addresses (RUN, 20/20 wallets); import and
+derivation ignore depth/parent/child. The one string equality is
+`NunchukStorage::HasSigner` (`storage.cpp:660-679`,
+`remote.get_xpub() == signer.get_xpub()`), which would report an md-rendered
+key as not the user's if the same key was earlier added as a REMOTE signer with
+its real xpub string. Cosmetic at worst; the calling screens were not traced.
+
+### F-626 — Nunchuk classifies an EXPERIMENTAL unsorted `multi` as a miniscript wallet, not a multisig
+
+**Status:** OPEN — **Owning phase:** the `ExperimentalUnsortedKeys` copy, next composer copy pass. **Tier:** `docs`. **Found:** lens 2 N-2.
+
+`wsh(multi(2,K,K,K))` imports and its addresses match, but Nunchuk shows it as
+`MINISCRIPT 0-of-3` with one signing path rather than `MULTI_SIG 2-of-3`,
+because only the `wsh(sortedmulti(` prefix takes its multisig route
+(`descriptor.cpp:596-598`). The §8b body could say so.
+
+### F-627 — Device restore document spells hardened `h`, the host `'`; the BIP-380 checksums an operator compares by eye differ
+
+**Status:** OPEN — **Owning phase:** next restore-document pass (fork `gui/md1_expand.go:129-147`). **Tier:** `docs` / `ux`. **Found:** lens 3 M-1.
+
+C01: device `…[73c5da0a/48h/0h/0h/2h]…#c6ptw3rr`, host `md descriptor`
+`…[73c5da0a/48'/0'/0'/2']…#k9z7pr9l`. Both checksums verify for their own
+spelling (recomputed from BIP-380); the xpub strings are identical. Decide one
+spelling for the device document, or print both checksums, or say on the
+document that the checksum depends on the spelling.
+
+### F-628 — Composer lock echo grammar: "1 blocks", and an unreachable 0-days echo
+
+**Status:** OPEN — **Owning phase:** next composer copy pass. **Tier:** `nit`. **Found:** lens 1 N-1.
+
+`"1 blocks (about 0.0 days)"`; a 3-unit `older` echoes
+`"0 days = 3 units of 512 s (0.0 days)"`, unreachable from the pad (minimum one
+day = 169 units), seen only because the harness fed units directly.
+
+### F-629 — The Nunchuk operator runbook lives only in a review report
+
+**Status:** OPEN — **Owning phase:** next demo pass. **Tier:** `docs`. **Found:** lens 2, §"Operator runbook".
+
+`design/agent-reports/composer-fable-r0-nunchuk.md` §"Operator runbook" gives
+the exact text to paste into Nunchuk Desktop 2.1.1 for the demo payload's
+wallet, the route ("Recover via BSMS/descriptors", multipath form) and the first
+three receive addresses per chain. It belongs in `demo/sh2/WALKS.md` next to the
+device walks, so the operator's live check is one file away.
