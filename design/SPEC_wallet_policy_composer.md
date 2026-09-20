@@ -667,9 +667,16 @@ the sizing and §5 has fixed the content rules; the named backup formats of D8
 ### 8a. EXPERIMENTAL, keyless path (wsh) — confirm-to-proceed, fires once per keyless path
 
 > KEY-LESS PATH (EXPERIMENTAL)
-> This path needs no signature. Whoever knows the
-> preimage of its hash can spend it. If that preimage
-> is ever engraved, the plate is bearer access.
+> This path needs no signature. Whoever knows the preimage of its hash can
+> spend it. If that preimage is ever engraved, the plate is bearer access.
+> It also makes the WHOLE wallet un-importable, keyed paths included. Bitcoin
+> Core, Nunchuk and Liana all refuse it. Only md can rebuild this wallet, and
+> md cannot sign: no other wallet will watch it or spend from it.
+
+The consent RESTATES this whole body when the DECODED shape carries a key-less
+path (fable review r0, L1 I-1 = L3 I-1; measured: Core v25/v31.1 "witnesses
+without signature exist", libnunchuk 2.1.1 refuses, Liana refuses any hashlock
+path). 344 chars, headroom 146.
 
 ### 8b. EXPERIMENTAL, unsorted keys — confirm-to-proceed, fires once per key set where sorted was legal and declined
 
@@ -722,9 +729,14 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 ### 8f. NUMS note (C18), shown when a tr policy falls back to NUMS
 
 > KEY PATH: NONE (NUMS)
-> Spends use the script paths only. Bitcoin Core and
-> Nunchuk import this form. Liana and BIP-388 signers
-> need an unspendable xpub instead (see F-449).
+> Spends use the script paths only. Bitcoin Core imports this form. Nunchuk
+> cannot import a NUMS policy at all: for Nunchuk, use wsh, or a tr policy
+> whose first path is a single key. Liana and BIP-388 signers need an
+> unspendable xpub instead (see F-449), which is a different wallet with
+> different addresses.
+
+(fable review r0, L2 I-1: libnunchuk 2.1.1 refuses 7 of 7 composer NUMS shapes;
+the unspendable-xpub form derives other addresses, §5c. 272 chars, headroom 277.)
 
 ### 8g. Same seed twice in one path (C29): the first body when the shared seed's slots in that path reach the threshold, the second otherwise
 
@@ -835,6 +847,13 @@ replacing the first sentence where more than one kind is present.
 
 > Legacy wrappers hold one plain multisig only.
 > Use wsh or tr.
+
+> A wallet can have one key-less path, not two. Two of them make this script
+> malleable, and no wallet will import it. A time lock does not help. Give one
+> of them a key, or fold them into one path.
+
+(line 6, §4e's second-keyless row; it is reported only after the slot cap and
+the legacy-wrapper rule, whose remedies its own would not satisfy.)
 
 > This wallet already has 32 key slots.
 
@@ -952,6 +971,20 @@ dispatch between the two could not tell them apart.
 > Two keys declare the same origin and not both
 > carry a fingerprint. This template could not be
 > restored. Use cards or records with fingerprints.
+
+### 8w. Mixed lock bases under wsh (fable review r0, L2 I-2) — a notice on the consent
+
+> MIXED LOCK BASES
+> Some paths lock by block height and others by time. Nunchuk will refuse this
+> wallet; Bitcoin Core imports it. Taproot accepts both, because it checks each
+> path on its own.
+
+Fires when a `wsh` policy's paths carry both a height-based lock (`older` in
+blocks, `after` a height) and a time-based one (`older` in 512-second units,
+`after` a Unix time); measured: libnunchuk 2.1.1 "Timelock mixing" on the
+whole script, Core v25/v31.1 import it, the same paths under `tr` import into
+Nunchuk. On the consent rather than the mapping review, which is skipped for a
+flow with no sources.
 
 ## 9. Device work items (fork)
 
