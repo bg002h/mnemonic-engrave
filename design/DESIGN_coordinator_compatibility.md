@@ -3,11 +3,14 @@
 **Status: DRAFT, third fold. Nothing in this document is still "as approved" —
 sections 1-2 were approved and have since been revised twice under review, so
 treat the whole of it as current draft rather than reaching for which
-sentences carried an approval (r3 N-1).** Reviewed twice: the fable architect
-(`design/agent-reports/coordinator-compat-fable-architect.md`, 4C/7I/4M/2N)
-and an opus spec review with an implementability walk
-(`design/agent-reports/coordinator-compat-spec-opus.md`, 4C/10I/5M/2N, which
-answered **"implementable as written: NO"**). Both are folded here.
+sentences carried an approval (r3 N-1).** Reviewed four times, all folded here: the fable architect
+(`…-fable-architect.md`, 4C/7I/4M/2N); an opus spec review with an
+implementability walk (`…-spec-opus.md`, 4C/**11**I/5M/2N — the body has
+eleven Importants, not the ten its own header claimed); a re-review of the
+second fold (`…-spec-r2-verify.md`, 1C/7I/5M/1N new); and r4
+(`…-spec-r4.md`, 0C/2I/2M/1N new), whose judgement was that a fifth design
+round would be the wrong instrument and whose recommended sequence this
+revision follows.
 Brainstorm 2026-09-20. Not a spec yet.
 
 The architect's verdict was *"the family of architecture is right; the
@@ -70,9 +73,13 @@ struct Coordinator { id: CoordinatorId, name: &'static str, rules: &'static [Rul
 struct RuleSet {
     span: Span,                          // both ends a version actually verified
     source_verified_at: &'static [Version],
-    measured_at: MeasuredAt,             // §3.1's date (r3)
+    reads: ReadSet,                      // which Skeleton fields this rule may touch
     refuse: fn(&Skeleton) -> Option<Reason>,
 }
+
+/// Declared, because §1(a2)'s template-only rule is otherwise undecidable: you
+/// cannot ask an opaque `fn` pointer whether it reads key identity (r4).
+bitflags ReadSet { STRUCTURE, KEY_IDENTITY, LOCK_VALUES, DIGESTS }
 
 enum Verdict {
     // `renderer` is on EVERY MEASURED verdict, not on `Imports` alone (r2 C-3).
@@ -101,7 +108,8 @@ without them.
 ```rust
 /// Everything a rule may read. Computed from a DECODED md1 only.
 struct Skeleton {
-    root: ScriptKind,          // wsh | sh | sh(wsh) | tr  (r3: the rule's FIRST arg)
+    root: ScriptKind,          // the fork's SIX: Wpkh|Pkh|Sh|Wsh|Tr|ShWpkh
+    inner_wsh: bool,           // sh(wsh) is NOT a ScriptKind value (r4 NEW-I1)
     template: String,          // canonical @i template, use-site KEPT (r2 I-2)
     shape: PolicyShape,        // the semantic decomposition; carries KeyPath
     fp_partition: Vec<Vec<Vec<u8>>>,  // [path][group][slot]: slots sharing a fingerprint
@@ -116,10 +124,25 @@ struct Version(&'static str);   // opaque, ordered by the registry's declared or
 struct CoordinatorId(&'static str);
 struct RendererId { tool: &'static str, version: &'static str, form: Form }
 
-/// §3.1 requires every verdict to carry a DATE, and no type held one.
+/// §3.1 requires every VERDICT to carry a date. It lives on the evidence row
+/// and is copied onto the verdict — NOT on `RuleSet` beside
+/// `source_verified_at`, which is a different fact about a different act
+/// (when source was read, versus when a binary was run) (r4 NEW-M1).
 /// ISO 8601 date, no clock: the device cannot tell the time (§6b) and never
 /// compares this to "now" — it is printed for a human to judge.
 struct MeasuredAt(&'static str);
+
+/// One measured cell. The date and the renderer live here and ride onto the
+/// verdict the table build produces.
+struct EvidenceRow {
+    key: SkeletonKey,
+    coordinator: CoordinatorId,
+    version: Version,          // the APPLICATION's version (§3)
+    library_rev: &'static str, // provenance; what the binary self-reported
+    renderer: RendererId,
+    measured_at: MeasuredAt,
+    outcome: MeasuredOutcome,  // Imported | Refused(String) | ImportedAltered(Description)
+}
 enum UnprovenReason { NoEvidence, KeysAbsent, OutsideEveryVerifiedSpan }
 
 /// Which rendering produced the descriptor a measurement was taken on.
@@ -227,8 +250,9 @@ semantic reading, and coordinators do not parse semantics, they parse text.
 Two md1 trees with identical `PolicyShape` but different fragments (`or_i` vs
 `or_d`) can differ in importability. The key is md-codec's **existing**
 canonical payload — placeholders renumbered by first appearance
-(`canonicalize.rs:168`) — rendered as a template with lock values replaced by
-`kind#class`, digests by their kind, and origins erased:
+(`crates/md-codec/src/canonicalize.rs:168`) — rendered as a template with lock values and digests alike replaced by
+`kind#class`, and origins erased (one spelling; an earlier draft said "digests
+by their kind" here and `sha256(#1)` thirty-five lines later — r4 NEW-I2):
 
     wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),
              or_i(pkh(@3/<0;1>/*),
@@ -258,6 +282,29 @@ of the design rather than folklore:
 Any of these turning into a real disagreement surfaces as a **D1/D2 build
 failure**, not as a silent wrong verdict. That is the containment.
 
+**THE KEY'S MEMBERSHIP, settled here because a plan may not choose it** (r4).
+`SkeletonKey` — the thing hashed, printed by `md shape-key`, and used to key
+the evidence table — is exactly:
+
+    root + inner_wsh + template + fp_partition + key_partition + key_path_kind
+
+and **nothing else**. Specifically:
+
+- **`key_partition` IS in the key.** It distinguishes wallets Liana refuses on
+  `DuplicateKey`, and a measurement taken on a policy where two slots share an
+  xpub does not apply to one where they do not.
+- **The internal-key kind IS in the key.** An earlier draft defined a
+  serialization without it, which would have made a NUMS policy and an
+  unspendable-xpub policy share a key — the distinction Nunchuk makes and F-449
+  records (r4).
+- **`keys_present` is NOT in the key.** It selects the *verdict* (§1(a2)), it
+  does not make a template-only card a different policy from the same card
+  seated.
+- **A "path" for `tr` is a taptree LEAF, plus the key path as path 0 when the
+  internal key is spendable.** `policy_shape.go`'s `walkTapTree` already
+  defines this decomposition and the port inherits it; without the sentence an
+  implementer could reasonably have partitioned by branch node instead.
+
 **The key's serialized form** is the template, a `U+001F` separator, then the
 partitions rendered as `[path][group][slot]` with slots ascending, groups
 ordered by their lowest slot, and paths in template traversal order. That
@@ -281,9 +328,9 @@ controller at `b6e20412`):
 - **Genuinely already owned:** `render::descriptor_to_template(&Descriptor)`
   (`crates/md-codec/src/render.rs:52`) takes the **decoded** descriptor, emits
   `@i` placeholders and **erases origins**; placeholder renumbering is real
-  (`canonicalize::canonicalize_placeholder_indices`, `canonicalize.rs:168`).
+  (`canonicalize::canonicalize_placeholder_indices`, `crates/md-codec/src/canonicalize.rs:168`).
 - **Not owned:** lock values and digests render **literally**
-  (`render.rs:159`, `:171`, and the two hash renderers) — the key needs a
+  (`crates/md-codec/src/render.rs:159`, `crates/md-codec/src/render.rs:171`, and the two hash renderers) — the key needs a
   rendering MODE that abstracts them. The **per-path** fingerprint partition
   needs a spend-path decomposition that exists **nowhere in Rust**:
   `compose::SpendPath` is the *input* model, `md decompose`'s `Occurrence`
@@ -306,6 +353,15 @@ that depends only on structure (wrapper, lock kind, hash presence) **still
 stands** — it is sound without keys — so a template-only policy can be refused
 but can never be claimed to import. The device's template-only consent is the
 same state on steel.
+
+**(a3) A card whose keys will not expand is `Unproven`, and the build says so**
+(r4). `ExpandWalletPolicyChunks` can fail — a hardened wildcard, a hardened
+multipath alternative, an exotic range — and on that card no partition can be
+computed, so no key exists. The verdict for every coordinator is
+`Unproven { reason: NoEvidence }`, the device prints no coordinator row at all
+rather than an empty one, and `md` prints the expansion error it already has.
+This is distinct from template-only (a2), where the structure is known and only
+identity is absent.
 
 **(b) The fingerprint partition is part of the key.** Liana refuses on a
 key-IDENTITY relation (X11, `DuplicateOriginSamePath`) that a structural key
@@ -475,7 +531,7 @@ not.
    and before the paths. The paths are what the operator consents to; the
    coordinator verdict is what changes whether they *should*. The current
    placement puts it behind a CONTINUE that is live on every page
-   (`multisig_build.go:1898`), which makes it skippable by construction.
+   (`gui/multisig_build.go:1898`), which makes it skippable by construction.
 2. **Worst first, so overflow can only hide good news.** Order: `Refuses`,
    `ImportsAltered`, `Unproven`, `Imports`. If the registry ever exceeds the
    first page, what slides to page two is a positive, whose loss costs a
@@ -511,7 +567,7 @@ is the moment ruling 2's loud stop belongs, and it exits non-zero naming
 **`--md-only`** (r2 I-8) as the flag that proceeds. `md descriptor` **reads**
 an existing card, usually one already engraved: refusing there would deny an
 operator the descriptor for a wallet they already hold, which is a regression
-`validate.rs:449-458` documents in its own words. It prints the same notice on
+`crates/md-codec/src/validate.rs:449-458` documents in its own words. It prints the same notice on
 stderr and exits 0.
 
 The flag is on `md compose` alone, because it is the only command that can
