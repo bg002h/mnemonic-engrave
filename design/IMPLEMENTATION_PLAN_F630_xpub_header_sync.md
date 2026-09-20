@@ -61,8 +61,9 @@ NoKeyedPath:1 TooManyKeylessPaths:3 TooManySlots:1]*. The vector is pinned at
 | descriptor-only, **not** script-covered | 9 | `keyed_tr_depth2`, `…_rightspine`, `keyed_tr_pathological`, `keyed_tr_with_leaf`, `keyed_wsh_multi_2of3`, `keyed_wsh_or_b`, `keyed_wsh_or_d_degrading`, `keyed_wsh_sortedmulti_2of3`, `keyed_wsh_thresh` |
 | semantic — **F-529** | 3 | `keyed_tr_multi_a`, `keyed_tr_sortedmulti_a`, `keyed_wsh_timelock_hashlock` |
 
-88 chain-descriptor entries move across the 41. Zero address lines and zero id
-lines move in those 41 — the three records whose `keys`, `fingerprints`,
+82 chain-descriptor entries move across the 41, and 88 across all 44 drifted
+records (the F-529 three carry stale descriptors too). Zero address lines and
+zero id lines move in those 41 — the three records whose `keys`, `fingerprints`,
 `wallet_policy_id`, `md1_encoding_id`, `wallet_descriptor_template_id` and
 addresses all move are exactly F-529's three, and none of them is a
 `keyed_compose_*`.
@@ -87,93 +88,188 @@ path); `parent fingerprint == 0`.
 0.44.0 defect survived because "a uniformly wrong corpus agrees with itself":
 `keys[]` held the correct depth-4 key and `descriptor` held the depth-0
 rendering. So the gate also asserts that each descriptor xpub's
-(chain code ‖ compressed pubkey) equals some `keys[]` entry's, **and** that it
-equals some slot of the Go port's own `ExpandWalletPolicyChunks` expansion of
-the same card, with every Go slot carrying an xpub appearing at least once.
-That last clause is what makes it cross-language rather than a JSON
-self-consistency check.
+(chain code ‖ compressed pubkey) equals some `keys[]` entry's (D2a), **and**
+that it equals some slot of the Go port's own `ExpandWalletPolicyChunks`
+expansion of the same card, with every Go slot carrying an xpub appearing at
+least once (D2b). That last clause is what makes it cross-language rather than
+a JSON self-consistency check.
 
-Note `keys[]` xpubs carry the **real** parent fingerprint (measured: `1cf29716`,
+`keys[]` xpubs carry the **real** parent fingerprint (measured: `1cf29716`,
 `3edf3f57`, `64f9d328` for `keyed_compose_preset_plain_multisig`) while the
 descriptor's carry zero — so the comparison is over the 65 bytes, never the
 base58 string.
 
-**D3 — the elided-origin divergence is pinned, not skipped.** For
-`keyed_wpkh` and `keyed_tr_keyonly` the Rust record emits a bare-fingerprint
-origin (`[73c5da0a]`, depth 0) while the Go port canonical-fills it from
-`canonicalOrigin(tree)` and would render `[73c5da0a/84h/0h/0h]` at depth 3 —
-the deliberate R0-I1 divergence `md/expand.go:76-81` documents. Both satisfy
-D1 independently. The gate therefore does **not** assert bracket-path == Go
-origin path globally; it carries an explicit allowlist naming those two
-vectors with their measured Go paths, and fails if an allowlisted vector stops
-diverging or a non-allowlisted one starts. A pinned gap with an exact shape,
-per the repo convention; not a skip.
+**D2c — bind the origin bracket's FINGERPRINT (R0 I-7).** D1 relates the
+bracket's path to the header and D2 binds key material; nothing bound
+`[XXXXXXXX/…]`, and a mutation setting every bracket fingerprint to `deadbeef`
+passed the whole gate. In the Rust function 0.44.0 rewrote, the fingerprint is
+assembled on the same line as the path (`to_miniscript.rs`,
+`e.fingerprint.map(|fp| (Fingerprint::from(fp), path))`), so a regression there
+emits a uniformly wrong fingerprint that agrees with itself — the exact failure
+mode D2 exists for. Addresses do not depend on it and `wallet_policy_id` is
+computed from the card, so no existing test can see it. The gate asserts the
+bracket fingerprint equals `ExpandedKey.Fingerprint` (`md/expand.go:56-64`);
+measured, they agree **284/284** on the re-vendored corpus today.
 
-**D4 — widen the vendor script to the whole keyed tier.** Leaving 9 records
-stale ships a red gate, which is worse than no gate. `vendor-compose-vectors.sh`
-moves from `^(keyed_)?compose_` to the whole `keyed_*` ∪ `compose_*` set, and
-its provenance pin grows to cover them.
+**D3 — the elided-origin divergence is pinned on BOTH sides (R0 I-4, N-1).**
+For `keyed_wpkh` and `keyed_tr_keyonly` the Rust record emits a bare-fingerprint
+origin (`[73c5da0a]`, depth 0) while the Go port canonical-fills from
+`canonicalOrigin(tree)` and renders `[73c5da0a/84h/0h/0h]` at depth 3 — the
+deliberate R0-I1 divergence `md/expand.go:76-81` documents. Both satisfy D1
+independently.
 
-**D5 — F-529's three keep a fork-side witness before they are re-vendored.**
-`keyed_tr_multi_a` and `keyed_tr_sortedmulti_a` are already pinned in
-`md/testdata/forkbuilt/`. `keyed_wsh_timelock_hashlock` is **not**, and it is
-the only fork witness for `md.DuplicateRefusedByCore` — depended on by
-`md/duplicate_keys_test.go:84`, `gui/composer_flow_test.go:599,684` and
-`gui/policy_address_test.go:149`. Re-vendoring it without a pin first would
-swap a 3-key duplicate policy for a 5-key reuse-free one and leave those
-assertions green against a shape that no longer carries the defect. It gets a
-pin of its own first, with its own shape test (the existing
-`TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot* internal-key
-reuse and cannot cover a wsh duplicate).
+So: the gate **does** assert bracket-path == Go origin path for every vector,
+and carries a two-sided allowlist for those two — pinning the Go path
+(`m/84h/0h/0h`, `m/86h/0h/0h`) **and the record's expected bracket** (bare
+`[73c5da0a]`, zero components). It fails if an allowlisted vector stops
+diverging, if a non-allowlisted one starts, **or if an allowlisted record's
+bracket changes at all**. The first version pinned only the Go half, and a
+record re-pointed to account `9h` — consistently, header and bracket together —
+passed every clause: a wrong-account descriptor on the two plainest single-key
+vectors in the corpus. Pinning the record half closes that.
+
+Hardening is spelled differently on the two sides — the fork renders `48h`,
+the record carries `48'` — so every path comparison normalises before
+comparing. Same class as F-627.
+
+**D4 — widen the vendor script to the whole keyed tier, minus the refusal
+vectors.** Leaving 9 records stale ships a red gate, which is worse than no
+gate. `vendor-compose-vectors.sh:16` moves from `^(keyed_)?compose_` to
+`^(keyed_|compose_)` **excluding `compose_refusal_`**. That exclusion is not
+cosmetic: the script as it stands already selects 177 files against a pin of
+176, because `compose_refusal_keyless_cap.json` is deliberately carried by
+`compose_refusal_vectors.provenance.json` instead
+(`isComposeVectorFile`, `md/compose_vectors_pin_test.go:79-84`). Re-running the
+script today would pull it into the compose pin and trip
+`compose_vectors_pin_test.go:134`. Pre-existing rot, detonated by T3.
+
+**D5 — a fork-side pin carries the RECORD as well as the CARD (R0 C-1).** This
+is the correction that matters most. `TestEveryKeyedVectorReachesAnAddress`
+takes its **record** from a glob of the vendored corpus
+(`gui/policy_address_test.go:125`) and its **card** from the pin-preferring
+`loadVectorChunks` (`:174`), then compares addresses derived from the card
+against the record's expected addresses (`assertMatchesRust`,
+`gui/policy_address_test.go:77`). Those are the same policy today. Pin the card
+and re-vendor the record and they are **different policies**, and the test
+compares one against the other — measured red on all three F-529 vectors, e.g.
+
+    keyed_wsh_timelock_hashlock chain 0 index 0 via complex:
+      got  bc1q6h9y4ngdfacaplw0qk67rugxs3vanv0jayk3n3xnhed7uke76zksfqt7py
+      want bc1qa9wapjm45uthw7r806zuz9mev2a5cwqmrlwnyuj4pjs0c78d75rqp6j29e (rust)
+
+Of the three ways out, two destroy evidence: moving the vectors into
+`stillUnsupported` retires the cross-language address check for every shape the
+refusal covers (the test's own comment says so at
+`gui/policy_address_test.go:143-147`), and dropping the pin preference deletes
+the F-533 and F-514 witnesses outright. So the pin gains a record: a
+`loadVectorRecord(name)` helper mirroring `loadVectorChunks`, preferring
+`md/testdata/forkbuilt/<name>.conformance.json`, so record and card are always
+one policy.
+
+**D6 — the pins' anti-drift check pins a DIVERGENCE, not a deletion (R0 I-1).**
+`TestPinnedKeyReuseVectorsStillMatchTheVendoredCorpus` skips only when the
+vendored file is **gone** (`md/f533_pinned_vectors_test.go:82-86`). F-529's
+premise was that a re-vendor deletes these vectors; measured, `b2c5d693` still
+ships all three, **changed** — so the skip never fires and the test fails
+instead, on the two existing pins, with no T2 change at all. Worse, its failure
+message prescribes the destructive remedy ("re-copy the vendored phrase"),
+which would replace the reuse-bearing witnesses with reuse-free cards.
+
+The check becomes: the pin matches the vendored file, **or** the vendored
+file's `wallet_descriptor_template_id` equals a recorded "the primary moved
+here" value — `8c1c0566` / `09903620` / `71ff3b74`, measured at `b2c5d693`. A
+pinned gap with an exact shape; any *third* policy under these names fails.
 
 ## Tasks
 
-Each task ends green before the next begins; the gate command is stated per task.
+**No task pushes a red tree; T1 deliberately commits one.** T1's whole purpose
+is the RED demonstration, so `go test ./md/` is red between T1 and T4 and the
+only push is T5. (The earlier draft asserted "each task ends green before the
+next begins", which T1 contradicts by construction.)
 
 **T1 — the gate, RED first.** Extend `keyedConformanceRecord` in
 `md/conformance_keyed_test.go` with `Keys`, and add
 `TestKeyedConformanceDescriptorHeadersAgreeWithTheirOrigins` implementing D1,
-D2 and D3. Run it against the **stale** corpus and record the output: it must
-fail on the 41 drifted records and pass on the 2 identical ones. That RED is
-the evidence the gate has teeth, and it is captured in the commit message.
+D2a, D2b, D2c and D3. Use the **pin-preferring** loader (`vectorChunksFor`,
+`md/duplicate_keys_test.go:16`) for the card and, once D5 lands, the
+pin-preferring record too — the plain `loadPhraseChunks` would silently pair a
+pinned card with a re-vendored record, which is C-1 in a second place. Run
+against the **stale** corpus and record the output in the commit message.
+
+*Acceptance: 44 of 46 fail, 2 pass* (`keyed_tr_keyonly`, `keyed_wpkh` — bare
+fingerprint origins, depth 0 already right). Not 41: the F-529 three carry
+stale descriptors too, and an implementer who tunes the gate until exactly 41
+fail would exempt precisely the three vectors this cycle is most exposed on.
 Gate: `go test ./md/ -run TestKeyedConformance -v`.
 
-**T2 — the `keyed_wsh_timelock_hashlock` pin (D5).** Copy the vendored phrase
-to `md/testdata/forkbuilt/keyed_wsh_timelock_hashlock.md1.txt`; add a
-`pinnedDuplicateVectors` list and a shape test asserting the pin carries a slot
-appearing at two use sites under one wsh miniscript (the shape
-`DuplicateRefusedByCore` is about), plus the anti-drift check against the
-vendored file while it is still present. Point the three dependent test sites
-at the pin-preferring loader. Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned' -v`.
+**T2 — fork-side pins, card AND record (D5, D6).** Copy the pre-re-vendor
+`keyed_wsh_timelock_hashlock` phrase to
+`md/testdata/forkbuilt/keyed_wsh_timelock_hashlock.md1.txt`, and copy the
+current `.conformance.json` of **all three** F-529 vectors to
+`md/testdata/forkbuilt/`. Add `loadVectorRecord` and point
+`TestEveryKeyedVectorReachesAnAddress` at it. Add a `pinnedDuplicateVectors`
+list and a shape test asserting the wsh pin carries a slot at two use sites
+under one miniscript — the existing
+`TestPinnedKeyReuseVectorsAreTheShapeTheyClaim` asserts a *taproot*
+internal-key reuse and cannot cover it. Rework the anti-drift check per D6.
+Gate: `go test ./md/ ./gui/ -run 'Duplicate|Pinned|ReachesAnAddress' -v`.
 
-**T3 — widen the vendor script (D4).** `scripts/vendor-compose-vectors.sh`
-selects the whole keyed tier; the provenance pin records the new file set and
-`b2c5d693`. Assert the union is exhaustive — no file in `testdata/vectors`
-matching the widened pattern may be outside the pin, and the existing
-directory-scan test already enforces the converse for refusal vectors.
-Gate: run the script, then `go test ./md/ -run 'Provenance|Pin' -v`.
+**T3 — widen the script and re-vendor (one action, D4).** `vendor-compose-vectors.sh`
+selects `^(keyed_|compose_)` minus `compose_refusal_`; update
+`md/compose_vectors_pin_test.go:103` (36 hardcoded names in
+`composeVectorNames`) and `:110-111` (the literal `176`) to the widened set.
+**T3 and the re-vendor are the same action** — the script copies and *then*
+hashes the destination (`scripts/vendor-compose-vectors.sh:18,20-22`), so there
+is no tree state in which the script is widened, the pin regenerated, and the
+corpus still stale. Capture the pre-state first (`git stash` or a copy) so the
+diff expectation below can be checked.
 
-**T4 — re-vendor.** Run the widened script against dm `b2c5d693`. Expect
-exactly 41 conformance records to change descriptor lines, 3 to change
-wholesale, 0 address lines and 0 id lines outside those 3. Verify that
-expectation with a diff count before committing. T1's gate must now be GREEN.
+*Expected, and verified with a count before committing:* exactly 41 records
+change descriptor lines only (82 chain entries), 3 change wholesale, 0 address
+lines and 0 id lines outside those 3, 0 files added or removed (247 both
+sides). T1's gate must now be GREEN at 46 of 46.
 Gate: the full `./md/` and `./gui/` suites.
 
-**T5 — whole-surface gate.** `go vet` (ArtifactDir baseline only), `gofmt -l .`
-against the five-file baseline, `./md/ ./sysw/ ./mk/`, the whole `gui` via
-`scripts/gui-shard-test.sh ./gui/ 24`, and the firmware size measurement.
-Then push via `scripts/push-via-staging.sh` with main frozen for the window.
+**T4 — whole-surface gate and push.** `go vet` (ArtifactDir baseline only),
+`gofmt -l .` against the **five-file** baseline, `./md/ ./sysw/ ./mk/`, the
+whole `gui` via `scripts/gui-shard-test.sh ./gui/ 24`, firmware size. Push via
+`scripts/push-via-staging.sh` with main frozen for the window.
 
 ## What this plan does NOT cover
 
-- No normative Go behavior changes. T1–T4 touch tests, fixtures, vendored data
-  and one shell script. If T4 turns any `./gui/` or `./md/` test red for a
+- No normative Go behavior changes. T1–T3 touch tests, fixtures, vendored data
+  and one shell script. If T3 turns any `./gui/` or `./md/` test red for a
   reason other than a stale expected-value, that is a finding, not a fixup —
   it means the fork and the primary disagree somewhere this plan assumed they
   agreed, and it stops the plan.
-- F-529 is **narrowed, not closed**, by T2 + T4: its three vectors get
-  fork-side witnesses and the corpus stops diverging silently, but the
-  question of whether the device should carry reuse-free or reuse-bearing
-  fixtures for F-514's warning is a separate ruling.
-- The 17 dm-only `.template` files and the 36 fork-only fixtures are
-  out of scope; neither tier feeds the conformance gate.
+- **Four parts of the descriptor string stay outside the gate**, as a
+  consequence of D1's header scoping: the BIP-380 checksum, a swap of
+  `chains["0"]` with `chains["1"]`, the derivation suffix `/0/*` → `/7/*`, and
+  a swap of two `multi()` key positions. The last two are caught as *drift* by
+  `TestEveryKeyedVectorReachesAnAddress`, which compares Go-derived addresses
+  per chain against the record's; the checksum and the chain-index suffix are
+  covered by nothing. Recorded, not scheduled.
+- F-529 is **narrowed, not closed**, by T2 + T3: its three vectors get
+  fork-side card+record witnesses and the corpus stops diverging silently, but
+  whether the device should carry reuse-free or reuse-bearing fixtures for
+  F-514's warning is a separate ruling.
+- The 17 dm-only `.template` files and the 36 fork-only fixtures are out of
+  scope; neither tier feeds the conformance gate.
+
+## Sites depending on `keyed_wsh_timelock_hashlock`
+
+Complete, measured (the earlier draft named three and missed the fourth):
+
+| site | after a re-vendor with no pin |
+| --- | --- |
+| `md/duplicate_keys_test.go:84` | FAILS loudly (`kind=0, want 1`) |
+| `gui/composer_flow_test.go:599` | FAILS loudly (`the predicate says 0 (@0), want 1`) |
+| `gui/composer_flow_test.go:684` | FAILS loudly (`no longer carries a miniscript duplicate`) |
+| `md/compose_shape_test.go:111` | stays green — same branch shape either way |
+
+D5's rationale in the earlier draft was that these would *go green against a
+shape no longer carrying the defect*. Measured, they fail loudly. T2 is still
+required — the witness must survive — but it is justified by "the evidence
+would be deleted", not by "the assertions would go silent". The distinction
+matters: the false version frames T2 as sufficient, and T2 alone is exactly
+what produces C-1.
