@@ -312,9 +312,15 @@ and **nothing else**. Specifically:
   does not make a template-only card a different policy from the same card
   seated.
 - **A "path" for `tr` is a taptree LEAF, plus the key path as path 0 when the
-  internal key is spendable.** `policy_shape.go`'s `walkTapTree` already
-  defines this decomposition and the port inherits it; without the sentence an
-  implementer could reasonably have partitioned by branch node instead.
+  internal key is not NUMS.** **CORRECTION (plan 1a, Task 4):** an earlier
+  draft said `walkTapTree` "already defines this decomposition and the port
+  inherits it". That is factually wrong — the Go appends one branch per **leaf
+  only**, and the key-path branch does not exist there. It is an ADDITION the
+  Rust port makes deliberately, implemented at `policy_shape.rs`'s `Tag::Tr`
+  arm, gated on `!is_nums`, pushed before `walk_tap_tree` so it lands at index
+  0. It matters because the next plan's rules read `shape.branches`, and a
+  spendable internal key IS an unlocked spend path: a rule counting unlocked
+  paths would undercount every such taproot.
 
 **The key's serialized form** is the template, a `U+001F` separator, then the
 partitions rendered as `[path][group][slot]` with slots ascending, groups
