@@ -19207,6 +19207,43 @@ property of the design — nothing would have told us otherwise. The remedy is
 <version>" in the copy, and a `KNOWN_RELEASES` gate that fails when a
 coordinator's newest release outruns every verified version.
 
+### F-634 — md-codec's decoder admits `wsh(tr(...))`, a descriptor Bitcoin cannot spend
+
+**Status:** OPEN — **Owning phase:** the next md-codec validation pass (NOT coordinator-compat plan 1a, which only surfaced it). **Tier:** `correctness`. **Found:** operator challenge during the plan-1a Task 1 review, 2026-09-20; measured by the task reviewer.
+
+The operator asked whether `wsh(tr(...))` "is a real thing that can ever yield
+a valid bitcoin transaction". It is not: `tr()` is a top-level output
+descriptor and cannot appear inside a witness script.
+
+**md-codec encodes and decodes it anyway.** Round-tripped through the real
+codec during the review:
+
+    wsh(tr(@0))                      -> encode OK, decode OK
+    wsh(taptree(pk_k@0, pk_k@1))     -> encode OK, decode OK
+
+**Why.** `crates/md-codec/src/decode.rs:97-106` checks only the **root** tag,
+and `validate_tap_script_tree` — which forbids `Tag::Tr` as a leaf — runs only
+when the root is `Tr` (`decode.rs:129-133`). A `Tr` node nested under `Wsh` is
+reached by neither check.
+
+**The fork does not have this gap in the same way.** `md/policy_shape_test.go:176-177`
+builds exactly this tree as a hand-made `node` and says "tagTr nested inside a
+script is not constructible by the decoder" — true of the Go decoder, and
+measured false of the Rust one. Under the Rust-primary rule the divergence is
+the *primary's* to fix, and the Go is the one that happens to be right.
+
+**Consequence, and why it is Minor rather than blocking.** It admits a payload
+no coordinator will import and no one can spend — a card an operator could
+engrave and never use. It is not a wrong-funds path: nothing derives an address
+from it, and `md address` refuses the shape. But `PolicyShape.complete=false`
+IS reachable from a real decode in Rust because of it, which is the opposite of
+the Go's documented assumption, so anything reasoning from "the decoder cannot
+produce that" needs re-checking here.
+
+**Remedy:** run the tap-script-tree leaf check on every `Tr` node, not only a
+root one — or refuse `Tag::Tr` below the root outright, which is what BIP-386
+implies.
+
 ### F-632 — an `xprv` forged with a rendered xpub's header passes the whole F-630 descriptor gate
 
 **Status:** OPEN — **Owning phase:** none (opportunistic; secret-handling, non-gating). **Tier:** `secret-handling`. **Found:** F-630 plan r5 closing review (2026-09-20), Minor.
