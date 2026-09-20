@@ -67,6 +67,7 @@ struct Coordinator { id: CoordinatorId, name: &'static str, rules: &'static [Rul
 struct RuleSet {
     span: Span,                          // both ends a version actually verified
     source_verified_at: &'static [Version],
+    measured_at: MeasuredAt,             // §3.1's date (r3)
     refuse: fn(&Skeleton) -> Option<Reason>,
 }
 
@@ -97,18 +98,25 @@ without them.
 ```rust
 /// Everything a rule may read. Computed from a DECODED md1 only.
 struct Skeleton {
+    root: ScriptKind,          // wsh | sh | sh(wsh) | tr  (r3: the rule's FIRST arg)
     template: String,          // canonical @i template, use-site KEPT (r2 I-2)
-    shape: PolicyShape,        // the semantic decomposition the rules read
-    fp_partition: Vec<Vec<u8>>,       // per path, slots sharing a fingerprint
-    key_partition: Vec<Vec<u8>>,      // whole-policy, slots sharing (xpub, derivation)
-    key_path: KeyPathKind,     // Nums | UnspendableXpub | Spendable  (r2 I-9)
+    shape: PolicyShape,        // the semantic decomposition; carries KeyPath
+    fp_partition: Vec<Vec<Vec<u8>>>,  // [path][group][slot]: slots sharing a fingerprint
+    key_partition: Vec<Vec<u8>>,      // whole-policy [group][slot]: same (xpub, origin_path)
     keys_present: bool,        // false for a template-only payload (r2 C-2)
+    // NO key_path field: it would duplicate shape.KeyPath, and a ported rule
+    // reading the duplicate is how I-9 re-opens. One field, extended below.
 }
 
 struct Span { since: Version, until: Version }   // both ends VERIFIED, closed
 struct Version(&'static str);   // opaque, ordered by the registry's declared order
 struct CoordinatorId(&'static str);
 struct RendererId { tool: &'static str, version: &'static str, form: Form }
+
+/// §3.1 requires every verdict to carry a DATE, and no type held one.
+/// ISO 8601 date, no clock: the device cannot tell the time (§6b) and never
+/// compares this to "now" — it is printed for a human to judge.
+struct MeasuredAt(&'static str);
 enum UnprovenReason { NoEvidence, KeysAbsent, OutsideEveryVerifiedSpan }
 
 /// Which rendering produced the descriptor a measurement was taken on.
@@ -148,9 +156,33 @@ the key would make the key disagree with the artifact it is looked up against.
 The `--chain 0`/`--chain 1` *form* is correctly a renderer property, not a key
 property — one decoded card renders both.
 
-**`key_path` is three-way, not two** (r2 I-9): a NUMS point and an
-unspendable-xpub internal key are different wallets to Nunchuk, and the
-rendered template cannot distinguish them. F-449 already records this.
+**`root` is in the struct because the rule template's first argument is
+`root`** (r3). The design quotes
+`composerLianaOutsideModelClass(root md.ScriptKind, shape md.PolicyShape)` two
+paragraphs above and then defined a `Skeleton` without it — Liana class 1,
+"legacy wrapper", is uncomputable without it. The fork's own comment says why
+it is separate: *"PolicyShape does not carry it: policyShape walks tagWsh and
+tagSh identically."*
+
+**THE PORT IS A PORT PLUS TWO NAMED EXTENSIONS** (r3 C-1 remainder). A verbatim
+port of `policy_shape.go` yields a `Skeleton` whose central field cannot be
+filled, because:
+
+1. **`Branch` keeps a COUNT, not the slots.** `branchOf`
+   (`md/policy_shape.go:239-245`) builds `keys := map[uint8]struct{}{}` — the
+   placeholder indices the branch references — then writes `br.Keys =
+   len(keys)` and **discards the map**. `fp_partition` needs *which* slots,
+   per path. So the ported `Branch` must retain the index set.
+2. **`KeyPathKind` is three-valued and none of them is an unspendable xpub.**
+   The fork has `KeyPathNone`, `KeyPathNUMS`, `KeyPathSpendable`
+   (`md/policy_shape.go:33-39`); an unspendable-xpub internal key falls into
+   `Spendable`, which is the wallet-identity distinction Nunchuk makes and
+   F-449 already records. The ported enum gains a fourth value.
+
+Both extensions land in **Rust**, and this is the rare direction: `policy_shape.go`
+is fork-native code with no Rust counterpart, so porting it *makes* Rust
+primary for it. The fork's Go converges afterwards if it wants the new fields;
+nothing in the fork needs them today.
 
 **`kind#class` is defined** (r2 I-3): *kind* is the `LockKind` discriminant
 (`after-height`, `after-time`, `older-blocks`, `older-units`); *class* is a
@@ -160,6 +192,14 @@ traversal order. `older(26280)` then `older(1000)` then `older(26280)` renders
 `older(older-blocks#1)`, `older(older-blocks#2)`, `older(older-blocks#1)`.
 Digests render as `sha256(#)` — kind only, no class, because no coordinator
 measured distinguishes two digests.
+
+**`key_partition` groups by `(xpub bytes, origin_path)`** — "derivation" in the
+architect's clause means the origin path, the only derivation a decoded md1
+carries — and **an absent xpub is its own singleton**, by the same argument as
+the fingerprint rule below. It exists for Liana's `DuplicateKey`, which is a
+whole-policy relation, where `fp_partition` is per-path and exists for
+`DuplicateOriginSamePath`. Two relations, two partitions; collapsing them
+would make one of the two refusals uncomputable.
 
 **An absent fingerprint is its own singleton partition** (r2 I-4). md-codec has
 already ruled on this question for itself: `[0,0,0,0]` is the ABSENT sentinel,
@@ -184,8 +224,21 @@ canonical payload — placeholders renumbered by first appearance
 (`encode.rs:59-62`) — rendered as a template with lock values replaced by
 `kind#class`, digests by their kind, and origins erased:
 
-    wsh(or_d(multi(2,@0,@1,@2),or_i(pkh(@3),and_v(v:pkh(@4),older(blocks#1)))))
-    | fp-partition per path: [{0},{1},{2}] [{3}] [{4}]
+    wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),
+             or_i(pkh(@3/<0;1>/*),
+                  and_v(v:pkh(@4/<0;1>/*),older(older-blocks#1)))))
+    | fp-partition per path: [[{0}],[{1}],[{2}]] [[{3}]] [[{4}]]
+
+The use-site `/<0;1>/*` is KEPT and the lock reads `older-blocks#1`, not
+`blocks#1` — an earlier draft of this example spelled both the other way,
+which left the document carrying two incompatible key spellings (r3). The
+partition nests three deep, `[path][group][slot]`, matching the type.
+
+**The key's serialized form** is the template, a `U+001F` separator, then the
+partitions rendered as `[path][group][slot]` with slots ascending, groups
+ordered by their lowest slot, and paths in template traversal order. That
+serialization is the thing hashed, the thing `md shape-key` prints and the
+thing the evidence table is keyed by — one spelling, defined once.
 
 Too-coarse becomes structurally impossible, every measured shape stays
 matchable, and a foreign md1 with an unfamiliar fragment falls to `Unproven` —
@@ -332,11 +385,12 @@ Six mechanisms:
 2. **No open-ended span, for either verdict kind.** "As of" is the only tense a
    positive may use.
 3. **Committed, runnable harnesses**, each pinning the coordinator source
-   revision it builds. Today every harness lives in `/scratch/.tmp`, outside
-   all three repos — only the *consumer* (`scripts/importability-matrix.py`) is
-   committed, never the producers. Re-measurement without a committed harness
-   is a research project every time, and under ruling 6 that means the registry
-   can grow rules but never evidence: refusals forever, positives never.
+   revision it builds. **Liana's is now committed** (`harnesses/liana/`,
+   `606ab180`) and was used to re-measure at v15.0; Nunchuk's and Core's still
+   live in `/scratch/.tmp`, outside all three repos. Re-measurement without a
+   committed harness is a research project every time, and under ruling 6 that
+   means the registry can grow rules but never evidence for those two:
+   refusals forever, positives never.
 4. **A hand-maintained `KNOWN_RELEASES` file** — each coordinator's newest
    known release, its date, the URL it was read from — and a build-time check
    that fails, or degrades the row to `Unproven` with a stated reason, when the
@@ -488,7 +542,10 @@ already measured in a plan's own citations.
   `wsh`/`sh` shapes differ — so the measurement is one representative
   descriptor per candidate release, not 15 shapes across 6. Until then the
   honest verdict for such a policy is `Unproven`.
-- **Liana must be re-measured at v15.0** (F-633).
+- ~~Liana must be re-measured at v15.0~~ — **DONE** (`606ab180`): 289/289
+  verdicts identical to v8.0, 73/73 accepted policies identical in inferred
+  policy and addresses, 10 refusals changed message only. F-633 stays open on
+  the unqualified present tense, which §3 fixes, not on a wrong verdict.
 - **`K`, the collapse threshold**, is a measurement against the real frame, not
   a number to pick here.
 
