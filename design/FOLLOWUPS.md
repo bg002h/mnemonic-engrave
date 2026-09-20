@@ -19036,7 +19036,19 @@ document that the checksum depends on the spelling.
 
 ### F-628 — Composer lock echo grammar: "1 blocks", and an unreachable 0-days echo
 
-**Status:** OPEN — **Owning phase:** next composer copy pass. **Tier:** `nit`. **Found:** lens 1 N-1.
+**Status:** CLOSED 2026-09-20 in fork `7b6f2fb`. **Tier:** `nit`. **Found:** lens 1 N-1.
+
+The grammar half is fixed: counts of one take the singular, reusing the
+package's existing `plural` helper (`gui/transaction.go:264`) rather than
+growing a second one. `TestComposerLockEchoesAreGrammatical` pins it; dropping
+either call reds the matching row.
+
+The 0-days half is PINNED, not written. A sub-day `older` claims zero days
+while enforcing 25.6 minutes, and it is unreachable — the pad takes days,
+refuses 0, and one day is already 169 units. Inventing copy for a state nobody
+can enter would add a body the spec does not carry and no operator will read;
+`TestSubDayLockIsUnreachableFromThePad` asserts the unreachability instead and
+fails if a future pad admits one.
 
 `"1 blocks (about 0.0 days)"`; a 3-unit `older` echoes
 `"0 days = 3 units of 512 s (0.0 days)"`, unreachable from the pad (minimum one
@@ -19134,7 +19146,17 @@ public ones.
 
 ### F-631 — The Liana-model notice's class order between `after` and `older`-in-units is pinned by no test
 
-**Status:** OPEN — **Owning phase:** next composer test pass. **Tier:** `test-infra`. **Found:** composer fable review r0, lens 5 fold verification (2026-09-20), Minor.
+**Status:** CLOSED 2026-09-20 in fork `7b6f2fb` — row 15 of `TestFableOutsideLianaModelNamesTheFirstClass`. **Tier:** `test-infra`. **Found:** composer fable review r0, lens 5 fold verification (2026-09-20), Minor.
+
+Added the compound fixture: `wsh` with an unlocked single key, a path at
+`after(1000000)`, and a path at `older` 100 **units** — the one shape where
+classes 5 and 6 are both true. It asserts "an absolute lock" wins.
+
+Mutation-verified: swapping the two cases in
+`composerLianaOutsideModelClass` fails **this row alone**, which is the proof
+the gap was real — the other fourteen rows each make exactly one lock-shaped
+class fire, so they pinned each class's text and none of them pinned the
+order.
 
 §8x checks nine classes in Liana 8.0's order; the verification re-ran the
 mutations for classes 1, 3, 7 and 9 and every shape agreed with the measured

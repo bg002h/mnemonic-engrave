@@ -715,6 +715,19 @@ here now and all of §8's bodies are diffable again.
 
 > 1000 blocks (about 6.9 days)
 
+**Singular forms (F-628, lens 1 N-1).** Counts of exactly one take the
+singular: `1 block (about 0.0 days)`, `1 day = 1 unit of 512 s (0.0 days)`. The
+blockquotes above are the plural examples and are unchanged. A one-block
+relative lock IS reachable — the pad admits 1..65535 — so an operator can meet
+this string.
+
+A sub-day `older` (e.g. 3 units) would echo `0 days = 3 units of 512 s`, which
+claims zero days while enforcing 25.6 minutes. It is **unreachable**: the pad
+takes days, refuses 0, and one day is already 169 units. No copy is specified
+for it, and `TestSubDayLockIsUnreachableFromThePad` fails if a future pad ever
+admits one — so the body gets written then, by someone who knows what the new
+pad offers, rather than invented now for a state nobody can enter.
+
 > Block 905000
 
 > 2027-03-01 00:00 UTC
