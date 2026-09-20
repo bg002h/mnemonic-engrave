@@ -423,7 +423,7 @@ use sha2::Digest as _;
 /// (Stage 2). Changing a row means changing this in both repos — the point.
 /// Measured 2026-09-02 by running the regenerate test over CASES in the plan's
 /// build-gate scratch copy; the regenerate test prints it again on every run.
-const FIXTURE_SHA256: &str = "14a1c56328d68527156694c77bfb04738d7457ec3cb17919be18608b30c04e73";
+const FIXTURE_SHA256: &str = "c5f721455b75513b4217c200cf49b4b0eed471fbfcb704121c3cebbd09066770";
 const FIXTURE_PATH: &str = "testdata/record_class_vectors.json";
 
 fn fixture_path() -> std::path::PathBuf {
@@ -494,7 +494,8 @@ fn the_fixture_covers_every_class_and_every_8n_line_at_least_twice() {
         "key-journey-cosigner-0",
         "key-h-spelling",
         "key-depth-3-valid",
-        "key-testnet-tpub-valid",
+        "key-testnet-tpub-refused-s1",
+        "key-testnet-tpub-refused",
         "key-bare-xpub",
         "key-origin-no-path",
         "key-origin-shorter-than-depth",

@@ -222,6 +222,18 @@ pub enum ComposerRecord {
 pub enum ComposerRecordError {
     /// `key:` failed; the detail is for logs and tests, the line is fixed.
     Key(&'static str),
+    /// A well-formed key record whose extended key is not a MAINNET key (a
+    /// `tpub`/`upub`/`vpub` version). Its own variant and its own §8n line,
+    /// deliberately: the `Key` line describes a MALFORMED record ("a bare
+    /// xpub is not a key record"), and a testnet key is not malformed -- it
+    /// is unsupported, because complex-policy derivation is mainnet-only by
+    /// construction (SPEC §4f). Refusing it with the malformation body would
+    /// be a refusal with the wrong reason, the class the fable review r0
+    /// filed twice (L4 M-4, M-5). Three lenses found the silent admission
+    /// (L1 M-2, L3 M-2, L4 M-6): the key seated, the consent printed mainnet
+    /// addresses for material derived under coin type 1', and the re-minted
+    /// card carried the tpub while its label said mainnet.
+    KeyNetwork,
     /// `hash:` failed its rule (§6). `Some(kind)` means the token was
     /// understood and the body was not that kind's width or not lowercase hex;
     /// `None` means the token itself was unknown or wrongly cased.
@@ -258,6 +270,9 @@ impl ComposerRecordError {
                 "record {index}: hash: unknown hash kind; expected `hash:<hex>` (sha256) or \
                  `hash:<kind>:<hex>` with kind hash256, ripemd160 or hash160, lowercase"
             ),
+            ComposerRecordError::KeyNetwork => format!(
+                "record {index}: key: a testnet key (tpub) is unsupported; complex-policy derivation is mainnet-only (SPEC §4f)"
+            ),
             ComposerRecordError::Now => format!("record {index}: now: must be <seconds>[,<height>] in range"),
             ComposerRecordError::Phrase => format!(
                 "record {index}: phrase: must be <method>,<phrase> as lowercase hex, with method hardened or sha256"
@@ -269,6 +284,9 @@ impl ComposerRecordError {
     pub fn detail(&self) -> &'static str {
         match self {
             ComposerRecordError::Key(d) => d,
+            ComposerRecordError::KeyNetwork => {
+                "a well-formed key record whose xpub version is not mainnet"
+            }
             ComposerRecordError::Hash(Some(_)) => "not that kind's width in lowercase hex",
             ComposerRecordError::Hash(None) => "unknown or wrongly-cased hash kind token",
             ComposerRecordError::Now => "not <seconds>[,<height>] in range",
@@ -535,6 +553,9 @@ fn parse_key(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
         return Err(K("the key carries a derivation suffix; give the account xpub alone, as `md decompose --emit keys` prints it"));
     }
     let xpub = Xpub::from_str(xpub_text).map_err(|_| K("not an extended public key"))?;
+    if xpub.network != bitcoin::NetworkKind::Main {
+        return Err(ComposerRecordError::KeyNetwork);
+    }
     if !matches!(xpub.depth, 3 | 4) {
         return Err(K("xpub depth is not 3 or 4"));
     }
@@ -591,7 +612,10 @@ pub const CASES: &[Case] = &[
     Case { name: "key-body-empty", record: "key:", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     // ---- every §6a rule has a row of its own (the coverage test below lists them by name)
     Case { name: "key-depth-3-valid", record: "key:5b37336335646130612f3438272f30272f30275d7870756236434b5a7455614b3159487051626736434c6147526d734d4b4c514231694b7a73766d7874794844365837677a4c71434232564e5a596431584378726363516e453868684478745962523153616b6b76697379324a3443635478576565476a6d6b6173436f4e5339765a6d", class: "Key", host_line: None },
-    Case { name: "key-testnet-tpub-valid", record: "key:5b37336335646130612f3438272f31272f30272f32275d747075624446483964677a76657944387a5462505546754c72476d4379644e76786568794e6455584b4a41514e387834615a346a36555a7147666e71467244344e7179615456474b62764557353474737650544b32556f5362434331504a593869434e6977544c3352575a45686551", class: "Key", host_line: None },
+    // RETIRED ACCEPTANCE (composer fable review r0, 2026-09-20): S1 pinned that a
+    // tpub PARSES as a key record; three lenses then found it seating silently
+    // into a mainnet-only policy (SPEC §4f, §14). The same record now refuses.
+    Case { name: "key-testnet-tpub-refused-s1", record: "key:5b37336335646130612f3438272f31272f30272f32275d747075624446483964677a76657944387a5462505546754c72476d4379644e76786568794e6455584b4a41514e387834615a346a36555a7147666e71467244344e7179615456474b62764557353474737650544b32556f5362434331504a593869434e6977544c3352575a45686551", class: "Unknown", host_line: Some("record 0: key: a testnet key (tpub) is unsupported; complex-policy derivation is mainnet-only (SPEC §4f)") },
     Case { name: "key-depth-2-refused", record: "key:5b37336335646130612f3438272f30275d787075623639784456786235326d37484c693856346242556f7351646a41343771476b5142354b6738454b6867417737386e41615066625a3761765a544862506f58716a7a5743337761766b375a75524e7737325843533343795339587568594a7141764d457245644562366e3254", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-depth-5-refused", record: "key:5b37336335646130612f3438272f30272f30272f32272f305d78707562364767475a4369657850337170683533486a50694c7237476b5846746669635455677661706e4a32583275696737795a763578674538635163445367396f6538597062626f4b43476b68724742565a525973354776585a39366835556b32514845554d735a7250374d764c", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-fingerprint-uppercase", record: "key:5b37334335444130412f3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
@@ -601,6 +625,7 @@ pub const CASES: &[Case] = &[
     Case { name: "key-origin-unterminated", record: "key:5b37336335646130612f3438272f30272f30272f32277870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-body-not-utf8", record: "key:ff", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
     Case { name: "key-uppercase-H-marker-out-of-scope", record: "key:5b37336335646130612f3438482f30482f30482f32485d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266", class: "Unknown", host_line: Some("record 0: key: needs [fingerprint/path]xpub with an origin; a bare xpub is not a key record") },
+    Case { name: "key-testnet-tpub-refused", record: "key:5b33663633356136332f3438272f31272f30272f32275d74707562444650745041726a34477a424546486f68656767315861747263314669396f536f78354c7a7553525839316d697751787555724570427870764452736d5a594a4b59466867644b33555374736a43384a4b586655624d696e6a467169454d34754e777a5661436148707973", class: "Unknown", host_line: Some("record 0: key: a testnet key (tpub) is unsupported; complex-policy derivation is mainnet-only (SPEC §4f)") },
     Case { name: "hash-valid", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8", class: "Hash", host_line: None },
     Case { name: "hash-valid-zeros", record: "hash:0000000000000000000000000000000000000000000000000000000000000000", class: "Hash", host_line: None },
     Case { name: "hash-63-chars", record: "hash:a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a", class: "Unknown", host_line: Some("record 0: hash: sha256 needs exactly 64 lowercase hex characters") },
