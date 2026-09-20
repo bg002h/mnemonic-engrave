@@ -986,6 +986,30 @@ whole script, Core v25/v31.1 import it, the same paths under `tr` import into
 Nunchuk. On the consent rather than the mapping review, which is skipped for a
 flow with no sources.
 
+### 8x. Outside Liana's model (fable review r0, lens 5 I-1 and I-2) — a notice on the consent, naming the FIRST class that applies
+
+> OUTSIDE LIANA'S MODEL
+> Liana takes one unlocked path, at least one path locked by older in
+> blocks, and no hash. This policy: <class>. Bitcoin Core imports it.
+
+`<class>` is one of nine phrases, checked in Liana 8.0's own order of refusal
+(`liana` crate `src/descriptors/analysis.rs` at tag v8.0; measured 17 of 56
+composable shapes accepted, lens 5): 1 `legacy wrapper` (`sh`, `sh(wsh)`);
+2 `NUMS key path`; 3 `no locked path` (a plain multisig or single key has no
+recovery path -- the demo payload's own 2-of-3); 4 `a hash lock` (any kind,
+keyed or key-less); 5 `an absolute lock` (`after`); 6 `a lock in time units`
+(`older` in 512-second units); 7 `no unlocked path`; 8 `two paths with one
+lock` (the same `older` value twice); 9 `a second unlocked path` -- Liana
+refuses a second unlocked MULTI-key path outright and silently folds a
+second unlocked SINGLE-key path into the first path's key set without
+changing its threshold (I-2: `[2-of-3, 1 key, 1 key + older]` imports as
+"2 of 4 keys" and its GUI never spends the single key), so both are named
+by one phrase because both leave a wallet Liana will not show as built.
+A real spendable taproot key path counts as an unlocked path (every shipped
+`tr` preset puts its primary there), so Liana's own accepted `tr` shape does
+not misread as class 7. Silent exactly when Liana 8.0 accepts. Same-seed
+inside one path stays §8g's line. Fold `fa070df0`; 1374/1374.
+
 ## 9. Device work items (fork)
 
 1. `md` tree BUILDER API and an extended `md.PolicyShape`: construct a
