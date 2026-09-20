@@ -203,10 +203,41 @@ a live fourth occurrence of the C-1 shape, invisible to it. `os.DirFS`, a
 package-level `const` and `fs.ReadFile` evade it identically, none being a
 `filepath.Join` call.
 
-So the gate is a **text scan for the substring `conformance.json`** in any
-`*_test.go` outside the loader's own file, failing on any occurrence. No AST
-matching: the substring must appear however the path is spelled, so literal,
-concatenation, `const` and `DirFS` are all caught by construction.
+So the gate is a scan for the substring `conformance.json` in the **STRING
+TOKENS** of any `*_test.go` outside the loader's own file, failing on any
+occurrence. Not an AST call-shape match and not a raw text grep: `go/scanner`
+in its default mode yields string tokens and skips comments, which is exactly
+the discrimination needed. Every spelling that reads a record must put the
+substring in some string token — a literal, either half of a `name +
+".conformance.json"` concatenation, a `const`, a `DirFS` path — so all are
+caught by construction. (`".conformance" + ".json"` would evade; it is
+contrived, and the gate's own comment says so rather than pretending
+otherwise.)
+
+**Measured before specifying it, because a rule that cannot be implemented is
+worse than none:** the two packages' test files hold **18** occurrences of the
+substring across 9 files, of which **2 are in comments**
+(`md/compose_vectors_pin_test.go:151`, `md/conformance_keyed_test.go:12`) — a
+raw grep would fail on both, which is why the scan is token-based.
+
+**D5e — one principled exemption, declared in the file itself.** Of the 16
+occurrences in code, one is not a pairing and must NOT be routed:
+`md/compose_vectors_pin_test.go:158` calls `vectorPath(name,
+"conformance.json")` under `os.Stat` **to audit the vendored tier itself**.
+Sending that through a pin-preferring loader would mask a missing vendored file
+whenever a pin exists — the gate would hide the very drift the provenance test
+exists to find.
+
+So the boundary admits exactly one exemption, and it is declared **in the
+exempt file** as a `//go:vectortier vendored` marker the scan recognises, never
+as a list living somewhere else. A list in another file drifts silently and is
+the shape this whole decision exists to avoid; a marker makes every exemption a
+visible, deliberate line in the diff that adds it, and the gate reports how
+many markers it honoured so a second one cannot appear unnoticed.
+
+`md/` also needs its own pin-preferring record loader (`vectorRecordFor`,
+mirroring `vectorChunksFor`) — `loadVectorRecord` is a `gui` helper and cannot
+be called from package `md`.
 
 **D5c — the gate must prove it can fail (r2 Q2).** A source scan that matches
 nothing passes vacuously, and this one did: the natural first implementation
