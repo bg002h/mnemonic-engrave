@@ -1,6 +1,9 @@
 # DESIGN — which wallet coordinators will take this policy
 
-**Status: DRAFT, second fold.** Reviewed twice: the fable architect
+**Status: DRAFT, third fold. Nothing in this document is still "as approved" —
+sections 1-2 were approved and have since been revised twice under review, so
+treat the whole of it as current draft rather than reaching for which
+sentences carried an approval (r3 N-1).** Reviewed twice: the fable architect
 (`design/agent-reports/coordinator-compat-fable-architect.md`, 4C/7I/4M/2N)
 and an opus spec review with an implementability walk
 (`design/agent-reports/coordinator-compat-spec-opus.md`, 4C/10I/5M/2N, which
@@ -190,8 +193,11 @@ counter over **distinct values of that kind within this policy**, base 10,
 starting at 1, assigned in the canonical template's own left-to-right
 traversal order. `older(26280)` then `older(1000)` then `older(26280)` renders
 `older(older-blocks#1)`, `older(older-blocks#2)`, `older(older-blocks#1)`.
-Digests render as `sha256(#)` — kind only, no class, because no coordinator
-measured distinguishes two digests.
+Digests render **with a class too** — `sha256(#1)` — symmetric with locks
+(r3 M-4). The asymmetry in an earlier draft was unexplained and wrong for the
+same reason locks carry one: two hashlock branches committing to the *same*
+digest is a different wallet from two committing to different ones, and the
+device composes hashlock paths. Class numbering is per kind, as for locks.
 
 **`key_partition` groups by `(xpub bytes, origin_path)`** — "derivation" in the
 architect's clause means the origin path, the only derivation a decoded md1
@@ -221,7 +227,7 @@ semantic reading, and coordinators do not parse semantics, they parse text.
 Two md1 trees with identical `PolicyShape` but different fragments (`or_i` vs
 `or_d`) can differ in importability. The key is md-codec's **existing**
 canonical payload — placeholders renumbered by first appearance
-(`encode.rs:59-62`) — rendered as a template with lock values replaced by
+(`canonicalize.rs:168`) — rendered as a template with lock values replaced by
 `kind#class`, digests by their kind, and origins erased:
 
     wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),
@@ -234,11 +240,34 @@ The use-site `/<0;1>/*` is KEPT and the lock reads `older-blocks#1`, not
 which left the document carrying two incompatible key spellings (r3). The
 partition nests three deep, `[path][group][slot]`, matching the type.
 
+**The key's blind spots, listed** (r3 M-2) — *"same key, different verdict" is
+exactly what a future reviewer will be asked to explain*, so the list is part
+of the design rather than folklore:
+
+- **Lock-value classes hide push-size differences.** `older(100)` is one byte,
+  `older(65535)` three, `after(1700000000)` five. Two policies sharing a key
+  can sit on opposite sides of a script-size or op-count limit, and a
+  coordinator that refuses on that limit would refuse one and accept the other.
+- **Digest classes hide the digest.** Two policies with the same structure and
+  different preimages share a key; no coordinator measured distinguishes them,
+  but a future one checking a known-preimage list would.
+- **The key is renderer-independent by construction**, which is why the
+  renderer rides on the evidence tuple. A coordinator that parses text — all
+  three measured do — can disagree across spellings of one key.
+
+Any of these turning into a real disagreement surfaces as a **D1/D2 build
+failure**, not as a silent wrong verdict. That is the containment.
+
 **The key's serialized form** is the template, a `U+001F` separator, then the
 partitions rendered as `[path][group][slot]` with slots ascending, groups
 ordered by their lowest slot, and paths in template traversal order. That
 serialization is the thing hashed, the thing `md shape-key` prints and the
 thing the evidence table is keyed by — one spelling, defined once.
+
+Slot ids are **0-based** (they are `@i` placeholder indices, and `@0` is a real
+placeholder); equality classes are **1-based** (they are a counter, and `#0`
+would read as "no class"). The two bases differ on purpose and the key's
+grammar says so, because an earlier draft left a reader to guess (r3 N-2).
 
 Too-coarse becomes structurally impossible, every measured shape stays
 matchable, and a foreign md1 with an unfamiliar fragment falls to `Unproven` —
@@ -385,7 +414,11 @@ Six mechanisms:
 2. **No open-ended span, for either verdict kind.** "As of" is the only tense a
    positive may use.
 3. **Committed, runnable harnesses**, each pinning the coordinator source
-   revision it builds. **Liana's is now committed** (`harnesses/liana/`,
+   revision it builds **and recording the binary's own self-reported version —
+   never a label typed by the person running it** (r3 M-5). The motive is
+   measured: `bitcoind --version` on this box prints
+   `Bitcoin Satellite version v0.2.4` for what the matrix calls "Core 25.0".
+   A hand-typed label is how a verdict comes to name a release nobody ran. **Liana's is now committed** (`harnesses/liana/`,
    `606ab180`) and was used to re-measure at v15.0; Nunchuk's and Core's still
    live in `/scratch/.tmp`, outside all three repos. Re-measurement without a
    committed harness is a research project every time, and under ruling 6 that
@@ -456,6 +489,11 @@ not.
 detail screen elsewhere — five hand-written coordinator notices already ship
 (§8a, §8f, §8x and two more), and this design retires them rather than adding a
 sixth.
+
+**A gate asserts that no `composerCopy*` body names a coordinator** (r3 M-3) —
+the bodies become reason strings and the consent prints from the registry, but
+without the gate a sixth hand-written notice grows exactly as the first five
+did, unnoticed.
 
 **Gates this repo already knows how to write:** assert the first-frame row
 count against the registry size (the kind-picker lesson — a paginated screen
