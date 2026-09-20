@@ -152,10 +152,12 @@ enum Form { Multipath, Chain0, Chain1 }
 /// the source that establishes it. `cite` is what makes a rule auditable.
 struct Reason { class: &'static str, cite: &'static str }
 
-/// The three-way internal key (r2 I-9). NUMS and an unspendable xpub are
-/// different wallets to Nunchuk, and the rendered template cannot tell them
-/// apart.
-enum KeyPathKind { Nums, UnspendableXpub, Spendable, NotTaproot }
+/// The internal key, THREE-valued. An unspendable xpub is NOT a variant here:
+/// it is an ordinary key_index on the md1 wire, and recognising one means
+/// re-deriving a specific coordinator's own function — so that distinction
+/// lives in a rule, not in the key. See the port note above.
+/// `Xpub`, not `Spendable`: this walk verifies nothing about spendability.
+enum KeyPathKind { NotTaproot, Nums, Xpub }
 
 /// The coordinator's OWN parsed reading, recorded by the harness — never
 /// hand-authored (r2 I-7).
