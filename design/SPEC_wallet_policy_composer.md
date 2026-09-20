@@ -162,6 +162,7 @@ so (§8d).
 | no path with keys | REFUSE, §8m line 1 |
 | a path with neither keys nor hash | REFUSE, §8m line 2 |
 | keyless path under `tr` | REFUSE, §8m line 3 (a policy choice of this build, not a taproot limit) |
+| a SECOND keyless path (any locks, any positions) | REFUSE, §8m line 6: two key-less paths always put two signature-free arms under one `or_i`, which is malleable; a timelock does not make an arm safe. MEASURED 2026-09-20 (composer fable review r0, L1 C-1): `md compose --experimental` refuses every list with two or more key-less paths and admits every list with at most one; the primary states the rule in `validate()` (md-codec 0.45.0) and the device ports it |
 | more than 8 paths, or n > 9 in a path, or n = 1 under `sh`/`sh(wsh)`, or a 33rd slot | REFUSE at the picker (the picker does not offer the value); the slot cap says §8m line 5 |
 | `sh`/`sh(wsh)` with anything other than ONE unlocked, unhashed path whose key set has n ≥ 2 | REFUSE, §8m line 4; the legacy wrappers are sorted-only, so the §8b confirm is never offered under them (feasibility M-5) |
 | a taproot key-path slot that is also in a leaf | cannot occur (C5) |
@@ -248,8 +249,15 @@ the other legs and compare `lift()` against a hand-written `Semantic` policy.
 
 ### 5c. NUMS and BIP-388 (C18)
 
-The raw `H` spelling is valid in Bitcoin Core and imported by Nunchuk; it is NOT a
-BIP-388 key placeholder, so BIP-388-strict registration and Liana refuse it. This
+The raw NUMS point (the 32-byte `H` written as hex in the key-path position) is
+valid in Bitcoin Core (v25 and v31.1, measured) and is REFUSED by Nunchuk
+(libnunchuk 2.1.1, 7 of 7 composer NUMS shapes, RUN: `sortedmulti_a` is not a
+fragment its template validator knows, and its DISABLE_KEY_PATH form re-renders
+the key path as an unspendable XPUB, so the round-trip check fails -- composer
+fable review r0, L2 I-1); it is NOT a BIP-388 key placeholder, so BIP-388-strict
+registration and Liana refuse it too. The unspendable-xpub form Nunchuk and
+BIP-388 accept is a DIFFERENT wallet with different addresses (measured), never
+"the same wallet spelled for Nunchuk". This
 is a property of md's existing wire (`is_nums` flag, `crates/md-codec/src/tree.rs:51`)
 that the composer inherits; the xpub form is F-449, its own constellation cycle.
 The device says so in copy (§8f).
@@ -276,7 +284,10 @@ secret.
 its own line (§11):** `key:` MUST parse as BIP-380 key-origin notation with a
 NON-EMPTY origin (an md1 slot carries a path; F-166 pathless is open), an xpub at
 depth 3 or 4 (md's own `--key` rule), and an origin whose component count equals
-the xpub's depth; a bare xpub is refused naming the fix. `hash:` MUST decode to
+the xpub's depth, and an xpub whose VERSION BYTES are mainnet -- a `tpub`/`upub`/`vpub`
+is well-formed and UNSUPPORTED (§4f: mainnet-only by construction; §14), refused
+with its own line rather than the malformation line (fable review r0, three
+lenses; host commit `1cbecbfd`, vectors `key-testnet-tpub-refused*`); a bare xpub is refused naming the fix. `hash:` MUST decode to
 exactly 32 bytes. `now:` MUST match `^[0-9]{1,10}(,[0-9]{1,9})?$` with seconds in
 `1..=2147483647` and the height, when present, in `1..=499,999,999` (§4c's height
 band). Uppercase hex anywhere is not valid hex (section 5.3). **Where the refusals
@@ -1159,12 +1170,27 @@ table, so the glyph and modal-fits gates cover it.
 2. **Ledger registration of md's depth-0 xpubs.** Core, Liana and Sparrow accept
    them (measured); Ledger's whole-xpub `memcmp` likely does not: UNVERIFIED,
    filed descriptor-mnemonic `md-descriptor-depth0-xpub-ledger-registration`.
-3. **Nunchuk UI** treatment of `or_i` vs `or_d` (library is Core's verbatim) and
-   of custom-template miniscript imports.
-4. **Import tests** of composed outputs into Core, Nunchuk, Liana are import
-   tests, not emit tests, and belong to the journey (§12 item 2) or to F-449;
-   Liana's import refuses any `after` or hashlock path regardless of head
-   (second lowering review), so F-449's acceptance wallet must be `older`-only.
+3. **Nunchuk import — MEASURED 2026-09-20** (composer fable review r0, lens 2,
+   RUN against libnunchuk `a7cfb498`, desktop 2.1.1's pin, built with its
+   vendored Core v28.99): 20 of 30 composer shapes import through "Recover via
+   BSMS/descriptors" (every `wsh`/`sh`/`sh(wsh)`, every `tr` with a real
+   internal key) and derive byte-identical addresses to `md`, the device and
+   Core on both chains with every spend path enumerated; REFUSED: every
+   NUMS-keyed `tr` (7/7, §5c), every `wsh` policy that mixes time-based and
+   height-based locks across paths ("Timelock mixing" -- the `tr` form of the
+   same paths imports, leaves validate separately), the two EXPERIMENTAL
+   key-less hash paths, and the change-chain single-chain spelling (F-624).
+   Nunchuk's UI screens were not driven; its `or_i`/`or_d` treatment is the
+   library's (Core's verbatim) and the runbook for the operator's live click-
+   through is in the lens 2 report (F-629).
+4. **Import tests** into Core: MEASURED the same day (lens 1, lens 3): every
+   fully seated shape without a key-less path imports into Core v25/v31.1 with
+   addresses equal to the consent screen, and the spend conditions hold under
+   funded branch tests (84 on v31.1, 39 on v25). A key-less path makes the
+   WHOLE wallet un-importable in Core, Nunchuk and Liana ("witnesses without
+   signature exist"), keyed paths included -- §8a says so now. Liana's import
+   refuses any `after` or hashlock path regardless of head (second lowering
+   review), so F-449's acceptance wallet must be `older`-only.
 5. **Recon results folded here were verified against Core v25 (single-chain
    forms; the local build lacks BIP-389 multipath and tapscript miniscript),
    Liana master and drongo HEAD**: brainstorm record section 3.11. A newer Core
