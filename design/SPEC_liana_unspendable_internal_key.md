@@ -1,11 +1,18 @@
 # SPEC — the Liana unspendable internal key (F-449)
 
-**Status:** r2, folded from four independent reviews plus four author-found
-findings. R0: opus 2C/6I/5M/2N, fable adversarial 0C/4I/9M. r1 re-review:
-mechanical fold-check 1 unaddressed + 2 new defects, new-design review
-1C/4I/2M. Awaiting re-review.
+**Status:** r3, folded from six independent reviews plus four author-found
+findings. R0: opus 2C/6I/5M/2N, fable adversarial 0C/4I/9M. r1: fold-check
+1 unaddressed + 2 defects, new-design 1C/4I/2M. r2: fold-check 0 unaddressed +
+1 cosmetic, **journey walk 2C/6I/4M**. Awaiting re-review.
 **Reports:** `design/agent-reports/f449-spec-r0-{opus,fable-adversarial,self}.md`,
-`f449-spec-r1-{fold-check,new-design}.md`
+`f449-spec-r1-{fold-check,new-design}.md`, `f449-spec-r2-{fold-check,journey}.md`
+
+**Both r2 Criticals were the author's own folds**, found only by a journey walk
+after four correctness-shaped lenses had closed: a choice-screen predicate that
+fired on the one preset where the choice is meaningless and stayed silent on the
+two this cycle exists for, and an identity ruling written for Rust that left the
+Go half — the half the operator reads off the screen and off an mk1 card —
+unscheduled and ungated.
 **Owning cycle:** its own constellation cycle in `descriptor-mnemonic`, per F-449.
 **Rust-primary:** normative codec behaviour. Lands in `md-codec` **first**, with
 test vectors, then the fork's Go port. The port may never lead.
@@ -27,20 +34,71 @@ existed (fable I-4: `md/compose.go:961` `isNums: ik < 0` is unconditional, and
 `composerLianaOutsideModelClass` is called only from the consent screen at
 `gui/composer_consent.go:261`). r2 fixes the plan, not the promise. Two pieces of device work, not one:
 
-1. **A choice screen**, fired **only when the answer can change the Liana
-   outcome** — that is, when `composerLianaOutsideModelClass` (class 2 skipped
-   for the new kind) returns `""`. r1 fired it whenever a `tr` policy fell back
-   to NUMS, which is **5 of 6 presets while the answer matters on 2**; on
-   `plain-multisig`, `hashlock-gated` and `decaying-multisig` §0a's own table
-   says no encoding change helps, so offering kind 1 there is a strict downgrade
-   (different addresses, different `WalletPolicyId` and 12-word phrase, Liana
-   still refusing, Nunchuk acceptance dropping to 1/24 for four keys). Worse,
-   `plain-multisig` under `tr` composes as a sole `sortedmulti_a` leaf, the exact
-   shape **§6 row 1 refuses at kind 1** — r1 offered an option the codec would
-   reject. The narrow predicate already ships and is already called at
-   `gui/composer_consent.go:261`.
+1. **A choice screen** — see §0b, which specifies it completely. r1 gave it one
+   sentence and that sentence was measurably inverted.
 2. **Device address derivation for kind 1**, which r1 omitted entirely and
    which is the larger half. See §7a.
+
+### 0b. The choice screen (normative)
+
+r1 specified this screen in one sentence — *"fired only when
+`composerLianaOutsideModelClass` (class 2 skipped for the new kind) returns
+`""`"* — and a journey walk measured that rule to be **inverted**:
+
+| preset under `tr` | `shape.KeyPath` | classifier | r1's rule fires? | should fire? |
+| --- | --- | --- | --- | --- |
+| `simple-timelocked-inheritance` | `KeyPathSpendable` | `""` | **yes** | **no** |
+| `kofn-recovery` | `KeyPathNUMS` | `"NUMS key path"` | **no** | **yes** |
+| `tiered-recovery` | `KeyPathNUMS` | `"NUMS key path"` | **no** | **yes** |
+
+It fired on the one tr preset where the choice is meaningless and stayed silent
+on the two this cycle exists for — which would have silently deleted §0's whole
+measured claim. Skipping class 2 alone does not fix it: with class 2 skipped
+`simple-timelocked-inheritance` still returns `""`, and it has a **real**
+internal key (`md compose … --json` → `internal_key_path: 0`) where kind 1 is
+unrepresentable in §3f's sum type.
+
+**FIRING PREDICATE — both conjuncts are required:**
+
+```
+fire  ⟺  the tr internal key is NUMS today          (internal_key_path == null)
+     AND composerLianaOutsideModelClass(root, shape), with class 2 skipped
+         for the new kind, returns ""
+```
+
+Conjunct 1 is what r1 dropped. Conjunct 2 keeps the screen off
+`plain-multisig`, `hashlock-gated` and `decaying-multisig`, where §0a's measured
+table says no encoding change helps and kind 1 is a strict downgrade (different
+addresses, different `WalletPolicyId` and 12-word phrase, Liana still refusing,
+Nunchuk acceptance falling to 1/24 for four keys) — and where, for
+`plain-multisig`, §6 row 1 would refuse the option the screen offered.
+
+**PLACEMENT.** The screen sits **between `composerShapeFlow` and the first
+`composerStubFlow`** (`gui/composer_flow.go:97-118`). The kind changes the tree,
+hence the template chunks, hence the Template-ID and `mk1 stub` the operator
+**copies onto steel and mints cosigner cards from**. r1 pointed twice at
+`gui/composer_consent.go:261` as "where the predicate already ships", which aims
+an implementer at the *last* screen before steel. If the choice is ever placed
+after the stub screen it MUST return through `composerStubFlow` and raise the
+existing changed-id banner (`composerStubDelta`), whose own doc comment says a
+false statement there is worse than a missing one.
+
+**RESET.** The chosen kind resets to 0 on any shape, wrapper or path-list edit
+that re-enters `composerShapeFlow`. Without this the kind survives a Back-edit
+into a shape where it is a silent downgrade or a §6 refusal, with no screen to
+unset it — and the composer's documented Back invariant is "going back should
+lose nothing".
+
+**DEFAULT ROW.** `Initial` is the **NUMS row**. The widget's zero value selects
+row 0, so a default row of "Liana xpub" would re-implement the alternative §0
+explicitly rejects — silently changing the wallet form for an operator who
+pressed through.
+
+**COPY.** The screen names, for each row: which coordinators import the result,
+and that the two rows are **different wallets with different addresses** that
+cannot be interchanged after engraving. This is the one screen in this spec that
+decides which of two wallets is cut into steel; every other operator-facing
+string here carries a copy requirement and r1 gave this one none.
 
 It is **not** the target-selection mode (menu narrowing, picker constraints,
 multi-coordinator intersection), which remains a separate later cycle.
@@ -248,6 +306,36 @@ false-evidence-match reasoning applies here and more sharply.
 `compute_md1_encoding_id` → `chunk_set_id` is unaffected: it goes through
 `encode_payload_for_identity`, which includes the header (`identity.rs:45`).
 
+**THIS RULING BINDS THE GO PORT IDENTICALLY.** r2 stated it for Rust only, and
+the fork mirrors the structure 3-for-3 with `writeNode` equally version-less
+(`func writeNode(w *bitWriter, n node, keyIndexWidth uint8) error`):
+
+| Go site | what it computes |
+| --- | --- |
+| `md/encode.go:417` | the wire payload |
+| `md/template_id.go:53` | `WalletDescriptorTemplateId` |
+| `md/walletpolicyid.go:42` | `WalletPolicyId` |
+
+Leaving these at a constant version reintroduces §3e's collision **on the
+surface where the plates physically are**, because these are exactly the values
+the operator reads and trusts:
+
+- `gui/composer_consent.go:216-229` → `md.FormAwareIdChunks` /
+  `FormAwareStubChunks` — the consent screen's id and **mk1 stub**;
+- `policyIDHeader` → `md.WalletPolicyIdChunks` — the `Policy id:` line on the
+  inspect screen, the only line there that could distinguish the two kinds;
+- `md/template_id.go:112` `FormAwareStub` → `WalletPolicyIDStub` **or**
+  `WalletDescriptorTemplateIdStub` — the **mk1 KEY card's** `policy_id_stub`,
+  which binds a cosigner's key card to a policy. (The journey report cited
+  `:116`, the `else` branch; verified, the dispatcher is `:112` and **both**
+  stub flavours route through the version-less `writeNode`, so the exposure is
+  slightly wider than reported.)
+
+**Consequence if missed:** an mk1 KEY card minted for the kind-0 wallet seats
+and verifies against the kind-1 plates of the same tree, and the reverse. Same
+stub, different addresses — a positive false match on the screen whose entire
+job is to prove two artifacts belong together.
+
 Read-side version checks to thread: `chunk.rs:70`, `:373`; write side
 `chunk.rs:279`, `encode.rs:174`.
 
@@ -431,6 +519,23 @@ its test passes vacuously. It ships as a pinned invariant with a test
 demonstrating *why* it is unreachable, so if the placeholder rule ever changes
 the pin fails instead of admitting an empty concat.
 
+### 6a. What an older toolchain says about a version-8 plate
+
+Version 8 fails closed everywhere (§3d). But *failing closed* and *saying
+something true* are different properties, and a journey walk over a mixed
+two-board fleet found the messages are wrong in three places. All three are
+**this cycle's** to fix, because this cycle is what makes a version-8 plate
+exist.
+
+| surface | today | required |
+| --- | --- | --- |
+| old device, chunked plate | `md.ParseChunkHeader` errors → `gatherIgnored` → **"Not an md1 descriptor chunk."** | a **false statement** about a plate the constellation cut. `gatherIgnored` must be split so a well-formed md1 at an unsupported version says so, and names the version |
+| `md repair`, older binary | the BCH correction loop **succeeds**, then `decode_with_correction` rejects version 8 and `repair.rs:88-96` returns `Ok(2)`, **discarding the successful correction** — and exit 2 is documented as "the plate is too damaged" | distinguish "BCH capacity exceeded" from "corrected fine, but this wire version is unsupported"; never discard a correction that succeeded |
+| `WireVersionMismatch` Display | `"wire-format version mismatch: got 8, expected 4"` (`error.rs:33`) | "expected 4" becomes false the moment the decoder accepts `{4, 8}`; the message must name the accepted set |
+
+The host error names the version and the device error does not, so §3d's *"loud
+and correctly named"* is true of Rust and false of the fork until this is done.
+
 ## 7. Verdict integration
 
 - **Rust:** `KeyPathKind` gains a fourth value beside `NotTaproot | Nums | Xpub`.
@@ -451,6 +556,12 @@ the pin fails instead of admitting an empty concat.
   1, class 7 never fires, and the composer tells the operator the wallet is
   Liana-compatible **before the plates are cut**. A device test must pin this
   exact shape.
+- **The device inspect screen names no internal key at all.** `md1Summary`
+  (reached via `gui/md1_gather.go` → `md1PolicyFlow`) does not switch on
+  `KeyPath`, so §7's two-print-site enumeration does not reach the screen an
+  operator uses a year later to ask "which kind are these plates?". It must name
+  the kind, or the only answer on the device is the `Policy id:` line — which
+  answers correctly only once C2's Go fix lands.
 - **Fork consumers switch on `KeyPath` with no default** (fable M-3):
   `gui/template_engrave.go:159-164` ("THE KEY-PATH LINE COMES FIRST AND IS NEVER
   OMITTED") and `gui/composer_consent.go:205-214` print nothing for a fourth
@@ -484,9 +595,15 @@ wrong places:
 2. A **third branch** in `gui/policy_address.go` that recomputes §2 over the
    collected leaf keys and derives at `0/i` / `1/i` (stage 4).
 3. **A refusal, not a fallback.** If the device meets an internal-key kind it
-   cannot derive, it REFUSES to show an address and REFUSES to engrave. It must
-   never fall back to the NUMS branch. Without this rule a future fourth kind
-   reintroduces row 1 above.
+   cannot derive, it REFUSES to show an address and must never fall back to the
+   NUMS branch. Without this rule a future fourth kind reintroduces row 1 above.
+
+   **Scope of the engrave refusal.** The address-refusal half already ships:
+   `complexAddressSource` probes `src(0, false)` and returns `nil, false` rather
+   than falling back. The engrave half is new, and it applies to a policy whose
+   internal-key kind *this firmware cannot derive* — not to the shipped D3/D4
+   paths that deliberately engrave without an address. State it that way, or it
+   reads as a blanket "no address, no engrave" and retires working behaviour.
 
 r1 asserted one choice screen was "the minimum that makes §0 true". It was not:
 composing a wallet the device cannot address does not deliver §0's promise.
@@ -522,10 +639,13 @@ already records" was false.
    while version 5 was unusable. The gate runs `decode_with_correction` **and**
    the Go `ParseChunkHeader`/`Decode` pair, single-string **and** chunked, at
    both versions, plus a v8 payload refused by a v4 decoder.
-5. **Identity distinctness and stability.** Same tree at kind 0 vs kind 1 →
-   different `WalletPolicyId`, different `WalletDescriptorTemplateId`, different
-   12-word phrase. And every existing v4 id is byte-preserved. r0 had no id
-   vector at all and would not have caught §3e's collision.
+5. **Identity distinctness and stability, in BOTH languages.** Same tree at kind
+   0 vs kind 1 → different `WalletPolicyId`, different
+   `WalletDescriptorTemplateId`, different 12-word phrase, and a different
+   **mk1 `policy_id_stub`**. Every existing v4 id byte-preserved. r0 had no id
+   vector at all; r2 had one but scheduled it in Rust only, leaving the Go half
+   — the half the operator actually reads — with no owner. **Rust leg: stage 1b.
+   Go leg: stage 3.**
 6. **Structure-independence pin.** All three of `kofn-recovery`,
    `tiered-recovery` and `decaying-multisig` over the same four keys derive one
    internal key — the third is the nested case.
@@ -538,6 +658,15 @@ already records" was false.
    drop the version bump, use kind 0's hex at kind 1, pass a constant version to
    the identity hashes, and group the new kind with `KeyPathSpendable`.
 
+### 8a. The last mile, for the runbook rather than the gate
+
+§0's promise ends at a Liana import, and nothing in this spec describes how the
+operator gets from plates to that import. Measured, it works and needs no
+change: `md encode` over the four keys emits 8 chunk strings, and
+`md descriptor` over those 8 emits the concrete descriptor **with the BIP-380
+checksum** §8.2 compares (`…#xnta28tv`, RUN). Recorded here so the acceptance
+runbook has the two commands; not a gate.
+
 ## 9. Sequencing
 
 | stage | content | gate |
@@ -545,20 +674,25 @@ already records" was false.
 | **1a** | behaviour-preserving `InternalKey` refactor, wire untouched (§3f) | suite green at 1400+, no wire bytes changed |
 | **1b** | version 8, the kind bit, §2 derivation, §4 rendering, §4a's `md decompose` recogniser and `md encode` refusal, §6 refusals | §8 vectors **1, 2, 5, 6, 7, 9** — every leg runnable in Rust alone |
 | **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes |
-| **3** | Go port in the fork's `md/`, including `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg** |
-| **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the two print-site arms, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and the narrowed choice screen (§0) | **§8.3's device leg**, §7's constructed shape, and an address test for a kind the device cannot derive |
-| **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ | site 200 + emulator reaches the new screen |
+| **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
+| **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
+| **4a** | `me` (this repo): unpin `md-codec 0.42` from crates.io onto the workspace/git source and carry the new version; §6a's chunked-arm message | `me` round-trips a version-8 payload, or refuses it with a message naming the version |
+| **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ with `demo/sh2/update.sh` | site 200, `application/wasm`, and the emulator reaches §0b's screen |
 
-**Every §8 item has exactly one owning stage** (opus I3 and the fold-check both
-found §8.8 declared REQUIRED and then scheduled nowhere; opus M2 found stage 1b
-claiming a gate whose device and Go legs it cannot run):
+**Every §8 item has an owning stage, and no item is left unowned** (opus I3 and
+the r1 fold-check both found §8.8 declared REQUIRED and scheduled nowhere; opus
+M2 found stage 1b claiming a gate whose device and Go legs it cannot run). Two
+items are deliberately gated twice, at different layers — that is a double gate,
+not a duplicate:
 
-| §8 item | owning stage |
+| §8 item | owning stage(s) |
 | --- | --- |
-| 1 recipe vectors, 2 descriptor equality, 5 identity, 6 structure pin, 7 fixpoint, 9 mutation | 1b |
-| 2 (re-run with the CLI), **8 live Liana install** | 2 |
+| 1 recipe vectors, 6 structure pin, 7 fixpoint, 9 mutation | 1b |
+| 2 descriptor equality | 1b (codec) **and** 2 (through the CLI) — deliberate |
+| 5 identity distinctness | 1b (Rust) **and** 3 (Go) — deliberate; the Go half is the one the operator reads |
+| 8 live Liana install | 2 |
 | 4 dispatch round trip — Go leg | 3 |
-| 3 address equality — **device leg** | 4 |
+| 3 address equality — device leg | 4 |
 
 **Stage 1a/1b do NOT stand alone as r0 claimed** (opus I5). `md-cli` pins
 `md-codec = { path = "../md-codec", version = "=0.45.1" }`
@@ -566,6 +700,13 @@ claiming a gate whose device and Go legs it cannot run):
 makes resolution fail **before rustc runs**, and §3f breaks four non-test md-cli
 sites at compile time (§3f names them). The pin bump and the call-site repairs ship **in the same
 commit** as the change that requires them.
+
+**`me` is downstream and its pin is not bumpable the usual way** (journey I6).
+`crates/me-cli/Cargo.toml:26` pins `md-codec = "0.42"` from **crates.io**
+(`Cargo.lock`: `source = "registry+…crates.io-index"`), while md-codec is
+developed unpublished. `me` is the tool in *this* repo that carries md1 to a
+SeedHammer II, so a version-8 payload reaches it — and r2's downstream list
+named only `mnemonic-toolkit`. Stage 4a owns it.
 
 **`mnemonic-toolkit` is downstream** (opus M5): `render.rs:9-12` records that its
 `inspect` renders the same `template:` line via `descriptor_to_template`,
