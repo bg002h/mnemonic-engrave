@@ -88,13 +88,20 @@ Its R0 carries forward the findings already banked against it:
 | `crates/md-codec/tests/common/vendored.rs` | **new** — `load_vendored_phrase` + `decode_vendored`, `include!`d by both examples and the gate test |
 | `crates/md-codec/examples/dump_{encodings,ids}.rs` | **new** — capture the two pre-change goldens |
 | `crates/md-codec/tests/golden/pre_refactor_{encodings,ids}.json` | **new** — the goldens themselves |
-| `crates/md-codec/tests/internal_key_refactor.rs` | **new** — the byte-equality and non-zero-index gates |
+| `crates/md-codec/tests/internal_key_refactor.rs` | **new** — the byte-equality gate (see Step 1b: there is deliberately no non-zero-index test) |
 | `crates/md-codec/tests/common/mod.rs:85` | `tr_node` signature, and its 29 call sites |
 | `fuzz/tests/gen_corpus.rs:182` | its own workspace; nothing in the gate compiles it |
 
-**Not touched by stage 1a**, though the combined plan's table listed them:
-`header.rs`, `nums.rs`, `encode.rs`, `decode.rs`, `chunk.rs`, `identity.rs`,
-`render.rs`, `validate.rs`, `parse/template.rs`, `decompose/`. All are stage 1b.
+**Touched by stage 1a as part of the migration**, and named by Step 7's ruling
+table: `render.rs:194`, `to_miniscript.rs:341`, `policy_shape.rs:250`,
+`md-cli/src/format/json.rs:353`, `validate.rs`, `canonicalize.rs:115`,
+`md-cli/src/parse/template.rs`. r2 of this plan listed three of these as
+untouched **while Step 7 named two of them by path** — including the site of
+what this plan calls its one genuinely load-bearing choice.
+
+**Not touched by stage 1a**, all stage 1b: `header.rs`, `nums.rs`,
+`encode.rs`'s version threading, `decode.rs`, `chunk.rs`, `identity.rs`,
+`decompose/`.
 
 **Measured blast radius for Task 1** (brace-matched against `#[cfg(test)]`, not guessed):
 
@@ -319,36 +326,35 @@ fn every_vendored_wire_vector_re_encodes_to_the_same_bytes() {
 }
 ```
 
-- [ ] **Step 1b: Pin a NON-ZERO `key_index`, which the corpus does not cover**
+- [ ] **Step 1b: Do NOT add a "non-zero key_index" test — it cannot pass, and the gap it was written for does not exist**
 
-Measured over all 65 vectors with `decode_vendored`: 23 carry `Body::Tr`,
-10 `NumsPoint` / 13 `Slot` — and **0 of the 13 `Slot` vectors carry a non-zero
-index**. Widening the corpus from 46 to 65 did not widen this. So the golden
-alone cannot catch a refactor that drops or truncates the index; the only
-existing coverage is the unit test at `tree.rs:559`.
+r1 reported "0 of the 13 `Slot` vectors carry a non-zero index" and r2 of this
+plan turned that into a round-trip test. Both readings were wrong, and the test
+**cannot pass on unmodified code**. Measured:
 
-Add a direct round trip, since `Slot(u8)` is the one variant carrying data:
+`encode_payload_inner` (`encode.rs:143-147`) clones, **canonicalises at `:145`**,
+and only then validates at `:147`:
 
 ```rust
-/// A minimal `tr(@idx, {pk(@0), pk(@1), pk(@2), pk(@3)})` descriptor whose
-/// internal key is `Slot(idx)`. Needs n >= 8 so `key_index_width` is 3 bits
-/// and an index of 7 is representable -- with the default 4 keys, kiw is 2
-/// and `Slot(7)` would be silently truncated by the width, not by the
-/// refactor, which would make this test lie.
-fn tr_descriptor_with_slot(idx: u8) -> Descriptor { /* build with 8 keys */ }
-
-#[test]
-fn a_non_zero_slot_index_survives_the_round_trip() {
-    // The vendored corpus is all Slot(0) and NumsPoint, so nothing in the
-    // golden would fail if the refactor silently zeroed the index.
-    for idx in [1u8, 2, 7] {
-        let d = tr_descriptor_with_slot(idx);          // kiw >= 3 so idx fits
-        let (bytes, bits) = encode_payload(&d).expect("encode");
-        let back = decode_payload(&bytes, bits).expect("decode");
-        assert_eq!(back, d, "Slot({idx}) did not survive");
-    }
-}
+let mut d_canonical = d.clone();
+crate::canonicalize::canonicalize_placeholder_indices(&mut d_canonical)?;   // :145
+let d = &d_canonical;
+crate::validate::validate_placeholder_usage(&d.tree, d.n)?;                 // :147
 ```
+
+`canonicalize_placeholder_indices` renumbers `Tr.key_index` by first appearance
+(`canonicalize.rs:12`, `:107`), and a root `Tr`'s internal key **appears
+first** — so it is renumbered to `Slot(0)` on every encode. A non-zero
+internal-key slot is therefore **canonically unreachable**, not merely absent
+from the corpus. "0 of 13" is a property of the format, not a coverage gap, and
+widening the corpus could never have changed it.
+
+The layer where a non-zero index *does* exist is the raw `write_node`/`read_node`
+pair — which is exactly the layer Steps 5 and 6 rewrite — and it is already
+covered by the unit tests in `tree.rs` (`:559` onward), which run inside the
+crate, below canonicalisation. **Those are the gate for the index; confirm they
+still pass rather than writing a new test above them that the encoder will
+normalise away.**
 
 - [ ] **Step 1a: Define the one helper these tests use**
 
