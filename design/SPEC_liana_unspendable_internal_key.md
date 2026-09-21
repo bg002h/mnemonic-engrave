@@ -1,8 +1,11 @@
 # SPEC — the Liana unspendable internal key (F-449)
 
-**Status:** r1, folded from two independent R0 reviews (opus 2C/6I/5M/2N, fable
-adversarial 0C/4I/9M) plus four author-found findings. Awaiting re-review.
-**Reports:** `design/agent-reports/f449-spec-r0-{opus,fable-adversarial,self}.md`
+**Status:** r2, folded from four independent reviews plus four author-found
+findings. R0: opus 2C/6I/5M/2N, fable adversarial 0C/4I/9M. r1 re-review:
+mechanical fold-check 1 unaddressed + 2 new defects, new-design review
+1C/4I/2M. Awaiting re-review.
+**Reports:** `design/agent-reports/f449-spec-r0-{opus,fable-adversarial,self}.md`,
+`f449-spec-r1-{fold-check,new-design}.md`
 **Owning cycle:** its own constellation cycle in `descriptor-mnemonic`, per F-449.
 **Rust-primary:** normative codec behaviour. Lands in `md-codec` **first**, with
 test vectors, then the fork's Go port. The port may never lead.
@@ -22,12 +25,25 @@ plus `kofn-recovery` and `tiered-recovery`.
 scheduled only verdict plumbing in §9, so no device path to a kind-1 wallet
 existed (fable I-4: `md/compose.go:961` `isNums: ik < 0` is unconditional, and
 `composerLianaOutsideModelClass` is called only from the consent screen at
-`gui/composer_consent.go:261`). r1 fixes the plan, not the promise: stage 4
-carries **one choice screen** — when a `tr` policy falls back to NUMS, the
-composer asks which spelling, showing the compatibility consequence of each.
-That is the minimum that makes §0 true. It is **not** the target-selection mode
-(menu narrowing, picker constraints, multi-coordinator intersection), which
-remains a separate later cycle.
+`gui/composer_consent.go:261`). r2 fixes the plan, not the promise. Two pieces of device work, not one:
+
+1. **A choice screen**, fired **only when the answer can change the Liana
+   outcome** — that is, when `composerLianaOutsideModelClass` (class 2 skipped
+   for the new kind) returns `""`. r1 fired it whenever a `tr` policy fell back
+   to NUMS, which is **5 of 6 presets while the answer matters on 2**; on
+   `plain-multisig`, `hashlock-gated` and `decaying-multisig` §0a's own table
+   says no encoding change helps, so offering kind 1 there is a strict downgrade
+   (different addresses, different `WalletPolicyId` and 12-word phrase, Liana
+   still refusing, Nunchuk acceptance dropping to 1/24 for four keys). Worse,
+   `plain-multisig` under `tr` composes as a sole `sortedmulti_a` leaf, the exact
+   shape **§6 row 1 refuses at kind 1** — r1 offered an option the codec would
+   reject. The narrow predicate already ships and is already called at
+   `gui/composer_consent.go:261`.
+2. **Device address derivation for kind 1**, which r1 omitted entirely and
+   which is the larger half. See §7a.
+
+It is **not** the target-selection mode (menu narrowing, picker constraints,
+multi-coordinator intersection), which remains a separate later cycle.
 
 **Rejected alternative:** defaulting the device to kind 1 for every NUMS `tr`.
 It would silently change the wallet form for every existing operator and make
@@ -253,8 +269,12 @@ pub enum InternalKey {
 This retires the `debug_assert!` at `tree.rs:148` by construction.
 
 **It ships as TWO commits, refactor first** (SELF-3). Measured blast radius: **88
-`is_nums` occurrences across 14 files** in `md-codec/src`, **58** NUMS
-references in the fork's `md/` + `gui/`, plus **four** non-test md-cli sites
+`is_nums` occurrences across 14 files** in `md-codec/src`, plus the NUMS
+references in the fork's `md/` + `gui/` — reproducible as
+`grep -rn "isNums\|IsNUMS\|KeyPathNUMS\|NUMS" md/*.go gui/*.go | wc -l`, which
+gives **87 in `md/*.go` and 49 in `gui/*.go`, 136 across 32 files** (r1 said 58,
+from a grep that used the Rust spelling `is_nums` against Go source) — plus
+**four** non-test md-cli sites
 (`format/json.rs:348`, `parse/reuse.rs:515`, `parse/template.rs:1604`, `:1629`).
 The opus review listed a fifth, `seat/compose.rs:148`; verified, it does not
 break — it matches `Body::Tr { tree: Some(t), .. }`, naming only `tree`, so the
@@ -312,10 +332,40 @@ converge here (opus I3, fable I-3, SELF-4):
   phantom-slot parse and then fails `expand_per_at_n` (`skeleton.rs:186-193`), so
   the very ACCEPT evidence this cycle exploits is unkeyable.
 
-**Ruling.** `md encode`, `md decompose`, and the template grammar recompute §2
-over the parsed leaf keys and accept the descriptor as kind 1 **only when the
-xpub matches**. A non-matching xpub in that position gets a real refusal naming
-the mismatch, never the internal error and never a phantom slot.
+**Ruling, and it differs per surface — r1 treated three surfaces as one.**
+
+| surface | can it recompute §2? | ruling |
+| --- | --- | --- |
+| `md decompose` (a concrete descriptor) | **yes** — it holds the real leaf keys | recompute; on a match, kind 1 and no slot |
+| the template grammar | n/a — the marker carries no key binding | accept `UNSPENDABLE(liana)` via a substitution rule |
+| `md encode` with a **literal xpub** | **no** | refuse, with a message that names the marker |
+
+`md encode` cannot do it, and r1's ruling was unimplementable there.
+`parse_template` → `substitute_synthetic` (`md-cli/src/parse/template.rs:1047-1084`)
+replaces every `@i` with a domain-separated placeholder derived from
+`sha256(b"md-v0.15" ‖ i ‖ depth)` **before** `walk_tr` ever sees the tree, so at
+the moment the kind must be decided the leaf keys are synthetic. The recipe over
+synthetic leaves cannot equal the recipe over the wallet's real leaves, so the
+match can never succeed and r1's prescribed *"refusal naming the mismatch"*
+would have told a Liana user that their genuine Liana key is not their genuine
+Liana key.
+
+So `md encode` **refuses a literal xpub in the tr internal-key position** with a
+message naming the two spellings that do work — `UNSPENDABLE(liana)` in a
+template, or handing the concrete descriptor to `md decompose`. That replaces
+the internal-error leak, which is the actual defect.
+
+**A non-matching origin-less internal key keeps TODAY'S behaviour.** r1 said
+"never a phantom slot", which over-refuses: the property that makes a slot
+phantom is **no origin**, not "not Liana's". `md decompose` today accepts such a
+descriptor, annotates the origin-less slot, and refuses only `--emit commands` —
+deliberate shipped behaviour. Two real classes would lose a working verb under
+r1's rule: libnunchuk's PR-1746 form (a real wallet Nunchuk builds, for which
+md1 has no wire encoding), and **a real spendable internal key whose owner
+recorded no origin**, where `@0` is the correct answer and not phantom at all.
+
+Ruling: match §2 → kind 1, no slot. Otherwise → today's annotated slot,
+unchanged. This cycle adds a recogniser; it removes no existing capability.
 
 This turns the recipe from something md emits into something md **verifies**,
 and it makes the natural opposite journey work: a wallet created in Liana can be
@@ -363,12 +413,12 @@ literal in a position BIP-388 wants to hold a placeholder.
 
 | condition | outcome |
 | --- | --- |
-| `kind = 1` with a **`sortedmulti_a` leaf anywhere in the tree** | REFUSE. The device's address builder sorts that leaf's keys **by derived key, per index** (`address/taproot_script_path.go`), while §2 hashes them in wire order — a chain code that changes with the address index. The only shape that produces it (`plain-multisig`) is out of scope anyway (§0a), so this costs nothing and closes fable I-2a |
+| `kind = 1` with a **`sortedmulti_a` leaf anywhere in the tree** | REFUSE, as a **belt against a port error**. §2 hashes the leaves' *account-level* 33-byte pubkeys, which are index-independent, so a correct implementation's chain code does not vary with the address index — r1 gave that as the reason and it was wrong. The real risk is that `MultiALeafScript` (`address/taproot_script_path.go:261-270`) sorts the **serialized derived** x-only keys when building the script, and a port that feeds that already-sorted list into the recipe silently diverges (fable M-8). Reachability: the device composer emits `sortedmulti_a` only for `plain-multisig` (out of scope, §0a), but **`md encode` accepts one in any tree shape** (RUN), so the refusal is not vacuous. Cost is near-zero — Liana emits `multi_a`, never `sortedmulti_a` |
 | `kind = 1` with a use-site path other than `<0;1>` | REFUSE. `md encode` accepts `<2;3>`, `<0;1;2>` and `<0;1>/*h` under `tr(H,…)` today (RUN). Liana pairs alternatives positionally and would derive from `0/i` while a use-site-following device derives from `2/i` (fable I-2b). Refusing is narrower than reconciling, and keeps §8.3 honest |
 | `kind = 1` with a real internal key extracted | unrepresentable in §3f's sum type. `--unspendable liana` on a path list containing a bare single is a **no-op today**; it must WARN, not silently ignore (fable M-6) |
 | `kind = 1` **nested** under `sh`/`wsh` | REFUSE. r0's "any wrapper other than `tr`" was ambiguous between vacuous and this (opus M1); this is the non-vacuous reading and the one that needs a check |
 | a version-8 payload reaching a version-4 decoder | `WireVersionMismatch` — single-string via `Header::read` (the dispatch routes it correctly at 8), chunked via `chunk.rs:70` with `got: 8` |
-| version 8 with every `Body::Tr` at `kind = 0` | REFUSE at **encode** (minimum-version rule). Accepted at decode so old payloads never become invalid — but note this admits a hand-crafted second encoding of a kind-0 wallet with a different `WalletDescriptorTemplateId` (opus/fable M-4). Documented, not reachable through any encoder |
+| version 8 on a descriptor whose root `Tag::Tr` (there is at most one, `decode.rs:97-104`) is at `kind = 0` — or which has no `tr` at all | REFUSE at **encode** (minimum-version rule). Accepted at decode so old payloads never become invalid — but note this admits a hand-crafted second encoding of a kind-0 wallet with a different `WalletDescriptorTemplateId` (opus/fable M-4). Documented, not reachable through any encoder |
 
 **INVARIANT, not a refusal (SELF-2).** r0 required REFUSE when `kind = 1` has no
 leaf keys, to stop `sha256("")` becoming a shared constant. That state cannot be
@@ -413,6 +463,33 @@ the pin fails instead of admitting an empty concat.
   (`descriptor.cpp:640-648`), so it accepts a kind-1 descriptor exactly when the
   leaf pubkeys already sit in sorted, unique order — 1/2 for two keys, 1/6 for
   three, 1/24 for four — and then imports the *same* wallet.
+
+### 7a. Device address derivation (the half r1 omitted)
+
+`gui/policy_address.go:132-158` has exactly **two** internal-key branches, and
+`md.EmitTapLeavesChunks` returns a two-state `(keyIndex, isNums)`
+(`md/tapleaves.go:188`, `:204`). Per §5 the derived xpub takes no slot, so
+`byIndex` can never hold it. A kind-1 wallet therefore lands in one of two
+wrong places:
+
+| naive port | what the device does |
+| --- | --- |
+| kind 1 → `isNUMS = true` | derives the **raw H point** — addresses of a *different wallet*, shown on the consent screen and at plate verify. **This is the silent-wrong-address failure this whole cycle exists to prevent.** |
+| kind 1 → `isNUMS = false` | `byIndex[ikIndex]` misses, `policyAddressSource` returns `nil, false`, and the operator consents to steel for a wallet the device cannot address |
+
+**Required work, scheduled in §9 and not merely gated:**
+
+1. `md.EmitTapLeavesChunks` returns a **three-state** internal-key kind
+   (stage 3, with the rest of the Go port).
+2. A **third branch** in `gui/policy_address.go` that recomputes §2 over the
+   collected leaf keys and derives at `0/i` / `1/i` (stage 4).
+3. **A refusal, not a fallback.** If the device meets an internal-key kind it
+   cannot derive, it REFUSES to show an address and REFUSES to engrave. It must
+   never fall back to the NUMS branch. Without this rule a future fourth kind
+   reintroduces row 1 above.
+
+r1 asserted one choice screen was "the minimum that makes §0 true". It was not:
+composing a wallet the device cannot address does not deliver §0's promise.
 
 ## 8. Acceptance
 
@@ -466,11 +543,22 @@ already records" was false.
 | stage | content | gate |
 | --- | --- | --- |
 | **1a** | behaviour-preserving `InternalKey` refactor, wire untouched (§3f) | suite green at 1400+, no wire bytes changed |
-| **1b** | version 8, the kind bit, §2 derivation, §4 rendering, §4a input side, §6 refusals, §8 vectors 1-7, 9 | §8 |
-| **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the JSON schema version bump (§4a) | §8.2 |
-| **3** | Go port in the fork's `md/`, same vectors, provenance pin bumped | §8 vectors in Go |
-| **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the two switch arms, F-633 copy, **and the one choice screen (§0)** | §8.3 device leg, §7's constructed shape |
+| **1b** | version 8, the kind bit, §2 derivation, §4 rendering, §4a's `md decompose` recogniser and `md encode` refusal, §6 refusals | §8 vectors **1, 2, 5, 6, 7, 9** — every leg runnable in Rust alone |
+| **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes |
+| **3** | Go port in the fork's `md/`, including `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg** |
+| **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the two print-site arms, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and the narrowed choice screen (§0) | **§8.3's device leg**, §7's constructed shape, and an address test for a kind the device cannot derive |
 | **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ | site 200 + emulator reaches the new screen |
+
+**Every §8 item has exactly one owning stage** (opus I3 and the fold-check both
+found §8.8 declared REQUIRED and then scheduled nowhere; opus M2 found stage 1b
+claiming a gate whose device and Go legs it cannot run):
+
+| §8 item | owning stage |
+| --- | --- |
+| 1 recipe vectors, 2 descriptor equality, 5 identity, 6 structure pin, 7 fixpoint, 9 mutation | 1b |
+| 2 (re-run with the CLI), **8 live Liana install** | 2 |
+| 4 dispatch round trip — Go leg | 3 |
+| 3 address equality — **device leg** | 4 |
 
 **Stage 1a/1b do NOT stand alone as r0 claimed** (opus I5). `md-cli` pins
 `md-codec = { path = "../md-codec", version = "=0.45.1" }`
