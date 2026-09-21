@@ -599,6 +599,15 @@ this wallet, and md cannot sign."*
 
 ## Section 5 — Rust-first sequencing
 
+**The gate for every step in every plan is four commands, not three:**
+`cargo test`, **`cargo doc --workspace --no-deps --document-private-items
+--all-features`**, `cargo clippy --all-targets -- -D warnings`, `cargo fmt
+--check`. Plan 1a shipped with `cargo doc` missing from its gate, and the
+omission reached `main` — the CI workflow went red on it while both REQUIRED
+contexts passed, so the push ritual reported "no bypass" and was right to.
+Seven reviews inherited the blind spot because each was scoped to the plan's
+own gate. A required-contexts check is not a green build.
+
 Each step with its gate. Nothing starts in the fork.
 
 1. **`md-codec`** — **first task: port `policy_shape.go`'s branch split to

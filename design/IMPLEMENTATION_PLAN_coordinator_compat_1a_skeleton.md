@@ -46,7 +46,8 @@ something that runs.
   fp_partition + key_partition + key_path_kind`, and nothing else.
   `keys_present` is NOT in the key.
 - **Slot ids are 0-based; equality classes are 1-based.**
-- **Gate for every task:** `cargo test -p md-codec`, `cargo clippy --all-targets
+- **Gate for every task:** `cargo test -p md-codec`, `cargo doc --workspace
+  --no-deps --document-private-items --all-features`, `cargo clippy --all-targets
   -- -D warnings`, `cargo fmt --check`.
 
 ---
@@ -669,7 +670,8 @@ Expected: five `name<TAB>key` lines, each key containing `U+001F`.
 - [ ] **Step 6: Full gate and commit**
 
 ```bash
-cargo test -p md-codec && cargo clippy --all-targets -- -D warnings && cargo fmt --check
+cargo test -p md-codec && cargo doc --workspace --no-deps --document-private-items --all-features \
+  && cargo clippy --all-targets -- -D warnings && cargo fmt --check
 git add crates/md-codec/tests/skeleton_key_conformance.rs \
         crates/md-codec/examples/dump_skeleton_keys.rs
 git commit -m "md-codec: the key is a property of the policy, not of the route
