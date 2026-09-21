@@ -1,15 +1,15 @@
-# F-449 Stage 1 (1a + 1b) — md-codec Implementation Plan
+# F-449 Stage 1a — `InternalKey` Refactor Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax.
 
-**Goal:** Give md1 a second taproot internal-key kind — Liana's unspendable xpub, derived from the leaf keys — carried on a new wire version 8, so a `tr` policy with a multi-key primary imports into Liana.
+**Goal:** Replace `Body::Tr`'s `is_nums: bool` + `key_index: u8` pair with an `InternalKey` sum type, **changing no wire bytes**, so that stage 1b's wire change lands as a diff a reviewer can actually read.
 
-**Architecture:** Two commits in sequence. **1a** replaces `Body::Tr`'s `is_nums: bool` + `key_index: u8` pair with an `InternalKey` sum type, changing **no wire bytes** — a pure refactor whose gate is byte-equality against the current encoder. **1b** then adds `Header::WF_UNSPENDABLE_VERSION = 8`, a 1-bit `kind` field written only at version 8, the §2 derivation, rendering, the input-side recogniser, and refusals. Splitting them is deliberate: a ~59-site mechanical rename in the same diff as a funds-relevant wire change produces a diff nobody can review.
+**Architecture:** One behaviour-preserving commit, gated by byte-equality against a golden captured from unmodified code. The `LianaUnspendable` variant is introduced here but **never constructed** — every site maps it to the NUMS branch — so stage 1a is exactly neutral and stage 1b's diff shows each site being deliberately changed. Splitting 1a from 1b is deliberate: a ~98-site mechanical rename in the same diff as a funds-relevant wire change produces a diff nobody can review.
 
 **Tech Stack:** Rust (crates `md-codec`, `md-cli`), `bitcoin` + `rust-miniscript`, `cargo nextest`.
 
-**Status:** r1, folded from the stage-1a R0 (2C/8I/8M/3N, `design/agent-reports/f449-plan-stage1a-r0.md`). Awaiting re-review.
-(0C/6I/16M). Reports: `design/agent-reports/f449-plan-stage1-{r0,r1}.md`.
+**Status:** r2, folded from the stage-1a R0 (2C/8I/8M/3N) and its re-review
+(1C/5I/7M/3N). Reports: `design/agent-reports/f449-plan-stage1a-{r0,r1}.md`.
 Awaiting re-review.
 
 **Spec:** `design/SPEC_liana_unspendable_internal_key.md` (GREEN at `a621cfdf`, 0C/0I after nine review passes). **Read it — this plan argues from it and does not restate it.**
@@ -69,7 +69,7 @@ Its R0 carries forward the findings already banked against it:
 
 | carried finding | what 1b's plan must answer |
 | --- | --- |
-| r2 IMP-7 | `encode_md1_chunks` does not exist — `chunk.rs:240 split(&Descriptor) -> Vec<String>` is the producer; and a kind-1 `Descriptor` cannot be built from `cases.json`'s TLV bytes alone (no taptree, no `older`, no fingerprints, no divergent origins). Build it by **decoding a vendored kind-0 vector and swapping `internal_key`**, which carries all four for free |
+| r2 IMP-7 | `encode_md1_chunks` does not exist — `chunk.rs:240 split(&Descriptor) -> Result<Vec<String>, Error>` is the producer; and a kind-1 `Descriptor` cannot be built from `cases.json`'s TLV bytes alone (no taptree, no `older`, no fingerprints, no divergent origins). Build it by **decoding a vendored kind-0 vector and swapping `internal_key`**, which carries all four for free |
 | r2 IMP-8 | the encode-only hook is right but the stated reason is wrong (no plate carries kind 1 yet), and it disarms §6 row 1's purpose — that row guards a **port** error, and a port's plate arrives via **decode**. The render/derive boundary is the one that catches it without making plates undecodable |
 | r2 IMP-9 | the identity golden is a 4-tuple and the reader a 2-tuple, pinning 1 of 3 values; `compute_id_by_name` undefined. Real APIs: `compute_wallet_policy_id`, `compute_wallet_descriptor_template_id`, `WalletPolicyId::to_phrase` |
 | r2 MIN-19 | `encode_payload_unchecked` does not exist and `Admission` is `pub(crate)`, so "a refused shape still decodes" must be a **unit** test inside the crate, not an integration test |
@@ -80,18 +80,21 @@ Its R0 carries forward the findings already banked against it:
 
 ## File Structure
 
-| file | responsibility in this plan |
+| file | responsibility in THIS plan (stage 1a only) |
 | --- | --- |
-| `crates/md-codec/src/tree.rs` | `InternalKey`, `Body::Tr`, versioned `read_node`/`write_node` |
-| `crates/md-codec/src/header.rs` | `WF_UNSPENDABLE_VERSION = 8`, accept `{4, 8}` |
-| `crates/md-codec/src/nums.rs` | **new home for §2's derivation** — it already owns the NUMS constant |
-| `crates/md-codec/src/encode.rs`, `decode.rs`, `chunk.rs` | thread the wire version |
-| `crates/md-codec/src/identity.rs` | pass the derived version at both hash sites |
-| `crates/md-codec/src/render.rs` | three render modes for the new kind |
-| `crates/md-codec/src/validate.rs` | §6 refusals |
-| `crates/md-cli/src/parse/template.rs` | `UNSPENDABLE(liana)` marker, `md encode` refusal |
-| `crates/md-cli/src/decompose/{mod,walk}.rs` | the recogniser |
-| `crates/md-codec/tests/liana_unspendable.rs` | **new** — §8 vectors 1, 2, 5, 6 |
+| `crates/md-codec/src/tree.rs:41-57` | define `InternalKey`; `Body::Tr` takes it; port both wire arms with **no byte change** |
+| the 47 other `md-codec/src` production sites | mechanical migration (four shapes — see Step 7) |
+| the 12 `md-cli/src` production sites | same; four of them break the build and ship in this commit |
+| `crates/md-codec/tests/common/vendored.rs` | **new** — `load_vendored_phrase` + `decode_vendored`, `include!`d by both examples and the gate test |
+| `crates/md-codec/examples/dump_{encodings,ids}.rs` | **new** — capture the two pre-change goldens |
+| `crates/md-codec/tests/golden/pre_refactor_{encodings,ids}.json` | **new** — the goldens themselves |
+| `crates/md-codec/tests/internal_key_refactor.rs` | **new** — the byte-equality and non-zero-index gates |
+| `crates/md-codec/tests/common/mod.rs:85` | `tr_node` signature, and its 29 call sites |
+| `fuzz/tests/gen_corpus.rs:182` | its own workspace; nothing in the gate compiles it |
+
+**Not touched by stage 1a**, though the combined plan's table listed them:
+`header.rs`, `nums.rs`, `encode.rs`, `decode.rs`, `chunk.rs`, `identity.rs`,
+`render.rs`, `validate.rs`, `parse/template.rs`, `decompose/`. All are stage 1b.
 
 **Measured blast radius for Task 1** (brace-matched against `#[cfg(test)]`, not guessed):
 
@@ -100,6 +103,7 @@ Its R0 carries forward the findings already banked against it:
 | `md-codec/src` | **47** | 41 |
 | `md-cli/src` | **12** | 25 |
 | `md-codec/tests/` + `md-cli/tests/` | **38** (integration tests — r0 omitted these entirely) | — |
+| `fuzz/tests/gen_corpus.rs:182` | **1**, and **no gate compiles it** — `fuzz/` is its own workspace, so this breaks silently | — |
 
 The load-bearing one in that third row is a shared helper whose signature **is
 the pair being replaced**:
@@ -151,6 +155,21 @@ enumerate `tests/vectors/*.phrase.txt` (**all of them — do NOT reuse
 `keyed_phrase_files()`, which filters `starts_with("keyed_")` and yields 46**),
 read each with `load_vendored_phrase` (Task 1 Step 1a), decode with
 `decode_vendored`, then emit JSON on stdout.
+
+**Where the two helpers live, because an example CANNOT import from `tests/`.**
+`examples/` and `tests/` are separate crate roots and `use` across them does not
+compile. Put both in one file, `crates/md-codec/tests/common/vendored.rs`, and
+pull it into each consumer with `include!` — the mechanism that works across
+roots without shipping test code in the library:
+
+```rust
+// in examples/dump_encodings.rs, examples/dump_ids.rs, and
+// tests/internal_key_refactor.rs alike:
+include!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/common/vendored.rs"));
+```
+
+One reader, three consumers, no divergence, and no `pub mod testsupport`
+leaking into the shipped crate.
 
 - `dump_encodings` → `{count, tr_count, vectors: [[name, hex_of_encode_payload]]}`
 - `dump_ids` → `{count, vectors: [[name, wallet_policy_id, template_id, phrase]]}`
@@ -240,9 +259,8 @@ python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refac
 - [ ] **Step 4: Commit — this commit must contain NO source changes**
 
 ```bash
-git add crates/md-codec/tests/vectors/liana crates/md-codec/tests/golden \
-        crates/md-codec/examples scripts/vendor-liana-evidence.sh
-git commit -m "test: vendor the Liana evidence and capture pre-change goldens"
+git add crates/md-codec/tests/golden crates/md-codec/tests/common crates/md-codec/examples
+git commit -m "test: capture the pre-change encoding and identity goldens"
 git diff HEAD~1 --stat -- crates/md-codec/src crates/md-cli/src   # MUST be empty
 ```
 
@@ -258,7 +276,11 @@ git diff HEAD~1 --stat -- crates/md-codec/src crates/md-cli/src   # MUST be empt
 **Interfaces:**
 - Produces: `pub enum InternalKey { Slot(u8), NumsPoint, LianaUnspendable }` in `md_codec::tree`, and `Body::Tr { internal_key: InternalKey, tree: Option<Box<Node>> }`. Every later task consumes these names exactly.
 
-- [ ] **Step 1: Write the byte-equality guard FIRST — it is the whole gate for this task**
+- [ ] **Step 1: Write the byte-equality guard FIRST — the task's PRIMARY gate**
+
+(Primary, not the only one: `md-cli/tests/vector_corpus.rs` independently
+`diff -r`s the regenerated corpus against the committed one, and the full
+`phase-gate.sh` run in Step 8 is the rest.)
 
 Create `crates/md-codec/tests/internal_key_refactor.rs`:
 
@@ -271,21 +293,59 @@ Create `crates/md-codec/tests/internal_key_refactor.rs`:
 //! a SeedHammer II plate carries, decode them, re-encode, and compare. That
 //! is a stronger gate than re-encoding a parsed template, because the input
 //! is the real wire.
-use md_codec::chunk::reassemble;
 use md_codec::encode::encode_payload;
+
+/// The golden is an OBJECT, not a bare array (Task 0 Step 2).
+#[derive(serde::Deserialize)]
+struct Golden { count: usize, tr_count: usize, vectors: Vec<(String, String)> }
 
 #[test]
 fn every_vendored_wire_vector_re_encodes_to_the_same_bytes() {
-    let golden: Vec<(String, String)> =
+    let g: Golden =
         serde_json::from_str(include_str!("golden/pre_refactor_encodings.json"))
             .expect("golden parses");
-    assert!(!golden.is_empty(), "golden is empty — Step 2 did not run");
-    for (name, want_hex) in &golden {
-        let chunks = load_vendored_phrase(name);          // tests/vectors/<name>.phrase.txt
-        let refs: Vec<&str> = chunks.iter().map(String::as_str).collect();
-        let d = reassemble(&refs).unwrap_or_else(|e| panic!("{name}: reassemble: {e}"));
+    assert_eq!(g.count, 65, "vector population drifted");
+    assert_eq!(g.tr_count, 23, "Body::Tr coverage drifted — this stage is about Tr");
+    assert_eq!(g.vectors.len(), g.count);
+    for (name, want_hex) in &g.vectors {
+        let chunks = load_vendored_phrase(name);   // tests/vectors/<name>.phrase.txt
+        // decode_vendored, NOT reassemble: 13 of the 65 are single-payload
+        // strings, and the chunk reader misreads their first symbol as
+        // version 2. Task 0 Step 2 has the full explanation.
+        let d = decode_vendored(&chunks).unwrap_or_else(|e| panic!("{name}: decode: {e}"));
         let (bytes, _bits) = encode_payload(&d).unwrap_or_else(|e| panic!("{name}: encode: {e}"));
         assert_eq!(hex::encode(&bytes), *want_hex, "wire bytes changed for {name}");
+    }
+}
+```
+
+- [ ] **Step 1b: Pin a NON-ZERO `key_index`, which the corpus does not cover**
+
+Measured over all 65 vectors with `decode_vendored`: 23 carry `Body::Tr`,
+10 `NumsPoint` / 13 `Slot` — and **0 of the 13 `Slot` vectors carry a non-zero
+index**. Widening the corpus from 46 to 65 did not widen this. So the golden
+alone cannot catch a refactor that drops or truncates the index; the only
+existing coverage is the unit test at `tree.rs:559`.
+
+Add a direct round trip, since `Slot(u8)` is the one variant carrying data:
+
+```rust
+/// A minimal `tr(@idx, {pk(@0), pk(@1), pk(@2), pk(@3)})` descriptor whose
+/// internal key is `Slot(idx)`. Needs n >= 8 so `key_index_width` is 3 bits
+/// and an index of 7 is representable -- with the default 4 keys, kiw is 2
+/// and `Slot(7)` would be silently truncated by the width, not by the
+/// refactor, which would make this test lie.
+fn tr_descriptor_with_slot(idx: u8) -> Descriptor { /* build with 8 keys */ }
+
+#[test]
+fn a_non_zero_slot_index_survives_the_round_trip() {
+    // The vendored corpus is all Slot(0) and NumsPoint, so nothing in the
+    // golden would fail if the refactor silently zeroed the index.
+    for idx in [1u8, 2, 7] {
+        let d = tr_descriptor_with_slot(idx);          // kiw >= 3 so idx fits
+        let (bytes, bits) = encode_payload(&d).expect("encode");
+        let back = decode_payload(&bytes, bits).expect("decode");
+        assert_eq!(back, d, "Slot({idx}) did not survive");
     }
 }
 ```
@@ -300,8 +360,9 @@ combined plan three review rounds. This is the only such helper in stage 1a:
 ///
 /// Two shapes exist in that directory and both must be handled: most files
 /// carry a `chunk-set-id:` header line that is NOT part of the payload, and
-/// 13 carry none (their first line IS the md1 string). Those 13 are the
-/// v0.14-era wire-version-2 vectors -- Task 0 skips them by name.
+/// 13 carry none (their first line IS the md1 string). Those 13 are
+/// SINGLE-PAYLOAD vectors (`force_chunked: false`), not a different wire
+/// version -- nothing is skipped; `decode_vendored` picks the right reader.
 fn load_vendored_phrase(name: &str) -> Vec<String> {
     let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/vectors")
@@ -322,11 +383,15 @@ fn load_vendored_phrase(name: &str) -> Vec<String> {
 cd /scratch/code/shibboleth/descriptor-mnemonic
 mkdir -p crates/md-codec/tests/golden
 cargo run --quiet --example dump_encodings > crates/md-codec/tests/golden/pre_refactor_encodings.json
-python3 -c "import json,sys; d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json')); print(len(d),'vectors'); assert d"
+# (superseded — the asserting block in Task 0 Step 2 is the check)
 ```
 
 **The golden must be generated from unmodified code** — a golden captured after
-the refactor proves nothing. Generate and commit it as its own commit BEFORE
+the refactor proves nothing. The golden is generated and committed in **Task 0
+Step 4**, which is a commit of its own containing no source changes — so by the
+time Task 1 Step 9's `git diff --quiet HEAD -- …/golden` runs, the golden is
+already in `HEAD` and the guard is meaningful rather than vacuous. Generate it
+BEFORE
 Step 4 touches `tree.rs`.
 
 - [ ] **Step 3: Run it to confirm it passes on unmodified code**
@@ -342,6 +407,8 @@ In `crates/md-codec/src/tree.rs`, replace the `Tr` variant's fields:
 /// The taproot internal key. Replaces the `is_nums: bool` + `key_index: u8`
 /// pair, whose invariant ("is_nums = true implies key_index = 0, no wire
 /// representation otherwise") was enforced only by a debug_assert.
+// Copy is deliberate: the type is one byte plus a discriminant and is passed
+// by value at ~98 sites; Hash mirrors what Body already derives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InternalKey {
     /// A real, spendable key at this placeholder slot.
@@ -354,9 +421,16 @@ pub enum InternalKey {
 }
 ```
 
-and the variant itself:
+and the variant itself — **including its outer doc comment**, which currently
+describes `is_nums`/`key_index` over five lines at `tree.rs:41-48` and is stale
+the moment the fields change:
 
 ```rust
+/// Tr's body: the taproot internal key plus an optional tap-script-tree root.
+/// Per SPEC v0.30 §7 the wire shape is
+/// `Tag::Tr | is_nums(1) | [key_index(kiw) iff !is_nums] | has_tree(1) | [tree]`.
+/// `InternalKey` replaces the former `is_nums`/`key_index` pair; stage 1a
+/// changes no wire bytes.
 Tr {
     /// The internal key. See [`InternalKey`].
     internal_key: InternalKey,
@@ -379,7 +453,7 @@ Body::Tr { internal_key, tree } => {
             w.write_bits(u64::from(*i), key_index_width as usize);
         }
         // Stage 1a: both non-slot kinds still write exactly the v4 NUMS
-        // encoding. Task 3 is what makes them differ, and only at v8.
+        // encoding. STAGE 1B is what makes them differ, and only at v8.
         InternalKey::NumsPoint | InternalKey::LianaUnspendable => {
             w.write_bits(1, 1);
         }
@@ -413,7 +487,17 @@ Tag::Tr => {
 
 - [ ] **Step 7: Migrate the remaining production sites**
 
-Mechanical. `is_nums: true` → `internal_key: InternalKey::NumsPoint`; `is_nums: false, key_index: i` → `internal_key: InternalKey::Slot(i)`; `if !*is_nums` → `if let InternalKey::Slot(i) = internal_key`. In `compose/tr.rs:45` the expression `is_nums: ik.is_none()` becomes:
+Mechanical. `is_nums: true` → `internal_key: InternalKey::NumsPoint`; `is_nums: false, key_index: i` → `internal_key: InternalKey::Slot(i)`; `if !*is_nums` → `if let InternalKey::Slot(i) = internal_key`. A **fourth** shape exists that none of the three patterns covers — assignment
+*through* the index, at `canonicalize.rs:115`:
+
+```rust
+*key_index = perm[*key_index as usize];                    // before
+if let InternalKey::Slot(i) = internal_key {               // after
+    *internal_key = InternalKey::Slot(perm[*i as usize]);
+}
+```
+
+In `compose/tr.rs:45` the expression `is_nums: ik.is_none()` becomes:
 
 ```rust
 internal_key: match ik {
@@ -451,7 +535,7 @@ starts from a list rather than a search.
 
 **`md-cli` breaks at four production sites and they ship in THIS commit** (`format/json.rs:348`, `parse/reuse.rs:515`, `parse/template.rs:1604`, `:1629`). `seat/compose.rs:148` matches `Body::Tr { tree: Some(t), .. }` and is absorbed by the `..` — do not touch it.
 
-`format/json.rs`'s serde shape is a **published v1 schema**: keep emitting `is_nums: bool` in stage 1a. Task 6 versions it.
+`format/json.rs`'s serde shape is a **published v1 schema**: keep emitting `is_nums: bool` (and `key_index: u8`, which the same struct also carries) in stage 1a. **Stage 1b** versions the schema.
 
 - [ ] **Step 8: Build, then run the gate**
 
@@ -468,15 +552,28 @@ Then run the **full six-command gate**, not two of it, with the pinned
 toolchain on PATH (see Global Constraints) and `--all-targets` so the new
 examples actually build:
 
+**Call the repo's own gate rather than hand-rolling the list.**
+`scripts/phase-gate.sh` exists and already carries every flag — including the
+one a typed list loses:
+
 ```bash
 export PATH=$HOME/.rustup/toolchains/1.85.0-x86_64-unknown-linux-gnu/bin:$PATH
-cargo clippy --version    # must print 0.1.85
-cargo test   --workspace --all-targets --all-features
-cargo test   --workspace --doc         --all-features
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo fmt --all --check
-cargo doc    --workspace --no-deps --document-private-items --all-features
-cargo check  --target x86_64-unknown-freebsd -p md-cli
+cargo clippy --version    # must print 0.1.85, not 0.1.98
+./scripts/phase-gate.sh
+```
+
+**`RUSTDOCFLAGS="-D warnings"` is not optional.** CI sets it at job level
+(`.github/workflows/ci.yml:83`); without it `cargo doc` *warns and exits 0*, so
+the doc leg of a "full gate" cannot fail. That matters here specifically: this
+repo's current HEAD is *"md-codec: docs on public items must not LINK to
+private ones (CI cargo doc)"*, and Step 4 of this task adds an intra-doc link.
+`phase-gate.sh` sets it; a hand-typed list forgets it.
+
+Also run, because `fuzz/` is its **own workspace** and the gate never compiles
+it (see the blast-radius table):
+
+```bash
+( cd fuzz && cargo check --all-targets )   # gen_corpus.rs:182 builds Body::Tr
 ```
 
 - [ ] **Step 9: Commit**
