@@ -73,3 +73,41 @@ on top. `git diff` over the second commit is then exactly the wire change.
 
 This also de-risks the Go port, where the same split applies and where the
 Rust-primary rule means the port cannot lead either half.
+
+## SELF-4 (Important) — §4 emits a literal xpub that `md` cannot read back
+
+§4 rules that at kind 1 the keyed descriptor renders "the **derived literal
+xpub**". The spec never says whether `md` must ACCEPT one on input. Measured, it
+does not, and it fails badly:
+
+    $ md encode "tr(xpub661MyMwAqRbcFswVugWF.../<0;1>/*,{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})" --path bip48
+    md: template parse error: internal: synthetic key xpub661MyMwAqRbcFswVugWF... not found in key map
+        (rendered: xpub661MyMwAqRbcFswVugWF.../<0;1>/*)
+
+Two distinct defects:
+
+1. **An internal invariant leaks as a user-facing parse error.** "internal:
+   synthetic key ... not found in key map" is not a refusal anybody can act on.
+   Whatever the scope ruling, this string should never reach a user.
+
+2. **The round trip is open.** The spec's §8 criterion 4 requires "encode →
+   decode → render is byte-stable", but for kind 1 the *entry* to that loop does
+   not exist — md can write a descriptor it cannot read. This project's own
+   record is emphatic that a round trip which was never run is not a property
+   ("Success is not round-trip"; "A round trip is not a restore test").
+
+Why it is worth more than a refusal, and why I think it changes the design: if
+`md encode` RECOGNISES the form — recompute §2's recipe over the parsed leaf
+keys and accept the descriptor as kind 1 **only when the xpub matches** — then
+the recipe stops being something md merely emits and becomes something md can
+**verify**. That yields two things the spec does not currently have:
+
+- an operator can hand md an existing Liana taproot descriptor and engrave it,
+  which is the natural other half of "let a user make a Liana-compatible wallet";
+- any xpub in that position which is NOT the recipe's output gets caught, rather
+  than being silently treated as a spendable key — which is exactly the failure
+  mode lens 5 measured on Liana's side (`InvalidKey`, because a non-recipe xpub
+  has no origin).
+
+The author must either take that scope or rule it out explicitly and replace the
+internal error with a real refusal. Silence is the one option that is wrong.
