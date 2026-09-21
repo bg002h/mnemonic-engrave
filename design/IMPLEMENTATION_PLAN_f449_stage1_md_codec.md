@@ -8,8 +8,9 @@
 
 **Tech Stack:** Rust (crates `md-codec`, `md-cli`), `bitcoin` + `rust-miniscript`, `cargo nextest`.
 
-**Status:** r1, folded from the plan R0 review (1C/10I/7M/4N,
-`design/agent-reports/f449-plan-stage1-r0.md`). Awaiting re-review.
+**Status:** r2, folded from the plan R0 (1C/10I/7M/4N) and its re-review
+(0C/6I/16M). Reports: `design/agent-reports/f449-plan-stage1-{r0,r1}.md`.
+Awaiting re-review.
 
 **Spec:** `design/SPEC_liana_unspendable_internal_key.md` (GREEN at `a621cfdf`, 0C/0I after nine review passes). **Read it — this plan argues from it and does not restate it.**
 
@@ -69,24 +70,48 @@ than transcribed" claim was false.
 `scripts/vendor-liana-evidence.sh <path-to-mnemonic-engrave>` extracts the eight
 `liana-unspendable-xpub` records and their `md` counterparts into
 `tests/vectors/liana/cases.json`, one object per case: `name`, `accepted`,
-`leaf_pubkeys_hex` (33-byte, wire order), `expected_xpub`,
-`descriptor_with_checksum`, `liana_receive[3]`, `liana_change[3]`. It records the
+**`leaf_tlv_hex` — the full 65-byte `chain code ‖ compressed pubkey` entries in
+wire order** (`validate.rs:331-335`, `:348`), `leaf_pubkeys_hex` (the 33-byte
+slices at `[32..65]`, which is what §2 hashes), `expected_xpub`,
+`descriptor_with_checksum`, `liana_receive[3]`, `liana_change[3]`.
+
+**The 65-byte entries are required, not redundant.** Task 5 and Task 8 must
+build a real md1 `Descriptor` carrying seated keys at kind 1; the 33-byte
+pubkeys alone cannot do that, because a TLV entry needs its chain code. It records the
 source commit SHA in the output so drift is visible. Script and output are both
 committed; the fixture is then reproducible inside this repo.
 
 - [ ] **Step 2: Capture the encodings golden — from UNMODIFIED code**
 
-r0 gave two conflicting enumerations in consecutive paragraphs, and **both
-readings lose the `tr`/NUMS vectors**: `keyed_phrase_files()` filters
-`starts_with("keyed_")` → **46 files**; the bare glob → **65 files**, of which
-**13 carry no `chunk-set-id:` header** (their first line *is* the md1 string).
-Enumerate all 65 and handle both header shapes explicitly.
+**MEASURED, and this corrects r0 of this plan AND its reviewer.** The 13
+header-less files are not a different header shape — their payloads are
+**v0.14-era wire version 2**, which the shipped decoder does not support at all:
+
+```
+total=65  noheader=13  ok=52  reassemble_err=13  encode_err=0
+REASSEMBLE_ERR nums_taproot: wire-format version mismatch: got 2, expected 4
+```
+
+So "enumerate all 65" cannot execute — it halts on the first version-2 file.
+And r0's stated reason for widening the enumeration was **false**: the `keyed_`
+filter does *not* lose the `tr`/NUMS vectors. Of the **52 decodable** vectors,
+**20 carry `Body::Tr`, 18 of them `keyed_*`**.
+
+The enumeration is therefore **the 52 decodable vectors**, with the 13 skipped
+**explicitly and by asserted count**, so the skip set cannot silently grow:
+
+```python
+assert ok == 52 and skipped == 13, f"vector population drifted: {ok=} {skipped=}"
+```
+
+A bare `len(d)==65` would fail on the first run; a silent `try/except` around
+reassemble would let a future decode regression shrink the corpus invisibly.
 
 ```bash
 cd /scratch/code/shibboleth/descriptor-mnemonic
 mkdir -p crates/md-codec/tests/golden
 cargo run --quiet --example dump_encodings > crates/md-codec/tests/golden/pre_refactor_encodings.json
-python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json'));assert len(d)==65,f'expected 65 got {len(d)}';print(len(d),'vectors')"
+python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json'));assert len(d)==52,f'expected 52 decodable, got {len(d)}';print(len(d),'vectors')"
 ```
 
 - [ ] **Step 3: Capture the IDENTITY golden — also before anything moves**
@@ -97,11 +122,13 @@ post-change output to itself and `every_existing_v4_identity_is_byte_preserved`
 becomes **a test that cannot fail**.
 
 `examples/dump_ids.rs` emits `[[name, wallet_policy_id, template_id, phrase], …]`
-over the same 65 vectors.
+over the same **52** vectors — a **4-tuple**. Task 8 Step 3's reader must
+destructure all four and assert all three captured values; r0's reader took a
+2-tuple and so pinned **one of three**.
 
 ```bash
 cargo run --quiet --example dump_ids > crates/md-codec/tests/golden/pre_refactor_ids.json
-python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_ids.json'));assert len(d)==65;print(len(d),'ids')"
+python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_ids.json'));assert len(d)==52;print(len(d),'ids')"
 ```
 
 - [ ] **Step 4: Commit — this commit must contain NO source changes**
@@ -730,8 +757,22 @@ pub fn to_miniscript_descriptor_multipath(d: &Descriptor) -> Result<..., Error> 
 ```
 
 Zero of the 55 existing sites change, and no caller can get a wrong-network
-xpub by accident. `cmd/descriptor.rs` already has `args.network` (`:62`, `:128`)
-and switches to the `_with_network` form.
+xpub by accident.
+
+**TWO call sites switch to the `_with_network` form, not one.** r0 named only
+`cmd/descriptor.rs` (which already has `args.network` at `:62`, `:128`). The
+one it missed is the funds-relevant one:
+
+- **`derive.rs:134`** — `let desc = crate::to_miniscript::to_miniscript_descriptor(self, chain)?;`
+  inside `derive_address(&self, chain, index, network)` (`:88-97`). It **already
+  has a `network` parameter in scope**; it simply was not passing it down.
+  `md address` reaches it directly (`cmd/address.rs:82`).
+
+Without this, every kind-1 address derivation returns
+`Err(NetworkRequiredForUnspendable)` and **Task 8 Step 2's three-way address
+equality against Liana's own receive/change triples — the funds-relevant half
+of the acceptance vectors — cannot pass.** The refusal would have disabled the
+exact thing this stage must measure.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -919,7 +960,13 @@ Expected: FAIL — `md encode` emits `internal: synthetic key … not found in k
 Per §4a's table:
 
 - **`md decompose`** holds the real leaf keys, so it **recomputes** §2 and accepts kind 1 only on a byte match. On a mismatch it falls back to **today's** annotated-slot behaviour — it must not gain a new refusal, or it locks out libnunchuk's PR-1746 form and real origin-less spendable keys.
-- **The template grammar** gains a substitution rule for `UNSPENDABLE(liana)` in `walk_tr`, before the `NUMS_H_POINT_X_ONLY_HEX` comparison at `:1601`.
+- **The template grammar** gains a substitution rule for `UNSPENDABLE(liana)` in
+  **`substitute_synthetic` (`:1047-1084`)** — NOT in `walk_tr`. `walk_tr` runs
+  *after* `Descriptor::from_str`, and `UNSPENDABLE(liana)` is not a valid
+  descriptor key expression, so `from_str` fails before `walk_tr` is ever
+  reached. SPEC §4a says "via a substitution rule" for exactly this reason.
+  Substitute it to a recognisable synthetic key on the way in, then map that key
+  back to `InternalKey::LianaUnspendable` at the `Tr` node.
 - **`md encode` with a literal xpub** **cannot** recompute: `substitute_synthetic` (`:1047-1084`) replaces every `@i` with a `sha256(b"md-v0.15" ‖ i ‖ depth)` placeholder *before* `walk_tr` sees the tree, so the leaves are synthetic and the match can never succeed. It **refuses**, naming both working spellings. This replaces the internal-error leak, which is the actual defect.
 
 - [ ] **Step 4: Version the JSON schema**
@@ -993,7 +1040,46 @@ fn the_minimum_version_rule_is_a_PROPERTY_of_wire_version_not_a_refusal() {
 Run: `cargo nextest run --locked -p md-codec liana_unspendable`
 Expected: FAIL — none of these error variants exist.
 
-- [ ] **Step 3: Implement the four refusals and their `Error` variants in `error.rs`.**
+- [ ] **Step 3: Implement the four refusals — ENCODE-SIDE ONLY**
+
+There is **no function called `validate`**. `validate.rs` exposes **ten**
+production `validate_*` functions (the review said eleven; counted by
+brace-matching `#[cfg(test)]`, it is ten) — `validate_placeholder_usage`,
+`validate_multipath_consistency`, `validate_use_site_overrides_canonical`,
+`validate_relative_timelocks`, `validate_tap_script_tree`,
+`validate_explicit_origin_required`, `validate_xpub_bytes`,
+`validate_no_duplicate_key_slots`, `validate_origin_key_consistency`,
+`validate_no_empty_origin_overrides` — reached from **two** places with
+**different policy**:
+`encode_payload_inner` (`encode.rs:152-172`, two of them behind
+`Admission::Enforce`) and `decode_payload_with_opts` (`decode.rs:120-150`).
+The tests above must call the specific `validate_*` they mean, or go through
+`encode_payload`.
+
+**The four §6 refusals hook into the ENCODE/admission path and MUST NOT reach
+decode.** This is not a style preference — the crate records a measured funds
+regression at `encode.rs:116-131`, verbatim:
+
+> THIS EXISTS BECAUSE THE ENCODE-SIDE REFUSALS WERE REACHING DECODE. …
+> `chunk::reassemble` — a DECODE path — verifies a chunk set by recomputing the
+> md1 encoding id, `compute_md1_encoding_id` called `encode_payload`, and
+> `encode_payload` applies admission policy. So every rule added to the mint
+> path retroactively made older cards of that shape undecodable. Measured
+> 2026-09-19: a 2-of-2 emitted by the shipped toolkit stopped reading.
+
+A refusal added to the decode side here would make **existing plates
+unreadable**. Add each rule where `Admission::Enforce` already gates, and add a
+test that a chunk set carrying the refused shape still *decodes*:
+
+```rust
+#[test]
+fn a_refused_shape_still_DECODES_so_existing_cards_never_stop_reading() {
+    // The 2026-09-19 regression in one assertion: minting refuses it,
+    // reading it back does not.
+    let bytes = encode_payload_unchecked(&tr_liana_with_sortedmulti_a_leaf()).unwrap();
+    assert!(decode_payload(&bytes).is_ok(), "a mint-side refusal reached decode");
+}
+```
 
 - [ ] **Step 4: Run**
 
@@ -1017,16 +1103,35 @@ git commit -m "feat(validate): SPEC §6's refusals for the Liana internal-key ki
 
 The gate is a deduction from a measurement: those exact strings were fed to `LianaDescriptor::from_str` at **v8.0 and v15.0** and came back ACCEPT. Byte-identical output therefore imports.
 
+**The kind-1 chunks are CONSTRUCTED here, not vendored.** No md1 card of this
+kind exists anywhere yet — this stage is what creates the first one — so r0's
+`/* the kind-1 chunks for this shape */` was a live TBD with nothing to fill it.
+Build the `Descriptor` from `cases.json`'s 65-byte entries, set
+`InternalKey::LianaUnspendable`, and encode it; that IS the chunk set.
+
 ```rust
+fn kind1_chunks(case: &Case) -> Vec<String> {
+    let d = descriptor_from_tlv_entries(&case.leaf_tlv_hex, InternalKey::LianaUnspendable);
+    assert_eq!(d.wire_version(), 8, "{}: must be a version-8 payload", case.name);
+    md_codec::encode::encode_md1_chunks(&d).expect("encode")
+}
+
 #[test]
 fn md_emits_byte_identical_descriptors_for_the_four_liana_accepted_shapes() {
-    for case in GOLDEN_ACCEPTED {           // 4 cases
-        let got = md(&["descriptor", /* the kind-1 chunks for this shape */]);
+    for case in GOLDEN_ACCEPTED {           // the 4 with accepted == true
+        let chunks = kind1_chunks(case);
+        let mut argv = vec!["descriptor".to_string()];
+        argv.extend(chunks);
+        let got = md_argv(&argv);
         assert_eq!(got.trim(), case.descriptor_with_checksum,
-                   "{} — checksum included, it is part of the gate", case.name);
+                   "{} — the checksum is part of the gate", case.name);
     }
 }
 ```
+
+`descriptor_from_tlv_entries` is a test helper built once in this task and
+reused by Task 5 Step 2's `descriptor_with_real_keys_at_liana_kind()`, which has
+the same need.
 
 - [ ] **Step 2: Address equality, three-way, and DIFFERENCE from kind 0**
 
