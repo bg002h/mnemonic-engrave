@@ -325,12 +325,6 @@ cargo run --quiet --example dump_encodings > crates/md-codec/tests/golden/pre_re
 python3 -c "import json,sys; d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json')); print(len(d),'vectors'); assert d"
 ```
 
-Create `crates/md-codec/examples/dump_encodings.rs` modelled on the existing
-`examples/dump_skeleton_keys.rs`: enumerate `tests/vectors/*.phrase.txt`,
-`reassemble` each, `encode_payload`, and print `[[name, hex], …]` as JSON.
-Reuse that file's `conformance_dir()` / `keyed_phrase_files()` helpers rather
-than writing new ones.
-
 **The golden must be generated from unmodified code** — a golden captured after
 the refactor proves nothing. Generate and commit it as its own commit BEFORE
 Step 4 touches `tree.rs`.
