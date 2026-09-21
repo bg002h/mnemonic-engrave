@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust (crates `md-codec`, `md-cli`), `bitcoin` + `rust-miniscript`, `cargo nextest`.
 
-**Status:** r2, folded from the plan R0 (1C/10I/7M/4N) and its re-review
+**Status:** r1, folded from the stage-1a R0 (2C/8I/8M/3N, `design/agent-reports/f449-plan-stage1a-r0.md`). Awaiting re-review.
 (0C/6I/16M). Reports: `design/agent-reports/f449-plan-stage1-{r0,r1}.md`.
 Awaiting re-review.
 
@@ -99,6 +99,20 @@ Its R0 carries forward the findings already banked against it:
 | --- | --- | --- |
 | `md-codec/src` | **47** | 41 |
 | `md-cli/src` | **12** | 25 |
+| `md-codec/tests/` + `md-cli/tests/` | **38** (integration tests — r0 omitted these entirely) | — |
+
+The load-bearing one in that third row is a shared helper whose signature **is
+the pair being replaced**:
+
+```rust
+// crates/md-codec/tests/common/mod.rs:85
+pub fn tr_node(is_nums: bool, key_index: u8, tree: Option<Node>) -> Node
+```
+
+It has **29 call sites** across the test suites. Change its signature to
+`tr_node(internal_key: InternalKey, tree: Option<Node>)` and update all 29; that
+is most of the 38. A plan that counts only `src/` understates this task by a
+third.
 
 ---
 
@@ -110,84 +124,100 @@ the code under test is in `descriptor-mnemonic`, which has no `design/evidence/`
 at all. A generator committed here cannot read it, so r0's "reproducible rather
 than transcribed" claim was false.
 
-**Files:** create `crates/md-codec/tests/vectors/liana/cases.json`,
-`scripts/vendor-liana-evidence.sh`, `crates/md-codec/tests/golden/pre_refactor_{encodings,ids}.json`,
-`crates/md-codec/examples/dump_{encodings,ids}.rs`.
+**Files:** create `crates/md-codec/tests/golden/pre_refactor_{encodings,ids}.json`
+and `crates/md-codec/examples/dump_{encodings,ids}.rs`. **Nothing under
+`crates/md-codec/tests/vectors/`** — that is a generated corpus under a
+`diff -r` drift test.
 
-- [ ] **Step 1: Vendor the evidence with a COMMITTED script**
+**`cases.json` is NOT in stage 1a.** r0 of this plan vendored the Liana
+evidence here and put it under `crates/md-codec/tests/vectors/`. Two things
+were wrong: that fixture serves stage **1b**'s Liana tests and stage 1a never
+reads it, and `tests/vectors/` is a **generated** corpus guarded by a `diff -r`
+drift test (`md-cli/tests/vector_corpus.rs:22,26`) that runs inside this plan's
+own gate — a new subdirectory there turns it RED. Stage 1b vendors it, under
+`crates/md-codec/tests/fixtures/liana/`, which no drift test covers.
 
-`scripts/vendor-liana-evidence.sh <path-to-mnemonic-engrave>` extracts the eight
-`liana-unspendable-xpub` records and their `md` counterparts into
-`tests/vectors/liana/cases.json`, one object per case: `name`, `accepted`,
-**`leaf_tlv_hex` — the full 65-byte `chain code ‖ compressed pubkey` entries in
-wire order** (`validate.rs:331-335`, `:348`), `leaf_pubkeys_hex` (the 33-byte
-slices at `[32..65]`, which is what §2 hashes), `expected_xpub`,
-`descriptor_with_checksum`, `liana_receive[3]`, `liana_change[3]`.
+Stage 1a needs exactly two artifacts, both under `tests/golden/`: the encodings
+golden and the identity golden.
 
-**The 65-byte entries are required, not redundant.** Task 5 and Task 8 must
-build a real md1 `Descriptor` carrying seated keys at kind 1; the 33-byte
-pubkeys alone cannot do that, because a TLV entry needs its chain code. It records the
-source commit SHA in the output so drift is visible. Script and output are both
-committed; the fixture is then reproducible inside this repo.
+- [ ] **Step 1: Write the two example binaries — they do not exist yet**
+
+r0 ran `cargo run --example dump_encodings` in a step before any step created
+it, and never created `dump_ids.rs` at all. Both are new files.
+
+`crates/md-codec/examples/dump_encodings.rs` and `examples/dump_ids.rs` share
+the same skeleton, modelled on the existing `examples/dump_skeleton_keys.rs`:
+enumerate `tests/vectors/*.phrase.txt` (**all of them — do NOT reuse
+`keyed_phrase_files()`, which filters `starts_with("keyed_")` and yields 46**),
+read each with `load_vendored_phrase` (Task 1 Step 1a), decode with
+`decode_vendored`, then emit JSON on stdout.
+
+- `dump_encodings` → `{count, tr_count, vectors: [[name, hex_of_encode_payload]]}`
+- `dump_ids` → `{count, vectors: [[name, wallet_policy_id, template_id, phrase]]}`
+  using `compute_wallet_policy_id`, `compute_wallet_descriptor_template_id` and
+  `WalletPolicyId::to_phrase` — those are the real API names.
+
+Examples are **not** built by `cargo build`; build them with `--all-targets` or
+by running them.
 
 - [ ] **Step 2: Capture the encodings golden — from UNMODIFIED code**
 
-**MEASURED, and this corrects r0 of this plan AND its reviewer.** The 13
-header-less files are not a different header shape — their payloads are
-**v0.14-era wire version 2**, which the shipped decoder does not support at all:
+**The corpus is all 65 — there is nothing to skip, and r0's skip rule was built
+on a misdiagnosis I propagated.** The 13 files that fail `reassemble` are not
+"v0.14-era wire version 2". They are **current single-payload md1 strings**:
+`test_vectors.rs` has exactly **13** entries with `force_chunked: false`
+(verified). `reassemble` is the *chunk* reader, and a chunk header reads bits
+4..1 of a single-payload first symbol as its version — which for version 4
+yields **2**. `header.rs:109` already pins that exact error, and SPEC §3c
+documents the same mechanism as the reason wire version 5 is unusable.
 
-```
-total=65  noheader=13  ok=52  reassemble_err=13  encode_err=0
-REASSEMBLE_ERR nums_taproot: wire-format version mismatch: got 2, expected 4
-```
-
-So "enumerate all 65" cannot execute — it halts on the first version-2 file.
-And r0's stated reason for widening the enumeration was **false**: the `keyed_`
-filter does *not* lose the `tr`/NUMS vectors. Of the **52 decodable** vectors,
-**20 carry `Body::Tr`, 18 of them `keyed_*`**.
-
-The enumeration is therefore **the 52 decodable vectors**, with the 13 skipped
-**explicitly and by asserted count**, so the skip set cannot silently grow:
-
-The generator emits **both** counts, and both are asserted — r2's MIN-18 found
-that only `ok` was checked, so the one drift shape the rule promises to catch
-(a new undecodable vector: total 66, ok 52, skipped 14) passed silently.
-
-`dump_encodings.rs` writes an object, not a bare array:
-
-```json
-{ "ok": 52, "skipped": 13,
-  "skipped_names": ["nums_taproot", "pkh_basic", "..."],
-  "vectors": [["keyed_...", "a1b2..."], ...] }
-```
-
-and the skip rule is **explicit, not a swallowed error** — skip a vector only
-when `reassemble` returns `WireVersionMismatch { got: 2 }`, and propagate every
-other error:
+So the fix is the right reader, not a skip list:
 
 ```rust
-match reassemble(&refs) {
-    Ok(d)  => { ok += 1; /* encode and record */ }
-    Err(Error::WireVersionMismatch { got: 2 }) => { skipped.push(name); }
-    Err(e) => panic!("{name}: unexpected decode failure: {e}"),  // never swallow
+/// Decode a vendored vector, choosing the reader by shape. A chunk SET goes
+/// through `reassemble`; a single-payload string goes through
+/// `decode_md1_string`, whose auto-dispatch reads bit 0 of the first symbol.
+/// Using `reassemble` for both is what made 13 of 65 look like "version 2".
+fn decode_vendored(chunks: &[String]) -> Result<Descriptor, md_codec::Error> {
+    if chunks.len() == 1 {
+        md_codec::decode::decode_md1_string(&chunks[0])
+    } else {
+        let refs: Vec<&str> = chunks.iter().map(String::as_str).collect();
+        md_codec::chunk::reassemble(&refs)
+    }
 }
 ```
 
-```bash
-python3 - <<'CHK'
-import json; d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json'))
-assert d["ok"]==52 and d["skipped"]==13, f"vector population drifted: {d['ok']=} {d['skipped']=}"
-assert len(d["vectors"])==d["ok"]
-print(d["ok"], "encoded,", d["skipped"], "skipped as wire version 2")
-CHK
+All **65** decode. `Body::Tr` coverage is **23**, not 20 — r0 would have dropped
+20% of the corpus while asserting the gap was intentional.
+
+`dump_encodings.rs` writes an object, so the population is asserted and not just
+the payload. **There is no skip list**, and a decode failure is a hard error
+rather than a quietly shrinking corpus:
+
+```rust
+let d = decode_vendored(&chunks)
+    .unwrap_or_else(|e| panic!("{name}: decode failed: {e}"));   // never swallow
+```
+
+```json
+{ "count": 65, "tr_count": 23, "vectors": [["keyed_...", "a1b2..."], ...] }
 ```
 
 ```bash
-cd /scratch/code/shibboleth/descriptor-mnemonic
-mkdir -p crates/md-codec/tests/golden
 cargo run --quiet --example dump_encodings > crates/md-codec/tests/golden/pre_refactor_encodings.json
-# (the assertion block below replaces this one-liner)
+python3 - <<'CHK'
+import json; d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json'))
+assert d["count"]==65,    f"vector population drifted: {d['count']}"
+assert d["tr_count"]==23, f"Body::Tr coverage drifted: {d['tr_count']}"
+assert len(d["vectors"])==65
+print(d["count"], "vectors,", d["tr_count"], "carrying Body::Tr")
+CHK
 ```
+
+Both counts are asserted because each catches a different drift: `count` catches
+a vector added or lost; `tr_count` catches the corpus silently losing the
+coverage this stage is actually about.
 
 - [ ] **Step 3: Capture the IDENTITY golden — also before anything moves**
 
@@ -197,13 +227,14 @@ post-change output to itself and `every_existing_v4_identity_is_byte_preserved`
 becomes **a test that cannot fail**.
 
 `examples/dump_ids.rs` emits `[[name, wallet_policy_id, template_id, phrase], …]`
-over the same **52** vectors — a **4-tuple**. Task 8 Step 3's reader must
-destructure all four and assert all three captured values; r0's reader took a
-2-tuple and so pinned **one of three**.
+over the same **65** vectors — a **4-tuple**. Any reader must destructure all
+four and assert all three captured values; the combined plan's reader took a
+2-tuple over a 4-tuple golden and so pinned **one of three**, silently
+discarding the 12-word phrase an operator reads off steel.
 
 ```bash
 cargo run --quiet --example dump_ids > crates/md-codec/tests/golden/pre_refactor_ids.json
-python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_ids.json'));assert d['ok']==52 and d['skipped']==13;assert all(len(r)==4 for r in d['vectors']),'ids must be 4-tuples: name, policy_id, template_id, phrase';print(d['ok'],'ids')"
+python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_ids.json'));assert d['count']==65;assert all(len(r)==4 for r in d['vectors']),'must be 4-tuples: name, policy_id, template_id, phrase';print(d['count'],'ids')"
 ```
 
 - [ ] **Step 4: Commit — this commit must contain NO source changes**
@@ -397,6 +428,33 @@ internal_key: match ik {
 },
 ```
 
+**RULING for `InternalKey::LianaUnspendable` at every non-encode site: it takes
+the NUMS branch, everywhere, with no `todo!()` and no `unreachable!()`.**
+
+This is the plan's one genuinely load-bearing choice, so it is made here rather
+than left to the implementer. Four production sites have the *inverse* shape —
+`if *is_nums { … } else { … key_index … }` — where the three rewrites above do
+not apply, because the `else` arm consumes an index the new variant does not
+carry:
+
+| site | current | stage-1a rule |
+| --- | --- | --- |
+| `md-codec/src/render.rs:194` | `if *is_nums { NUMS_H_POINT_X_ONLY_HEX } else { render_key(…) }` | `NumsPoint \| LianaUnspendable => NUMS hex` |
+| `md-codec/src/to_miniscript.rs:341` | `if *is_nums { build_nums_internal_key()? } else { lookup_key(…)? }` | `NumsPoint \| LianaUnspendable => build_nums_internal_key()?` |
+| `md-codec/src/policy_shape.rs:250` | `s.key_path = if *is_nums { Nums } else { Xpub }` | `NumsPoint \| LianaUnspendable => Nums` |
+| `md-cli/src/format/json.rs:353` | `is_nums: *is_nums, key_index: *key_index` | emit `is_nums: true, key_index: 0` for both |
+
+**Why NUMS and not a panic.** Both are behaviour-preserving in 1a *because the
+variant is never constructed* — which is precisely why no gate in this plan can
+tell them apart, and why leaving it to the implementer means stage 1b inherits
+a coin flip. A `todo!()` is a latent panic that fires the moment 1b constructs
+the variant, in code paths (rendering, address derivation) that are reached with
+funds on the line. Mapping to NUMS keeps stage 1a exactly neutral and makes
+stage 1b's diff show each site being *deliberately* changed.
+
+**Stage 1b changes all four.** Note them in the stage's completion so 1b's plan
+starts from a list rather than a search.
+
 **`md-cli` breaks at four production sites and they ship in THIS commit** (`format/json.rs:348`, `parse/reuse.rs:515`, `parse/template.rs:1604`, `:1629`). `seat/compose.rs:148` matches `Body::Tr { tree: Some(t), .. }` and is absorbed by the `..` — do not touch it.
 
 `format/json.rs`'s serde shape is a **published v1 schema**: keep emitting `is_nums: bool` in stage 1a. Task 6 versions it.
@@ -407,12 +465,41 @@ internal_key: match ik {
 cargo build --locked --workspace
 cargo nextest run --locked --workspace
 ```
-Expected: **1400 passed / 3 skipped**, and `internal_key_refactor` green. Any wire-byte change fails it by vector name.
+Expected: **1400 + the new tests passed, 3 skipped** — the count rises, it does
+not stay at 1400, because this task adds `internal_key_refactor`. Assert the
+shape, not a stale number: 3 skipped, 0 failed, and `internal_key_refactor`
+green. Any wire-byte change fails it by vector name.
+
+Then run the **full six-command gate**, not two of it, with the pinned
+toolchain on PATH (see Global Constraints) and `--all-targets` so the new
+examples actually build:
+
+```bash
+export PATH=$HOME/.rustup/toolchains/1.85.0-x86_64-unknown-linux-gnu/bin:$PATH
+cargo clippy --version    # must print 0.1.85
+cargo test   --workspace --all-targets --all-features
+cargo test   --workspace --doc         --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo fmt --all --check
+cargo doc    --workspace --no-deps --document-private-items --all-features
+cargo check  --target x86_64-unknown-freebsd -p md-cli
+```
 
 - [ ] **Step 9: Commit**
 
+**Before staging, prove the golden was NOT regenerated.** r0 re-staged
+`tests/golden/` in this commit with no check — and a golden regenerated after
+the refactor pins post-change output to itself, leaving the gate green while
+proving nothing. The golden was committed in Task 0 and must be byte-identical
+now:
+
 ```bash
-git add crates/md-codec/src crates/md-cli/src crates/md-codec/tests/internal_key_refactor.rs crates/md-codec/tests/golden crates/md-codec/examples
+git diff --quiet HEAD -- crates/md-codec/tests/golden \
+  || { echo "REFUSING: the golden changed since Task 0 — it must not be regenerated"; exit 1; }
+```
+
+```bash
+git add crates/md-codec/src crates/md-cli/src crates/md-codec/tests
 git commit -m "refactor: Body::Tr takes an InternalKey sum type, zero wire change
 
 Retires the is_nums/key_index pair whose invariant was a debug_assert.
