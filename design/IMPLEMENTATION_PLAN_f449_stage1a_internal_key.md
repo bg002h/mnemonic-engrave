@@ -25,6 +25,30 @@ Awaiting re-review.
 - **Version bytes come from the render-time `--network` flag, not the wire.** md1 carries no version bytes; its TLV pubkey entries are 65 bytes, `chain code ‖ compressed pubkey`, with the pubkey at `[32..65]` (`validate.rs:331-335`, `:348`).
 - **`md-cli` pins `md-codec = { path = "../md-codec", version = "=0.45.1" }` (`crates/md-cli/Cargo.toml:28`) in the same workspace.** Any md-codec version bump and the md-cli call-site repairs ship **in the same commit**, or cargo cannot resolve before rustc runs.
 - **Speed without losing checks:** `cargo nextest run --locked`. Never `--release` for tests — it drops `debug_assertions`.
+- **USE THE PINNED CLIPPY, or you will chase lints CI never sees.**
+  `rust-toolchain.toml` pins **1.85.0**, but a bare `cargo clippy` on this
+  machine runs **clippy 0.1.98** and fails the workspace at baseline with
+  `needless_range_loop` in `crates/md-codec/tests/parity_smoke.rs:228`,
+  `contains()`/`iter().any()`, and a `format!` lint — **none of which are
+  defects, and none of which CI reports.** Measured on unmodified `main`:
+
+  | clippy | `-D warnings` exit |
+  | --- | --- |
+  | `0.1.98` (bare `cargo clippy`) | **101** |
+  | `0.1.85` (pinned) | **0**, zero diagnostics |
+
+  Prepend the pinned toolchain's bin, which is what makes the versions match:
+
+  ```bash
+  export PATH=$HOME/.rustup/toolchains/1.85.0-x86_64-unknown-linux-gnu/bin:$PATH
+  cargo clippy --version   # must print 0.1.85
+  ```
+
+  If you "fix" a `parity_smoke.rs` lint, you have edited unrelated test code to
+  satisfy a compiler CI does not run.
+- **Baseline in the worktree is green on all six CI commands** (fmt 0,
+  clippy-pinned 0, doc 0, tests 1400 passed / 3 skipped). Any gate failure
+  during this stage is therefore attributable to your change.
 - **Every task ends green.** A red suite is itself a blocking finding.
 
 ---
