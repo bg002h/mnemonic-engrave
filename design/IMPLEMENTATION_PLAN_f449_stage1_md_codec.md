@@ -8,6 +8,9 @@
 
 **Tech Stack:** Rust (crates `md-codec`, `md-cli`), `bitcoin` + `rust-miniscript`, `cargo nextest`.
 
+**Status:** r1, folded from the plan R0 review (1C/10I/7M/4N,
+`design/agent-reports/f449-plan-stage1-r0.md`). Awaiting re-review.
+
 **Spec:** `design/SPEC_liana_unspendable_internal_key.md` (GREEN at `a621cfdf`, 0C/0I after nine review passes). **Read it — this plan argues from it and does not restate it.**
 
 **Baselines:** descriptor-mnemonic `6cbd49d8`, seedhammer `7b6f2fb`. Suite at baseline: **1400 passed / 3 skipped**.
@@ -37,7 +40,7 @@
 | `crates/md-codec/src/render.rs` | three render modes for the new kind |
 | `crates/md-codec/src/validate.rs` | §6 refusals |
 | `crates/md-cli/src/parse/template.rs` | `UNSPENDABLE(liana)` marker, `md encode` refusal |
-| `crates/md-cli/src/cmd/decompose.rs` | the recogniser |
+| `crates/md-cli/src/decompose/{mod,walk}.rs` | the recogniser |
 | `crates/md-codec/tests/liana_unspendable.rs` | **new** — §8 vectors 1, 2, 5, 6 |
 
 **Measured blast radius for Task 1** (brace-matched against `#[cfg(test)]`, not guessed):
@@ -46,6 +49,69 @@
 | --- | --- | --- |
 | `md-codec/src` | **47** | 41 |
 | `md-cli/src` | **12** | 25 |
+
+---
+
+## Task 0: vendor the Liana evidence, and capture BOTH pre-change goldens
+
+**r0 cited the evidence by bare relative path. It lives in a DIFFERENT
+REPOSITORY** — `mnemonic-engrave/design/evidence/composer-fable-r0/` — while
+the code under test is in `descriptor-mnemonic`, which has no `design/evidence/`
+at all. A generator committed here cannot read it, so r0's "reproducible rather
+than transcribed" claim was false.
+
+**Files:** create `crates/md-codec/tests/vectors/liana/cases.json`,
+`scripts/vendor-liana-evidence.sh`, `crates/md-codec/tests/golden/pre_refactor_{encodings,ids}.json`,
+`crates/md-codec/examples/dump_{encodings,ids}.rs`.
+
+- [ ] **Step 1: Vendor the evidence with a COMMITTED script**
+
+`scripts/vendor-liana-evidence.sh <path-to-mnemonic-engrave>` extracts the eight
+`liana-unspendable-xpub` records and their `md` counterparts into
+`tests/vectors/liana/cases.json`, one object per case: `name`, `accepted`,
+`leaf_pubkeys_hex` (33-byte, wire order), `expected_xpub`,
+`descriptor_with_checksum`, `liana_receive[3]`, `liana_change[3]`. It records the
+source commit SHA in the output so drift is visible. Script and output are both
+committed; the fixture is then reproducible inside this repo.
+
+- [ ] **Step 2: Capture the encodings golden — from UNMODIFIED code**
+
+r0 gave two conflicting enumerations in consecutive paragraphs, and **both
+readings lose the `tr`/NUMS vectors**: `keyed_phrase_files()` filters
+`starts_with("keyed_")` → **46 files**; the bare glob → **65 files**, of which
+**13 carry no `chunk-set-id:` header** (their first line *is* the md1 string).
+Enumerate all 65 and handle both header shapes explicitly.
+
+```bash
+cd /scratch/code/shibboleth/descriptor-mnemonic
+mkdir -p crates/md-codec/tests/golden
+cargo run --quiet --example dump_encodings > crates/md-codec/tests/golden/pre_refactor_encodings.json
+python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_encodings.json'));assert len(d)==65,f'expected 65 got {len(d)}';print(len(d),'vectors')"
+```
+
+- [ ] **Step 3: Capture the IDENTITY golden — also before anything moves**
+
+r0 scheduled this inside Task 8, reached *after* Task 2 changes
+`identity.rs:90`/`:200` to `d.wire_version()`. A golden captured there pins
+post-change output to itself and `every_existing_v4_identity_is_byte_preserved`
+becomes **a test that cannot fail**.
+
+`examples/dump_ids.rs` emits `[[name, wallet_policy_id, template_id, phrase], …]`
+over the same 65 vectors.
+
+```bash
+cargo run --quiet --example dump_ids > crates/md-codec/tests/golden/pre_refactor_ids.json
+python3 -c "import json;d=json.load(open('crates/md-codec/tests/golden/pre_refactor_ids.json'));assert len(d)==65;print(len(d),'ids')"
+```
+
+- [ ] **Step 4: Commit — this commit must contain NO source changes**
+
+```bash
+git add crates/md-codec/tests/vectors/liana crates/md-codec/tests/golden \
+        crates/md-codec/examples scripts/vendor-liana-evidence.sh
+git commit -m "test: vendor the Liana evidence and capture pre-change goldens"
+git diff HEAD~1 --stat -- crates/md-codec/src crates/md-cli/src   # MUST be empty
+```
 
 ---
 
@@ -338,6 +404,24 @@ Then add `wire_version: u8` as the last parameter of `write_node` and `read_node
 Run: `cargo nextest run --locked --workspace`
 Expected: **PASS**, 1400+ and both new tests green. Wire bytes are still unchanged — nothing emits version 8 yet.
 
+- [ ] **Step 5b: SPEC §6a's stage-1b row — the error message becomes false here**
+
+`error.rs:33`'s Display is `"wire-format version mismatch: got {got}, expected 4"`.
+The moment Step 3 accepts `{4, 8}`, "expected 4" is a lie, and this is the one
+§6a row stage 1b owns (the other two are stages 2 and 3). Name the accepted set
+instead, and assert it:
+
+```rust
+#[test]
+fn the_mismatch_message_names_the_ACCEPTED_SET_not_a_single_version() {
+    let e = Error::WireVersionMismatch { got: 9 };
+    let s = e.to_string();
+    assert!(s.contains('9'), "must name what it got: {s}");
+    assert!(!s.contains("expected 4"), "stale single-version claim: {s}");
+    assert!(s.contains('4') && s.contains('8'), "must name {{4, 8}}: {s}");
+}
+```
+
 - [ ] **Step 6: Commit**
 
 ```bash
@@ -373,14 +457,12 @@ fn a_liana_kind_tree_round_trips_at_v8_and_a_nums_tree_still_encodes_as_v4() {
     }
 }
 
-#[test]
-fn a_version_8_payload_is_refused_by_a_version_4_only_decoder() {
-    let bytes = encode_payload(&tr_descriptor(InternalKey::LianaUnspendable)).unwrap();
-    // Simulate the shipped decoder: only version 4 supported.
-    let err = decode_payload_restricted(&bytes, &[4]).unwrap_err();
-    assert!(matches!(err, Error::WireVersionMismatch { got: 8 }),
-            "must fail closed naming the version, got {err:?}");
-}
+// r0 asserted here that "a v4-only decoder refuses a v8 payload" through a
+// `decode_payload_restricted` knob. It does not exist and must NOT be
+// invented: after Task 2 this decoder accepts {4, 8} by construction, so there
+// is no v4-only decoder in this crate to observe. SPEC §8.4's v4-refusal claim
+// is about OLDER TOOLCHAINS (§6a), owned by stages 2/3/4a. The honest stage-1b
+// assertion is the header-level one Task 2 Step 1 already makes.
 
 #[test]
 fn kind_0_and_kind_1_over_the_same_tree_encode_to_DIFFERENT_bytes() {
@@ -500,7 +582,19 @@ fn sorting_or_deduplicating_the_leaves_produces_a_DIFFERENT_xpub() {
 Run: `cargo nextest run --locked -p md-codec liana_unspendable`
 Expected: FAIL — `liana_unspendable_xpub` does not exist.
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 3: Make the module reachable FIRST**
+
+`lib.rs:30` is `mod nums;` — **private** — and `NUMS_H_POINT_X_ONLY_HEX` is
+`pub(crate)` (`nums.rs:12`). Task 4's test is an *integration* test outside the
+crate, and Task 6 has `md-cli` consuming `LIANA_UNSPENDABLE_MARKER`. Neither can
+see a private module. Change `lib.rs:30` to `pub mod nums;` (matching
+`pub mod render;` at `:37`) and make the two new items `pub`.
+
+**`hex_lit` is NOT a dependency of `md-codec`.** Do not add one for a single
+constant — write the NUMS point as a byte array, or parse it with the `bitcoin`
+crate already in the graph.
+
+- [ ] **Step 4: Implement**
 
 ```rust
 /// Liana's unspendable internal key (SPEC §2, `analysis.rs:398-430`).
@@ -579,21 +673,91 @@ xpubs byte-for-byte; sorting or deduping is pinned as a DIFFERENT key."
 
 ---
 
-## Task 5: rendering the new kind (SPEC §4)
+## Task 5: rendering the new kind (SPEC §4) — TWO files, not one
 
-**Files:** Modify `crates/md-codec/src/render.rs:185-205`, `to_miniscript.rs:361-366`. Test: extend `tests/liana_unspendable.rs`, `tests/render_abstract.rs`.
+**r0 of this plan put all three render modes in `render.rs` and invented a
+`Mode::Keyed`, a `render_descriptor()` and a `ctx.network`. None exists.**
+Measured at `6cbd49d8`:
 
-**Interfaces:** Consumes `liana_unspendable_xpub`. Produces the three render modes of §4's table.
+- `render.rs`'s mode enum is exactly `enum Mode { Literal, Abstract }`
+  (`:58-61`), and `RenderCtx` (`:68-78`) has nine fields, none of them
+  `network`. Its only two public functions are `descriptor_to_template` (`:146`)
+  and `descriptor_to_abstract_template` (`:152`).
+- **The keyed descriptor — §4 row 1, the string an operator pastes into Liana —
+  is not produced by `render.rs` at all.** `cmd/descriptor.rs:198-201` calls
+  `md_codec::to_miniscript_descriptor(&d, chain)` or
+  `to_miniscript_descriptor_multipath(&d)`, whose internal-key branch is
+  `to_miniscript.rs:333-338` → `build_nums_internal_key()` (`:361`).
+- `to_miniscript.rs` contains **zero** occurrences of `Network`, and
+  `build_nums_internal_key` returns a `DescriptorPublicKey::Single(SinglePub {
+  key: SinglePubKey::XOnly(..) })` — no network needed for raw `H`. Kind 1 needs
+  an **xpub**, whose base58 prefix is network-dependent.
 
-- [ ] **Step 1: Write the failing tests**
+So §4's three rows live in two files, and the keyed path needs a network it does
+not currently carry.
+
+**Files:**
+- Modify: `crates/md-codec/src/render.rs:185-205` (rows 2 and 3)
+- Modify: `crates/md-codec/src/to_miniscript.rs:333-338`, `:361-370` (row 1)
+- Modify: `crates/md-codec/src/lib.rs` (the two new entry points)
+- Test: extend `crates/md-codec/tests/liana_unspendable.rs`, `tests/render_abstract.rs`
+
+**Interfaces:**
+- Consumes: `liana_unspendable_xpub`, `LIANA_UNSPENDABLE_MARKER` (Task 4).
+- Produces: `pub fn to_miniscript_descriptor_with_network(d: &Descriptor, chain: u32, network: bitcoin::Network)` and `pub fn to_miniscript_descriptor_multipath_with_network(d: &Descriptor, network: bitcoin::Network)`.
+
+- [ ] **Step 1: Do NOT change the existing keyed entry points' signatures**
+
+`to_miniscript_descriptor` and `to_miniscript_descriptor_multipath` have **55
+call sites** across `md-codec` and its tests (measured). Threading a network
+through all of them is a large mechanical diff for a feature that needs it in
+one place.
+
+Instead add the two `_with_network` entry points above, have the existing two
+delegate with `bitcoin::Network::Bitcoin`, and make the existing two **REFUSE**
+a descriptor whose `wire_version() == 8`:
+
+```rust
+pub fn to_miniscript_descriptor_multipath(d: &Descriptor) -> Result<..., Error> {
+    // A kind-1 internal key is an XPUB, whose base58 prefix depends on the
+    // network. This entry point has none, so rather than silently emitting a
+    // mainnet xpub for a testnet wallet it refuses and names the alternative.
+    if d.wire_version() == Header::WF_UNSPENDABLE_VERSION {
+        return Err(Error::NetworkRequiredForUnspendable);
+    }
+    to_miniscript_descriptor_multipath_with_network(d, bitcoin::Network::Bitcoin)
+}
+```
+
+Zero of the 55 existing sites change, and no caller can get a wrong-network
+xpub by accident. `cmd/descriptor.rs` already has `args.network` (`:62`, `:128`)
+and switches to the `_with_network` form.
+
+- [ ] **Step 2: Write the failing tests**
 
 ```rust
 #[test]
 fn the_keyed_descriptor_renders_the_derived_literal_xpub() {
     let d = descriptor_with_real_keys_at_liana_kind();
-    let s = md_codec::render::render_descriptor(&d, bitcoin::Network::Bitcoin).unwrap();
+    let s = md_codec::to_miniscript_descriptor_multipath_with_network(
+        &d, bitcoin::Network::Bitcoin).unwrap().to_string();
     assert!(s.starts_with("tr(xpub661MyMwAqRbcFswVugWF"), "got {s}");
     assert!(!s.contains("50929b74"), "must not spell raw H at kind 1");
+}
+
+#[test]
+fn the_network_less_entry_point_REFUSES_kind_1_rather_than_guessing_mainnet() {
+    let d = descriptor_with_real_keys_at_liana_kind();
+    let err = md_codec::to_miniscript_descriptor_multipath(&d).unwrap_err();
+    assert!(matches!(err, Error::NetworkRequiredForUnspendable), "got {err:?}");
+}
+
+#[test]
+fn testnet_renders_a_tpub_not_an_xpub() {
+    let d = descriptor_with_real_keys_at_liana_kind();
+    let s = md_codec::to_miniscript_descriptor_multipath_with_network(
+        &d, bitcoin::Network::Testnet).unwrap().to_string();
+    assert!(s.starts_with("tr(tpub"), "got {s}");
 }
 
 #[test]
@@ -607,67 +771,102 @@ fn both_keyless_modes_render_the_marker_because_the_xpub_needs_seated_keys() {
 
 #[test]
 fn kind_0_and_kind_1_produce_DIFFERENT_skeleton_keys() {
-    // A shared SkeletonKey would be a false-evidence-match between two
-    // wallets with different addresses.
     let a = md_codec::skeleton::skeleton_key(&descriptor_at_nums_kind()).unwrap();
     let b = md_codec::skeleton::skeleton_key(&descriptor_at_liana_kind()).unwrap();
-    assert_ne!(a, b);
+    assert_ne!(a, b, "a shared key would be a false-evidence-match");
 }
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [ ] **Step 3: Run to verify they fail**
 
 Run: `cargo nextest run --locked -p md-codec liana_unspendable`
-Expected: FAIL — kind 1 currently renders raw `H` in all three modes.
+Expected: FAIL — the `_with_network` entry points do not exist.
 
-- [ ] **Step 3: Implement**
+- [ ] **Step 4: Implement rows 2 and 3 in `render.rs`**
 
-In `render.rs`'s `Body::Tr` arm:
+`render.rs`'s existing `Mode { Literal, Abstract }` is unchanged — **both**
+keyless modes emit the marker, so no new mode is needed:
 
 ```rust
     match internal_key {
         InternalKey::Slot(i) => render_key(*i, default_usp, overrides, out)?,
         InternalKey::NumsPoint => out.push_str(NUMS_H_POINT_X_ONLY_HEX),
-        InternalKey::LianaUnspendable => match ctx.mode {
-            // The chain code is a function of the SEATED leaf keys, so the
-            // xpub does not exist in a keyless form. The marker is the only
-            // correct spelling, not a shortcut.
-            Mode::Template | Mode::Abstract => out.push_str(LIANA_UNSPENDABLE_MARKER),
-            Mode::Keyed => {
-                let leaves = collect_leaf_pubkeys_in_wire_order(node, overrides)?;
-                out.push_str(&liana_unspendable_xpub(&leaves, ctx.network).to_string());
-                out.push_str("/<0;1>/*");
-            }
-        },
+        // The chain code is a function of the SEATED leaf keys, so no keyless
+        // form can carry the xpub. The marker is the only correct spelling in
+        // BOTH Literal and Abstract mode.
+        InternalKey::LianaUnspendable => out.push_str(LIANA_UNSPENDABLE_MARKER),
     }
 ```
 
-with `pub const LIANA_UNSPENDABLE_MARKER: &str = "UNSPENDABLE(liana)";` in `nums.rs`.
+- [ ] **Step 5: Implement row 1 in `to_miniscript.rs`**
 
-- [ ] **Step 4: Run the tests**
+Where `:333-338` selects the internal key, add the kind-1 branch. The leaf
+pubkeys come from the **already-built miniscript leaves**, in tap-tree order —
+the same source `build_*` uses — so no new `collect_leaf_pubkeys_in_wire_order`
+helper is invented (r0 of this plan used that name without ever defining it):
+
+```rust
+fn build_liana_unspendable_internal_key(
+    leaves: &[(u8, Miniscript<DescriptorPublicKey, Tap>)],
+    network: bitcoin::Network,
+) -> Result<DescriptorPublicKey, Error> {
+    // SPEC §2: descriptor left-to-right order = wire order. Walk the leaves in
+    // the order they were built and collect each key's 33-byte compressed
+    // pubkey via `for_each_key`, exactly as Liana's analysis.rs:398-430 does.
+    let mut pks: Vec<[u8; 33]> = Vec::new();
+    for (_depth, ms) in leaves {
+        ms.for_each_key(|k| { pks.push(compressed_33(k)); true });
+    }
+    let xpub = crate::nums::liana_unspendable_xpub(&pks, network);
+    Ok(DescriptorPublicKey::MultiXPub(DescriptorMultiXKey {
+        origin: None,
+        xkey: xpub,
+        derivation_paths: DerivPaths::new(vec![
+            vec![ChildNumber::from_normal_idx(0)?].into(),
+            vec![ChildNumber::from_normal_idx(1)?].into(),
+        ]).expect("two non-empty paths"),
+        wildcard: Wildcard::Unhardened,
+    }))
+}
+```
+
+`compressed_33` is a small local helper over `DescriptorPublicKey` — for a
+`MultiXPub`/`XPub` it is `k.xkey.public_key.serialize()`. A leaf key that is not
+an xpub is a bug at this point; return `Err(failed(...))` naming it rather than
+panicking.
+
+- [ ] **Step 6: Run the tests**
 
 Run: `cargo nextest run --locked --workspace`
 Expected: **PASS**.
 
-- [ ] **Step 5: Extend the render-reparse fixpoint corpus to `tr` kind 1**
+- [ ] **Step 7: Extend the render-reparse fixpoint corpus to `tr` kind 1**
 
-`crates/md-cli/src/format/text.rs:269-274` asserts every rendered template re-parses, and its corpus is `wsh`-only — so it would stay green while the invariant it names is false for `tr` kind 1. Add a kind-1 case to that corpus. It will fail until Task 6 adds the marker's parse rule; that is the correct order.
+`crates/md-cli/src/format/text.rs:269-274` asserts every rendered template
+re-parses, and its corpus is `wsh`-only — so it stays green while the invariant
+it names is false for `tr` kind 1. Add a kind-1 case. **It will fail until Task
+6 adds the marker's parse rule; that is the correct order**, and Task 6 Step 5
+is where it goes green.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add crates/md-codec/src crates/md-cli/src/format/text.rs crates/md-codec/tests
 git commit -m "feat(render): the derived xpub when keyed, UNSPENDABLE(liana) when not
 
-The chain code is a function of the seated leaf keys, so no keyless form
-can carry it. Kind 0 and kind 1 now produce different SkeletonKeys."
+The keyed descriptor comes from to_miniscript.rs, not render.rs, and it
+needed a network it did not carry. Rather than thread one through 55 call
+sites, two _with_network entry points are added and the existing ones
+REFUSE kind 1 instead of guessing mainnet."
 ```
 
 ---
 
 ## Task 6: the input side (SPEC §4a) and the JSON schema bump
 
-**Files:** Modify `crates/md-cli/src/parse/template.rs:1589-1632`, `crates/md-cli/src/cmd/decompose.rs`, `crates/md-cli/src/format/json.rs:320-330`, `docs/json-schema-v1.md`. Test: `crates/md-cli/tests/liana_input_side.rs` (create).
+**Files:** Modify `crates/md-cli/src/parse/template.rs:1589-1632`, **`crates/md-cli/src/decompose/mod.rs:439`** and **`crates/md-cli/src/decompose/walk.rs`** (`collect_occurrences` at `:175`, `Placeholders::pk` at `:202`) — NOT `cmd/decompose.rs`, which is 207 lines of `run()`/`println!` plumbing that never sees a key — plus `crates/md-cli/src/format/json.rs:320-330`, `docs/json-schema-v1.md`.
+
+**Note on the walk:** `for_each_key` yields keys with no structural position, so the internal key must be separated from the leaves before the recipe can be recomputed. Do that at the `Tr` node in the walk, not downstream of `for_each_key`. Test: `crates/md-cli/tests/liana_input_side.rs` (create).
 
 **Interfaces:** Consumes `liana_unspendable_xpub`, `LIANA_UNSPENDABLE_MARKER`.
 
@@ -700,11 +899,13 @@ fn md_encode_refuses_a_literal_xpub_in_the_internal_key_position_CLEANLY() {
 }
 
 #[test]
-fn the_marker_round_trips_through_compose_then_encode() {
-    let tpl = md(&["compose", "--wrapper", "tr", "--preset",
-                   "kofn-recovery,2of3,older=26280", "--unspendable", "liana"]);
-    assert!(tpl.contains("UNSPENDABLE(liana)"));
-    md(&["encode", tpl.lines().next().unwrap(), "--path", "bip48"]); // must not error
+fn the_marker_PARSES_in_a_template() {
+    // r0 drove this through `md compose --unspendable liana`, which is STAGE 2
+    // work that does not exist at stage 1b -- the test could never have passed.
+    // Assert the grammar directly; the compose flag gets its own test in stage 2.
+    md(&["encode",
+         "tr(UNSPENDABLE(liana),{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})",
+         "--path", "bip48"]);   // must not error
 }
 ```
 
@@ -775,11 +976,15 @@ fn kind_1_nested_under_wsh_is_refused() {
 }
 
 #[test]
-fn version_8_with_every_tr_at_kind_0_is_refused_at_ENCODE() {
-    // The minimum-version rule is enforced on the encode side only, so old
-    // payloads never become invalid at decode.
-    let err = encode_payload_at_version(&tr_descriptor(InternalKey::NumsPoint), 8).unwrap_err();
-    assert!(matches!(err, Error::NonMinimalWireVersion { .. }));
+fn the_minimum_version_rule_is_a_PROPERTY_of_wire_version_not_a_refusal() {
+    // r0 asserted this through an `encode_payload_at_version` knob that does
+    // not exist. The encoder has no version parameter to abuse -- wire_version()
+    // IS the rule -- so the honest assertion is that a kind-0-only tree never
+    // reports 8, which makes a non-minimal encoding UNCONSTRUCTIBLE rather
+    // than merely refused.
+    assert_eq!(tr_descriptor(InternalKey::NumsPoint).wire_version(), 4);
+    assert_eq!(nested_tr_all_nums().wire_version(), 4);
+    assert_eq!(tr_descriptor(InternalKey::LianaUnspendable).wire_version(), 8);
 }
 ```
 
@@ -843,6 +1048,62 @@ fn addresses_agree_with_lianas_own_and_differ_from_kind_0() {
 
 `case.liana_receive` / `liana_change` come from `fable-liana-parse-out-v15.jsonl`.
 
+- [ ] **Step 2b: SPEC §8.1's three UNMEASURED gaps get their own vectors**
+
+§2 is measured only for **mainnet**, **one-level** taptrees with `multi_a`/`pk`
+leaves. The spec names three gaps explicitly and §8.1 requires vectors for them;
+r0 of this plan delivered none:
+
+```rust
+#[test]
+fn a_tpub_wallet_derives_a_tpub_internal_key() {
+    // The tpub branch of §2 step 5 is TRANSCRIBED, not measured -- all eight
+    // evidence descriptors are mainnet xpub. This is the vector that measures it.
+    let x = liana_unspendable_xpub(&four_leaf_pubkeys(), bitcoin::Network::Testnet);
+    assert!(x.to_string().starts_with("tpub"), "got {x}");
+}
+
+#[test]
+fn a_NESTED_taptree_hashes_its_leaves_depth_first_left_to_right() {
+    // {A,{B,C}} appears in the evidence only as preset-decaying-multisig-tr,
+    // which Liana REFUSED on policy shape -- so no ACCEPT backs this ordering.
+    // It is right by rust-miniscript's TapTreeIter; this pins it.
+    let nested = case("preset-decaying-multisig-tr");
+    assert_eq!(
+        liana_unspendable_xpub(&nested.leaf_pubkeys, bitcoin::Network::Bitcoin).to_string(),
+        nested.expected_xpub);
+}
+
+#[test]
+fn a_sortedmulti_a_leaf_is_REFUSED_so_no_derivation_vector_is_owed() {
+    // §8.1 asks for a sortedmulti_a vector "if §6 did not refuse it". §6 row 1
+    // does refuse it, so the obligation is discharged by the refusal -- assert
+    // that, rather than leaving the reader to infer it.
+    assert!(matches!(validate(&tr_liana_with_sortedmulti_a_leaf()),
+                     Err(Error::UnspendableWithSortedMultiA)));
+}
+```
+
+- [ ] **Step 2c: SPEC §8.6's structure-independence pin, across all THREE presets**
+
+Task 4 pins two. The spec names three, and the third is the one that matters:
+`preset-decaying-multisig-tr` is the only evidence shape with a **nested**
+taptree, so it is what proves the traversal is depth-first left-to-right rather
+than per-branch.
+
+```rust
+#[test]
+fn three_different_trees_over_the_same_four_keys_share_one_internal_key() {
+    let names = ["preset-kofn-recovery-tr", "preset-tiered-recovery-tr",
+                 "preset-decaying-multisig-tr"];
+    let cases: Vec<_> = names.iter().map(|n| case(n)).collect();
+    for w in cases.windows(2) {
+        assert_eq!(w[0].leaf_pubkeys, w[1].leaf_pubkeys, "fixture precondition");
+        assert_eq!(w[0].expected_xpub, w[1].expected_xpub);
+    }
+}
+```
+
 - [ ] **Step 3: Identity distinctness AND stability**
 
 ```rust
@@ -863,7 +1124,9 @@ fn every_existing_v4_identity_is_byte_preserved() {
 }
 ```
 
-Capture `pre_refactor_ids.json` the same way as Task 1's golden: **from unmodified code, before Task 2**.
+`pre_refactor_ids.json` was captured in **Task 0 Step 3**, before any source
+change. Do NOT regenerate it here — regenerating after Task 2 pins post-change
+output to itself and makes this test unable to fail.
 
 - [ ] **Step 4: Run**
 
@@ -875,6 +1138,55 @@ Expected: **PASS**.
 ```bash
 git add crates/md-codec/tests
 git commit -m "test: SPEC §8 vectors 1, 2, 5, 6, 7 for the Liana internal key"
+```
+
+---
+
+## Task 8b: SPEC §4b — retire the two texts that forbid what this stage does
+
+**Files:** Modify `crates/md-codec/src/policy_shape.rs:119-133`;
+`mnemonic-engrave/design/DESIGN_coordinator_compatibility.md:155-158`.
+
+Both record a prior ruling that an unspendable xpub is **not** codec-observable,
+and the source comment ends **"Do not 'restore fidelity' with the Go name
+here"**. This stage makes it codec-observable, which is a legitimate reversal —
+but until both are retired the source actively instructs the next reader not to
+do what the spec requires. SPEC §4b requires them retired **in the same change**.
+
+- [ ] **Step 1: Rewrite the `policy_shape.rs` doc comment**
+
+Say what is now true: the distinction IS codec-observable as of wire version 8,
+cite SPEC §4b, and keep the original reasoning as history ("before version 8 this
+needed a coordinator rule, because…") so the reversal is legible rather than
+silent.
+
+- [ ] **Step 2: Update the design document in the OTHER repo**
+
+`DESIGN_coordinator_compatibility.md:155-158` lives in `mnemonic-engrave`. It is
+a separate commit in a separate repo — note it in the stage's completion so it
+is not lost. Do not edit it from the `descriptor-mnemonic` worktree.
+
+- [ ] **Step 3: Assert the reversal is complete**
+
+```bash
+# The phrase WRAPS across two doc-comment lines in the source, so a
+# contiguous-string grep silently matches nothing whether or not the text is
+# still there. Match one line and check the neighbourhood:
+grep -rn -A1 'Do not "restore' crates/    # expect: no matches
+```
+
+(Verified while writing this plan: `grep -rn "restore fidelity"` returns
+nothing *today*, with the text fully present at `policy_shape.rs:119-133`. A
+grep that cannot fail is not a check.)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add crates/md-codec/src/policy_shape.rs
+git commit -m "docs: retire the ruling that an unspendable xpub is not codec-observable
+
+SPEC §4b. Wire version 8 makes it observable; the old comment told the
+next reader not to do what the spec now requires."
 ```
 
 ---
@@ -945,14 +1257,25 @@ Name the wire change, the JSON schema break, and that existing v4 plates are una
 
 - [ ] **Step 3: Run the full gate — all four commands CI runs**
 
+**These are the commands CI actually runs** — read out of
+`.github/workflows/`, not guessed. r0 of this plan named four and got the
+flags wrong; a local gate that does not match CI is how a `cargo doc`
+failure reached main in this repo before.
+
 ```bash
-cargo build --locked --workspace
-cargo nextest run --locked --workspace
-cargo clippy --locked --workspace --all-targets -- -D warnings
-cargo doc --locked --no-deps --workspace
+cargo test  --workspace --all-targets --all-features
+cargo test  --workspace --doc         --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo fmt --all --check
+cargo doc   --workspace --no-deps --document-private-items --all-features
+cargo check --target x86_64-unknown-freebsd -p md-cli
 ```
 
-**`cargo doc` is not optional** — a `cargo doc` failure reached main once in this repo because a local gate ran three commands while CI ran four.
+Note `--all-features`, the separate **doc-test** run, `--document-private-items`
+(so a broken intra-doc link in a private item fails), `cargo fmt --all --check`
+(absent from r0 entirely), and the **FreeBSD cross-check**. Use
+`cargo nextest run --locked --workspace` during development for speed, but the
+gate above is what must pass before the commit.
 
 - [ ] **Step 4: Commit**
 
