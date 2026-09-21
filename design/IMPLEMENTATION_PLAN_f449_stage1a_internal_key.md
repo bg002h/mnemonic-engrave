@@ -8,9 +8,12 @@
 
 **Tech Stack:** Rust (crates `md-codec`, `md-cli`), `bitcoin` + `rust-miniscript`, `cargo nextest`.
 
-**Status:** r2, folded from the stage-1a R0 (2C/8I/8M/3N) and its re-review
-(1C/5I/7M/3N). Reports: `design/agent-reports/f449-plan-stage1a-{r0,r1}.md`.
-Awaiting re-review.
+**Status:** **r3 — GREEN, ready for implementation.** Four rounds:
+R0 2C/8I/8M/3N -> r1 1C/5I/7M/3N -> r2 1C/1I/5M/3N -> r3 verification clean
+(0 blocking unaddressed, 0 bad citations). Reports:
+`design/agent-reports/f449-plan-stage1a-{r0,r1,r2,r3}.md`.
+Eight non-blocking Minor/Nit items remain open and are listed in r3's report;
+they are recorded, not dropped.
 
 **Spec:** `design/SPEC_liana_unspendable_internal_key.md` (GREEN at `a621cfdf`, 0C/0I after nine review passes). **Read it — this plan argues from it and does not restate it.**
 
