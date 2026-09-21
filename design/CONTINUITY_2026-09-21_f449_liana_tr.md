@@ -25,8 +25,43 @@ is green at baseline and produces `dist/` with an 11 MB `emu.wasm`.
 
 ## Where the cycle is
 
-Brainstorm → **spec r1 folded** → re-review dispatched. No implementation yet.
+Brainstorm → **spec r4** → closing review dispatched. **No implementation yet.**
 The R0 rule binds: NO code before the spec is GREEN (0C/0I).
+
+### Review history — every lens found what the previous one could not
+
+| round | lens | verdict |
+| --- | --- | --- |
+| r0 | opus, correctness | **2C**/6I/5M/2N |
+| r0 | fable, adversarial funds | 0C/**4I**/9M |
+| r0 | author self-review | 2I/1M |
+| r1 | sonnet, mechanical fold-check | 1 unaddressed / 2 new defects |
+| r1 | opus, new design only | **1C**/4I/2M |
+| r2 | sonnet, mechanical fold-check | 0 unaddressed / 1 cosmetic |
+| r2 | **opus, JOURNEY WALK** | **2C**/6I/4M |
+| r3 | sonnet, mechanical fold-check | 4 partial / 0 new defects |
+| r3 | opus, new design only | **0C**/6I/4M |
+
+**The three highest-value findings, for anyone tempted to shorten this:**
+
+1. **Version 5 was unimplementable** (r0, found independently by two lenses).
+   Single-payload md1 versions must be EVEN. A v5 plate routes to the chunk
+   reassembler and the device refuses the plate it just cut.
+2. **The device cannot derive a kind-1 address** (r1 new-design). A naive port
+   maps kind 1 onto the NUMS branch and shows addresses of a DIFFERENT WALLET
+   at consent and at plate verify.
+3. **The journey walk's two Criticals, both the author's own folds** (r2), after
+   four correctness-shaped lenses had closed clean: a choice-screen predicate
+   that was measurably INVERTED, and an identity ruling written for Rust that
+   left the Go half — the mk1 card stub the operator reads — ungated.
+
+Pattern worth keeping: **three times** this spec stated a ruling in prose and
+gated none of it (§8.8 REQUIRED and scheduled nowhere; §8.5 Rust-only; §0b/§6a
+ungated). §8.9 now exists to make that structural rather than remembered. And
+**four reviewer claims were corrected rather than propagated** — five md-cli
+sites were four, `template_id.go:116` was the else branch, the placement window
+was 96-128 not 97-118, and a Go blast-radius figure of 58 was the author's own
+error (136 across 32 files).
 
 | artifact | commit |
 | --- | --- |
