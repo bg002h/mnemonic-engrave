@@ -19207,6 +19207,48 @@ property of the design — nothing would have told us otherwise. The remedy is
 <version>" in the copy, and a `KNOWN_RELEASES` gate that fails when a
 coordinator's newest release outruns every verified version.
 
+### F-635 — `me-bundle-silently-skips-an-undecodable-md1-plate`: a decode failure leaves the completeness claim computed from nothing (owning phase: **F-449 stage 4a**, `design/SPEC_liana_unspendable_internal_key.md` §8b) `#mnemonic-engrave` `#me` `#funds-adjacent`
+
+**Status:** OPEN
+Filed 2026-09-21 during the F-449 journey walk (I6), which found it while
+checking what an older toolchain does with a version-8 plate.
+
+**The defect.** `crates/me-cli/src/bundle.rs:371`:
+
+```rust
+if let Ok(d) = md_codec::decode::decode_md1_string(s) {
+    hashlock_kinds.extend(descriptor_hash_kinds(&d));
+    key_slots = key_slots.max(d.n as usize);
+    keyless_template |= !d.is_wallet_policy();
+}
+plates.push(PlateEntry { ... });          // pushed regardless
+```
+
+On a decode error the block is skipped **silently** while the plate is still
+recorded, so `key_slots`, `keyless_template` and `hashlock_kinds` keep their
+zero values and the emitted bundle's *"backup needs N plates"* is a count
+computed from nothing. The comment three lines above states the intent this
+violates: *"a check that covered only the chunked shape would be a completeness
+claim with a hole in it."*
+
+**Latent today; F-449's version 8 ACTIVATES it.** `crates/me-cli/Cargo.toml:26`
+pins `md-codec = "0.42"` from **crates.io** (`Cargo.lock`:
+`source = "registry+...crates.io-index"`), and md-codec is developed
+unpublished, so the pin cannot simply be bumped. An `me` at 0.42 fails
+`decode_md1_string` on every version-8 plate and then reports a plate count it
+never computed.
+
+**What it needs.** Report, never skip: `me bundle` either refuses the payload
+naming the wire version, or emits the bundle with the completeness claim
+explicitly marked unknown. Plus the pin moved off crates.io onto the workspace
+or a git source. Both are F-449 stage 4a, gated by that spec's §8.9.
+
+**Why this is filed separately from F-449.** The fail-open is a defect in this
+repo independent of the Liana cycle — any future wire change, or any corrupt
+plate, hits the same path. F-449 is merely what made it reachable.
+
+- **Owning phase:** F-449 stage 4a. **Tier:** `me` / `correctness` / `funds-adjacent`.
+
 ### F-634 — md-codec's decoder admits `wsh(tr(...))`, a descriptor Bitcoin cannot spend
 
 **Status:** OPEN — **Owning phase:** the next md-codec validation pass (NOT coordinator-compat plan 1a, which only surfaced it). **Tier:** `correctness`. **Found:** operator challenge during the plan-1a Task 1 review, 2026-09-20; measured by the task reviewer.
