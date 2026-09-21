@@ -4,13 +4,24 @@
 > (recommended) or `superpowers:executing-plans` to implement this plan
 > task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **SHIPPED 2026-09-21** at descriptor-mnemonic main `6cbd49d8`, md-codec
+> **0.45.1**, CI green. Two corrections this document carried until then, both
+> recorded rather than silently patched: `KeyPathKind`'s fourth variant was
+> ruled out before execution (see Task 1), and **`cargo doc` was missing from
+> the gate below** — the omission reached `main`, where the CI workflow went
+> red on it while both REQUIRED contexts passed, so the push ritual reported
+> "no bypass" and was right to. Five task reviews, a whole-branch review and a
+> fix-wave re-review all ran this plan's gate, so none could see what it
+> omitted. **A required-contexts check is not a green build.**
+
 **Goal:** Give `md-codec` a `Skeleton` — a canonical, coordinator-independent
 summary of any decoded md1 — and a `SkeletonKey` with one defined
 serialization, so a later plan can key measured evidence by it.
 
 **Architecture:** Port the fork's Go `md/policy_shape.go` branch decomposition
 into Rust with two named extensions (retain each branch's placeholder-index
-set; add a fourth `KeyPathKind`), add an abstracting render mode over the
+set; add the taproot key path as branch 0 when the internal key is not NUMS),
+add an abstracting render mode over the
 existing `descriptor_to_template`, compute two partitions over key identity,
 and serialize the whole into one string that is the key.
 
@@ -157,16 +168,20 @@ produces:
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RootKind { Wpkh, Pkh, Sh, Wsh, Tr, ShWpkh }
 
-/// A taproot internal key. FOUR-valued: the Go original has three
-/// (`None`/`NUMS`/`Spendable`, `md/policy_shape.go:33-39`) and an
-/// unspendable-xpub internal key falls into `Spendable` there. Nunchuk treats
-/// it as a different wallet and F-449 records it, so the port adds it.
+/// A taproot internal key. THREE-valued, matching the Go's arity but not its
+/// names. An earlier draft of this plan added a fourth, `UnspendableXpub`;
+/// a controller ruling removed it BEFORE execution, because md-codec cannot
+/// compute it: `Body::Tr { is_nums, key_index, .. }` makes `is_nums` the only
+/// internal-key discriminant on the wire, and an unspendable xpub is an
+/// ordinary `key_index`. Recognising one means re-deriving a specific
+/// coordinator's own function, so that distinction belongs in a rule.
+/// `Xpub`, not the Go's `Spendable`: this walk verifies nothing about
+/// spendability and the Go name asserts it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyPathKind {
     NotTaproot,
     Nums,
-    UnspendableXpub,
-    Spendable,
+    Xpub,
 }
 
 /// One spend path.
