@@ -162,3 +162,47 @@ does not wrap a different function). Green at baseline, 4 top-level tests,
 58 RUN/PASS lines, 0.14s when scoped with `-run` — and the `-run` filter was
 verified with `-v` to have actually matched, since a filter matching nothing
 also prints `ok`.
+
+## Implementation readiness (2026-09-21)
+
+**Spec is GREEN** at `a621cfdf` — 0C/0I after five rounds and nine review passes.
+The plan is at **r1** (`f50cf015`), folded from its own R0 (1C/10I/7M/4N), and is
+in re-review. **No code has been written.**
+
+| artifact | commit |
+| --- | --- |
+| spec GREEN | `a621cfdf` |
+| plan r0 | `83f0db54` |
+| plan R0 report (1C/10I/7M/4N) | persisted before the fold |
+| **plan r1** | `f50cf015` |
+
+**Worktree for implementation:** `/scratch/code/shibboleth/dm-worktrees/f449-stage1`,
+branch `f449-stage1` off `main` @ `6cbd49d8`. Baseline verified **1400 passed /
+3 skipped** in the worktree with `CARGO_TARGET_DIR=/scratch/code/shibboleth/.tmp/f449-target`
+(own target dir — a shared one bakes paths when numbers are quoted).
+
+### The plan R0's three most expensive catches
+
+1. **Task 5 was written against a render path that does not exist.**
+   `render.rs`'s mode enum is `{Literal, Abstract}` — no `Mode::Keyed`, no
+   `render_descriptor()`, no `ctx.network`. The **keyed** descriptor comes from
+   `to_miniscript.rs`, which has ZERO occurrences of `Network`, while a kind-1
+   xpub's base58 prefix needs one. Resolved with two `_with_network` entry
+   points; the existing two REFUSE kind 1 rather than guessing mainnet, so none
+   of their **55 call sites** change.
+2. **Three tests that could never fail.** The identity golden was scheduled
+   after the code it guards (pinning post-change output to itself); two gates
+   called APIs no task produced and the design makes unconstructible.
+3. **The gate named four CI commands; CI runs six** — including
+   `cargo fmt --all --check`, a separate doc-test pass, `--all-features`, and a
+   FreeBSD cross-check. It would have passed locally and gone red in CI.
+
+### Two traps worth carrying forward
+
+- **The golden enumeration was self-contradictory** (46 `keyed_` files vs 65
+  total, 13 with no header) and **both readings dropped the `tr`/NUMS vectors** —
+  the ones this stage is about.
+- **A phrase grep across wrapped doc-comment lines cannot fail.** I asserted
+  "restore fidelity" was absent from `policy_shape.rs`; it is present, wrapped
+  across two `///` lines. The spec's citation was right and my check was
+  unfalsifiable. Match one line, then inspect the neighbourhood.
