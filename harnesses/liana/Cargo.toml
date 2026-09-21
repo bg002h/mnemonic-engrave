@@ -11,3 +11,11 @@ edition = "2021"
 [dependencies]
 liana = { path = "../../../.tmp/fable-liana-src-v15/liana" }
 serde_json = "1"
+
+# Its OWN workspace: the `liana` dependency is a path OUTSIDE this repo (an
+# unvendored checkout at the tag being measured), so the root workspace must not
+# try to resolve it. Same pattern as crates/me-cli/fuzz. Without this table
+# `cargo build` here fails with "current package believes it's in a workspace
+# when it's not" -- which meant the committed harness was not runnable, the very
+# property DESIGN_coordinator_compatibility.md §3 mechanism 3 requires of it.
+[workspace]
