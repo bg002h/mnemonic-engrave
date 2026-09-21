@@ -653,10 +653,58 @@ already records" was false.
    `format/text.rs:269-274`'s corpus is `wsh`-only.
 8. **A live `harnesses/liana` install run at v15.0 — REQUIRED, not a bonus.**
    It is the only measurement of the install path for any unspendable shape.
-9. **Mutation testing.** Every property above must be shown to FAIL when the code
+9. **The operator-facing rulings get vectors too — a rule with no gate is not a
+   rule.** r3 stated §0b, §6a and stage 4a as prose and gated only §0b's
+   predicate, which is the same shape of gap this spec has already been caught
+   on twice (§8.8 declared REQUIRED and scheduled nowhere; §8.5 stated for Rust
+   only). Each of these is a test, with its owning stage:
+
+   | what | gate | stage |
+   | --- | --- | --- |
+   | §0b PLACEMENT | the choice screen is reached before the first `composerStubFlow`; if placed later, the changed-id banner fires | 4 |
+   | §0b RESET | set kind 1, Back-edit the shape, and assert the kind is 0 again | 4 |
+   | §0b DEFAULT ROW | the widget opens on the NUMS row, asserted on the FIRST page | 4 |
+   | §0b COPY | both rows name their coordinators and say the two are different wallets | 4 |
+   | §6a old-device message | a version-8 chunk yields "unsupported wire version", never "Not an md1 descriptor chunk." | 3 |
+   | §6a `md repair` | a v8 chunk with a correctable BCH error keeps the correction and reports an unsupported version, not "too damaged" | 2 |
+   | §6a error Display | `WireVersionMismatch`'s message names the accepted set, not "expected 4" | 1b |
+   | §8b `me` fail-open | see §8b | 4a |
+
+10. **Mutation testing.** Every property above must be shown to FAIL when the code
    it guards is broken: flip the concat order, sort the keys, deduplicate them,
    drop the version bump, use kind 0's hex at kind 1, pass a constant version to
    the identity hashes, and group the new kind with `KeyPathSpendable`.
+
+### 8b. `me`'s silent skip — a fail-open that version 8 ACTIVATES
+
+`crates/me-cli/src/bundle.rs:371`:
+
+```rust
+if let Ok(d) = md_codec::decode::decode_md1_string(s) {
+    hashlock_kinds.extend(descriptor_hash_kinds(&d));
+    key_slots = key_slots.max(d.n as usize);
+    keyless_template |= !d.is_wallet_policy();
+}
+plates.push(PlateEntry { … });          // pushed regardless
+```
+
+On a decode error the block is skipped **silently** while the plate is still
+recorded, so `key_slots`, `keyless_template` and `hashlock_kinds` keep their
+zero values. The comment three lines above says why that decode is there:
+*"a check that covered only the chunked shape would be a completeness claim
+with a hole in it."*
+
+This is latent today and **version 8 activates it**: an older `me` — and
+`crates/me-cli/Cargo.toml:26` pins `md-codec = "0.42"` from crates.io, which
+this cycle cannot bump there because md-codec is unpublished — fails the decode
+on every kind-1 plate and then emits a bundle whose *"backup needs N plates"*
+claim was computed from nothing.
+
+**Ruling.** A decode failure on a plate that feeds a completeness claim is
+reported, never skipped. `me bundle` either refuses the payload naming the
+version, or emits the bundle with the completeness claim explicitly marked
+unknown — it must not state a count it did not compute. Owned by stage 4a,
+gated by §8.9.
 
 ### 8a. The last mile, for the runbook rather than the gate
 
@@ -676,7 +724,7 @@ runbook has the two commands; not a gate.
 | **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes |
 | **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
 | **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
-| **4a** | `me` (this repo): unpin `md-codec 0.42` from crates.io onto the workspace/git source and carry the new version; §6a's chunked-arm message | `me` round-trips a version-8 payload, or refuses it with a message naming the version |
+| **4a** | `me` (this repo): unpin `md-codec 0.42` from crates.io onto the workspace/git source and carry the new version; §6a's chunked-arm message; **§8b's fail-open fix at `bundle.rs:371`** | `me` round-trips a version-8 payload, or refuses it naming the version; **§8.9's `me` fail-open row — a bundle never states a plate count it did not compute** |
 | **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ with `demo/sh2/update.sh` | site 200, `application/wasm`, and the emulator reaches §0b's screen |
 
 **Every §8 item has an owning stage, and no item is left unowned** (opus I3 and
