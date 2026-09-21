@@ -1,11 +1,13 @@
 # SPEC — the Liana unspendable internal key (F-449)
 
-**Status:** r3, folded from six independent reviews plus four author-found
+**Status:** r4, folded from eight independent reviews plus four author-found
 findings. R0: opus 2C/6I/5M/2N, fable adversarial 0C/4I/9M. r1: fold-check
 1 unaddressed + 2 defects, new-design 1C/4I/2M. r2: fold-check 0 unaddressed +
-1 cosmetic, **journey walk 2C/6I/4M**. Awaiting re-review.
+1 cosmetic, **journey walk 2C/6I/4M**. r3: fold-check 4 partial + 0 new
+defects, new-design **0C**/6I/4M. Awaiting re-review.
 **Reports:** `design/agent-reports/f449-spec-r0-{opus,fable-adversarial,self}.md`,
-`f449-spec-r1-{fold-check,new-design}.md`, `f449-spec-r2-{fold-check,journey}.md`
+`f449-spec-r1-{fold-check,new-design}.md`, `f449-spec-r2-{fold-check,journey}.md`,
+`f449-spec-r3-{fold-check,new-design}.md`
 
 **Both r2 Criticals were the author's own folds**, found only by a journey walk
 after four correctness-shaped lenses had closed: a choice-screen predicate that
@@ -74,7 +76,11 @@ Nunchuk acceptance falling to 1/24 for four keys) — and where, for
 `plain-multisig`, §6 row 1 would refuse the option the screen offered.
 
 **PLACEMENT.** The screen sits **between `composerShapeFlow` and the first
-`composerStubFlow`** (`gui/composer_flow.go:97-118`). The kind changes the tree,
+`composerStubFlow`** — measured, `composerShapeFlow` closes at
+`gui/composer_flow.go:95` and the first `composerStubFlow` is at `:129`, so the
+window is **`96-128`**. Within it the screen must come **before**
+`composerTemplateChunksFor`, since that is what turns the kind into the chunks
+the stub screen displays. The kind changes the tree,
 hence the template chunks, hence the Template-ID and `mk1 stub` the operator
 **copies onto steel and mints cosigner cards from**. r1 pointed twice at
 `gui/composer_consent.go:261` as "where the predicate already ships", which aims
@@ -83,16 +89,33 @@ after the stub screen it MUST return through `composerStubFlow` and raise the
 existing changed-id banner (`composerStubDelta`), whose own doc comment says a
 false statement there is worse than a missing one.
 
-**RESET.** The chosen kind resets to 0 on any shape, wrapper or path-list edit
-that re-enters `composerShapeFlow`. Without this the kind survives a Back-edit
-into a shape where it is a silent downgrade or a §6 refusal, with no screen to
-unset it — and the composer's documented Back invariant is "going back should
-lose nothing".
+**RESET — expressed as a predicate, not as an edit event.** r3 said the kind
+"resets on any shape, wrapper or path-list edit that re-enters
+`composerShapeFlow`", which is a granularity the composer cannot observe: it
+does not diff path lists, and the one existing change detector is measurably
+blind to the edits that flip §0b's predicate.
 
-**DEFAULT ROW.** `Initial` is the **NUMS row**. The widget's zero value selects
-row 0, so a default row of "Liana xpub" would re-implement the alternative §0
-explicitly rejects — silently changing the wallet form for an operator who
-pressed through.
+So do not detect the edit. **Re-evaluate the predicate.** On every entry to
+`composerStubFlow`, recompute §0b's two conjuncts against the current shape; if
+either is false, the kind is 0. A kind-1 selection is therefore never carried
+into a shape that cannot represent it, no edit needs to be detected, and the
+Back invariant is preserved — nothing the operator chose is lost while it is
+still applicable, and what is dropped was unrepresentable anyway.
+
+This also makes the screen's reachability total: the predicate that shows the
+screen is the same predicate that keeps the value, so there is no state where
+the kind is set but the screen cannot be reached to unset it.
+
+**DEFAULT ROW — seeded once, from the current value.** `Initial` is the NUMS
+row **on first entry only**; on any re-entry it is the kind currently set. The
+zero-value trap is real (a default of "Liana xpub" would silently change the
+wallet form for an operator who pressed through), but "always NUMS" is wrong on
+every pass after the first: because PLACEMENT puts this screen before the stub
+screen, an operator who sets kind 1 and then steps Back would find the screen
+proposing NUMS again, and pressing through would silently revert their choice.
+The composer has closed this exact defect twice — a picker that opens on row
+zero *proposes* a setting, so looking at it changes it. Seed the initial **once
+per screen entry** from current state, never from a constant.
 
 **COPY.** The screen names, for each row: which coordinators import the result,
 and that the two rows are **different wallets with different addresses** that
@@ -529,8 +552,8 @@ exist.
 
 | surface | today | required |
 | --- | --- | --- |
-| old device, chunked plate | `md.ParseChunkHeader` errors → `gatherIgnored` → **"Not an md1 descriptor chunk."** | a **false statement** about a plate the constellation cut. `gatherIgnored` must be split so a well-formed md1 at an unsupported version says so, and names the version |
-| `md repair`, older binary | the BCH correction loop **succeeds**, then `decode_with_correction` rejects version 8 and `repair.rs:88-96` returns `Ok(2)`, **discarding the successful correction** — and exit 2 is documented as "the plate is too damaged" | distinguish "BCH capacity exceeded" from "corrected fine, but this wire version is unsupported"; never discard a correction that succeeded |
+| old device, chunked plate | `md.ParseChunkHeader` errors → `gatherIgnored` → **"Not an md1 descriptor chunk."** | a **false statement** about a plate the constellation cut. `gatherIgnored` must be split so a well-formed md1 at an unsupported version says so, and names the version. **This crosses a package boundary:** `errWireVersion` is unexported (`md/md.go:22`), so package `md` must first expose a sentinel or typed error before `gui` can distinguish the case — a `md/` change, hence stage 3, not a `gui/` one |
+| `md repair`, older binary | the BCH correction loop **succeeds**, then `decode_with_correction` rejects version 8 and `repair.rs:88-96` returns `Ok(2)`, **discarding the successful correction** — and exit 2 is the atomic-fail code | distinguish "BCH capacity exceeded" from "corrected fine, but this wire version is unsupported"; never discard a correction that succeeded |
 | `WireVersionMismatch` Display | `"wire-format version mismatch: got 8, expected 4"` (`error.rs:33`) | "expected 4" becomes false the moment the decoder accepts `{4, 8}`; the message must name the accepted set |
 
 The host error names the version and the device error does not, so §3d's *"loud
@@ -599,8 +622,10 @@ wrong places:
    NUMS branch. Without this rule a future fourth kind reintroduces row 1 above.
 
    **Scope of the engrave refusal.** The address-refusal half already ships:
-   `complexAddressSource` probes `src(0, false)` and returns `nil, false` rather
-   than falling back. The engrave half is new, and it applies to a policy whose
+   `complexAddressSource` (`gui/policy_address.go:88`, the entry point every
+   screen goes through) probes `src(0, false)` and returns `nil, false` rather
+   than falling back — the probe itself is in `complexAddressDeriver` at
+   `:188-190`, which is where an implementer should grep. The engrave half is new, and it applies to a policy whose
    internal-key kind *this firmware cannot derive* — not to the shipped D3/D4
    paths that deliberately engrave without an address. State it that way, or it
    reads as a blanket "no address, no engrave" and retires working behaviour.
@@ -668,7 +693,8 @@ already records" was false.
    | §6a old-device message | a version-8 chunk yields "unsupported wire version", never "Not an md1 descriptor chunk." | 3 |
    | §6a `md repair` | a v8 chunk with a correctable BCH error keeps the correction and reports an unsupported version, not "too damaged" | 2 |
    | §6a error Display | `WireVersionMismatch`'s message names the accepted set, not "expected 4" | 1b |
-   | §8b `me` fail-open | see §8b | 4a |
+   | §8b `me` fail-open | a bundle never states a plate count it did not compute | 4a |
+   | `me` record confirmation | an unsupported wire version is REPORTED, never silently reduced to "unconfirmed" (`sysw/record.rs:251-252`) | 4a |
 
 10. **Mutation testing.** Every property above must be shown to FAIL when the code
    it guards is broken: flip the concat order, sort the keys, deduplicate them,
@@ -724,7 +750,7 @@ runbook has the two commands; not a gate.
 | **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes |
 | **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
 | **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
-| **4a** | `me` (this repo): unpin `md-codec 0.42` from crates.io onto the workspace/git source and carry the new version; §6a's chunked-arm message; **§8b's fail-open fix at `bundle.rs:371`** | `me` round-trips a version-8 payload, or refuses it naming the version; **§8.9's `me` fail-open row — a bundle never states a plate count it did not compute** |
+| **4a** | `me` (this repo), and it is larger than "carry the new version" — see §9a | **§8.9's `me` rows.** NOT "me round-trips a version-8 payload": measured, that already passes on the pinned 0.42 with no change at all, because `me convert` validates only the codex32/BCH layer (`me-cli/src/lib.rs:75-83` → `validate.rs:95-100`), which is version-agnostic. A gate the status quo satisfies is not a gate |
 | **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ with `demo/sh2/update.sh` | site 200, `application/wasm`, and the emulator reaches §0b's screen |
 
 **Every §8 item has an owning stage, and no item is left unowned** (opus I3 and
@@ -748,6 +774,27 @@ not a duplicate:
 makes resolution fail **before rustc runs**, and §3f breaks four non-test md-cli
 sites at compile time (§3f names them). The pin bump and the call-site repairs ship **in the same
 commit** as the change that requires them.
+
+### 9a. Stage 4a is three pieces of work, not one
+
+r3 described stage 4a as "unpin and carry the new version". Measured, it is
+three, and two of them were invisible:
+
+1. **The unpin needs a `[patch.crates-io]` override.** Pointing
+   `crates/me-cli/Cargo.toml:26` at the local md-codec 0.45.1 and running
+   `cargo check -p mnemonic-engrave --all-targets` does **not** compile: the
+   graph also needs a `miniscript` patch. Stage 4a names the pin and not the
+   override, so an implementer hits a wall that reads like a broken workspace.
+2. **§3f's type change breaks `me`'s own source.** §3f enumerates its blast
+   radius carefully — 88 md-codec sites, the fork's `md/`+`gui/`, four non-test
+   md-cli sites, and it even clears a fifth — and `me` is on none of those
+   lists. It is a `md_codec` consumer like any other and its `Body::Tr` uses
+   break with them.
+3. **The real version-sensitive surface is `sysw/record.rs:251-252`**, not
+   `convert`. It reduces `md_codec::reassemble` / `decode_md1_string` to
+   `.is_ok()`, so an unsupported wire version silently classifies a record as
+   **unconfirmed** with no message naming anything — the §6a defect shape,
+   on `me`. That is what stage 4a's gate points at.
 
 **`me` is downstream and its pin is not bumpable the usual way** (journey I6).
 `crates/me-cli/Cargo.toml:26` pins `md-codec = "0.42"` from **crates.io**

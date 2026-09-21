@@ -1,0 +1,6 @@
+# The `liana` dependency is an UNVENDORED path outside this repo, pointed at a
+# checkout of whatever tag is being measured (see README.md's tag table). A
+# committed lock would pin resolution for one tag and mislead for every other,
+# and the harness exists precisely to be re-run across tags.
+Cargo.lock
+target/
