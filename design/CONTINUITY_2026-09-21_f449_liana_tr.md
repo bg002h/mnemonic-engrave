@@ -98,3 +98,32 @@ differential, daily address job).
 - A bumped `md-codec` version and md-cli's `version = "=0.45.1"` exact pin
   (`crates/md-cli/Cargo.toml:28`) must move in the SAME commit or cargo cannot
   resolve.
+
+## Gates proven EXECUTABLE (not hypotheses) — 2026-09-21
+
+r1 promoted two acceptance items from aspiration to REQUIRED. Both were then
+proven to run, because this project treats a gate that has never executed as a
+hypothesis rather than a gate.
+
+**§8.8 — the live Liana install run.** The committed harness was NOT buildable:
+`harnesses/liana` was neither a workspace member nor excluded and had no
+`[workspace]` table. Fixed at `bca2ff36` using the pattern the repo already uses
+for `crates/me-cli/fuzz`. After the fix, run over the 8 `liana-unspendable-xpub`
+evidence descriptors:
+
+    4 ACCEPT / 4 REFUSE   (matches the recorded evidence exactly)
+    preset-kofn-recovery-tr recv[0] = bc1pj6davmeetfe2uutrjlgxcjytq5… (golden match)
+
+The Liana v15.0 checkout is present at `.tmp/fable-liana-src-v15`; the harness
+`Cargo.toml` already points at it. Build with
+`CARGO_TARGET_DIR=/scratch/code/shibboleth/.tmp/liana-harness-target cargo build`.
+**Take cargo's exit code directly — piping through `tail` reported exit 0 on a
+build that had failed.**
+
+**§8.3 — the device address leg.** Achievable: `gui/policy_address_test.go` and
+`gui/policy_address_export_test.go` already exercise the real device function
+(`TestPolicyAddressAtIsTheDeviceFunction` exists precisely to pin that the test
+does not wrap a different function). Green at baseline, 4 top-level tests,
+58 RUN/PASS lines, 0.14s when scoped with `-run` — and the `-run` filter was
+verified with `-v` to have actually matched, since a filter matching nothing
+also prints `ok`.
