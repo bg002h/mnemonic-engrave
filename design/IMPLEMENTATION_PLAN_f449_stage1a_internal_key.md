@@ -78,6 +78,7 @@ Its R0 carries forward the findings already banked against it:
 | r2 MIN-19 | `encode_payload_unchecked` does not exist and `Admission` is `pub(crate)`, so "a refused shape still decodes" must be a **unit** test inside the crate, not an integration test |
 | r2 MIN-20 | `cmd/vectors.rs:193` is a **third** production caller of the network-less form, beyond `cmd/descriptor.rs` and `derive.rs:134` |
 | r2 MIN-17 | citations: validators also run at `encode.rs:147`/`:149`; decode's run `:118`-`:153` |
+| **stage-1a M5 (RULING, carried)** | **1b's version bump must be `0.46.0`, NOT `0.45.2`, and its CHANGELOG entry must attribute the breaking change to stage 1a.** `Body::Tr`'s fields are public API (`lib.rs:44`), md-codec is published (no `publish = false`, `documentation = docs.rs/md-codec`), and the repo's convention is that `0.X` is the breaking axis. Stage 1a shipped the breaking shape change with no bump — deliberately, since this plan assigns the bump to 1b — so the break belongs to 1a and 1b must not mislabel it as part of the wire-version-8 work. No build breaks meanwhile: md-cli's `=0.45.1` pin still resolves because the version did not move. |
 
 ---
 
