@@ -19323,3 +19323,42 @@ mutations for classes 1, 3, 7 and 9 and every shape agreed with the measured
 Liana truth (55/56), but no test holds a policy carrying BOTH an `after` and
 an `older` in 512-second units, so an edit that swapped classes 5 and 6 would
 pass the suite. Add one compound fixture asserting "an absolute lock" wins.
+
+### F-636 — the disjoint-multipath refusal names md's limit, not the real problem, when the repeated key is the recognised Liana-unspendable one (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
+
+**Status:** OPEN
+Filed 2026-09-22 from the Task 6 fix-round re-review (0C/0I/1M) in F-449
+stage 1b. The behaviour is correct and gated; only the wording is off.
+
+**The defect.** When a `tr()`'s recognised Liana-unspendable internal key is
+ALSO placed at a tapleaf with a disjoint use-site, `md decompose` correctly
+refuses — but via `decompose/mod.rs`'s pre-existing disjoint-multipath
+branch, whose message says:
+
+> BIP 388 permits that shape — this is not a BIP violation — but md's
+> template surface is narrower … UNSUPPORTED
+
+That is true of the general repeated-key case and misleading for this one.
+The operator is told they hit an **md capability limit**, which invites
+"then I'll use another tool". The actual problem is that they placed a
+**provably unspendable key at a spending leaf** — no tool can spend it, and
+the leaf is dead in any implementation. A message that sends someone to a
+different coordinator to reproduce a dead branch is worse than telling them
+nothing.
+
+**Why it is not blocking.** It fails CLOSED — nothing is minted, no card is
+engraved, exit is non-zero. Before the stage-1b reorder this shape was
+silently ACCEPTED and slotted as `@0`, which was the funds-adjacent half and
+is now fixed and pinned by
+`decompose_refuses_the_recognised_internal_key_reused_at_a_disjoint_use_site`.
+
+**The fix.** Detect the case in the refusal path — the key being repeated is
+the one `liana_internal_key_match` just recognised — and say so plainly: the
+descriptor reuses its own unspendable internal key at a spending leaf, that
+leaf can never be satisfied, remove it or use a real cosigner key. Keep the
+existing message for every other repeated-key shape.
+
+**Test note.** The existing test deliberately pins the OUTCOME (refused,
+`UNSUPPORTED`, no `internal:` leak) and not the wording, so improving the
+message here does not require rewriting it — but a new assertion on the new
+phrasing should be added with the fix.
