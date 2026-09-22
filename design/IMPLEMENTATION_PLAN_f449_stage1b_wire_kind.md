@@ -1038,7 +1038,7 @@ fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
 
 A no-op edit reads as a pass. Put a `panic!` in the mutated branch first and watch the suite fail; then replace it with the real mutation.
 
-- [ ] **Step 2: Run the fifteen**
+- [ ] **Step 2: Run the seventeen**
 
 | # | mutation | must be caught by |
 | --- | --- | --- |
@@ -1049,8 +1049,10 @@ A no-op edit reads as a pass. Put a `panic!` in the mutated branch first and wat
 | 7 | write the kind bit at version 4 | **stage 1a's byte-equality gate** |
 | 8-11 | drop each of §6's four refusals | Task 7 |
 | 12-15 | **collapse each of G-1's four or-pattern sites to the NUMS arm** | Task 5 — **if any stays green, that site has no gate and G-1 is unclosed** |
+| 16 | **invert the kind bit's polarity on BOTH sides** (`write:199` and `read:377`) | Task 3's golden-bit assertion — a SYMMETRIC inversion is invisible to every round-trip test by construction, so only a golden bit catches it. Stage 3's Go port must agree on polarity or plates written by one are misread by the other. |
+| 17 | **weaken the recogniser at `decompose/walk.rs:235` to a NUMS-pubkey/depth-0 pattern-match** (compare `public_key` and `depth` only, ignoring the chain code that carries the leaf hash) | Task 6's `decompose_does_not_recognise_lianas_own_recipe_computed_over_the_wrong_leaves` — a positive-only suite CANNOT see this weakening, because a pattern-match accepts every input the real check accepts. Under it a DIFFERENT wallet's Liana recipe xpub is relabelled `UNSPENDABLE(liana)`. |
 
-- [ ] **Step 3: Record all fifteen verbatim, revert every mutation, confirm the tree is clean**
+- [ ] **Step 3: Record all seventeen verbatim, revert every mutation, confirm the tree is clean**
 
 ```bash
 git diff --stat                      # must be empty except the report

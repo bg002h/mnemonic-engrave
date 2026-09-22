@@ -731,6 +731,24 @@ already records" was false.
    drop the version bump, use kind 0's hex at kind 1, pass a constant version to
    the identity hashes, and group the new kind with `KeyPathSpendable`.
 
+   Two further classes, each added because a whole family of tests is blind to
+   it by construction rather than by oversight:
+
+   - **Invert the kind bit's polarity on BOTH sides at once.** A symmetric
+     inversion round-trips perfectly, so no encode-then-decode test can see it
+     — only a golden assertion on the literal bit. It is a cross-implementation
+     hazard, not a local one: an encoder and a decoder that disagree on
+     polarity misread each other's plates while both pass their own suites.
+   - **Weaken the §4a recogniser from full byte equality to a structural
+     pattern-match** (the NUMS pubkey and depth 0, ignoring the chain code that
+     actually carries the leaf-set hash). A POSITIVE-ONLY suite cannot catch
+     this: a pattern-match accepts every input the real check accepts, so it is
+     a strict superset on exactly the cases such tests cover. Only an input the
+     real check must REJECT separates them — a valid recipe output computed
+     over a DIFFERENT leaf set, which a weakened check relabels as this
+     wallet's own unspendable key. Any conforming implementation therefore owes
+     at least one near-miss vector, not only matching ones.
+
 ### 8b. `me`'s silent skip — a fail-open that version 8 ACTIVATES
 
 `crates/me-cli/src/bundle.rs:371`:
