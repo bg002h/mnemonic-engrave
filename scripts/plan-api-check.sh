@@ -52,7 +52,8 @@ KEYWORDS = {'assert','assert_eq','assert_ne','println','format','panic','vec','m
             'as_slice','as_deref','is_ok','is_err','is_some','is_none','is_some_and',
             'to_byte_array','from_normal_idx','hash','serialize','clone','to_vec','zip',
             'find','filter','lines','join','split','next','count','sort','dedup','get',
-            'read_to_string','to_owned','to_str','file_name','display','path','join'}
+            'read_to_string','to_owned','to_str','file_name','display','path','join',
+            'into_iter','unwrap_or_else','into_bytes','as_str','as_ref','decode'}
 # Names the PLAN ITSELF defines in a rust block (tests and local helpers) are
 # not claims about the repo -- they are the plan's own code.
 defined = set(re.findall(r'\bfn ([a-z_][a-z_0-9]*)', '\n'.join(blocks)))
