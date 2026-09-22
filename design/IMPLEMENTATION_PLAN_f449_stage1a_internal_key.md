@@ -78,6 +78,8 @@ Its R0 carries forward the findings already banked against it:
 | r2 MIN-19 | `encode_payload_unchecked` does not exist and `Admission` is `pub(crate)`, so "a refused shape still decodes" must be a **unit** test inside the crate, not an integration test |
 | r2 MIN-20 | `cmd/vectors.rs:193` is a **third** production caller of the network-less form, beyond `cmd/descriptor.rs` and `derive.rs:134` |
 | r2 MIN-17 | citations: validators also run at `encode.rs:147`/`:149`; decode's run `:118`-`:153` |
+| **stage-1a FINAL-REVIEW, GATING** | **The four `NumsPoint \| LianaUnspendable` or-patterns give stage 1b NO non-exhaustive-match error.** Sites: `render.rs:192`, `to_miniscript.rs:341`, `policy_shape.rs:251`, `md-cli/src/format/json.rs:356`. Proven by the final reviewer: splitting the or-patterns so `LianaUnspendable` hits `unreachable!()` left the suite at **1439 passed / 3 skipped, unchanged** — nothing exercises those arms. So a site 1b forgets to update **silently yields a NUMS taproot output key — a wrong address** — instead of failing to compile. That is the exact benefit the sum type was introduced for, switched off at exactly the four sites that matter. **1b must visit all four by name; do not rely on the compiler to find them.** |
+| **stage-1a M2 CORRECTION (the plan's own reasoning was FALSE)** | Stage 1a's Step 1b removed a non-zero-`key_index` test on the grounds that such a slot is *"canonically unreachable"*. **That justification is wrong.** The final reviewer minted a real card — `md1yp802gggqpsfx2q26nd0c9nkv89j4` — carrying `Slot(1)`, and verified it byte-identical at base and tip. The refactor is correct there; only the stated reason was. Standing coverage for a non-zero slot is one unit test (`tree.rs`). 1b must not inherit the false premise: a non-zero internal-key slot IS constructible. |
 | **stage-1a M5 (RULING, carried)** | **1b's version bump must be `0.46.0`, NOT `0.45.2`, and its CHANGELOG entry must attribute the breaking change to stage 1a.** `Body::Tr`'s fields are public API (`lib.rs:44`), md-codec is published (no `publish = false`, `documentation = docs.rs/md-codec`), and the repo's convention is that `0.X` is the breaking axis. Stage 1a shipped the breaking shape change with no bump — deliberately, since this plan assigns the bump to 1b — so the break belongs to 1a and 1b must not mislabel it as part of the wire-version-8 work. No build breaks meanwhile: md-cli's `=0.45.1` pin still resolves because the version did not move. |
 
 ---
@@ -348,9 +350,17 @@ crate::validate::validate_placeholder_usage(&d.tree, d.n)?;                 // :
 
 `canonicalize_placeholder_indices` renumbers `Tr.key_index` by first appearance
 (`canonicalize.rs:12`, `:107`), and a root `Tr`'s internal key **appears
-first** — so it is renumbered to `Slot(0)` on every encode. A non-zero
-internal-key slot is therefore **canonically unreachable**, not merely absent
-from the corpus. "0 of 13" is a property of the format, not a coverage gap, and
+first** — so it is renumbered to `Slot(0)` on every encode **through that
+path**.
+
+**CORRECTION (stage-1a final review).** The conclusion drawn from this — that a
+non-zero internal-key slot is *"canonically unreachable"* — is **false**, and
+was wrong when written. The final reviewer minted a real md1 card,
+`md1yp802gggqpsfx2q26nd0c9nkv89j4`, carrying `Slot(1)`, and verified it
+byte-identical at base and tip. The refactor handles it correctly; only this
+paragraph's reasoning was wrong. What remains true is the narrower fact: the
+65-vector corpus contains no non-zero slot, so the **golden** cannot catch a
+refactor that zeroes one, and the standing coverage is the `tree.rs` unit test. "0 of 13" is a property of the format, not a coverage gap, and
 widening the corpus could never have changed it.
 
 The layer where a non-zero index *does* exist is the raw `write_node`/`read_node`
