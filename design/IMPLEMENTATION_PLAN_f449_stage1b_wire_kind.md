@@ -12,7 +12,7 @@
 
 **Predecessor:** `design/IMPLEMENTATION_PLAN_f449_stage1a_internal_key.md`, shipped at `37367c1f` on `descriptor-mnemonic` main. Baseline there: `phase-gate.sh` all six green, 1439 passed / 3 skipped under `--all-features`.
 
-**Status:** r1, folded from the stage-1b R0 (4C/7I/9M/4N, `design/agent-reports/f449-plan-stage1b-r0.md`). Awaiting re-review.
+**Status:** r2, folded from the stage-1b R0 (4C/7I/9M/4N) and its re-review (1C/5I/11M/4N). Reports: `design/agent-reports/f449-plan-stage1b-{r0,r1}.md`. Awaiting re-review.
 
 ## Global Constraints
 
@@ -409,14 +409,37 @@ decision, not a law of nature) this fails loudly rather than silently changing
 every kind-1 chain code:
 
 ```rust
+const NUMS_HEX: &str = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0";
+
 #[test]
 fn a_slot_cannot_appear_twice_in_a_taptree_so_occurrence_order_IS_slot_order() {
     // §2's hashed sequence is unambiguous only because md1 refuses both reuse
-    // forms. If either refusal is ever relaxed, the recipe must be re-specified
-    // as per-OCCURRENCE before that lands -- Liana walks leaves, not slots.
-    for tpl in [SAME_PATH_REUSE_TEMPLATE, DISJOINT_PATH_REUSE_TEMPLATE] {
-        assert!(md_encode(tpl).is_err(), "reuse became expressible: {tpl}");
-    }
+    // forms. If either refusal is relaxed, the recipe must be re-specified as
+    // per-OCCURRENCE before that lands -- Liana walks leaves, not slots.
+    //
+    // TWO THINGS MAKE THIS PIN ABLE TO FAIL, and an earlier draft had neither:
+    //
+    // 1. The internal key is the REAL NUMS HEX, not a `<NUMS>` placeholder.
+    //    Measured: `tr(<NUMS>,{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})` fails with
+    //    "miniscript parse failed: key too short". Today the reuse check runs
+    //    FIRST, so the placeholder spelling still produced the right error --
+    //    but the moment either refusal is REMOVED (the one change this test
+    //    exists to catch) the template would fall through to that parse error
+    //    and a bare is_err() would keep passing. The pin would survive the
+    //    deletion of the thing it pins.
+    // 2. Each case asserts its OWN error, not `is_err()`.
+    let same_path = format!(
+        "tr({NUMS_HEX},{{pk(@0/<0;1>/*),and_v(v:pk(@0/<0;1>/*),older(26280))}})");
+    let disjoint = format!(
+        "tr({NUMS_HEX},{{pk(@0/<0;1>/*),and_v(v:pk(@0/<2;3>/*),older(26280))}})");
+
+    let e = md_err(&["encode", &same_path, "--path", "bip48"]);
+    assert!(e.contains("same path expression") && e.contains("BIP 388"),
+            "same-path reuse no longer refused for its own reason: {e}");
+
+    let e = md_err(&["encode", &disjoint, "--path", "bip48"]);
+    assert!(e.contains("DISJOINT multipath sets") && e.contains("ONE path per key slot"),
+            "disjoint-path reuse no longer refused for its own reason: {e}");
 }
 ```
 
@@ -583,7 +606,12 @@ In `decompose/walk.rs`, at the `Tr` node (NOT downstream of `for_each_key`, whic
 
 - [ ] **Step 1: Write the failing tests — as UNIT tests inside `encode.rs`**
 
-`encode_payload_inner` is **module-private** (`encode.rs:143` — not `pub(crate)`, unlike `encode_payload_for_identity` at `:139`), and `Admission` is `pub(crate)`. An integration test in `tests/` can reach neither. These live in `encode.rs`'s own `#[cfg(test)] mod tests`.
+**Two homes, decided by what each test needs — an earlier draft put all three in `encode.rs` and then had them call `kind1_from_vector`, which lives in `tests/common/liana.rs` and is unreachable from inside the crate.**
+
+| test | needs | home |
+| --- | --- | --- |
+| the two refusal tests | only `encode_payload`, which is **public** (`encode.rs:99`) | **integration**, `tests/liana_unspendable.rs` — so they may use `kind1_from_vector` |
+| `a_refused_shape_still_DECODES` | `encode_payload_inner` (module-private, `:143`) and `Admission::SkipPolicy` (`pub(crate)`, `:107`) | **unit**, inside `encode.rs`'s own `#[cfg(test)] mod tests` — and it must build its fixture **in-crate**, with no `tests/` helper |
 
 ```rust
 #[test]
@@ -592,12 +620,14 @@ fn kind_1_with_a_sortedmulti_a_leaf_is_refused_at_MINT() {
     assert!(matches!(encode_payload(&d), Err(Error::UnspendableWithSortedMultiA)));
 }
 
+// UNIT test, inside encode.rs. Its fixture is built IN-CRATE: tests/common/
+// is a different crate root and `kind1_from_vector` is not reachable here.
 #[test]
 fn a_refused_shape_still_DECODES_so_existing_cards_never_stop_reading() {
     // encode.rs:116-131 records the measured 2026-09-19 regression: mint-side
     // refusals leaking into decode made a shipped 2-of-2 stop reading. This is
     // that regression as an assertion.
-    let d = tr_liana_with_sortedmulti_a_leaf();
+    let d = in_crate_tr_liana_with_sortedmulti_a_leaf();   // built from Node/Body directly
     let (bytes, bits) = encode_payload_inner(&d, Admission::SkipPolicy).expect("mint-bypass encode");
     assert!(decode_payload(&bytes, bits).is_ok(), "a mint-side refusal reached decode");
 }
@@ -717,6 +747,15 @@ Through `decode_with_correction`, single-string **and** chunked — not `decode_
 
 `preset-decaying-multisig-tr` is the evidence's only nested taptree `{A,{B,C}}`, and Liana **refused** it on policy shape — so no ACCEPT backs the traversal order. Task 4's `the_chain_code_depends_on_the_KEYS_not_the_TREE` already pins it against the golden xpub, which is the strongest available evidence. **State in the test's comment that this ordering is pinned by recipe-agreement, not by a Liana ACCEPT**, so nobody later mistakes it for measured import.
 
+**And record the non-delivery explicitly.** §8.1 asks for "a nested taptree that
+Liana ACCEPTS". **No such evidence exists** — the only nested case in the corpus
+is `preset-decaying-multisig-tr`, which Liana refused on policy shape, and no
+accepted case is nested. So this stage delivers the strongest thing available
+(recipe agreement against the golden xpub) and **does not** deliver the thing
+§8.1 literally asks for. That is a deliberate gap, not an oversight: closing it
+would need a new Liana-accepted nested shape measured through the harness, which
+is **stage 2's** live run. Carry it into stage 2's brief.
+
 - [ ] **Step 5: §6's pinned invariant (I6)**
 
 SPEC §6 carries an invariant, not a refusal: a `tr` with no leaf keys cannot be constructed, so `sha256("")` can never become a shared chain code. It belongs in **md-cli**'s tests (the guard is the template parser's):
@@ -781,6 +820,8 @@ git diff --stat                      # must be empty except the report
 ## Self-Review
 
 **Spec coverage.** §2 → Task 4. §3a/3c/3d → Tasks 2-3. §3e → Task 2 Step 4. §4 → Task 5. §4a → Task 6. §4b → Task 10. §6 → Task 7. §6a's stage-1b row → Task 2 Step 3. §8 items 1/2/5/6/7 → Task 8; item 10 → Task 9. §9's pin rule → Task 10.
+
+**§6 row 3's `--unspendable liana` no-op WARN is stage 2's**, not this stage's: the flag itself is `md compose`, which §9 assigns to stage 2. A kind-1 request on a path list that already has a bare single key must WARN rather than silently do nothing (fable M-6). Named here so it is not lost between the two plans.
 
 **Owned by later stages, deliberately absent:** §0b's choice screen and §7/§7a's device work (stage 4), §8.3's device leg (stage 4), §8.4's Go leg and §7a.1's three-state port (stage 3), §8.8's live Liana install run (stage 2), §8b and §9a's `me` work (stage 4a), §8.9's operator-facing rows (stages 2-4a).
 
