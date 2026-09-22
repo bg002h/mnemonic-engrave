@@ -935,17 +935,34 @@ fn item_2_descriptor_equality_at_the_CORPUS_level() {
 // LIVES IN crates/md-cli/tests/ — it shells out to the `md` binary, and
 // md-codec has no CLI runner in dev-deps and no CARGO_BIN_EXE_md. r2/I-D fixed
 // exactly this 450 lines above; do not re-introduce it here.
+// THE FIXPOINT HAS TWO HALVES AND THEY LIVE IN DIFFERENT CRATES. An earlier
+// fold collapsed it to the reparse half alone, which dropped the only call to
+// `descriptor_to_template` in the whole plan — the test then compiled, passed,
+// and exercised the renderer not at all. Render and reparse each get their own
+// test, in the crate that can reach them.
+
+// --- md-codec: tests/liana_unspendable.rs — the RENDER half ---
 #[test]
-fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
+fn item_7a_a_kind_1_descriptor_renders_to_a_template_carrying_the_marker() {
+    let t = descriptor_to_template(&kind1_from_vector("keyed_compose_tr_nums_three_leaves"))
+        .expect("render");
+    assert!(t.contains("UNSPENDABLE(liana)"), "renderer dropped the marker: {t}");
+    assert!(!t.contains("50929b74"), "kind 1 must not render as the raw NUMS hex: {t}");
+}
+
+// --- md-cli: tests/liana_input_side.rs — the REPARSE half ---
+#[test]
+fn item_7b_that_template_re_parses() {
     // md-cli/src/format/text.rs:269-274 asserts every rendered template
     // re-parses; its corpus is wsh-only, so it stays green while the invariant
-    // it names is false for tr kind 1. This is the kind-1 case.
+    // it names is false for tr kind 1.
     //
-    // It does NOT call kind1_from_vector. That helper is include!d via
-    // env!("CARGO_MANIFEST_DIR"), which from md-cli resolves to a nonexistent
-    // crates/md-cli/tests/common/liana.rs -- relocating a test across crates
-    // moves its helper resolution with it. The template is written literally
-    // instead, which is also what the fixpoint property is actually about.
+    // The template is LITERAL here rather than rendered, because
+    // `kind1_from_vector` is include!d via env!("CARGO_MANIFEST_DIR") and from
+    // md-cli that resolves to a nonexistent crates/md-cli/tests/common/liana.rs
+    // — relocating a test across crates moves its helper resolution with it.
+    // item_7a is what proves the renderer emits this exact shape; keep the two
+    // strings in sync, and if 7a's assertion changes, change this one too.
     let t = "tr(UNSPENDABLE(liana),{pk(@0/48'/0'/0'/3'/<0;1>/*),pk(@1/48'/0'/1'/3'/<0;1>/*)})";
     md(&["encode", t, "--path", "bip48"]);        // must not error: it re-parses
 }
