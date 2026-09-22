@@ -29,7 +29,7 @@ PLAN="${1:?usage: plan-api-check.sh <plan.md> [repo-root]}"
 REPO="${2:-/scratch/code/shibboleth/descriptor-mnemonic}"
 
 # Symbols the plan itself declares it will CREATE (its Interfaces blocks).
-ALLOW='InternalKey|liana_unspendable_xpub|LIANA_UNSPENDABLE_MARKER|wire_version|is_supported_version|WF_UNSPENDABLE_VERSION|to_miniscript_descriptor_with_network|to_miniscript_descriptor_multipath_with_network|descriptor_from_tlv_entries|kind1_chunks|validate_unspendable_shape|kind1_from_vector|all_cases|all_kind0_tr_vectors|tr_liana_at_use_site|tr_liana_with_sortedmulti_a_leaf|md_encode|md_err|in_crate_tr_liana_with_sortedmulti_a_leaf|wsh_wrapping_tr_liana|all_nums_tr|encode_payload_at_forced_version|compressed_33|NetworkRequiredForUnspendable|NonMinimalWireVersion|UnspendableNotRootTr|UnspendableWithSortedMultiA|UnspendableUseSiteNotCanonical|UnspendableNotRootTr|dump_encodings|dump_ids|md_argv|md_err|case|md_address'
+ALLOW='InternalKey|liana_unspendable_xpub|LIANA_UNSPENDABLE_MARKER|wire_version|is_supported_version|WF_UNSPENDABLE_VERSION|to_miniscript_descriptor_with_network|to_miniscript_descriptor_multipath_with_network|descriptor_from_tlv_entries|kind1_chunks|validate_unspendable_shape|kind1_from_vector|all_cases|all_kind0_tr_vectors|tr_liana_at_use_site|tr_liana_with_sortedmulti_a_leaf|md_encode|md_err|in_crate_tr_liana_with_sortedmulti_a_leaf|wsh_wrapping_tr_liana|all_nums_tr|encode_payload_at_forced_version|compressed_33|key_arg|descriptor_with|NetworkRequiredForUnspendable|NonMinimalWireVersion|UnspendableNotRootTr|UnspendableWithSortedMultiA|UnspendableUseSiteNotCanonical|UnspendableNotRootTr|dump_encodings|dump_ids|md_argv|md_err|case|md_address'
 
 python3 - "$PLAN" "$REPO" "$ALLOW" <<'PY'
 import re, subprocess, sys, pathlib

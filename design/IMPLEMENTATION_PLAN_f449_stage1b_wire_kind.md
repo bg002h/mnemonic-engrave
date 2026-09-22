@@ -12,7 +12,7 @@
 
 **Predecessor:** `design/IMPLEMENTATION_PLAN_f449_stage1a_internal_key.md`, shipped at `37367c1f` on `descriptor-mnemonic` main. Baseline there: `phase-gate.sh` all six green, 1439 passed / 3 skipped under `--all-features`.
 
-**Status:** r2, folded from the stage-1b R0 (4C/7I/9M/4N) and its re-review (1C/5I/11M/4N). Reports: `design/agent-reports/f449-plan-stage1b-{r0,r1}.md`. Awaiting re-review.
+**Status:** r4, folded from the stage-1b R0 (4C/7I/9M/4N), r1 (1C/5I/11M/4N) and r2 (0C/6I/14M/4N). Reports: `design/agent-reports/f449-plan-stage1b-{r0,r1,r2}.md`. Awaiting re-review.
 
 ## Global Constraints
 
@@ -445,6 +445,12 @@ for twice. Pin the *reason* instead, so that if md1 ever widens (F-417 is a
 decision, not a law of nature) this fails loudly rather than silently changing
 every kind-1 chain code:
 
+**This pin lives in `crates/md-cli/tests/`, not md-codec's.** It shells out to
+the `md` binary, and md-codec's `[dev-dependencies]` are `serde`, `serde_json`,
+`hex`, `proptest`, `miniscript` — no CLI runner, and `CARGO_BIN_EXE_md` is not
+defined outside md-cli's own targets, so `md_err` cannot resolve there. Task 8
+Step 5 relocates an identical pin for the same reason.
+
 ```rust
 const NUMS_HEX: &str = "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0";
 
@@ -657,26 +663,41 @@ fn kind_1_with_a_sortedmulti_a_leaf_is_refused_at_MINT() {
     assert!(matches!(encode_payload(&d), Err(Error::UnspendableWithSortedMultiA)));
 }
 
-// UNIT test, inside encode.rs. Its fixture is built IN-CRATE: tests/common/
-// is a different crate root and `kind1_from_vector` is not reachable here.
+/// The in-crate fixture for the test below. It must do TWO things at once:
+/// trip §6's `sortedmulti_a` refusal under `Admission::Enforce`, AND survive
+/// `Admission::SkipPolicy` encode followed by `decode_payload`. A fixture that
+/// only does the first makes the test vacuous.
+#[cfg(test)]
+fn in_crate_tr_liana_with_sortedmulti_a_leaf() -> Descriptor {
+    // tests/common/ is a different crate root, so kind1_from_vector is not
+    // reachable here -- build the tree directly.
+    let leaf = Node { tag: Tag::SortedMultiA, body: Body::Variable {
+        k: 2, children: vec![key_arg(0), key_arg(1), key_arg(2)] } };
+    let tree = Node { tag: Tag::Tr, body: Body::Tr {
+        internal_key: InternalKey::LianaUnspendable,
+        tree: Some(Box::new(leaf)) } };
+    descriptor_with(tree, /* n */ 3)   // existing #[cfg(test)] helper in encode.rs
+}
+
+// UNIT test, inside encode.rs.
 #[test]
 fn a_refused_shape_still_DECODES_so_existing_cards_never_stop_reading() {
     // encode.rs:116-131 records the measured 2026-09-19 regression: mint-side
     // refusals leaking into decode made a shipped 2-of-2 stop reading. This is
     // that regression as an assertion.
-    let d = in_crate_tr_liana_with_sortedmulti_a_leaf();   // built from Node/Body directly
+    let d = in_crate_tr_liana_with_sortedmulti_a_leaf();
     let (bytes, bits) = encode_payload_inner(&d, Admission::SkipPolicy).expect("mint-bypass encode");
     assert!(decode_payload(&bytes, bits).is_ok(), "a mint-side refusal reached decode");
 }
 
 #[test]
 fn kind_1_off_the_canonical_use_site_is_refused() {
-    assert!(matches!(encode_payload(&tr_liana_at_use_site("<2;3>")),
+    assert!(matches!(encode_payload(&tr_liana_at_use_site(2, 3)),
                      Err(Error::UnspendableUseSiteNotCanonical)));
 }
 ```
 
-**The two fixtures these tests use, defined here:**
+**The three fixtures these tests use, defined here:**
 
 ```rust
 /// A kind-1 tr whose taptree contains a `sortedmulti_a` leaf — the shape §6
@@ -687,13 +708,21 @@ fn tr_liana_with_sortedmulti_a_leaf() -> Descriptor {
     kind1_from_vector("keyed_compose_tr_sole_sortedmulti_a")
 }
 
-/// A kind-1 tr whose slots sit at a non-canonical use site. Built by decoding
-/// a NUMS vector, swapping the kind, and rewriting the use-site path — md1
-/// carries ONE path per slot (F-417), so this is a whole-descriptor change,
-/// not a per-leaf one.
-fn tr_liana_at_use_site(path: &str) -> Descriptor {
+/// A kind-1 tr whose slots sit at a non-canonical use site. md1 carries ONE
+/// path per slot (F-417), so this is a whole-descriptor change, not per-leaf.
+///
+/// `UseSitePath` has NO `parse` and NO `FromStr` — its surface is
+/// `standard_multipath()`, `write()`, `read()` (`use_site_path.rs:70-78`).
+/// Build it by struct literal; the fields are public.
+fn tr_liana_at_use_site(a: u32, b: u32) -> Descriptor {
     let mut d = kind1_from_vector("keyed_compose_tr_nums_three_leaves");
-    d.use_site_path = UseSitePath::parse(path).expect("use-site path");
+    d.use_site_path = UseSitePath {
+        multipath: Some(vec![
+            Alternative { hardened: false, value: a },
+            Alternative { hardened: false, value: b },
+        ]),
+        wildcard_hardened: false,
+    };
     d
 }
 ```
