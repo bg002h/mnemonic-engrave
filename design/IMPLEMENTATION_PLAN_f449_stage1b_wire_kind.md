@@ -666,6 +666,13 @@ fn kind_1_with_a_sortedmulti_a_leaf_is_refused_at_MINT() {
     assert!(matches!(encode_payload(&d), Err(Error::UnspendableWithSortedMultiA)));
 }
 
+/// MEASURED AGAINST `37367c1f`, not reasoned about: this exact body encodes to
+/// **88 bits** under `Admission::SkipPolicy` and `decode_payload` returns
+/// **Ok**. (Round-trip EQUALITY does not hold until Task 3 adds the kind bit —
+/// `LianaUnspendable` has no wire representation before then and decodes back
+/// as `NumsPoint`. The test below asserts `is_ok()`, which is the property it
+/// needs; do not strengthen it to `assert_eq!` before Task 3.)
+///
 /// The in-crate fixture for the test below. It must do TWO things at once:
 /// trip §6's `sortedmulti_a` refusal under `Admission::Enforce`, AND survive
 /// `Admission::SkipPolicy` encode followed by `decode_payload`. A fixture that
@@ -693,7 +700,24 @@ fn in_crate_tr_liana_with_sortedmulti_a_leaf() -> Descriptor {
     // `wpkh_template_only` at encode.rs:284.
     Descriptor {
         n: 3,
-        path_decl: PathDecl { n: 3, paths: PathDeclPaths::Shared(OriginPath { components: vec![] }) },
+        // NOT an empty origin path. `wpkh_template_only` can use one; a
+        // `tr(@N, TapTree)` CANNOT -- it sits in canonical_origin's
+        // forced-explicit column, and an empty decl gives
+        // Err(MissingExplicitOrigin{idx:0}) at decode, which reads as a
+        // decode-path bug rather than a fixture bug. MEASURED: empty ->
+        // encode Ok 60 bits -> decode Err(MissingExplicitOrigin{idx:0}).
+        // Shape copied from origin_path.rs:216-226.
+        path_decl: PathDecl {
+            n: 3,
+            paths: PathDeclPaths::Shared(OriginPath {
+                components: vec![
+                    PathComponent { hardened: true, value: 48 },
+                    PathComponent { hardened: true, value: 0 },
+                    PathComponent { hardened: true, value: 0 },
+                    PathComponent { hardened: true, value: 3 },
+                ],
+            }),
+        },
         use_site_path: UseSitePath::standard_multipath(),
         tree,
         tlv: TlvSection::new_empty(),
@@ -916,9 +940,14 @@ fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
     // md-cli/src/format/text.rs:269-274 asserts every rendered template
     // re-parses; its corpus is wsh-only, so it stays green while the invariant
     // it names is false for tr kind 1. This is the kind-1 case.
-    let t = descriptor_to_template(&kind1_from_vector("keyed_compose_tr_nums_three_leaves")).unwrap();
-    assert!(t.contains("UNSPENDABLE(liana)"));
-    md(&["encode", &t, "--path", "bip48"]);        // must not error
+    //
+    // It does NOT call kind1_from_vector. That helper is include!d via
+    // env!("CARGO_MANIFEST_DIR"), which from md-cli resolves to a nonexistent
+    // crates/md-cli/tests/common/liana.rs -- relocating a test across crates
+    // moves its helper resolution with it. The template is written literally
+    // instead, which is also what the fixpoint property is actually about.
+    let t = "tr(UNSPENDABLE(liana),{pk(@0/48'/0'/0'/3'/<0;1>/*),pk(@1/48'/0'/1'/3'/<0;1>/*)})";
+    md(&["encode", t, "--path", "bip48"]);        // must not error: it re-parses
 }
 ```
 
