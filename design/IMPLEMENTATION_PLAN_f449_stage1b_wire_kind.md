@@ -428,8 +428,11 @@ needs a tree walk instead:
 ```rust
 // RIGHT: walk the tap tree, collect each key occurrence in order.
 let mut pks = Vec::new();
-for (_depth, ms) in tap_tree.iter() {
-    ms.for_each_key(|k| { pks.push(compressed_33(k)); true });
+for leaf in tap_tree.leaves() {
+    // miniscript 13.0.0 has no TapTree::iter(); it is `leaves()`, yielding
+    // TapTreeIterItem. The repo already spells it this way at
+    // md-cli/src/parse/template.rs:1671 and :2684.
+    leaf.miniscript().for_each_key(|k| { pks.push(compressed_33(k)); true });
 }
 
 // WRONG: keys.iter() is slot order. It coincides only for CLI-minted shapes,
@@ -671,12 +674,30 @@ fn kind_1_with_a_sortedmulti_a_leaf_is_refused_at_MINT() {
 fn in_crate_tr_liana_with_sortedmulti_a_leaf() -> Descriptor {
     // tests/common/ is a different crate root, so kind1_from_vector is not
     // reachable here -- build the tree directly.
-    let leaf = Node { tag: Tag::SortedMultiA, body: Body::Variable {
-        k: 2, children: vec![key_arg(0), key_arg(1), key_arg(2)] } };
-    let tree = Node { tag: Tag::Tr, body: Body::Tr {
-        internal_key: InternalKey::LianaUnspendable,
-        tree: Some(Box::new(leaf)) } };
-    descriptor_with(tree, /* n */ 3)   // existing #[cfg(test)] helper in encode.rs
+    // Tag::SortedMultiA takes Body::MultiKeys, NOT Body::Variable — the
+    // latter's doc says "Tag::Thresh ONLY; multi-family tags use MultiKeys"
+    // (tree.rs:38-56). MEASURED: the Variable spelling encodes to 106 bits and
+    // decode_payload returns TlvLengthExceedsRemaining{length:9,remaining:5},
+    // so the test would be RED before §6 exists, blaming the decode path.
+    let leaf = Node {
+        tag: Tag::SortedMultiA,
+        body: Body::MultiKeys { k: 2, indices: vec![0, 1, 2] },
+    };
+    let tree = Node {
+        tag: Tag::Tr,
+        body: Body::Tr { internal_key: InternalKey::LianaUnspendable, tree: Some(Box::new(leaf)) },
+    };
+    // Build the Descriptor inline. There is no `descriptor_with` helper and no
+    // `Descriptor::default_for_tests` — an earlier draft invented both. The
+    // in-crate pattern is a full struct literal; model it on
+    // `wpkh_template_only` at encode.rs:284.
+    Descriptor {
+        n: 3,
+        path_decl: PathDecl { n: 3, paths: PathDeclPaths::Shared(OriginPath { components: vec![] }) },
+        use_site_path: UseSitePath::standard_multipath(),
+        tree,
+        tlv: TlvSection::new_empty(),
+    }
 }
 
 // UNIT test, inside encode.rs.
@@ -887,6 +908,9 @@ fn item_2_descriptor_equality_at_the_CORPUS_level() {
     }
 }
 
+// LIVES IN crates/md-cli/tests/ — it shells out to the `md` binary, and
+// md-codec has no CLI runner in dev-deps and no CARGO_BIN_EXE_md. r2/I-D fixed
+// exactly this 450 lines above; do not re-introduce it here.
 #[test]
 fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
     // md-cli/src/format/text.rs:269-274 asserts every rendered template

@@ -29,7 +29,7 @@ PLAN="${1:?usage: plan-api-check.sh <plan.md> [repo-root]}"
 REPO="${2:-/scratch/code/shibboleth/descriptor-mnemonic}"
 
 # Symbols the plan itself declares it will CREATE (its Interfaces blocks).
-ALLOW='InternalKey|liana_unspendable_xpub|LIANA_UNSPENDABLE_MARKER|wire_version|is_supported_version|WF_UNSPENDABLE_VERSION|to_miniscript_descriptor_with_network|to_miniscript_descriptor_multipath_with_network|descriptor_from_tlv_entries|kind1_chunks|validate_unspendable_shape|kind1_from_vector|all_cases|all_kind0_tr_vectors|tr_liana_at_use_site|tr_liana_with_sortedmulti_a_leaf|md_encode|md_err|in_crate_tr_liana_with_sortedmulti_a_leaf|wsh_wrapping_tr_liana|all_nums_tr|encode_payload_at_forced_version|compressed_33|key_arg|descriptor_with|NetworkRequiredForUnspendable|NonMinimalWireVersion|UnspendableNotRootTr|UnspendableWithSortedMultiA|UnspendableUseSiteNotCanonical|UnspendableNotRootTr|dump_encodings|dump_ids|md_argv|md_err|case|md_address'
+ALLOW='InternalKey|liana_unspendable_xpub|LIANA_UNSPENDABLE_MARKER|wire_version|is_supported_version|WF_UNSPENDABLE_VERSION|to_miniscript_descriptor_with_network|to_miniscript_descriptor_multipath_with_network|descriptor_from_tlv_entries|kind1_chunks|validate_unspendable_shape|kind1_from_vector|all_cases|all_kind0_tr_vectors|tr_liana_at_use_site|tr_liana_with_sortedmulti_a_leaf|md_encode|md_err|in_crate_tr_liana_with_sortedmulti_a_leaf|wsh_wrapping_tr_liana|all_nums_tr|encode_payload_at_forced_version|compressed_33|NetworkRequiredForUnspendable|NonMinimalWireVersion|UnspendableNotRootTr|UnspendableWithSortedMultiA|UnspendableUseSiteNotCanonical|UnspendableNotRootTr|dump_encodings|dump_ids|md_argv|md_err|case|md_address'
 
 python3 - "$PLAN" "$REPO" "$ALLOW" <<'PY'
 import re, subprocess, sys, pathlib
@@ -69,6 +69,22 @@ if missing:
     for m in missing: print(f"   {m}")
 else:
     print("all extracted symbols resolve")
+# THE ALLOW LIST IS A LOOPHOLE UNLESS IT IS VISIBLE. Measured 2026-09-22:
+# key_arg / descriptor_with were added here as "symbols a task creates" while
+# the plan's own comment called descriptor_with an EXISTING helper. The
+# contradiction produced a green gate on a fixture that could not decode.
+# So print what was exempted, and say which of those the repo actually has.
+exempted = sorted({c for c in cands
+                   if (c.split('::')[-1] in KEYWORDS) is False
+                   and (allow_re.match(c.split('::')[-1]) or allow_re.match(c))})
+if exempted:
+    print(f"\nEXEMPTED BY ALLOW ({len(exempted)}) -- each MUST be a symbol this plan CREATES.")
+    print("If the plan describes any of these as already existing, that is a defect the")
+    print("gate cannot see; check it by hand:")
+    for e in exempted:
+        name = e.split('::')[-1]
+        r = subprocess.run(['grep','-rqE',f'fn {name}',f'{repo}/crates'],capture_output=True)
+        print(f"   {e}{'   [ALSO EXISTS in repo -- is it really created here?]' if r.returncode==0 else ''}")
 print(f"\nchecked {len(cands)} candidate symbols from {len(blocks)} rust blocks")
 print("NOT covered: signatures, arities, generics, borrows, macro-built names.")
 PY
