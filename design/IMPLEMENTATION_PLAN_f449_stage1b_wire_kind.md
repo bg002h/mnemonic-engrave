@@ -787,8 +787,15 @@ git diff --stat                      # must be empty except the report
 **Vector names cited by this plan, verified to exist** (the API gate checks Rust
 symbols, not string literals naming files — this is its blind spot, and the
 first draft cited `keyed_tr_nums_multi_a`, which does not exist):
-`keyed_compose_tr_nums_three_leaves`, `keyed_tr_sortedmulti_a`. 22 of the 65
-vendored vectors are `tr`-shaped.
+`keyed_compose_tr_nums_three_leaves` (NUMS + a three-leaf tree) and
+`keyed_compose_tr_sole_sortedmulti_a` (NUMS + a sole `sortedmulti_a` leaf).
+22 of the 65 vendored vectors are `tr`-shaped.
+
+**Shape was verified, not just existence.** An earlier draft used
+`keyed_tr_sortedmulti_a` — the file exists, but it is
+`tr(@0/...,sortedmulti_a(...))` with a **spendable** internal key, so
+`kind1_from_vector`'s assert would have panicked. Checking that a fixture file
+exists is not checking that it is the shape the test needs.
 
 **Placeholder scan.** `scripts/plan-api-check.sh` reports zero unresolved. Every helper this plan calls is defined by it — `Case`/`leaf_pubkeys`/`all_cases`/`case`/`all_kind0_tr_vectors`/`kind1_from_vector` in Task 1, `tr_liana_with_sortedmulti_a_leaf` in Task 7 — or by stage 1a (`load_vendored_phrase`, `decode_vendored`, `all_vendored_vector_names`). The first draft of this plan asserted that sentence while four of them were undefined; the gate caught it.
 
