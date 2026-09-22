@@ -19362,3 +19362,64 @@ existing message for every other repeated-key shape.
 `UNSUPPORTED`, no `internal:` leak) and not the wording, so improving the
 message here does not require rewriting it — but a new assertion on the new
 phrasing should be added with the fix.
+
+### F-637 — `me bundle --preview` renders with PRISTINE UPSTREAM, while the device runs the FORK (owning phase: **unowned — operator decision pending**) `#mnemonic-engrave` `#me-preview` `#preview-vs-device`
+
+**Status:** OPEN — awaiting an operator ruling on which of the two fixes.
+Raised 2026-09-22 by the operator asking whether the vendored pin being a
+release behind is the right arrangement. Measured below; the version number
+turned out to be the wrong question.
+
+**The arrangement.** `preview/go.mod` does
+`replace seedhammer.com => ../third_party/seedhammer`, so the sidecar imports
+upstream's real `engrave`, `bezier`, `bspline`, `font/sh` and `backup`
+instead of reimplementing the curve math. Reusing upstream code and pinning
+it are both correct. The defect is WHAT it is pinned to: pristine upstream
+(`713aee2`, v1.4.2), when the SH2 runs `bg002h/seedhammer`.
+
+**Measured divergence, fork `v1.4.3..HEAD`, preview-imported packages only:**
+
+| package | commits since v1.4.3 |
+| --- | --- |
+| `engrave` | 25 |
+| `backup`  | 58 |
+| `bspline` | 3 |
+| `font/sh` | 2 |
+| `bezier`  | 0 |
+
+The engraving font binary differs for real:
+
+| tree | `font/sh/sh.bin` sha256 (first 16) |
+| --- | --- |
+| vendored pin (v1.4.2) | `aa87f3b0a964b05b` |
+| upstream v1.4.3 | `aa87f3b0a964b05b` |
+| **fork HEAD** | `19e2171527420af6` |
+
+**Blast radius is NARROW — checked, not assumed.** The font change
+(`5bc8e6c`, "complete printable ASCII so free text cannot panic the
+engraver") is PURELY ADDITIVE: 41 added glyph lines and one removed line,
+the SVG header, whose viewBox widened 308 -> 320 to fit the appended glyphs.
+No existing glyph outline moved. So existing characters preview EXACTLY as
+engraved; the gap is limited to characters the fork ADDED, which the
+preview's older font lacks. This is NOT "every plate diverges".
+
+**v1.4.2 -> v1.4.3 is inert here.** Its only `engrave` changes are
+`ConstantQR`'s `dim > 33` guard and `SafePointer.Progress` dropping its
+`k.Engrave &&` conjunct. The sidecar calls NEITHER (grepped: zero hits for
+both symbols outside `third_party/`). Bumping the pin to v1.4.3 would
+therefore change nothing that matters — it is the wrong fix.
+
+**Two real options.**
+
+1. **Repoint the submodule at the fork** so preview and firmware share one
+   copy of the engraving code. Preferred: preview's whole job is to predict
+   the device, and rendering with different code is a harness substitution,
+   the class this project has a standing rule about removing before a flash.
+   Costs the clean-upstream-provenance anchor.
+2. **Keep pristine upstream, add a drift gate** that fails when the fork's
+   preview-imported packages diverge from the pin, so the divergence is
+   surfaced rather than silent. Keeps provenance; leaves preview knowingly
+   approximate.
+
+Do NOT simply bump to v1.4.3 — that reads as fixing it while leaving the
+fork divergence entirely in place.
