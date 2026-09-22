@@ -24,6 +24,7 @@
 - **Network comes from the render-time selector, not the wire.** md1's TLV pubkey entries are 65 bytes, `chain code ‖ compressed pubkey`, pubkey at `[32..65]` (`validate.rs:331-335`, `:348`).
 - **Use the PINNED clippy.** `rust-toolchain.toml` pins 1.85.0; a bare `cargo clippy` runs 0.1.98 and fails at baseline with lints CI never runs. `export PATH=$HOME/.rustup/toolchains/1.85.0-x86_64-unknown-linux-gnu/bin:$PATH`, then `cargo clippy --version` must print **0.1.85**.
 - **Run `./scripts/phase-gate.sh`, never a hand-typed command list** — it sets `RUSTDOCFLAGS="-D warnings"` (`:39`), which a typed list drops, and without it `cargo doc` warns and exits 0.
+- **`md(...)` in md-cli's tests returns `(String, String, i32)` and does NOT panic** (`cli_bip388_double_wildcard.rs:35-45`). **Every call must bind all three and assert the exit code.** A bare `md(&[...]);` asserts nothing — that defect reached this plan three times, in two different tests, and is why every CLI call here destructures.
 - **`fuzz/` is its own workspace.** Run `( cd fuzz && cargo check --all-targets )` or `gen_corpus.rs` breaks silently.
 
 ---
@@ -593,8 +594,9 @@ replace that with a refusal naming the two working spellings.
 ```rust
 #[test]
 fn decompose_RECOGNISES_a_real_liana_descriptor_and_gives_it_no_slot() {
-    let out = md(&["decompose", &case("preset-kofn-recovery-tr").descriptor_with_checksum,
-                   "--emit", "template"]);
+    let (out, err, code) = md(&["decompose",
+        &case("preset-kofn-recovery-tr").descriptor_with_checksum, "--emit", "template"]);
+    assert_eq!(code, 0, "decompose failed: {err}");
     assert!(out.contains("UNSPENDABLE(liana)"), "got {out}");
     assert!(!out.contains("state NO origin"), "must not become a phantom slot");
 }
@@ -604,7 +606,8 @@ fn decompose_keeps_TODAYS_behaviour_for_an_origin_less_key_that_is_NOT_lianas() 
     // G-8: the phantom property is NO ORIGIN, not "not Liana's". A real
     // spendable internal key whose owner recorded no origin is @0 and correct;
     // refusing it would also lock out libnunchuk's PR-1746 form.
-    let out = md(&["decompose", ORIGINLESS_SPENDABLE_TR, "--emit", "template"]);
+    let (out, err, code) = md(&["decompose", ORIGINLESS_SPENDABLE_TR, "--emit", "template"]);
+    assert_eq!(code, 0, "decompose failed: {err}");
     assert!(out.contains("tr(@0/"), "must still be a slot: {out}");
     assert!(out.contains("state NO origin"), "must still annotate");
 }
@@ -619,8 +622,9 @@ fn md_encode_refuses_a_literal_xpub_in_the_internal_key_position_CLEANLY() {
 
 #[test]
 fn the_marker_PARSES_in_a_template_and_yields_kind_1() {
-    let md1 = md(&["encode", "tr(UNSPENDABLE(liana),{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})",
-                   "--path", "bip48"]);
+    let (md1, err, code) = md(&["encode",
+        "tr(UNSPENDABLE(liana),{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})", "--path", "bip48"]);
+    assert_eq!(code, 0, "encode failed: {err}");
     let d = md_codec::decode::decode_md1_string(md1.trim()).expect("decode");
     assert!(matches!(d.tree.body, Body::Tr { internal_key: InternalKey::LianaUnspendable, .. }));
 }
@@ -935,38 +939,43 @@ fn item_2_descriptor_equality_at_the_CORPUS_level() {
 // LIVES IN crates/md-cli/tests/ — it shells out to the `md` binary, and
 // md-codec has no CLI runner in dev-deps and no CARGO_BIN_EXE_md. r2/I-D fixed
 // exactly this 450 lines above; do not re-introduce it here.
-// THE FIXPOINT HAS TWO HALVES AND THEY LIVE IN DIFFERENT CRATES. An earlier
-// fold collapsed it to the reparse half alone, which dropped the only call to
-// `descriptor_to_template` in the whole plan — the test then compiled, passed,
-// and exercised the renderer not at all. Render and reparse each get their own
-// test, in the crate that can reach them.
-
-// --- md-codec: tests/liana_unspendable.rs — the RENDER half ---
+// ONE test, in md-cli, doing BOTH halves as a real round trip. Two earlier
+// drafts of this failed the same way, and the pattern is worth naming:
+//
+//   draft 1: one test that only re-parsed  -> never called the renderer at all
+//   draft 2: two tests, one per crate      -> item_7b DISCARDED md()'s return,
+//            and md() is `fn md(args) -> (String, String, i32)` that does NOT
+//            panic (cli_bip388_double_wildcard.rs:35-45), so it could not fail;
+//            and the two template strings never corresponded, because
+//            keyed_compose_tr_nums_three_leaves renders a NESTED FOUR-KEY tree
+//            with older/multi_a/after, not the flat two-key literal.
+//
+// A fixpoint is encode -> render -> re-encode -> IDENTICAL. Doing it through
+// the CLI keeps both halves in one crate and makes every step assert.
 #[test]
-fn item_7a_a_kind_1_descriptor_renders_to_a_template_carrying_the_marker() {
-    let t = descriptor_to_template(&kind1_from_vector("keyed_compose_tr_nums_three_leaves"))
-        .expect("render");
-    assert!(t.contains("UNSPENDABLE(liana)"), "renderer dropped the marker: {t}");
-    assert!(!t.contains("50929b74"), "kind 1 must not render as the raw NUMS hex: {t}");
-}
+fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
+    let tpl = "tr(UNSPENDABLE(liana),{pk(@0/48'/0'/0'/3'/<0;1>/*),pk(@1/48'/0'/1'/3'/<0;1>/*)})";
 
-// --- md-cli: tests/liana_input_side.rs — the REPARSE half ---
-#[test]
-fn item_7b_that_template_re_parses() {
-    // md-cli/src/format/text.rs:269-274 asserts every rendered template
-    // re-parses; its corpus is wsh-only, so it stays green while the invariant
-    // it names is false for tr kind 1.
-    //
-    // The template is LITERAL here rather than rendered, because
-    // `kind1_from_vector` is include!d via env!("CARGO_MANIFEST_DIR") and from
-    // md-cli that resolves to a nonexistent crates/md-cli/tests/common/liana.rs
-    // — relocating a test across crates moves its helper resolution with it.
-    // item_7a is what proves the renderer emits this exact shape; keep the two
-    // strings in sync, and if 7a's assertion changes, change this one too.
-    let t = "tr(UNSPENDABLE(liana),{pk(@0/48'/0'/0'/3'/<0;1>/*),pk(@1/48'/0'/1'/3'/<0;1>/*)})";
-    md(&["encode", t, "--path", "bip48"]);        // must not error: it re-parses
-}
-```
+    // 1. ENCODE the marker form.
+    let (md1, err, code) = md(&["encode", tpl, "--path", "bip48"]);
+    assert_eq!(code, 0, "encode failed: {err}");
+
+    // 2. RENDER it back through the real renderer. `md decode` emits the
+    //    plain BIP-388 template by default.
+    let (rendered, err, code) = md(&["decode", md1.trim()]);
+    assert_eq!(code, 0, "decode failed: {err}");
+    assert!(rendered.contains("UNSPENDABLE(liana)"),
+            "the renderer dropped the marker: {rendered}");
+    assert!(!rendered.contains("50929b74"),
+            "kind 1 must not render as the raw NUMS hex: {rendered}");
+
+    // 3. RE-ENCODE what the renderer produced. This is the fixpoint, and it is
+    //    what md-cli/src/format/text.rs:269-274 asserts for wsh and cannot
+    //    currently assert for tr kind 1.
+    let (md1b, err, code) = md(&["encode", rendered.trim(), "--path", "bip48"]);
+    assert_eq!(code, 0, "the rendered template did NOT re-parse: {err}");
+    assert_eq!(md1.trim(), md1b.trim(), "round trip is not a fixpoint");
+}```
 
 - [ ] **Step 6: Gate and commit.**
 
