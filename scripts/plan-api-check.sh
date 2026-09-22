@@ -87,6 +87,36 @@ if exempted:
         name = e.split('::')[-1]
         r = subprocess.run(['grep','-rqE',f'fn {name}',f'{repo}/crates'],capture_output=True)
         print(f"   {e}{'   [ALSO EXISTS in repo -- is it really created here?]' if r.returncode==0 else ''}")
+# --- BARE CONSTANT REFERENCES -------------------------------------------
+# Measured 2026-09-22: ORIGINLESS_SPENDABLE_TR was referenced and never
+# defined, and this gate did not see it because it only extracted CALLS.
+consts_used, consts_def = set(), set()
+for b in blocks:
+    body = re.sub(r'//.*', '', b)
+    consts_used |= set(re.findall(r'\b([A-Z][A-Z0-9_]{3,})\b', body))
+    consts_def  |= set(re.findall(r'(?:const|static)\s+([A-Z][A-Z0-9_]{3,})', body))
+undef_consts = sorted(c for c in consts_used - consts_def
+                      if not re.match(r'^(SPEC|BIP|NUMS|JSON|TODO|RIGHT|WRONG|RED|OK|ONE|TWO|NOT|AND|ALSO)', c))
+if undef_consts:
+    print(f"\nUNDEFINED CONSTANTS ({len(undef_consts)}) -- referenced in a rust block, defined in none:")
+    for c in undef_consts:
+        r = subprocess.run(['grep','-rqE',f'(const|static) {c}',f'{repo}/crates'],capture_output=True)
+        print(f"   {c}{'   [exists in repo]' if r.returncode==0 else '   [NOWHERE]'}")
+
+# --- CROSS-CRATE REACHABILITY -------------------------------------------
+# Measured three times (r4/I-2, r5/I-1, r7/I-1): a helper EXISTS but is not
+# reachable from the crate the test lives in, because include! and
+# CARGO_MANIFEST_DIR are per-crate. The gate cannot decide this, so it REPORTS.
+cli_blocks = [b for b in blocks if re.search(r'\bmd(_err)?\(&\[', b)]
+cli_helpers = set()
+for b in cli_blocks:
+    cli_helpers |= set(re.findall(r'\b([a-z_][a-z_0-9]{3,})\s*\(', re.sub(r'//.*','',b)))
+cli_helpers -= KEYWORDS | {'md','md_err'}
+if cli_helpers:
+    print(f"\nCALLED FROM md-cli-SHAPED BLOCKS ({len(cli_helpers)}) -- each must be")
+    print("reachable from crates/md-cli/tests/, NOT only from md-codec's test root:")
+    for h in sorted(cli_helpers): print(f"   {h}")
+
 print(f"\nchecked {len(cands)} candidate symbols from {len(blocks)} rust blocks")
 print("NOT covered: signatures, arities, generics, borrows, macro-built names.")
 PY

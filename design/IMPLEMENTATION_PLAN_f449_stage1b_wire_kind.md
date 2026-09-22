@@ -589,6 +589,44 @@ replace that with a refusal naming the two working spellings.
 
 **The JSON schema change is a published v1 break** — version it in `docs/json-schema-v1.md`, do not slip it in.
 
+- [ ] **Step 0: md-cli's tests need their OWN fixture access — `case` is md-codec's**
+
+These tests shell out to `md`, so they live in `crates/md-cli/tests/`. `case`
+and `kind1_from_vector` are `include!`d into **md-codec's** test root via
+`env!("CARGO_MANIFEST_DIR")`; from md-cli that macro resolves to md-cli's own
+directory and the file is not there. This is the third time this class has bitten
+(r5/I-1 on `kind1_from_vector`, r4/I-2 on the same, now `case`), so md-cli gets
+its own loader over the **same committed JSON** — one fixture, two readers:
+
+```rust
+// crates/md-cli/tests/liana_cases.rs — md-cli's reader for md-codec's fixture.
+// The JSON is the shared artifact; the loader is per-crate, because include!
+// and CARGO_MANIFEST_DIR are per-crate.
+#[derive(serde::Deserialize, Clone)]
+struct Case { name: String, accepted: bool, descriptor_with_checksum: String,
+              expected_xpub: String, liana_receive: Vec<String>, liana_change: Vec<String> }
+
+fn case(name: &str) -> Case {
+    let raw = include_str!("../../md-codec/tests/fixtures/liana/cases.json");
+    serde_json::from_str::<Vec<Case>>(raw).expect("cases.json")
+        .into_iter().find(|c| c.name == name)
+        .unwrap_or_else(|| panic!("no vendored case {name}"))
+}
+
+/// A real `tr` whose internal key is a SPENDABLE xpub with NO recorded origin.
+/// Not Liana's recipe, not NUMS — the case G-8 says must keep today's
+/// annotated-slot behaviour. Taken from the evidence's `X23` row, whose
+/// internal key is a plain xpub.
+const ORIGINLESS_SPENDABLE_TR: &str = concat!(
+    "tr(xpub6DXuQW1Q2JpZyweiMewTZuMPvjG8hKhV2qoF6wL9VFxsMBExtbfqAAoR4oMG4GyxFzVdfas1v2eAdfLxyjc4Ceo5B6w6zT/<0;1>/*,",
+    "and_v(v:pk([73c5da0a/48'/0'/1'/3']xpub6DXuQW1Q2JpZzLV9kZbjmB9NcnQ7UmM8ZMDkM5yCkXqUFEJrJvVXmxfFrnBGJmFWVSYJVPNrVbTQQhZ8ryFHqPzWhBXAFsFCTGgCkeS/<0;1>/*),older(26280)))"
+);
+```
+
+**The exact xpubs above are illustrative.** Step 0's first action is to take them
+from the vendored `cases.json` rather than transcribe them — a hand-copied xpub
+is a defect this cycle has already paid for.
+
 - [ ] **Step 1: Write the failing tests**
 
 ```rust
@@ -936,9 +974,16 @@ fn item_2_descriptor_equality_at_the_CORPUS_level() {
     }
 }
 
-// LIVES IN crates/md-cli/tests/ — it shells out to the `md` binary, and
-// md-codec has no CLI runner in dev-deps and no CARGO_BIN_EXE_md. r2/I-D fixed
-// exactly this 450 lines above; do not re-introduce it here.
+```
+
+**The test below lives in `crates/md-cli/tests/`, not md-codec's** — it shells
+out to the `md` binary, and md-codec has no CLI runner in dev-deps and no
+`CARGO_BIN_EXE_md`. It is in its own fence for that reason: an earlier draft had
+it sharing a fence with the md-codec tests above, and `plan-api-check.sh`'s
+cross-crate report flagged the whole fence, because one fence with two crate
+homes is exactly how a helper ends up called from where it cannot be reached.
+
+```rust
 // ONE test, in md-cli, doing BOTH halves as a real round trip. Two earlier
 // drafts of this failed the same way, and the pattern is worth naming:
 //
