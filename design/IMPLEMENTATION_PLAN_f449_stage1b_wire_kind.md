@@ -28,6 +28,18 @@
 
 ---
 
+## Citing findings: ALWAYS prefix with the round
+
+Reports of this plan number their findings independently, and r0's `I1..I7`
+collided with r1's `I-1..I-5`. A fold commit that said *"I2, I3, I4, I7
+confirmed addressed"* meant r0's set; r1's **I-2, I-3 and I-5 were silently
+never folded**, and the next dispatch brief repeated the omission by asking
+only about r1's I-1 and I-4.
+
+**Cite every finding as `<round>/<label>`** — `r0/I3`, `r1/I-3` — in folds, in
+commit messages and in dispatch briefs. Before folding a report, list its
+findings and tick them off individually; do not carry a remembered subset.
+
 ## Findings banked against this stage before it was written
 
 Each was found by a review of the combined or stage-1a plan and must be answered here, not rediscovered.
@@ -398,9 +410,34 @@ md: unsupported: @0 appears at use sites with DISJOINT multipath sets ...
     because an md1 card carries ONE path per key slot (F-417)
 ```
 
-So **occurrence order ≡ slot order** here, and the two readings coincide for
-every descriptor this codec can carry. Implement whichever is natural; they are
-the same sequence.
+So the two readings coincide for every descriptor **md-cli** can mint.
+
+**But that is not a licence to implement either one, and an earlier draft wrongly
+gave one.** The code lands in **md-codec**, which is more permissive than the
+CLI: `validate_placeholder_usage` explicitly allows a slot *"at least once"*, and
+the `Admission::Enforce` block adds no reuse check. A `Descriptor` constructed
+in-crate — which every test fixture here is — can therefore carry a repeated
+slot that `md encode` would have refused.
+
+**§2 is normatively per KEY OCCURRENCE, walked over the tap tree.** Implement
+that, not the slot-indexed shortcut. The distinction is load-bearing at the one
+production call site: `node_to_descriptor` holds `keys: &[DescriptorPublicKey]`
+indexed **by slot**, so the natural implementation there is the **wrong** one and
+needs a tree walk instead:
+
+```rust
+// RIGHT: walk the tap tree, collect each key occurrence in order.
+let mut pks = Vec::new();
+for (_depth, ms) in tap_tree.iter() {
+    ms.for_each_key(|k| { pks.push(compressed_33(k)); true });
+}
+
+// WRONG: keys.iter() is slot order. It coincides only for CLI-minted shapes,
+// and md-codec admits others.
+```
+
+The refusal pin below keeps the *CLI* path unambiguous; it does not make the
+slot-indexed reading correct inside the codec.
 
 **Do not write a test asserting the distinction** — it cannot be constructed,
 and a test whose fixture cannot exist is the defect this cycle has already paid
@@ -663,6 +700,34 @@ fn tr_liana_at_use_site(path: &str) -> Descriptor {
 
 - [ ] **Step 2: Run to verify they fail** — `cargo nextest run --locked -p md-codec encode::` → FAIL, the variants and the validator do not exist.
 
+- [ ] **Step 2b: The other two refusals need tests and fixtures too**
+
+Step 1 covers the `sortedmulti_a` leaf and the non-canonical use-site. §6 has
+**four**, and Task 9 maps mutations 8-11 to this task — so without these two,
+two of those mutations cannot turn RED:
+
+```rust
+#[test]
+fn kind_1_nested_under_wsh_is_refused() {
+    // The internal key of a tr nested inside wsh is not the descriptor's
+    // internal key; kind 1 there has no meaning.
+    assert!(matches!(encode_payload(&wsh_wrapping_tr_liana()),
+                     Err(Error::UnspendableNotRootTr)));
+}
+
+#[test]
+fn version_8_with_no_kind_1_node_is_refused_at_ENCODE() {
+    // The minimum-version rule, enforced on the encode side only so old
+    // payloads never become invalid at decode.
+    assert!(matches!(encode_payload_at_forced_version(&all_nums_tr(), 8),
+                     Err(Error::NonMinimalWireVersion { .. })));
+}
+```
+
+Both fixtures are built in-crate from `Node`/`Body`; `encode_payload_at_forced_version`
+is a `#[cfg(test)]` helper in `encode.rs` that calls `encode_payload_inner` with an
+overridden version, since no public API lets a caller pick a non-minimal one.
+
 - [ ] **Step 3: Implement the validator** — the four §6 refusals in `validate.rs`, their `Error` variants in `error.rs`.
 
 - [ ] **Step 4: WIRE IT — the step earlier drafts omitted**
@@ -767,6 +832,40 @@ fn a_tr_with_no_leaf_keys_cannot_be_constructed() {
     // for every such wallet and they would all share one internal key.
     assert!(md_err(&["encode", "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0)"])
             .contains("no @i placeholders"));
+}
+```
+
+- [ ] **Step 5b: §8 items 2 and 7, which the C3 ruling left without a step**
+
+The C3 ruling moved item 2's **evidence** leg to stage 2 and promised a
+corpus-level replacement; no step implemented it. And item 7 — the
+render-reparse fixpoint — vanished from this task silently during that fold.
+Both are §9-assigned to 1b. Restore them at the corpus level:
+
+```rust
+#[test]
+fn item_2_descriptor_equality_at_the_CORPUS_level() {
+    // The evidence shapes move to stage 2 (they need md-cli to build). Here the
+    // property is that a kind-1 descriptor renders stably and re-renders
+    // identically -- md vs md, not md vs Liana.
+    for name in all_kind0_tr_vectors() {
+        let d = kind1_from_vector(&name);
+        if encode_payload(&d).is_err() { continue; }            // §6 refusals
+        let a = to_miniscript_descriptor_multipath_with_network(&d, Network::Bitcoin).unwrap().to_string();
+        let b = to_miniscript_descriptor_multipath_with_network(&d, Network::Bitcoin).unwrap().to_string();
+        assert_eq!(a, b, "{name}");
+        assert!(a.contains('#'), "{name}: the BIP-380 checksum is part of the gate");
+    }
+}
+
+#[test]
+fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
+    // md-cli/src/format/text.rs:269-274 asserts every rendered template
+    // re-parses; its corpus is wsh-only, so it stays green while the invariant
+    // it names is false for tr kind 1. This is the kind-1 case.
+    let t = descriptor_to_template(&kind1_from_vector("keyed_compose_tr_nums_three_leaves")).unwrap();
+    assert!(t.contains("UNSPENDABLE(liana)"));
+    md(&["encode", &t, "--path", "bip48"]);        // must not error
 }
 ```
 
