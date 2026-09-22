@@ -12,7 +12,7 @@
 
 **Predecessor:** `design/IMPLEMENTATION_PLAN_f449_stage1a_internal_key.md`, shipped at `37367c1f` on `descriptor-mnemonic` main. Baseline there: `phase-gate.sh` all six green, 1439 passed / 3 skipped under `--all-features`.
 
-**Status:** r4, folded from the stage-1b R0 (4C/7I/9M/4N), r1 (1C/5I/11M/4N) and r2 (0C/6I/14M/4N). Reports: `design/agent-reports/f449-plan-stage1b-{r0,r1,r2}.md`. Awaiting re-review.
+**Status:** **r9 — GREEN, ready for implementation.** Nine rounds: 4C/7I -> 1C/5I -> 0C/6I -> 0C/3I -> 0C/2I -> 0C/1I -> 0C/1I -> 0C/2I -> **0C/0I**. Reports: `design/agent-reports/f449-plan-stage1b-{r0..r8}.md`. Eight Minors and three Nits remain open and are named in r8's report; they are recorded, not dropped.
 
 ## Global Constraints
 
@@ -589,6 +589,10 @@ replace that with a refusal naming the two working spellings.
 
 **The JSON schema change is a published v1 break** — version it in `docs/json-schema-v1.md`, do not slip it in.
 
+**Test file for this task: `crates/md-cli/tests/liana_input_side.rs`** (new).
+Every test in Task 6 lives there — it shells out to `md`, so md-codec's test
+root cannot host it.
+
 - [ ] **Step 0: md-cli's tests need their OWN fixture access — `case` is md-codec's**
 
 These tests shell out to `md`, so they live in `crates/md-cli/tests/`. `case`
@@ -623,7 +627,7 @@ const ORIGINLESS_SPENDABLE_TR: &str = concat!(
 );
 ```
 
-**The exact xpubs above are illustrative.** Step 0's first action is to take them
+**The exact xpubs above are TRUNCATED and will not parse.** Step 0's first action is to take them
 from the vendored `cases.json` rather than transcribe them — a hand-copied xpub
 is a defect this cycle has already paid for.
 
@@ -1090,6 +1094,6 @@ first draft cited `keyed_tr_nums_multi_a`, which does not exist):
 `kind1_from_vector`'s assert would have panicked. Checking that a fixture file
 exists is not checking that it is the shape the test needs.
 
-**Placeholder scan — RE-RUN THE SCRIPT, do not restate this sentence.** `./scripts/plan-api-check.sh <this file>` must print *all extracted symbols resolve*. This claim has been **false twice** in this plan's history: r0 asserted it while four helpers were undefined, and r2 asserted it while `in_crate_tr_liana_with_sortedmulti_a_leaf` was undefined in the test encoding a measured funds regression. Helpers currently defined here: `Case`/`leaf_pubkeys`/`all_cases`/`case`/`all_kind0_tr_vectors`/`kind1_from_vector` (Task 1); `tr_liana_with_sortedmulti_a_leaf`/`tr_liana_at_use_site`/`in_crate_tr_liana_with_sortedmulti_a_leaf` (Task 7); `wsh_wrapping_tr_liana`/`all_nums_tr`/`encode_payload_at_forced_version` (Task 7 Step 2b); plus stage 1a's `load_vendored_phrase`, `decode_vendored`, `all_vendored_vector_names`.
+**Placeholder scan — RE-RUN THE SCRIPT, do not restate this sentence.** `./scripts/plan-api-check.sh <this file>` must print *all extracted symbols resolve*. This claim has been **false twice** in this plan's history: r0 asserted it while four helpers were undefined, and r2 asserted it while `in_crate_tr_liana_with_sortedmulti_a_leaf` was undefined in the test encoding a measured funds regression. Helpers currently defined here: `Case`/`leaf_pubkeys`/`all_cases`/`case`/`all_kind0_tr_vectors`/`kind1_from_vector` (Task 1, md-codec); a SECOND `Case`/`case` pair and `ORIGINLESS_SPENDABLE_TR` (Task 6 Step 0, md-cli — one fixture file, two per-crate readers); `tr_liana_with_sortedmulti_a_leaf`/`tr_liana_at_use_site`/`in_crate_tr_liana_with_sortedmulti_a_leaf` (Task 7); `wsh_wrapping_tr_liana`/`all_nums_tr`/`encode_payload_at_forced_version` (Task 7 Step 2b); plus stage 1a's `load_vendored_phrase`, `decode_vendored`, `all_vendored_vector_names`.
 
 **Type consistency.** `InternalKey::{Slot,NumsPoint,LianaUnspendable}` and `Body::Tr { internal_key, tree }` are stage 1a's shipped shape. `Header::WF_UNSPENDABLE_VERSION`, `Descriptor::wire_version()`, `liana_unspendable_xpub`, `LIANA_UNSPENDABLE_MARKER` are used identically throughout.
