@@ -213,7 +213,7 @@ must produce byte-identical templates for every composable list.
 | inside a path | `and_v(v:KEYS, and_v(v:sha256(H), LOCK))`, dropping absent parts | same |
 | key set | SOLE path, unlocked, unhashed, n ≥ 2: `sortedmulti` (BIP-383/388 sole-child rule); ANY other multi-key path: `multi`; one key: `pkh` | SOLE leaf, unlocked, unhashed, n ≥ 2: `sortedmulti_a` (whole leaf); any other multi-key path: `multi_a`; one key: `pk` |
 | unsorted where sorted was legal | `multi` instead of `sortedmulti`, EXPERIMENTAL confirm (§8b) | `multi_a` instead of `sortedmulti_a`, EXPERIMENTAL confirm (§8b) |
-| internal key | n/a | the FIRST-LISTED unlocked, unhashed one-key path (then not a leaf); otherwise NUMS |
+| internal key | n/a | the FIRST-LISTED unlocked, unhashed one-key path (then not a leaf); otherwise an unspendable key: NUMS by default, or Liana's derived key when requested (`md compose --unspendable liana`, md-cli 0.19.0; SPEC_liana_unspendable_internal_key.md §2) |
 | NUMS spelling | n/a | raw `50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0` (C18); see §5c |
 | placeholder numbering | `@i` by FIRST APPEARANCE in the emitted text; slot labels shown to the operator are these indices, computed after lowering and RECOMPUTED after any shape edit (§7d) | same; an extracted internal key is `@0` |
 | declarations | EVERY slot declares an origin (§4f) and, when seated, the master fingerprint of the seated key; a keyless template is engraved WITH fingerprints for seated slots and with distinct-account origins for unseated ones | same |

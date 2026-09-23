@@ -19489,7 +19489,7 @@ two numbers and no cause).
 Filed 2026-09-22 from the Task 7 independent review, which flagged it as
 out of scope for that task but newly relevant.
 
-**The defect.** `crates/md-codec/src/verify.rs:62` re-encodes an
+**The defect.** `crates/md-cli/src/cmd/verify.rs:62` re-encodes an
 already-decoded card under `Admission::Enforce`, while a comment eleven lines
 above states the opposite intent. Pre-existing, and **unreachable for the four
 §6 rules** — the reviewer confirmed that — but Task 7 widened what flows
@@ -19617,3 +19617,66 @@ lands").
    (descriptor-mnemonic `4c35175e`). Until then the two diverge, and
    `md repair`'s D26 block says so rather than claiming parity. Additive, so
    piece 1 compiles without it.
+
+### F-643 — `md repair`'s exit-5 branch drops decode as a second check behind a BCH miscorrection (owning phase: **F-449 stage 3**) `#descriptor-mnemonic` `#md-cli` `#repair`
+
+**Status:** OPEN
+Filed 2026-09-23 from the F-449 stage 2 whole-branch review
+(`design/agent-reports/f449-stage2-whole-branch.md`, M-2).
+
+**The defect.** Before md-cli 0.19.0, a codeword with more than 4 errors
+that BCH mis-corrected onto a DIFFERENT valid codeword was still refused by
+the decode that followed (exit 2). The new unsupported-version branch
+(descriptor-mnemonic `4c35175e`, guarded by `6f2fb760`) does not decode: if
+the mis-corrected header lands outside the accepted set {4, 8} — 14 of 16
+version values — `md repair` exits 5 and prints a WRONG "corrected" string.
+
+**Reproduction / rate.** Reviewer's measurement, 60,000 random trials on a
+v4 card: 5 errors 0 miscorrections, 6 errors 1 (caught by decode at a later
+field), 9 errors 0, 20 errors 0 — on the order of 1e-5 or less. The only
+consequence is a string no md decodes, so it is logged, not blocking.
+
+**Direction.** Stage 3 touches the same dispatch in Go; decide there whether
+the exit-5 branch should require a structural check the version-independent
+part of the payload can pass.
+
+### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **F-449 stage 4**) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
+
+**Status:** OPEN
+Filed 2026-09-23 from the F-449 stage 2 whole-branch review (M-7), widening
+the implementer's own concern (4).
+
+**Reproduction** (md-cli 0.19.0, each exit 0 with no Liana warning):
+- `md compose --wrapper tr --path 2of3,unsorted --path 2of2 --unspendable liana` (two unlocked primaries)
+- `md compose --wrapper tr --path 2of2 --path 1of1,after=800000 --unspendable liana` (absolute-timelock recovery)
+- `md compose --wrapper tr --path 2of2 --path 1of1,older=100 --path 1of1,older=100 --unspendable liana` (duplicate recovery timelock)
+- `md compose --wrapper tr --path 2of3,unsorted --experimental --unspendable liana` (no recovery path)
+
+**Why not blocking.** Liana refuses these at IMPORT, loudly and before any
+funding, so the outcome is not worse than silence.
+
+**The rule for the fix.** The harness is the oracle: gather Liana's own
+verdicts for each shape through `scripts/liana-live-gate.sh` (add them as
+probes, each with its internal key recomputed over its own leaves) BEFORE
+adding any warning, and key each warning on the composed shape.
+
+### F-645 — `md repair` refuses a damaged `tr(UNSPENDABLE(liana),…)` card that `md decode` reads (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#repair` `#restore`
+
+**Status:** OPEN
+Filed 2026-09-23 from the controller's measurement during the F-449 stage 2
+review; pre-existing in md-cli 0.18.0.
+
+**Reproduction** (md-cli 0.19.0 at descriptor-mnemonic `6f2fb760`, and 0.18.0):
+```
+$ md repair md1gppqqxq799p20d5hxuzu2c9la
+md: repair: non-canonical wrapper requires explicit origin for @0, but none provided
+exit 2
+$ md decode md1gppqqxq799p20d5hxuzu2c9la
+exit 4   # VERIFY-ME: a partial decode, origin unspecified
+```
+The card is `md encode "tr(UNSPENDABLE(liana),{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})"`.
+
+**The defect.** `md repair` refuses on a decode-side origin rule that `md
+decode` downgrades to a partial decode, so a DAMAGED card of this shape
+cannot be repaired even though its undamaged twin reads. Repair should keep
+its correction whenever decode would read the card, partial or not.
