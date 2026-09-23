@@ -19485,7 +19485,7 @@ two numbers and no cause).
 
 ### F-639 — `verify.rs:62` re-encodes a decoded card under `Admission::Enforce`, eleven lines below a comment stating the opposite intent (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#mint-policy-vs-decode`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `bcaa251b` (F-449 stage 2, controller ruling). `md verify` compares and mints nothing, so BOTH sides now serialise with the new additive `md_codec::encode_payload_unadmitted` (no admission policy; comparison and hashing only, never minting). The comment was right and the code was the defect. Reachable, MEASURED at 25acb33c: a §6 kind-1 `sortedmulti_a` card decoded at exit 0 while `md verify` against its own template refused with the mint error (exit 1). Pinned by `cmd_verify::verify_checks_a_mint_refused_card_instead_of_refusing_it` and the class gate `mint_policy_does_not_reach_decode.rs`.
 Filed 2026-09-22 from the Task 7 independent review, which flagged it as
 out of scope for that task but newly relevant.
 
