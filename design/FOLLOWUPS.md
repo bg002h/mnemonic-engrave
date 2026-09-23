@@ -19783,3 +19783,15 @@ Filed 2026-09-23 by the controller from the F-449 stage 4a plan.
 `md-codec 0.40.0`; `cargo check --locked` fails there at `8aea0d36`. Since
 stage 4a it also needs the root's `[patch.crates-io]`, because patches do not
 cross workspaces. The fuzz workspace is not in CI.
+
+### F-656 — `me sysw pack --expect` runs the confirmation walk twice, so its warnings print twice (owning phase: none — ownerless residue) `#mnemonic-engrave` `#me` `#sysw`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 4a implementer's report
+(`design/agent-reports/f449-stage4a-impl.md`, concern 2). Present before stage 4a.
+
+`me sysw pack --expect …` calls the walk in `expect::check` and again in
+`report_unconfirmed`. Measured with the MK1_A/MK1_B pair: the R2/R6 csid
+warning prints twice, exit 0. The "one walk call per invocation" rule, which
+stage 4a wrote into `mdmk_unconfirmed_why`'s doc, is therefore false on this
+path; the doc says so. **Fix:** walk once and pass the result to both.
