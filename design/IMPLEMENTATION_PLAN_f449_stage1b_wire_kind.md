@@ -1024,7 +1024,8 @@ fn item_7_the_render_reparse_fixpoint_covers_tr_kind_1() {
     let (md1b, err, code) = md(&["encode", rendered.trim(), "--path", "bip48"]);
     assert_eq!(code, 0, "the rendered template did NOT re-parse: {err}");
     assert_eq!(md1.trim(), md1b.trim(), "round trip is not a fixpoint");
-}```
+}
+```
 
 - [ ] **Step 6: Gate and commit.**
 
