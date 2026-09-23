@@ -439,6 +439,9 @@ fn a_good_plate_does_not_carry_a_bad_one() {
     let r = me(&["bundle"], &format!("{V8_TEMPLATE}\n{V12_SINGLE}\n"));
     assert_eq!(r.code, 4, "{}", r.err);
     assert!(r.out.is_empty(), "{}", r.out);
+    // R0 Nit: the refusal must name the BAD plate's version, so a refusal
+    // caused by the good plate cannot pass this test.
+    assert!(r.err.contains(V12_NAMED), "{}", r.err);
 }
 
 /// The chunked shape already refused; it now NAMES the version too.
@@ -858,6 +861,15 @@ In the test module, `the_mdmk_walk_is_blind_to_mt1_and_that_is_why_there_are_thr
 - **M7**, the same in `print_records`: kills `show_…`.
 - **M8**, `Unconfirmed::UnsupportedWireVersion(_) => broken.push(i)` in `check`: kills `expect_…`.
 
+- [ ] **Step 6b: Re-anchor the doc comments (R0 M-3, M-4).** The long doc
+  comment at `record.rs:179-209` (at `8aea0d36`) must sit on
+  `mdmk_unconfirmed_why`, the function it describes, not on the 4-line
+  projection the refactor put in front of it. Rewrite its caller list to match
+  the post-change callers (`pack`, `show`, `--expect`), found by grep, not
+  copied. It must also state the "one walk call per invocation" rule, which
+  today appears only in that stale comment. Correct `expect.rs:55-61`, which
+  names the old walk.
+
 - [ ] **Step 7: Commit.** Stage `crates/me-cli/src/sysw/record.rs`, `crates/me-cli/src/sysw/expect.rs`, `crates/me-cli/src/main.rs` and `crates/me-cli/tests/f449_stage4a.rs`. Subject: `me sysw: an md1 at an unsupported wire version is named, never reduced to "unconfirmed" (F-449 §6a)`.
 
 ---
@@ -901,7 +913,24 @@ This is the stage-2 plan's standing Task 7 rule: every stage ends with a sweep f
 
 **Files:** `crates/me-cli/Cargo.toml:3`, `Cargo.lock` (the `mnemonic-engrave` stanza), `crates/me-cli/CHANGELOG.md`.
 
-- [ ] **Step 0: PRECONDITION. Stop if stage 3 has not landed in fork main.** `me sysw`'s "confirmed" is a prediction of what the device will decode. After Task 1, `me` confirms a v8 card, but fork main `7b6f2fb`, and every image flashed from it, cannot read v8. The device would treat that card as a SECRET and replace its legend, while `me sysw show` said "confirmed". `me` cannot know which firmware is flashed, so the only guard is ordering, and SPEC §9 already orders 3 → 4 → 4a. **Check:** the fork's `md/` accepts version 8, i.e. `git -C /scratch/code/shibboleth/seedhammer log --oneline origin/main | grep -i 'stage 3'` returns the stage-3 merge, **and** `cd /scratch/code/shibboleth/seedhammer && /scratch/code/shibboleth/.toolchain/go/bin/go test ./md/ -run 'Version8|WireVersion'` shows v8 tests that pass. If either is missing, Tasks 0-4 may be merged, but **do not tag**. Report the release as blocked on stage 3, and do not install the master build as the local `me` (Step 8) either. *Cost if wrong:* an operator packs a v8 card, `me` calls it confirmed, and the device blanks its legend.
+- [ ] **Step 0: PRECONDITION. Stop if stage 3 has not landed in fork main.** `me sysw`'s "confirmed" is a prediction of what the device will decode. After Task 1, `me` confirms a v8 card, but fork main `7b6f2fb`, and every image flashed from it, cannot read v8. The device would treat that card as a SECRET and replace its legend, while `me sysw show` said "confirmed". `me` cannot know which firmware is flashed, so the only guard is ordering, and SPEC §9 already orders 3 → 4 → 4a. **Check — behavioural, and able to fail today (R0 I-1).** R0 measured that the
+  previous check (a `grep 'stage 3'` over commit subjects, and a `-run` filter
+  that matched no test and printed `ok … [no tests to run]`) PASSED at fork
+  `7b6f2fb`, where stage 3 has not landed. The check is now two parts, and both
+  must hold:
+  1. **Ancestry by SHA.** Take the stage-3 fork merge SHA from
+     `design/CONTINUITY_f449_stage2.md` (or its successor), where stage 3's ship
+     step records it, and run `git -C /scratch/code/shibboleth/seedhammer fetch -q origin && git -C /scratch/code/shibboleth/seedhammer merge-base --is-ancestor <sha> origin/main`.
+     It must exit 0. No SHA recorded means stage 3 has not shipped.
+  2. **Decode a real v8 card.** In a throwaway detached worktree of fork
+     `origin/main`, write `md/zz_stage4a_precondition_test.go` with
+     `func TestStage4aPreconditionDecodesV8(t *testing.T)` calling
+     `Decode("md1cpfdsssj6tvyywtsqrq0zjs4n7gdve74ar402")` and `t.Fatalf` on
+     error. Run `go test ./md/ -run TestStage4aPreconditionDecodesV8 -v`. The
+     output must contain the literal `--- PASS: TestStage4aPreconditionDecodesV8`.
+     `ok` alone is not enough, since a filter that matches nothing also says ok.
+     Then remove the worktree. **MEASURED by the controller at `7b6f2fb`:
+     `--- FAIL`**, so this check fails today, as it must. If either is missing, Tasks 0-4 may be merged, but **do not tag**. Report the release as blocked on stage 3, and do not install the master build as the local `me` (Step 8) either. *Cost if wrong:* an operator packs a v8 card, `me` calls it confirmed, and the device blanks its legend.
 
 - [ ] **Step 1: The number.** `0.10.0 → 0.11.0`. Under the pre-1.0 convention the minor number is the breaking axis (the `acbfcc93` message). This release breaks public API: `BundleError::Md1WireVersion(String)` becomes `(String, u8)`, the new variants `BundleError::Md1Undecodable` and `sysw::expect::Unmet::UnreadableVersion` are additions to exhaustive public enums, and the new `sysw::record::Unconfirmed`/`mdmk_unconfirmed_why` are also public. The operator-visible change is that `me bundle` now refuses a plate 0.10.0 accepted (F7).
 
@@ -912,6 +941,9 @@ This is the stage-2 plan's standing Task 7 rule: every stage ends with a sweep f
      - **Changed:** a testnet `tpub` in a `key:` record is refused as unsupported. This is `1cbecbfd` and has no CHANGELOG line yet.
      - **Fixed:** F-635, with the v4 origin-less template called out as **newly refused**.
      - **Fixed:** `me sysw pack`/`show`/`--expect` name an unsupported wire version.
+     - **Note (R0 M-1):** `me` now confirms version-8 (Liana kind-1) cards.
+       A board flashed BEFORE the F-449 stage 3 firmware cannot read them, and
+       treats such a card as a secret. Reflash before engraving a v8 card.
      - **Breaking (library):** the enum changes from Step 1.
 
      Keep an empty `## [Unreleased]` at the top. Match the file's `## [x.y.z] - YYYY-MM-DD` form, with an ASCII hyphen.
