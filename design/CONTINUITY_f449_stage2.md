@@ -10,6 +10,17 @@
 `descriptor-mnemonic-md-cli-v0.19.0`. engrave merge `b8ee1ede`.
 
 ### Do this first
+**Parallel state (2026-09-23):**
+- F-642 (toolkit): merged to toolkit master `642300b7` (0.104.0); push, tag
+  `mnemonic-toolkit-v0.104.0`, then the demo/sh2 install bump.
+- Stage 4a: DONE and reviewed (whole-branch 0C/0I) on branch `f449-stage4a`
+  `ed4b7792` (worktree me-worktrees/f449-stage4a). HELD, per below.
+- Stage 3: plan GREEN; implementing in dm-worktrees/sh-worktrees/me-worktrees
+  `f449-stage3*`; report design/agent-reports/f449-stage3-impl.md.
+- Stage 4: plan being authored against the stage-3 scratch end state in
+  .tmp/r0-s3/ -> design/IMPLEMENTATION_PLAN_f449_stage4_device.md.
+- Stage 5: `demo/sh2/update.sh` as root@quantoshi.xyz works (measured).
+
 **HOLD (stage 4a R0 M-2):** once stage 4a merges, master's `me` confirms v8
 cards that no board flashed before stage 3 can read. Do NOT tag `me` 0.11.0 and
 do NOT MERGE the `f449-stage4a` branch into master (stage 4a whole-branch M2),
