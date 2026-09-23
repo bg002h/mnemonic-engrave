@@ -152,12 +152,20 @@ enum Form { Multipath, Chain0, Chain1 }
 /// the source that establishes it. `cite` is what makes a rule auditable.
 struct Reason { class: &'static str, cite: &'static str }
 
-/// The internal key, THREE-valued. An unspendable xpub is NOT a variant here:
-/// it is an ordinary key_index on the md1 wire, and recognising one means
-/// re-deriving a specific coordinator's own function — so that distinction
-/// lives in a rule, not in the key. See the port note above.
+/// The internal key. **CORRECTION (F-449 stage 1b, Task 10):** this was
+/// THREE-valued when drafted, on the claim that an unspendable xpub is NOT a
+/// variant here — that recognising one means re-deriving a specific
+/// coordinator's own function, so the distinction lives in a rule, not in
+/// the key. Stage 1b (shipped, `crates/md-codec/src/policy_shape.rs`) made
+/// that claim false for Liana's convention specifically: it gave that
+/// convention its own wire discriminant (a version-8 kind bit), so for any
+/// descriptor that carries it the distinction now lives in the key. The
+/// reasoning is unchanged for `Xpub` itself — a `key_index` the wire gives
+/// no discriminant for remains exactly as ambiguous as before. See the port
+/// note above, and `KeyPathKind::LianaUnspendable`'s doc in the shipped code
+/// for the design reversal in full.
 /// `Xpub`, not `Spendable`: this walk verifies nothing about spendability.
-enum KeyPathKind { NotTaproot, Nums, Xpub }
+enum KeyPathKind { NotTaproot, Nums, Xpub, LianaUnspendable }
 
 /// The coordinator's OWN parsed reading, recorded by the harness — never
 /// hand-authored (r2 I-7).
@@ -201,22 +209,28 @@ filled, because:
    placeholder indices the branch references — then writes `br.Keys =
    len(keys)` and **discards the map**. `fp_partition` needs *which* slots,
    per path. So the ported `Branch` must retain the index set.
-2. **`KeyPathKind` keeps THREE values, and the unspendable-xpub distinction
-   lives in a RULE, not the key.** An earlier draft said the ported enum
-   "gains a fourth value" for an unspendable xpub. Right that the distinction
-   matters — Nunchuk treats it as a different wallet and F-449 records it —
-   **wrong about where it lives**, and measured so during plan 1a:
+2. **`KeyPathKind` kept THREE values through plan 1a; stage 1b gave it a
+   fourth.** An earlier draft said the ported enum "gains a fourth value" for
+   an unspendable xpub. Right that the distinction matters — Nunchuk treats
+   it as a different wallet and F-449 records it — **wrong about where it
+   lived, measured so during plan 1a:**
    `Body::Tr { is_nums, key_index, tree }` (`crates/md-codec/src/tree.rs:49-57`)
-   makes `is_nums` the only internal-key discriminant on the md1 wire, and an
-   unspendable xpub is an ordinary `key_index`, structurally identical to a
-   spendable one. Liana's `unspendable_internal_key(desc)` **derives** the key
-   from the descriptor rather than being a constant to match, so recognising
-   one means re-deriving a specific coordinator's function. That is a
-   coordinator computation, not a codec property. The enum is
-   `NotTaproot | Nums | Xpub` — `Xpub`, not the fork's `Spendable`, because
-   the walk verifies nothing about spendability — and the distinction is
-   evaluated by the coordinator's own rule, where a rule-vs-evidence
-   disagreement surfaces as a D1/D2 build failure.
+   made `is_nums` the only internal-key discriminant on the md1 wire, and an
+   unspendable xpub was an ordinary `key_index`, structurally identical to a
+   spendable one. **CORRECTION (F-449 stage 1b, Task 10): that is no longer
+   the wire's shape.** Liana's `unspendable_internal_key(desc)` **derives**
+   the key from the descriptor rather than being a constant to match, but
+   stage 1b taught the wire a second kind bit at version 8
+   (`crate::tree::InternalKey::LianaUnspendable`) precisely so that, for a
+   descriptor carrying it, recognising Liana's derivation no longer requires
+   re-deriving a coordinator's own function — the computation happens once,
+   at encode time, and the wire carries its result. The ported enum is
+   `NotTaproot | Nums | Xpub | LianaUnspendable` — `Xpub`, not the fork's
+   `Spendable`, because the walk verifies nothing about spendability — and
+   the coordinator-rule reasoning now scopes to `Xpub` alone: a `key_index`
+   the wire gives no discriminant for is exactly as ambiguous as before, and
+   a rule-vs-evidence disagreement over THAT case still surfaces as a D1/D2
+   build failure.
 
 Both extensions land in **Rust**, and this is the rare direction: `policy_shape.go`
 is fork-native code with no Rust counterpart, so porting it *makes* Rust
