@@ -19128,7 +19128,7 @@ and its four `precedence_*` vector cases must be ported at the same time.
 
 ### F-633 — §8x asserts a present-tense claim about Liana, verified against a release seven majors old
 
-**Status:** OPEN — **Owning phase:** the coordinator-compatibility cycle (`design/DESIGN_coordinator_compatibility.md` §3, staleness). **Tier:** `correctness` / `records`. **Found:** fable architect review of the coordinator-compat design, I-1 (2026-09-20).
+**Status:** OPEN — **Owning phase:** the coordinator-compatibility cycle (`design/DESIGN_coordinator_compatibility.md` §3, staleness). **Copy half done at F-449 stage 4** (fork `a054ead`): §8x says "Liana (as of v15.0)", the new kind-1 key-path body (§8y) names v15.0, and §8f's Liana sentence no longer points at F-449; OPEN for the KNOWN_RELEASES gate. **Tier:** `correctness` / `records`. **Found:** fable architect review of the coordinator-compat design, I-1 (2026-09-20).
 
 The shipped §8x notice says, in the present tense and naming no version:
 
@@ -19666,9 +19666,22 @@ after F-449 stage 2, with F-645/F-646/F-648/F-651. Still OPEN.
   can also land here. Message precision, not blocking; it belongs to that
   release.
 
-### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **F-449 stage 4**) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
+### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **next descriptor-mnemonic release**; device half closed at F-449 stage 4) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
 
-**Status:** OPEN
+**Status:** OPEN — owning phase: the next descriptor-mnemonic release (the md-cli half; the device half is closed)
+
+**Ruling at F-449 stage 4 (2026-09-23).** *Device half: done.* §0b's
+conjunct 2 (`composerLianaOutsideModelClass` on the kind-1 composition)
+names a class for all four shapes below, so the SH2 never offers the Liana
+key for any of them (`TestComposerLianaClassRulings`, fork `a054ead`). The
+evidence this entry's rule demands is now gathered: Liana v15.0 (`4684d5cb`)
+refuses each of the four, and SPEC §7's constructed shape (one timelocked
+leaf), each with its internal key recomputed over its own leaves by the
+harness's `unspendable` subcommand; it accepts a nested two-recovery tree and
+a `pk` primary leaf + recovery (`design/evidence/f449-stage4/liana-probes.sh`,
+engrave `1ca29d16`). *md-cli half: re-owned* to the next descriptor-mnemonic
+release; its fix keys each warning on the composed shape, per the rule below.
+
 Filed 2026-09-23 from the F-449 stage 2 whole-branch review (M-7), widening
 the implementer's own concern (4).
 
@@ -19814,7 +19827,19 @@ cross workspaces. The fuzz workspace is not in CI.
 
 ### F-654 — The Go composer has no Liana kind and no §6 kind-1 mint refusals (owning phase: **F-449 stage 4**) `#seedhammer` `#md` `#compose` `#liana`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 — seedhammer `8d21b07`, `d64695c` (branch `f449-stage4`, not yet merged: the landing replaces these with the fork merge SHA)
+
+**Closed by F-449 stage 4.** `md.ComposeWithUnspendable` ports md-codec's
+`UnspendableKind` request (fork `8d21b07`, `md/compose_unspendable.go`), and
+`(md.Composed).ValidateUnspendableShape` ports `validate_unspendable_shape`
+(SPEC §6 rows 1, 2, 4). It is called from the composer's one compose site,
+`composerCompose` (`d64695c`, `gui/composer_unspendable.go`), on the mint
+path, NOT from `encodePayload`, exactly as the constraint below requires.
+**`validate_minimal_wire_version` is unported BY DESIGN, not missed:** the Go
+encoder takes no version parameter (it derives the wire version from the
+tree, stage 3), so the state that function refuses cannot be constructed in
+Go. Do not port it as an oversight.
+
 Filed 2026-09-23 from F-449 stage 3 (plan Task 8 Step 2; fork `f449-stage3`
 at `43294c6`).
 
@@ -19878,3 +19903,35 @@ agree on every forged card the review built. Rule on it first: SPEC §6 row 6
 may deliberately be mint-only, which is the "mint policy never decides
 readability" rule. If so, record that here and close. Otherwise refuse it
 Rust-first.
+
+### F-659 — the composer's restore document promises key cards "listed below" on a run that cut none (owning phase: none — ownerless UX residue) `#seedhammer` `#gui` `#composer` `#restore`
+
+**Status:** OPEN — owning phase: none (ownerless residue)
+Filed 2026-09-23 from F-449 stage 4 (plan fact F14). Pre-existing since F-544
+(fork `5971ad3`); not caused by F-449.
+
+`composerRestoreDoc` (fork `gui/composer_flow.go:534-543` at `f449-stage4`
+`a66491f`) takes its `len(keyed) == 0` branch for every key-less composition
+and always says "This backup is a key-less TEMPLATE plus its key cards … restore
+needs the mk1 key cards listed below." On a run that seated no keys (the
+emulator walk's `keyless` and `liana` arms: census 1 plate, the template) no
+card is listed, because none was cut. **Direction:** when the census holds no
+mk1 card, say the cosigners' mk1 cards are made elsewhere from the template's
+stub, instead of pointing below. The plan's citation of the liana arm's `l06-`
+frame is off by one screen: `l06-bundle-engraved.png` is the bundle modal, and
+the walk confirms through the restore document without a shot; the fact above
+is from the code.
+
+### F-660 — the composer emulator walk runs on nothing, and was red for a week unnoticed (owning phase: **the composer cycle**) `#seedhammer` `#emu` `#ci` `#journeys`
+
+**Status:** OPEN — owning phase: the composer cycle
+Filed 2026-09-23 from F-449 stage 4 (plan fact F8).
+
+`design/journeys/capture_composer.py` drives `cmd/emu/shots_composer.js` in a
+headless browser; nothing runs it on push or before a flash. At the F-449
+stage-3 end state it was red three ways, none caused by F-449 (the keyless
+arm waited for superseded copy; every arm stalled on F-544's Restore Doc
+screen; keyed-B's census pages), and stayed so from 2026-09-16 until stage 4
+re-greened it (fork `a66491f`). **Direction:** run the `keyless` and `liana`
+arms (no payload, ~30 s each, measured 28 s) in a scheduled or pre-push job,
+or name the walk in the flash checklist.

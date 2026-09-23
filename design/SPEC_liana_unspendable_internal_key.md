@@ -90,6 +90,13 @@ after the stub screen it MUST return through `composerStubFlow` and raise the
 existing changed-id banner (`composerStubDelta`), whose own doc comment says a
 false statement there is worse than a missing one.
 
+**Status (stage 4, fork branch `f449-stage4` at `a66491f`, not yet merged to fork main):** the line numbers above are as of `7b6f2fb`.
+The step shipped as `composerUnspendableStep`, at `gui/composer_flow.go:101`,
+between `composerSizeAssignments` (`:96`) and `composerTemplateChunksFor`
+(`:104`); the first `composerStubFlow` is now `:135`. Back from the step
+`continue`s to the path list, as Back from the stub screen does. The RESET below
+runs in the same call, so "immediately before `composerTemplateChunksFor`" holds.
+
 **RESET — expressed as a predicate, not as an edit event.** r3 said the kind
 "resets on any shape, wrapper or path-list edit that re-enters
 `composerShapeFlow`", which is a granularity the composer cannot observe: it
@@ -616,11 +623,17 @@ stage 5 runbook must say to flash before reading kind-1 plates.
 ## 7. Verdict integration
 
 - **Rust:** `KeyPathKind` gains a fourth value beside `NotTaproot | Nums | Xpub`.
-  Name it `NumsXpub` rather than `Unspendable` — `Unspendable` sitting next to
-  `Nums` implies `Nums` is spendable (opus M3). `skeleton_key` already appends
+  *(History: this said "name it `NumsXpub` rather than `Unspendable` —
+  `Unspendable` sitting next to `Nums` implies `Nums` is spendable" (opus M3).
+  **Shipped as `KeyPathKind::LianaUnspendable`** (descriptor-mnemonic `cf35d61a`,
+  `crates/md-codec/src/policy_shape.rs`), which meets the same objection by
+  naming whose key it is; the Go sibling mirrors Rust's name.)* `skeleton_key` already appends
   `key_path_kind_label` (`skeleton.rs:313-320`), so kind 0 and kind 1 produce
   different `SkeletonKey`s from the fourth value alone.
-- **Go:** `md.KeyPathNUMS` gains a sibling.
+- **Go:** `md.KeyPathNUMS` gains a sibling. **Status:** `md.KeyPathLianaUnspendable`
+  (stage 4, fork `d7e1999`, `md/policy_shape.go:46`), appended so the three older
+  values keep their numbers; one mapping, `keyPathOf`, feeds both `policyShape`
+  and the `md.Template.KeyPath` the inspect screen reads.
 - **The class-2 ruling, stated precisely** (opus I6). The new kind is
   **excluded from class 2's refusal** (`composer_consent.go:397`) — that is what
   it exists for — **and is still NOT counted as an unlocked path**, because an
@@ -694,6 +707,18 @@ wrong places:
    paths that deliberately engrave without an address. State it that way, or it
    reads as a blanket "no address, no engrave" and retires working behaviour.
 
+**Status (stage 4, fork branch `f449-stage4` at `a66491f`, not yet merged to fork main):** item 2 is `taprootInternalKey`'s Liana arm
+(`gui/policy_address.go:221`, `63da55a`), fed by `lianaInternalKey` (`:243`),
+which runs §2 over the keys the deriver is GIVEN (on the Wallet Policy route,
+the seated mk1 cards, not the md1's TLV) and derives at an explicit `<0;1>/*`.
+The switch has no `default:`; an unknown kind is `errUnderivableInternalKey`
+(`TestAnUnderivableInternalKeyKindIsRefusedNotFallenBack`). Item 3's ENGRAVE
+half is `md1KeyPathUnknown` in `walletPolicyConsentLines`
+(`gui/wallet_policy.go:264`, `a054ead`), scoped to KEYED cards as above. It is
+**unreachable until a fourth kind exists** (the version set {4, 8} admits
+three), so deleting that call is invisible to every test: the stage-4 mutation
+table's one survivor, S8.
+
 r1 asserted one choice screen was "the minimum that makes §0 true". It was not:
 composing a wallet the device cannot address does not deliver §0's promise.
 
@@ -758,10 +783,10 @@ already records" was false.
 
    | what | gate | stage |
    | --- | --- | --- |
-   | §0b PLACEMENT | the screen is reached inside `composer_flow.go:96-128` and **before `composerTemplateChunksFor`**; if placed later, the changed-id banner fires | 4 |
-   | §0b RESET | **the predicate is re-evaluated, not the edit detected.** Set kind 1, Back-edit to a shape where a conjunct is false (e.g. give the primary a bare single key, making the internal key real), and assert the kind is 0. **And the converse, which is the half that catches an over-eager reset:** Back-edit in a way that keeps both conjuncts true and assert the kind is **still 1** | 4 |
-   | §0b DEFAULT ROW | two assertions, because one cannot fail: on FIRST entry the widget opens on the NUMS row (asserted on the first page), and **on RE-ENTRY after choosing kind 1 it opens on the kind-1 row** | 4 |
-   | §0b COPY | both rows name their coordinators and say the two are different wallets | 4 |
+   | §0b PLACEMENT | the screen is reached inside `composer_flow.go:96-128` and **before `composerTemplateChunksFor`**; if placed later, the changed-id banner fires | 4 — DONE (fork `d64695c`: `TestComposerKeyPathChoiceIsPlacedBeforeTheChunks`; the emulator walk's `liana` arm, `a66491f`, which FAILS with the step moved below `composerTemplateChunksFor`) |
+   | §0b RESET | **the predicate is re-evaluated, not the edit detected.** Set kind 1, Back-edit to a shape where a conjunct is false (e.g. give the primary a bare single key, making the internal key real), and assert the kind is 0. **And the converse, which is the half that catches an over-eager reset:** Back-edit in a way that keeps both conjuncts true and assert the kind is **still 1** | 4 — DONE (fork `d64695c`: `TestComposerUnspendableResetIsThePredicate`, both halves; `TestComposerLianaKeyDroppedFits` for the modal) |
+   | §0b DEFAULT ROW | two assertions, because one cannot fail: on FIRST entry the widget opens on the NUMS row (asserted on the first page), and **on RE-ENTRY after choosing kind 1 it opens on the kind-1 row** | 4 — DONE (fork `d64695c`: `TestComposerUnspendableDefaultRow`; the `liana` arm re-enters and presses through, and the id holds) |
+   | §0b COPY | both rows name their coordinators and say the two are different wallets | 4 — DONE (fork `d64695c`: `TestComposerUnspendableScreenFirstPage`; the bodies are rows of `composerCopyTable`, SPEC_wallet_policy_composer §8y) |
    | §6a old-device message | a chunk at a version OUTSIDE the accepted set (e.g. 12) yields the named-version message ("This firmware cannot read md1 version 12.") on the gather, inspect and bundle surfaces, never "Not an md1 descriptor chunk." — and a version-8 chunk is READ (stage-3 firmware accepts {4, 8}). A board not flashed with stage 3 still says "Not an md1 descriptor chunk." about a v8 plate; no code can fix a board already in the field, so the stage 5 runbook must say to flash before reading kind-1 plates | 3 — DONE (fork `e2b4c6f`, `gui/md1_version_test.go`) |
    | §6a `md repair` | a chunk — a SINGLE string — at a wire version OUTSIDE the accepted set (v8 is accepted since 1b, so the reachable trigger is e.g. 12) with a correctable BCH error KEEPS the correction and reports the unsupported wire version, exiting **5** (REPAIR_APPLIED), distinctly from the atomic-fail exit 2. **A multi-string call failing on the wire version exits 2 with empty stdout** (ruling 7): a build cannot know the chunk-header layout of a version it does not support, so it cannot tell one card's chunks from mixed or unrelated strings | 2 — DONE (`4c35175e`; single-string only since descriptor-mnemonic `23203195`) |
    | §6a error Display | `WireVersionMismatch`'s message names the accepted set, not "expected 4" | 1b |
@@ -849,7 +874,7 @@ runbook has the two commands; not a gate.
 | **1b** | version 8, the kind bit, §2 derivation, §4 rendering, §4a's `md decompose` recogniser and `md encode` refusal, §6 refusals | §8 vectors **1, 2, 5, 6, 7, 10** — every leg runnable in Rust alone. (§8.9 is a table of per-stage rows, not a single-stage item; §8.10 is the mutation pass and was item 9 before r3b inserted the gate table) |
 | **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a). **Status:** `md descriptor` kind 1 and the substitution rule shipped in 1b; the JSON bump's decode half in 1b and its compose half in stage 2; `--unspendable` in stage 2 (descriptor-mnemonic `6e918a8f`..`8d6697fe`, md-codec 0.47.0 / md-cli 0.19.0) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes. **Both run:** §8.2's CLI legs in `crates/md-cli/tests/liana_evidence_legs.rs`; §8.8 is `scripts/liana-live-gate.sh` (Liana v15.0, 11 verdicts, PASS) |
 | **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped. **Status:** SHIPPED 2026-09-23: fork main merge `d2350cb` (branch `f449-stage3` at `43294c6`); the Go vectors are vendored from descriptor-mnemonic `430ea478`, merged to dm main as `d269c556`. Landed beyond the row: §2's recipe ported into `md/` (test-only at this stage), the bundle surface of §6a, the `md1_encoding_id` assertion in the keyed conformance gate, and the ADDRESS half of §7a.3. Moved: the Go composer's Liana selection and §6's kind-1 mint refusals to stage 4 (F-654). Stage 3 alone lets the device copy kind-1 cards verbatim without an address (`noAddressLines`); the engrave refusal of §7a.3 is stage 4. Also until stage 4: a kind-1 wallet on the inspect screen shows its keys but NO `Policy id:` line (its kind-0 twin shows one) and no address — measured at `43294c6` | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
-| **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
+| **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy**. **Status:** implemented on fork branch `f449-stage4` at `a66491f`, not yet merged to fork main (`8d21b07` md request + §6 refusals, `d7e1999` the fourth kind, `63da55a` the address arm, `a054ead` the print sites, `d64695c` the choice screen, `a66491f` the walk); every gate named here runs green (`TestDeviceDerivesLianasOwnAddressesForKind1`, `TestComposerLianaClassRulings`, `TestAnUnderivableInternalKeyKindIsRefusedNotFallenBack`, `TestComposerUnspendablePredicateOnEveryTrPreset`). Landed beyond the row: the Go composer's Liana request and §6's mint refusals (F-654, closed); the self-check biconditional "chose Liana ⟺ decoded kind 1"; the composer emulator walk re-greened (it was red three ways at the stage-3 end state, F-660) with a `liana` arm; F-644's device half closed on Liana v15.0 evidence (`design/evidence/f449-stage4/`) | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
 | **4a** | `me` (this repo): §9a's four pieces — the unpin plus its `[patch.crates-io]` override, §3f's type-change repairs to `me`'s own source, §6a's message at `sysw/record.rs:251-252`, and **§8b's fail-open fix at `bundle.rs:371`**. **Status:** implemented on branch `f449-stage4a` — mnemonic-engrave `a16da983` (the unpin to md-codec 0.47.0 by git rev `cf35d61a`, plus the patch), `d25eee36` (§8b / F-635) and `57822135` (§6a on `me sysw`). `--expect` turned out to be a THIRD reader of the `sysw/record.rs` walk, beside `pack` and `show`, and it was fixed with them: it had called a whole card at an unsupported version "does not reassemble" | **§8.9's `me` rows.** NOT "me round-trips a version-8 payload": measured, that already passes on the pinned 0.42 with no change at all, because `me convert` validates only the codex32/BCH layer (`me-cli/src/lib.rs:75-83` → `validate.rs:95-100`), which is version-agnostic. A gate the status quo satisfies is not a gate |
 | **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ with `demo/sh2/update.sh` | site 200, `application/wasm`, and the emulator reaches §0b's screen |
 

@@ -1,6 +1,6 @@
 ########## versions -- BY PATH, because a bare name has been an alias here
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md --version
-md 0.14.0
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md --version
+md 0.19.0
 [exit 0]
 
 $ /home/bcg/.cargo/bin/mk --version
@@ -8,20 +8,20 @@ mk 0.13.0
 [exit 0]
 
 $ /home/bcg/.cargo/bin/ms --version
-ms 0.16.0
+ms 0.19.0
 [exit 0]
 
 $ /scratch/code/shibboleth/mnemonic-engrave/target/debug/me --version
-me 0.8.0
+me 0.10.0
 [exit 0]
 
 $ /scratch/code/shibboleth/.toolchain/go/bin/go version
 go version go1.26.7 linux/amd64
 [exit 0]
 
-fork checkout: /scratch/code/shibboleth/wt-composer-s4-emu
-$ git -C /scratch/code/shibboleth/wt-composer-s4-emu rev-parse --short HEAD
-b481be7
+fork checkout: /scratch/code/shibboleth/sh-worktrees/f449-stage4
+$ git -C /scratch/code/shibboleth/sh-worktrees/f449-stage4 rev-parse --short HEAD
+d64695c
 [exit 0]
 
 
@@ -87,7 +87,7 @@ is the digest itself; `now:` is the hex of "<seconds>,<height>". The
 nothing is auto-appended and the blob's digest does not move with the
 wall clock. The seed goes in as its words, sniffed as ClassMnemonic.
 
-$ cat /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/records.txt
+$ cat /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/records.txt
 key:5b37336335646130612f3438272f30272f30272f32275d7870756236446b4641585751326448787132766174727439717941336258595534546f57517743486266355842326d5354657863485a43654b5331565a5963506f4264355838795663625846484a523952385543567074383256583156685232386d43797855464c3472364b467266
 key:5b37336335646130612f3438272f30272f31272f32275d7870756236447a6879726e464659513148696d44694d33383878486e446952504e645a4a46426d6d786765335931575763484c744d4a4c665275685248716e51435062546a3366474b54754b464c487a7a77704a6b70354474633355744c4b5a4b61565a653179714d42586436566b
 hash:abababababababababababababababababababababababababababababababab
@@ -104,23 +104,23 @@ sequence. It is the check the emulator's whole payload leg rests on: if
 the generator drifted, the device would show a digest this transcript
 never computed.
 
-$ diff <(/scratch/code/shibboleth/.toolchain/go/bin/go run ./cmd/buildpayloadcomposer) /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/records.txt
+$ diff <(/scratch/code/shibboleth/.toolchain/go/bin/go run ./cmd/buildpayloadcomposer) /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/records.txt
 [exit 0]
 GATE PASS  records.txt == cmd/buildpayloadcomposer stdout
            = identical
 
 ########## 3. the payload the device loads
 
-$ /scratch/code/shibboleth/mnemonic-engrave/target/debug/me sysw pack --no-passphrase --in /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/records.txt --out /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/payload.bin
+$ /scratch/code/shibboleth/mnemonic-engrave/target/debug/me sysw pack --no-passphrase --in /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/records.txt --out /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/payload.bin
 sealing:  NOT SEALED — you passed --no-passphrase, and this payload HOLDS 
       SECRET MATERIAL (record 4 (BIP-39 mnemonic)). It will sit in flash in cleartext.
 strength: no passphrase — BELOW the threshold
 me: WARNING — this payload carries secret material with weak or no passphrase protection. Proceeding (spec §13 D3).
 digest:   dbe9 e774 e9a4 9231 0b62 626c 2b41 cf4b
-          re-print it with: me sysw show /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/payload.bin
+          re-print it with: me sysw show /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/payload.bin
 [exit 0]
 
-$ /scratch/code/shibboleth/mnemonic-engrave/target/debug/me sysw show /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/payload.bin
+$ /scratch/code/shibboleth/mnemonic-engrave/target/debug/me sysw show /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/payload.bin
 sealed:   false
 pub_len:  730
 ct_len:   0
@@ -129,7 +129,9 @@ digest:   dbe9 e774 e9a4 9231 0b62 626c 2b41 cf4b
 public record 0: cosigner key (key:) — [73c5da0a/48'/0'/0'/2']xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf
 public record 1: cosigner key (key:) — [73c5da0a/48'/0'/1'/2']xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk
 public record 2: sha256 hashlock (hash:) — abababab..abababab
+    sha256:abababababababababababababababababababababababababababababababab
 public record 3: pack time (now:) — 1788220800 (seconds), height 905000: a lower bound on the present the device echoes beside a time lock; never a locktime
+secret record 4: BIP-39 mnemonic — not shown
 [exit 0]
 
 ########## 3a. GATE -- byte-identical to the blob embedded in cmd/emu
@@ -139,7 +141,7 @@ these must be the same 782 bytes. `me sysw pack` is DETERMINISTIC for the
 unsealed variant -- salt and IV are only consumed on the sealed path --
 which is what makes this a byte comparison rather than a structural one.
 
-$ cmp /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/payload.bin /scratch/code/shibboleth/wt-composer-s4-emu/cmd/emu/sysw_composer_payload.bin
+$ cmp /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/payload.bin /scratch/code/shibboleth/sh-worktrees/f449-stage4/cmd/emu/sysw_composer_payload.bin
 [exit 0]
 GATE PASS  payload.bin == cmd/emu/sysw_composer_payload.bin
            = identical
@@ -151,12 +153,13 @@ GATE PASS  payload digest
 wsh; Path 1 = 2-of-2 (A@0, A@1); Path 2 = one key of master B behind a
 12960-block relative wait AND the payload's sha256 hashlock.
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md compose --wrapper wsh --path 2of2 --path 1of1,older=12960,sha256=abababababababababababababababababababababababababababababababab --json
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md compose --wrapper wsh --path 2of2 --path 1of1,older=12960,sha256=abababababababababababababababababababababababababababababababab --json
 {
   "experimental": [],
+  "experimental_paths": [],
   "internal_key_path": null,
   "preset": null,
-  "schema": "md-cli/1",
+  "schema": "md-cli/2",
   "slots": [
     {
       "index": 0,
@@ -188,13 +191,13 @@ its own hardened account by ordinal among the slots that master fills;
 master B fills one slot, so ordinal 0). So the host oracle is minted with
 THAT origin, not with md's placeholder:
 
-$ cat /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/keyed.template
+$ cat /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/keyed.template
 wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960)))))
 [exit 0]
 
 ########## 4a. the full policy, as the device engraves it (form A)
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --force-chunked --group-size 0
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md encode wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --force-chunked --group-size 0
 md1flv5xrq9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2at4gj8fq03ncnsuxv
 md1flv5xrqw46h2at4w46h2at4w46h2at4w4hqqqqe2qzlxrnchdq5h83w6p2hp5gmug4u83waqg8k6ntsjqqddg
 md1flv5xrqscl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz64mrqgdrha0m7umapumg67jfj6m3fvh7y
@@ -225,7 +228,7 @@ GATE PASS  keyed md1 chunk 1
 The ids come from `md inspect` OF THE CHUNKS, not of the arguments that
 produced them: that proves the identity the engraved strings carry.
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1flv5xrq9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2at4gj8fq03ncnsuxv md1flv5xrqw46h2at4w46h2at4w46h2at4w4hqqqqe2qzlxrnchdq5h83w6p2hp5gmug4u83waqg8k6ntsjqqddg md1flv5xrqscl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz64mrqgdrha0m7umapumg67jfj6m3fvh7y md1flv5xrqej075dhzfzvynh66n94j5lcxlmx9ayav9mj0jjejcxy50llpx82qfmryv7l68w6hqqhypxt9s9j68n md1flv5xrpzragnj3g5qrl85zeape8wq0vdczfyy55tqsd5576trsa3p40nfpd7hsyjyf7vlx6saxquqfv5er72p md1flv5xrp0k2j6ckr4wf0m36nn9pm0wkz5duhr4fq2pwsjch4zfmsclyyxap2w2ua7583pn5tsnkrk4cfxj37uw md1flv5xrpj7qeewyp4dfykwfkgg6fxyxetdcmythf4hsqzd3v879jprztejzs7ru967l2aj4n0rcs
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md inspect md1flv5xrq9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2at4gj8fq03ncnsuxv md1flv5xrqw46h2at4w46h2at4w46h2at4w4hqqqqe2qzlxrnchdq5h83w6p2hp5gmug4u83waqg8k6ntsjqqddg md1flv5xrqscl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz64mrqgdrha0m7umapumg67jfj6m3fvh7y md1flv5xrqej075dhzfzvynh66n94j5lcxlmx9ayav9mj0jjejcxy50llpx82qfmryv7l68w6hqqhypxt9s9j68n md1flv5xrpzragnj3g5qrl85zeape8wq0vdczfyy55tqsd5576trsa3p40nfpd7hsyjyf7vlx6saxquqfv5er72p md1flv5xrp0k2j6ckr4wf0m36nn9pm0wkz5duhr4fq2pwsjch4zfmsclyyxap2w2ua7583pn5tsnkrk4cfxj37uw md1flv5xrpj7qeewyp4dfykwfkgg6fxyxetdcmythf4hsqzd3v879jprztejzs7ru967l2aj4n0rcs
 template: wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*),and_v(v:pkh(@2/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960)))))
 n: 3
 wallet-policy-mode: true
@@ -251,13 +254,13 @@ The device's mk1 stubs are the FIRST FOUR BYTES of those two ids:
   mk1 stub (template): 531ab9e1
   mk1 stub (policy):   4dd749a8
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address --template wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --count 2
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md address --template wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --count 2
 bc1q8cf5g5fxfld9t22xguk7e0mg9mkjl2ujcxuux9napkw8cy89n3mqk0tp4l
 bc1qkd729k2r3kvrewzgdtpj0quhrrv9u4jgndt2zsmy6ypnr7rslzwsfhmu9a
 note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md address --template wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --change --count 2
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md address --template wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --key @0=xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --key @1=xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmmxge3Y1WWcHLtMJLfRuhRHqnQCPbTj3fGKTuKFLHzzwpJkp5Dtc3UtLKZKaVZe1yqMBXd6Vk --key @2=xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --change --count 2
 bc1q9ms8tdk54dzaelef0rrg82fpm3s9nfgyr30aed96rnyuj02hhgrqy3dyru
 bc1q3cs923r9rdcv5s8zmwkd5strrh7svzzpg2yrl4hcue3f3fv4lyfsdp3tz9
 note: stdout is watch-only — public keys only, cannot spend
@@ -274,7 +277,7 @@ GATE PASS  Change 1
 
 ########## 4c. read the card set back, as the device will
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md decode md1flv5xrq9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2at4gj8fq03ncnsuxv md1flv5xrqw46h2at4w46h2at4w46h2at4w4hqqqqe2qzlxrnchdq5h83w6p2hp5gmug4u83waqg8k6ntsjqqddg md1flv5xrqscl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz64mrqgdrha0m7umapumg67jfj6m3fvh7y md1flv5xrqej075dhzfzvynh66n94j5lcxlmx9ayav9mj0jjejcxy50llpx82qfmryv7l68w6hqqhypxt9s9j68n md1flv5xrpzragnj3g5qrl85zeape8wq0vdczfyy55tqsd5576trsa3p40nfpd7hsyjyf7vlx6saxquqfv5er72p md1flv5xrp0k2j6ckr4wf0m36nn9pm0wkz5duhr4fq2pwsjch4zfmsclyyxap2w2ua7583pn5tsnkrk4cfxj37uw md1flv5xrpj7qeewyp4dfykwfkgg6fxyxetdcmythf4hsqzd3v879jprztejzs7ru967l2aj4n0rcs
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md decode md1flv5xrq9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2at4gj8fq03ncnsuxv md1flv5xrqw46h2at4w46h2at4w46h2at4w4hqqqqe2qzlxrnchdq5h83w6p2hp5gmug4u83waqg8k6ntsjqqddg md1flv5xrqscl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz64mrqgdrha0m7umapumg67jfj6m3fvh7y md1flv5xrqej075dhzfzvynh66n94j5lcxlmx9ayav9mj0jjejcxy50llpx82qfmryv7l68w6hqqhypxt9s9j68n md1flv5xrpzragnj3g5qrl85zeape8wq0vdczfyy55tqsd5576trsa3p40nfpd7hsyjyf7vlx6saxquqfv5er72p md1flv5xrp0k2j6ckr4wf0m36nn9pm0wkz5duhr4fq2pwsjch4zfmsclyyxap2w2ua7583pn5tsnkrk4cfxj37uw md1flv5xrpj7qeewyp4dfykwfkgg6fxyxetdcmythf4hsqzd3v879jprztejzs7ru967l2aj4n0rcs
 wsh(or_d(multi(2,@0/<0;1>/*,@1/<0;1>/*),and_v(v:pkh(@2/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960)))))
 note: key origins carried by this card (not shown in the template):
   @0: [73c5da0a/48'/0'/0'/2']
@@ -289,7 +292,7 @@ The template WITH fingerprints is what the SECOND stub screen and form B's
 first plate carry. It shares the Template-ID with the first stub screen's
 unseated chunk set and is NOT the same string: that one puts @2 at 2'.
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --force-chunked --group-size 0
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md encode wsh(or_d(multi(2,@0/48'/0'/0'/2'/<0;1>/*,@1/48'/0'/1'/2'/<0;1>/*),and_v(v:pkh(@2/48'/0'/0'/2'/<0;1>/*),and_v(v:sha256(abababababababababababababababababababababababababababababababab),older(12960))))) --fingerprint @0=73c5da0a --fingerprint @1=73c5da0a --fingerprint @2=b8688df1 --force-chunked --group-size 0
 md1fxnz3qs9qjtvyyy5jmpprjjtvyyy4qqxpxqcyy2v6tjv6a4w46h2at4w46h2at4w46h2shlte30qvuhvrq
 md1fxnz3qsw46h2at4w46h2at4w46h2at4w46h2msqqqv4qp0npeutks2tnchdq4ts6yd7yq5swf47peq533w
 chunk-set-id: 0x34c51
@@ -313,6 +316,10 @@ counts one plate per card, at these chunk counts.
 $ /home/bcg/.cargo/bin/mk encode --xpub xpub6DkFAXWQ2dHxq2vatrt9qyA3bXYU4ToWQwCHbf5XB2mSTexcHZCeKS1VZYcPoBd5X8yVcbXFHJR9R8UCVpt82VX1VhR28mCyxUFL4r6KFrf --origin-fingerprint 73c5da0a --origin-path m/48'/0'/0'/2' --policy-id-stub 531ab9e1 --policy-id-stub 4dd749a8 --group-size 0
 mk1qp0tx8pqqsp9xx4eu9xawjdgw0za5zs9qjyty8su72t3dwaqcl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz6wxr0qw70xlh738c
 mk1qp0tx8pp2a3syx3m7halwd7s7d5e8l2xm3y3xzfmadfj6e20ur0anz7jwkzae8ef0tx83ncqsgvkaz2l8ag3
+mk1qp0tx8pqqsp9xx4eu9xawjdgw0za5zs9qjyty8su72t3dwaqcl9pvz58pmltjs9tjrg0g2z0agd4urfpzanhaq3lcdlz6wxr0qw70xlh738c
+mk1qp0tx8pp2a3syx3m7halwd7s7d5e8l2xm3y3xzfmadfj6e20ur0anz7jwkzae8ef0tx83ncqsgvkaz2l8ag3
+group size: 0
+separator: space
 note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
@@ -320,12 +327,21 @@ $ /home/bcg/.cargo/bin/mk encode --xpub xpub6DzhyrnFFYQ1HimDiM388xHnDiRPNdZJFBmm
 mk1qpcqd3zqqsp9xx4eu9xawjdgw0za5zh7qjcgpqyqpzqgpqyqpzqcpqyqpzpgpqyqpqzg3vs78m0n74uevrz28llsnr4qy6wvz3ttzcx58juf
 mk1qpcqd3zpwcer8h73mk4csl2yu529qqleaqk0gwfmsrmrwqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9sa22359sgj8evvk2gn
 mk1qpcqd3zze9lw8sqmzuvsnk6p3stnn6sgf
+mk1qpcqd3zqqsp9xx4eu9xawjdgw0za5zh7qjcgpqyqpzqgpqyqpzqcpqyqpzpgpqyqpqzg3vs78m0n74uevrz28llsnr4qy6wvz3ttzcx58juf
+mk1qpcqd3zpwcer8h73mk4csl2yu529qqleaqk0gwfmsrmrwqjfp99zcyrd98kjcu8vgdtu6gt04upy3z0n8ek4aj5kk9sa22359sgj8evvk2gn
+mk1qpcqd3zze9lw8sqmzuvsnk6p3stnn6sgf
+group size: 0
+separator: space
 note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
 $ /home/bcg/.cargo/bin/mk encode --xpub xpub6FQya7zGhR92kacYsNnjreouvnHJMpXYsUXnW6NJJAJRCKsa26TzDy4LdnGhEurr3d6y1J8PJ7EEMKQp74XTqYvmGJNogYXSKDszYHtF8mX --origin-fingerprint b8688df1 --origin-path m/48'/0'/0'/2' --policy-id-stub 531ab9e1 --policy-id-stub 4dd749a8 --group-size 0
 mk1qpvyhfpqqsp9xx4eu9xawjdghp5gmug9qjyty8hlm8z3nfejsahhtp2x7t365s9qhgfvt63yacv0jzrws489wwl2rcse667p7mrf6mctmefu
 mk1qpvyhfppzuhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58slvyhfe6svmcsnvan3zxgg
+mk1qpvyhfpqqsp9xx4eu9xawjdghp5gmug9qjyty8hlm8z3nfejsahhtp2x7t365s9qhgfvt63yacv0jzrws489wwl2rcse667p7mrf6mctmefu
+mk1qpvyhfppzuhsxwt3qdt2f9njdjzxjf3pk2mwxeza6dduqqnvtpl3vsgcj7vs58slvyhfe6svmcsnvan3zxgg
+group size: 0
+separator: space
 note: stdout is watch-only — public keys only, cannot spend
 [exit 0]
 
@@ -369,12 +385,12 @@ note: stdout is watch-only — public keys only, cannot spend
 
 tr; ONE path, 2-of-3; no lock, no hash; NO keys at all.
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md compose --wrapper tr --path 2of3
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md compose --wrapper tr --path 2of3
 tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*))
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
-$ cat /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/keyless-tr.template
+$ cat /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/keyless-tr.template
 tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*))
 [exit 0]
 
@@ -384,7 +400,7 @@ the DEVICE is chunk-form-always. Both forms verify, inspect and decode
 identically -- same template, same ids -- so the substitution is invisible
 to every md verb, and only the byte comparison below catches it.
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) --force-chunked --group-size 0
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) --force-chunked --group-size 0
 md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
 chunk-set-id: 0xb0884
 md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
@@ -402,7 +418,7 @@ GATE PASS  keyless md1 length
 
 For contrast, THE FORM THIS ORACLE IS NOT -- the host's unchunked default:
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) --group-size 0
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md encode tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) --group-size 0
 md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc
 md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc
 group size: 0
@@ -417,15 +433,15 @@ GATE PASS  the unchunked form is a DIFFERENT string
            = different
 GATE PASS  the unchunked form's length
            = 47
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md verify --template tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md verify --template tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
 OK
 [exit 0]
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md verify --template tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md verify --template tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*)) md15zfdsssj6tvyywtfdssj5hqqxqujzyxaduyd9dp5v3xc
 OK
 [exit 0]
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md inspect md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md inspect md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
 template: tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))
 n: 3
 wallet-policy-mode: false
@@ -443,7 +459,7 @@ note: stdout is a keyless descriptor template (no keys)
 GATE PASS  keyless Template-ID
            = e0863d3ccac31a64d3b5e14b85ccd6c0
 
-$ /scratch/code/shibboleth/descriptor-mnemonic/target/release/md decode md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md decode md1fkzyyqq9qjtvyyykjmpprj6tvyy49cqps8ys3psqcsmzu90h5wvl3
 tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,sortedmulti_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*))
 note: key origins carried by this card (not shown in the template):
   @0: m/48'/0'/0'/3'
@@ -452,35 +468,110 @@ note: key origins carried by this card (not shown in the template):
 note: stdout is a keyless descriptor template (no keys)
 [exit 0]
 
-########## Artifacts for the device half
-$ ls -la /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer /scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/cards
-/scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer:
-total 56
-drwxr-xr-x 1 bcg bcg 452 Sep  3 01:06 .
-drwxr-xr-x 1 bcg bcg  16 Sep  3 01:06 ..
-drwxr-xr-x 1 bcg bcg  78 Sep  3 01:06 cards
--rw-r--r-- 1 bcg bcg 744 Sep  3 04:44 compose.json
--rw-r--r-- 1 bcg bcg 126 Sep  3 04:44 keyed.change.txt
--rw-r--r-- 1 bcg bcg 206 Sep  3 04:44 keyed.id.txt
--rw-r--r-- 1 bcg bcg 613 Sep  3 04:44 keyed.md1.txt
--rw-r--r-- 1 bcg bcg 126 Sep  3 04:44 keyed.receive.txt
--rw-r--r-- 1 bcg bcg 201 Sep  3 04:44 keyed.template
--rw-r--r-- 1 bcg bcg 172 Sep  3 04:44 keyed-template.md1.txt
--rw-r--r-- 1 bcg bcg 177 Sep  3 04:44 keyless-tr.id.txt
--rw-r--r-- 1 bcg bcg  57 Sep  3 04:44 keyless-tr.md1.txt
--rw-r--r-- 1 bcg bcg 158 Sep  3 04:44 keyless-tr.template
--rw------- 1 bcg bcg 782 Sep  3 04:44 payload.bin
--rw-r--r-- 1 bcg bcg  50 Sep  3 04:44 payload.digest.txt
--rw-r--r-- 1 bcg bcg 731 Sep  3 04:44 records-from-fork.txt
--rw-r--r-- 1 bcg bcg 731 Sep  3 04:44 records.txt
+########## 7. THE LIANA ARM (F-449 stage 4) -- the same kofn-recovery tree, two wallets
 
-/scratch/code/shibboleth/wt-engrave-s4-emu/design/journeys/out/composer/cards:
+The device's key-path choice builds the LEFT one; the right one is what
+pressing through the NUMS row builds. Different Template-IDs, because the
+kind bit is part of the tree the id hashes (SPEC §3e).
+
+GATE PASS  md is 0.19.0 (the first with --unspendable)
+           = md 0.19.0
+$ cat /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/liana-kofn.template
+tr(UNSPENDABLE(liana),{multi_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*),and_v(v:pk(@3/48'/0'/3'/3'/<0;1>/*),older(26280))})
+[exit 0]
+
+GATE PASS  liana template
+           = tr(UNSPENDABLE(liana),{multi_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*),and_v(v:pk(@3/48'/0'/3'/3'/<0;1>/*),older(26280))})
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md encode tr(UNSPENDABLE(liana),{multi_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*),and_v(v:pk(@3/48'/0'/3'/3'/<0;1>/*),older(26280))}) --force-chunked --group-size 0
+md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9
+chunk-set-id: 0xfc0fd
+md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9
+group size: 0
+separator: space
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+GATE PASS  liana md1 string
+           = md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md inspect md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9
+template: tr(UNSPENDABLE(liana),{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))})
+n: 4
+wallet-policy-mode: false
+md1-encoding-id: fc0fd36376f8936a3059ddc3b3e3882f
+wallet-descriptor-template-id: f99cc42e1ff68bae546c4d1070e5963f
+origins:
+  @0: m/48'/0'/0'/3'
+  @1: m/48'/0'/1'/3'
+  @2: m/48'/0'/2'/3'
+  @3: m/48'/0'/3'/3'
+wallet-policy-id: bd2d3a5fbdcbaa5988e60e064b3f1622
+wallet-policy-id-fingerprint: 0xbd2d3a5f
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+GATE PASS  liana Template-ID
+           = f99cc42e1ff68bae546c4d1070e5963f
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md inspect md1frk8kqq9q6tvyyykjmpprj6tvyy495kcgfwtsqrqw9yq3pjv62msqqqe4gqs6s700nzfxf6l
+template: tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))})
+n: 4
+wallet-policy-mode: false
+md1-encoding-id: 1d8f624c0e7fe6ef2e467a198f764225
+wallet-descriptor-template-id: 8107216456de60d05e57f7fe268824d8
+origins:
+  @0: m/48'/0'/0'/3'
+  @1: m/48'/0'/1'/3'
+  @2: m/48'/0'/2'/3'
+  @3: m/48'/0'/3'/3'
+wallet-policy-id: c82a2f9c2458f870c4b09b22070d6e74
+wallet-policy-id-fingerprint: 0xc82a2f9c
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+GATE PASS  NUMS twin Template-ID
+           = 8107216456de60d05e57f7fe268824d8
+$ /scratch/code/shibboleth/.tmp/f449s4-dm-target/release/md decode md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9
+tr(UNSPENDABLE(liana),{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))})
+note: key origins carried by this card (not shown in the template):
+  @0: m/48'/0'/0'/3'
+  @1: m/48'/0'/1'/3'
+  @2: m/48'/0'/2'/3'
+  @3: m/48'/0'/3'/3'
+note: stdout is a keyless descriptor template (no keys)
+[exit 0]
+
+########## Artifacts for the device half
+$ ls -la /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer /scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/cards
+/scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer:
+total 72
+drwxr-xr-x 1 bcg bcg 614 Sep 23 07:55 .
+drwxr-xr-x 1 bcg bcg  16 Sep 23 07:55 ..
+drwxr-xr-x 1 bcg bcg  78 Sep 23 07:55 cards
+-rw-r--r-- 1 bcg bcg 772 Sep 23 07:55 compose.json
+-rw-r--r-- 1 bcg bcg 126 Sep 23 07:55 keyed.change.txt
+-rw-r--r-- 1 bcg bcg 206 Sep 23 07:55 keyed.id.txt
+-rw-r--r-- 1 bcg bcg 613 Sep 23 07:55 keyed.md1.txt
+-rw-r--r-- 1 bcg bcg 126 Sep 23 07:55 keyed.receive.txt
+-rw-r--r-- 1 bcg bcg 201 Sep 23 07:55 keyed.template
+-rw-r--r-- 1 bcg bcg 172 Sep 23 07:55 keyed-template.md1.txt
+-rw-r--r-- 1 bcg bcg 177 Sep 23 07:55 keyless-tr.id.txt
+-rw-r--r-- 1 bcg bcg  57 Sep 23 07:55 keyless-tr.md1.txt
+-rw-r--r-- 1 bcg bcg 158 Sep 23 07:55 keyless-tr.template
+-rw-r--r-- 1 bcg bcg 198 Sep 23 07:55 liana-kofn.id.txt
+-rw-r--r-- 1 bcg bcg  76 Sep 23 07:55 liana-kofn.md1.txt
+-rw-r--r-- 1 bcg bcg 114 Sep 23 07:55 liana-kofn-nums-twin.id.txt
+-rw-r--r-- 1 bcg bcg 158 Sep 23 07:55 liana-kofn.template
+-rw------- 1 bcg bcg 782 Sep 23 07:55 payload.bin
+-rw-r--r-- 1 bcg bcg  50 Sep 23 07:55 payload.digest.txt
+-rw-r--r-- 1 bcg bcg 731 Sep 23 07:55 records-from-fork.txt
+-rw-r--r-- 1 bcg bcg 731 Sep 23 07:55 records.txt
+
+/scratch/code/shibboleth/me-worktrees/f449-stage4/design/journeys/out/composer/cards:
 total 12
-drwxr-xr-x 1 bcg bcg  78 Sep  3 01:06 .
-drwxr-xr-x 1 bcg bcg 452 Sep  3 01:06 ..
--rw-r--r-- 1 bcg bcg 200 Sep  3 04:44 slot0.mk1.txt
--rw-r--r-- 1 bcg bcg 261 Sep  3 04:44 slot1.mk1.txt
--rw-r--r-- 1 bcg bcg 200 Sep  3 04:44 slot2.mk1.txt
+drwxr-xr-x 1 bcg bcg  78 Sep 23 07:55 .
+drwxr-xr-x 1 bcg bcg 614 Sep 23 07:55 ..
+-rw-r--r-- 1 bcg bcg 200 Sep 23 07:55 slot0.mk1.txt
+-rw-r--r-- 1 bcg bcg 261 Sep 23 07:55 slot1.mk1.txt
+-rw-r--r-- 1 bcg bcg 200 Sep 23 07:55 slot2.mk1.txt
 [exit 0]
 
 ########## RESULT
