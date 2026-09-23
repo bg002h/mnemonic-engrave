@@ -36,11 +36,13 @@ Every code block below was applied, **task by task**, to a fresh clone of fork `
 | Task 5 | same, gui copy / key-path / inspect / modal / walk-anchor tests | green |
 | Task 6 | same, gui `TestComposer*` + Liana + modal + walk-anchor | green |
 | Task 7 | same, gui `TestEmulatorWalks*`; `node --check` | green |
-| end state | `go test ./md/`; `scripts/gui-shard-test.sh ./gui/ 24`; every non-gui package | md **188**; gui **1396 (all ran, 24 shards)**; non-gui 55 `ok`, 0 fail |
+| end state | `go test ./md/`; `scripts/gui-shard-test.sh ./gui/ 24`; every non-gui package | md **188**; gui **1398 (all ran, 24 shards)**; non-gui 55 `ok`, 0 fail |
 | end state | gofmt | exactly the five-file baseline |
 | end state | emulator: `capture_composer.py --arm both` (keyed-A, keyed-B, keyless, liana) | **all legs matched the host**: keyed-A (7 strings), keyed-B (9), keyless (1), liana (1 string, 28 s, 11 shots); `--prove-it-can-fail` PASSED; the liana arm FAILS under the placement mutation (L1) |
-| end state | TinyGo size (CLAUDE.md recipe) | base **1,658,284 B flash / 63,352 B RAM**, end **1,665,220 / 63,376** (**+6,936 / +24**) |
+| end state | TinyGo size (CLAUDE.md recipe) | base **1,658,284 B flash / 63,352 B RAM**, end **1,665,828 / 63,376** (**+7,544 / +24**; +608 B from the R0 fold) |
 | end state | the mutation table in the Self-Review | every row applied, compiled, and was caught, except the one named survivor |
+
+**R0 fold (review `design/agent-reports/f449-plan-stage4-r0.md`, 0C/1I/5M/2N).** A fold is authorship, so everything in the table above was re-run on the folded plan, from this file, against `d2350cb`: the apply gate (all seven boundaries green, gui **1398**), the mutation table (**40 caught, S8 survives**), the emulator walk (Task 7 did not change, but Task 6 did, and the liana arm drives Task 6's screens: `--arm both` all four legs matched the host, the negative control PASSED), and the TinyGo size (+608 B flash for the fold). One defect the fold itself introduced was caught only by the whole-package shard run, not by the fold's own targeted tests: the unmet-request copy was first called only from a package-level `var`, and `TestComposerEveryScreenFunctionHasAProductionCaller` failed (a `composer*` function with no caller inside a function body). The text is now built inside `composerCompose`.
 
 **The apply gate.** `/scratch/code/shibboleth/mnemonic-engrave/scripts/plan-apply-gate-go.sh <fork-base-dir>` extracts this file's `Create`/`Apply to` blocks per task, applies them in order to a fresh clone, and runs the per-boundary gate above. It is how a fold re-earns the build gate. **The shipped `scripts/plan-build-gate-go.sh` cannot check this plan**: it assembles only whole NEW files matching `md/compose*.go`/`gui/composer_*.go` (here, 5 of the 8 created files) and never applies a patch, while most of this plan is patches to existing files. What no gate covers is listed at the end.
 
@@ -52,7 +54,7 @@ Each was measured, not read from a doc comment. A reviewer can re-run the comman
 | --- | --- | --- |
 | F1 | **Rust named the fourth kind `LianaUnspendable`, not the spec's `NumsXpub`** (`crates/md-codec/src/policy_shape.rs:145-162`, `skeleton.rs:275`). The Go sibling mirrors Rust: `md.KeyPathLianaUnspendable`. Task 9 reconciles the spec's §7 sentence. | `grep -n LianaUnspendable crates/md-codec/src/policy_shape.rs` at `cf35d61a` |
 | F2 | **§7's class-2 + unlocked-path ruling needs no code**: class 2 is `shape.KeyPath == md.KeyPathNUMS` (`gui/composer_consent.go:397`) and the unlocked count is `shape.KeyPath == md.KeyPathSpendable` (`:407`), so a fourth value is skipped by the first and not counted by the second. Both are pinned by mutation (Self-Review C1, C2). | Task 5's `TestComposerLianaClassRulings` |
-| F3 | The device's kind-1 derivation equals **Rust md** on both keyed kind-1 vectors (6 addresses each) and **Liana v15.0's own recorded addresses** on all **5** accepted evidence cases (receive and change 0..2), first run. | Task 4's two tests |
+| F3 | The device's kind-1 derivation equals **Rust md** on both keyed kind-1 vectors (6 addresses each), on the same wallet engraved as **template + mk1 key cards** (after the R0 I1 fold: the recipe now takes the keys the deriver is given), and **Liana v15.0's own recorded addresses** on all **5** accepted evidence cases (receive and change 0..2). | Task 4's three tests |
 | F4 | The Go composer's `kofn-recovery` at kind 1, unseated, emits **`md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9`**, byte-identical to `md compose --wrapper tr --preset kofn-recovery,2of3,older=26280 --unspendable liana \| md encode --force-chunked --group-size 0` (md-cli 0.19.0). Template-ID `f99cc42e1ff68bae546c4d1070e5963f`; the NUMS twin's is `8107216456de60d05e57f7fe268824d8`. | Task 2's `TestComposeLianaTemplateEqualsTheHost`; Task 7's transcript gates |
 | F5 | §0b's predicate over the six `tr` presets fires on exactly `kofn-recovery` and `tiered-recovery`. Without conjunct 1 it also fires on `simple-timelocked-inheritance`; without conjunct 2 on `plain-multisig`, `hashlock-gated`, `decaying-multisig`; with class 2 NOT skipped, on nothing. | Task 6 + Self-Review P1-P3 |
 | F6 | **Liana v15.0 refuses** the four F-644 shapes and §7's constructed shape (one timelocked leaf), each with its internal key recomputed over its own leaves by the harness's `unspendable` subcommand, so none is a key refusal wearing a policy refusal's words. It accepts a nested two-recovery tree and a `pk` primary leaf + recovery. The device classifier names a class for all five refused shapes, so the choice screen never offers the Liana key for any of them. | Task 9 Step 1's commands; `scripts/liana-live-gate.sh` PASS (11 verdicts) first |
@@ -63,7 +65,7 @@ Each was measured, not read from a doc comment. A reviewer can re-run the comman
 | F11 | The SH2's only input is the touch panel. `ChoiceScreen` carries one Lead and bare row labels; `composerPickScreenFrom` (`gui/composer_paged.go:295`) draws a per-page lead, makes every row a tap target, and reads `initial` once. The choice screen uses the latter; the first-page gate counts **tap targets** (`plateHitPoints`), not text, because `composerPageLines` draws an overflowing row it does not count. | Task 6's first-page test and mutation F1 |
 | F12 | Adding the screen broke **no** existing gui test except the two copy-table counters (`TestComposerCopyIsVerbatimFromTheSpec`, `TestComposerCopyTableCoversEveryBody`), measured by a full shard run before the table was updated. | full shard run after Task 6 |
 | F13 | Stage-4-owned follow-ups at `fe73cca6`: **F-644** and **F-654** (`grep -n "F-449 stage 4\*\*" design/FOLLOWUPS.md`). F-633 is owned by the coordinator-compat cycle, but SPEC §7 makes its copy gating here. The highest ID is F-658, so new entries start at F-659. | `grep` |
-| F14 | `composerRestoreDoc` (`gui/composer_flow.go:534`) tells an operator who cut a template and NO cards that "This backup is a key-less TEMPLATE plus its key cards … restore needs the mk1 key cards listed below" — none are listed. Pre-existing (F-544); filed, not fixed (Task 9). | the liana arm's `l06-` frames |
+| F14 | `composerRestoreDoc` (`gui/composer_flow.go:528`) tells an operator who cut a template and NO cards that "This backup is a key-less TEMPLATE plus its key cards … restore needs the mk1 key cards listed below" — none are listed. Pre-existing (F-544); filed, not fixed (Task 9). | the liana arm's `l06-` frames |
 
 ## Global Constraints
 
@@ -71,9 +73,10 @@ Each was measured, not read from a doc comment. A reviewer can re-run the comman
 - **Never map a non-Slot internal key to the NUMS point.** `taprootInternalKey` has no `default:` that derives; an unknown kind is `errUnderivableInternalKey` (SPEC §7a row 1 / §7a.3).
 - **The Liana key derives at `<0;1>/*` explicitly**, never from the wallet's use-site (SPEC §2 "derivation, not just rendering"; §6 row 2 refuses any other use-site at mint).
 - **§6's refusals stay OUT of `md`'s `encodePayload`**: `Reassemble` re-encodes decoded cards (stage 3's Global Constraints). They run in `composerCompose`, on the mint path.
-- **One compose site.** Every production lowering of the operator's path list goes through `composerCompose` (enforced by `TestComposerComposesOnlyThroughOneSite`; `md.Compose` in `composer_discard.go` is the one reviewed exemption: it reads only the slot map, which the kind does not move, SPEC §5).
+- **One compose site.** Every production lowering of the operator's path list goes through `composerCompose`, enforced by `TestComposerComposesOnlyThroughOneSite` **per enclosing function**, not per file (R0 m4). The two reviewed exemptions: `composerUnspendableFires` (composes kind 1 for itself to evaluate §0b's predicate; builds no artifact) and `composerShapeSignature`'s `md.Compose` (reads only the slot map, which the kind does not move, SPEC §5).
+- **One key source for the Liana internal key.** It is computed from the keys the address deriver is GIVEN (`md.LianaUnspendableKeyFor(collected, keys)`), the same keys every leaf script is built from, never from the md1's Pubkeys TLV. `lianaInternalKey` is its only production caller (R0 I1).
 - **The kind's zero value is NUMS**, and the choice screen seeds its row from the current kind once per entry, never from a constant.
-- **Touch only.** No new test or walk step moves a cursor with `Up`/`Down`; rows are TAPPED (`sessionHarness.tapRow`, `chooseRow` over `shTargets()`). The legacy composer flow tests that click `Down` are not extended by this plan.
+- **Touch only.** No new test or walk step moves a cursor with `Up`/`Down` or presses a nav button with a synthetic `ButtonEvent`: rows are TAPPED (`sessionHarness.choose`/`tapRow`, `chooseRow` over `shTargets()`) and nav buttons are tapped on their slot (`tapNav`/`tapNavSlot`). The first draft broke this in two tests (R0 m2); `grep -n 'click(&ctx.Router' gui/composer_unspendable*_test.go gui/keypath_print_sites_test.go gui/policy_address_liana_test.go` finds nothing. The legacy composer flow tests that click `Down` are not extended by this plan.
 - **Copy:** ASCII only (`TestComposerCopyIsDrawable`); every new body is a `composerCopy*` function with a `composerCopyTable` row, verbatim, and SPEC_wallet_policy_composer §8 gets the same text (Task 9). Present-tense claims about third-party software name the version measured ("Liana (as of v15.0)", F-633).
 - **md1PolicyFlow hard-chunks lines over 20 bytes mid-word**, so every new inspect-screen line is ≤ 20 bytes.
 - **Toolchain:** `export PATH=/scratch/code/shibboleth/.toolchain/go/bin:$PATH`. nix: `export PATH=/nix/var/nix/profiles/default/bin:$PATH`. Shell blocks are bash (the interactive shell is fish); commit messages go through `git commit -F <file>` with the attribution lines your session's system reminder gives.
@@ -86,10 +89,10 @@ Each was measured, not read from a doc comment. A reviewer can re-run the comman
 Inputs the spec implies that no task's unit tests fully exercise, most likely first:
 
 1. **An operator who minted cosigner cards from the NUMS stub, then chooses Liana on a later pass.** The Template-ID moves; `composerStubDelta`'s changed-id banner is what tells them (existing, unchanged). Pinned only indirectly: Task 6's placement test proves the stub shows the new id; no test asserts the banner text for this cause. Expected behaviour: the banner fires. Owner if it does not: Task 6.
-2. **A kind-1 wallet whose seating stays incomplete** (template + cards form). The consent shows `Template has no keys - no addresses.` and the Liana key line; no address proof exists until the cards are seated. Documentation, measured on the emulator's liana arm.
+2. **A kind-1 wallet engraved as template + mk1 key cards, proven later on Wallet Policy.** At the COMPOSER's consent, before any card is seated, it shows `Template has no keys - no addresses.` and the Liana key line (the emulator's liana arm). Brought back to Wallet Policy WITH the cosigners' mk1 cards, the device derives the wallet's addresses from the seated cards: `TestTemplatePlusKeyCardsDerivesTheLianaWallet` (Task 4) shows Rust md 0.19.0's receive 0 for `keyed_tr_liana_kofn_recovery` on exactly this route. The R0 review found this route FAILED in the first draft (the recipe read the template's absent TLV; I1). What remains untested is only the EMULATOR walk of it: the mk1 cards arrive over NFC, and the liana arm stops at the engrave.
 3. **A board running stage-3-or-earlier firmware reading these plates.** Nothing new can reach it; the stage 5 runbook must say "flash before reading kind-1 plates" (stage 3 already recorded this).
 4. **An operator who expects Nunchuk.** The copy says "Nunchuk only by chance" (SPEC §7, fable M-5: 1/24 for four keys). No device test can see Nunchuk; documentation only.
-5. **A keyed kind-1 card from ANOTHER producer** (a Liana wallet decomposed by `md decompose`) inspected on the device. It derives through the same `LianaUnspendableKeyChunks` path; covered for the two Rust vectors, not for foreign bytes. Expected: the same addresses Liana shows.
+5. **A keyed kind-1 card from ANOTHER producer** (a Liana wallet decomposed by `md decompose`) inspected on the device. It derives through the same `LianaUnspendableKeyFor` path; covered for the two Rust vectors, not for foreign bytes. Expected: the same addresses Liana shows.
 
 ## The operator's journey through the new screens
 
@@ -109,7 +112,8 @@ Walked on the emulator (Task 7's liana arm) and in the Go harness. At each step:
 | 10 | `hashlock-gated` / `decaying-multisig` / `plain-multisig` under tr | no Key path screen; consent keeps §8x "OUTSIDE LIANA'S MODEL … Liana (as of v15.0) takes…" | ask why no Liana option → §8x names the class | documentation only (existing notice) |
 | 11 | a hand-built `[2-of-3], [2-of-2]` or `[1 key + older]` alone | no screen (classes 3, 7; Liana v15.0 refuses both, F6) | — | not our concern |
 | 12 | engrave template only (no keys seated) | consent: `Template has no keys - no addresses.`; census 1 plate; **Restore Doc says "plus its key cards … listed below", none listed** | — | not our concern here; **filed** (F14 → Task 9) |
-| 13 | a year later, inspect the plates on the device | `Policy id:`, `Key path: Liana key`, addresses on Button2 | read on a stage-2 board → "Not an md1 descriptor chunk." | documentation only (stage 5 runbook) |
+| 13 | a year later, the TEMPLATE plate plus the cosigners' mk1 cards, on Wallet Policy | consent: `Key path: Liana key` and the wallet's receive/change addresses, derived from the seated cards (Task 4, R0 I1) | inspect the template ALONE → `Key path: Liana key`, no `Policy id:` and no addresses (a template has no keys); a full KEYED md1 alone → `Policy id:`, `Key path: Liana key`, addresses on Button2 (Task 5); read on a stage-2 board → "Not an md1 descriptor chunk." | default; the stage-2 board: documentation only (stage 5 runbook) |
+| 13a | seat two keys from ONE seed in one path of the Liana wallet | the mapping review's existing §8g notice: "SAME SEED, SAME PATH … Liana will refuse it" (Liana v15.0 refuses two keys from one master in one spending path, measured by R0) | — | warning (existing); the choice screen's "Liana (v15.0) … import it" is about the POLICY, and §8g covers the seating (R0 n2) |
 | 14 | a policy whose key-path kind this firmware cannot name (a future fourth kind) | Wallet Policy consent REFUSES before steel; inspect says `Key path: unknown`; no address | — | **refusal** (§7a.3, Task 5; unreachable today, see "What no gate covers") |
 
 ---
@@ -119,7 +123,7 @@ Walked on the emulator (Task 7's liana arm) and in the Go harness. At each step:
 **fork (`/scratch/code/shibboleth/sh-worktrees/f449-stage4`):**
 - `md/compose.go` — `lowerPathList`/`lowerTr` take the request; `ComposeWith` delegates; `Composed.requested`. (Task 2)
 - `md/compose_unspendable.go` (new) — `UnspendableKind`, `ComposeWithUnspendable`, `UnspendableRequestUnmet`, `ValidateUnspendableShape` + three errors. (Task 2)
-- `md/policy_shape.go` — `KeyPathLianaUnspendable`, `keyPathOf`. `md/md.go` — `Template.KeyPath`, `rootKeyPath`. `md/liana.go` — `LianaUnspendableKeyChunks`. (Task 3)
+- `md/policy_shape.go` — `KeyPathLianaUnspendable`, `keyPathOf`. `md/md.go` — `Template.KeyPath`, `rootKeyPath`. `md/liana.go` — `LianaUnspendableKeyFor`. (Task 3)
 - `gui/policy_address.go` — `taprootInternalKey`, `lianaInternalKey`, the third arm. (Task 4)
 - `gui/composer_consent.go`, `gui/template_engrave.go`, `gui/md1_inspect.go`, `gui/wallet_policy.go`, `gui/composer_copy.go` — the print-site arms, the classifier's doc, `md1KeyPathLine`, `md1KeyPathUnknown`, `composerCopyLianaKeyPath`, the F-633 edits. (Task 5)
 - `gui/composer_unspendable.go` (new), `gui/composer_state.go`, `gui/composer_flow.go`, `gui/composer_selfcheck.go`, `gui/composer_copy.go` — the choice screen, `composerCompose`, the self-check. (Task 6)
@@ -174,7 +178,7 @@ If a count differs, `main` has moved: record the new numbers and carry them thro
 
 **Interfaces:**
 - Consumes (stage 3): `trBody.ik`, `InternalKeyKind` (`InternalKeySlot`/`InternalKeyNUMS`/`InternalKeyLianaUnspendable`), `tagSortedMultiA`, `useSitePath`, `alternative`, `idxUseSite`.
-- Produces: `type UnspendableKind uint8` with `UnspendableNums` (zero value) and `UnspendableLiana`; `func ComposeWithUnspendable(list PathList, declared []*SlotOrigin, unspendable UnspendableKind) (Composed, error)`; `func (c Composed) UnspendableRequestUnmet() bool`; `func (c Composed) ValidateUnspendableShape() error`; `ErrUnspendableSortedMultiA`, `ErrUnspendableUseSite`, `ErrUnspendableNotRootTr`. `ComposeWith(list, declared)` is now `ComposeWithUnspendable(list, declared, UnspendableNums)`, so its 69 test callers are unchanged.
+- Produces: `type UnspendableKind uint8` with `UnspendableNums` (zero value) and `UnspendableLiana`; `func ComposeWithUnspendable(list PathList, declared []*SlotOrigin, unspendable UnspendableKind) (Composed, error)`; `func (c Composed) UnspendableRequestUnmet() bool`; `func (c Composed) ValidateUnspendableShape() error`; `ErrUnspendableSortedMultiA`, `ErrUnspendableUseSite`, `ErrUnspendableNotRootTr`. `ComposeWith(list, declared)` is now `ComposeWithUnspendable(list, declared, UnspendableNums)`, so its callers (16 call sites in test files, 4 in production at `d2350cb`; Task 6 moves the 3 composer ones) are unchanged.
 
 - [ ] **Step 1: Write the failing tests.** They bind the Go composer to the Rust primary's two keyed kind-1 vectors (stage 3 vendored them) and to md-cli 0.19.0's printed template (F4).
 
@@ -723,13 +727,13 @@ Expected: `ok`; md **185** tests (179 + 6). The gui composer tests are unchanged
 
 ## Task 3 (fork, `md/`): the fourth key-path kind, on the shape and on the Template, and the exported Liana key
 
-**Why.** SPEC §7: "`md.KeyPathNUMS` gains a sibling", and the inspect screen (`md1Summary`, which reads a `md.Template`) must name the kind. Named `KeyPathLianaUnspendable` because the Rust primary named it `KeyPathKind::LianaUnspendable` (F1); the spec's `NumsXpub` is reconciled in Task 9. **Appended**, so the three existing values keep their numbers. One mapping, `keyPathOf`, feeds both `policyShape` and `summarize`, so the consent screen and the inspect screen cannot disagree. A kind with no name makes the shape INCOMPLETE (the package's honesty contract), never a guessed neighbour. `LianaUnspendableKeyChunks` exports stage 3's test-only recipe (`md/liana.go`) for Task 4's deriver: from this task on the recipe is live firmware code (it was dead-code-eliminated at stage 3; Task 8's size delta includes it).
+**Why.** SPEC §7: "`md.KeyPathNUMS` gains a sibling", and the inspect screen (`md1Summary`, which reads a `md.Template`) must name the kind. Named `KeyPathLianaUnspendable` because the Rust primary named it `KeyPathKind::LianaUnspendable` (F1); the spec's `NumsXpub` is reconciled in Task 9. **Appended**, so the three existing values keep their numbers. One mapping, `keyPathOf`, feeds both `policyShape` and `summarize`, so the consent screen and the inspect screen cannot disagree. A kind with no name makes the shape INCOMPLETE (the package's honesty contract), never a guessed neighbour. `LianaUnspendableKeyFor` exports stage 3's test-only recipe (`md/liana.go`) for Task 4's deriver, over keys the CALLER supplies, walked in the tree's key-occurrence order (`collectKeyOccurrences`, the walk `lianaLeafPubkeys` uses). It does not read the card's Pubkeys TLV: on the Wallet Policy route the md1 is a key-less template and the leaf keys are the seated mk1 cards (R0 I1). From this task on the recipe is live firmware code (it was dead-code-eliminated at stage 3; Task 8's size delta includes it).
 
 **Files:** Create `md/keypath_liana_test.go`; Modify `md/policy_shape.go` (`:30-40`, `:121-130`), `md/md.go` (`Template` `:1278-1299`, `summarize` `:1438-1463`), `md/liana.go` (append).
 
 **Interfaces:**
 - Consumes: Task 2's `ComposeWithUnspendable` (tests only); stage 3's `lianaLeafPubkeys`, `lianaUnspendableKey`.
-- Produces: `md.KeyPathLianaUnspendable`; `func keyPathOf(InternalKeyKind) (KeyPathKind, bool)`; `func rootKeyPath(node) KeyPathKind`; field `md.Template.KeyPath KeyPathKind`; `func LianaUnspendableKeyChunks(strs []string) ([65]byte, error)` (chain code ‖ compressed H).
+- Produces: `md.KeyPathLianaUnspendable`; `func keyPathOf(InternalKeyKind) (KeyPathKind, bool)`; `func rootKeyPath(node) KeyPathKind`; field `md.Template.KeyPath KeyPathKind`; `func LianaUnspendableKeyFor(strs []string, xpubs map[uint8][65]byte) ([65]byte, error)` (chain code ‖ compressed H; errors if not kind 1 or a leaf's key is missing).
 
 - [ ] **Step 1: Write the failing tests.**
 
@@ -791,14 +795,26 @@ func TestAnUnknownInternalKeyKindIsNotDescribed(t *testing.T) {
 	}
 }
 
-// TestLianaUnspendableKeyChunksIsTheRecipeOverTheCardsOwnLeaves binds the
+// TestLianaUnspendableKeyForIsTheRecipeOverTheSuppliedLeaves binds the
 // exported entry the device's address deriver calls to the recipe the Go leg
-// of SPEC §8.1 already proved against Liana's goldens.
+// of SPEC §8.1 already proved against Liana's goldens -- over the keyed card
+// AND over its key-less template with the same keys supplied (the Wallet
+// Policy template + mk1 cards route, R0 I1).
 //
-// Mutation: LianaUnspendableKeyChunks returning lianaUnspendableKey(nil) fails.
-func TestLianaUnspendableKeyChunksIsTheRecipeOverTheCardsOwnLeaves(t *testing.T) {
+// Mutation: returning lianaUnspendableKey(nil) fails the first comparison.
+// (Visiting the keys in index order instead of occurrence order is inert by
+// construction: canonical numbering is first-occurrence -- stage 3's M6 note.)
+func TestLianaUnspendableKeyForIsTheRecipeOverTheSuppliedLeaves(t *testing.T) {
 	chunks := vectorChunksFor(t, "keyed_tr_liana_kofn_recovery")
-	got, err := LianaUnspendableKeyChunks(chunks)
+	_, keys, err := ExpandWalletPolicyChunks(chunks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	xpubs := map[uint8][65]byte{}
+	for _, k := range keys {
+		xpubs[k.Index] = k.Xpub
+	}
+	got, err := LianaUnspendableKeyFor(chunks, xpubs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -813,13 +829,24 @@ func TestLianaUnspendableKeyChunksIsTheRecipeOverTheCardsOwnLeaves(t *testing.T)
 	if want := lianaUnspendableKey(pks); got != want || len(pks) != 4 {
 		t.Fatalf("got %x, want %x over %d leaves", got, want, len(pks))
 	}
-	if _, err := LianaUnspendableKeyChunks(vectorChunksFor(t, "keyed_compose_preset_kofn_recovery")); err == nil {
+	tmpl, err := StripToTemplate(chunks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fromTemplate, err := LianaUnspendableKeyFor(tmpl, xpubs); err != nil || fromTemplate != got {
+		t.Fatalf("over the key-less template with the same keys: %x, %v; want %x", fromTemplate, err, got)
+	}
+	delete(xpubs, 3)
+	if _, err := LianaUnspendableKeyFor(tmpl, xpubs); err == nil {
+		t.Fatal("a missing leaf key yielded a Liana key")
+	}
+	if _, err := LianaUnspendableKeyFor(vectorChunksFor(t, "keyed_compose_preset_kofn_recovery"), nil); err == nil {
 		t.Fatal("a kind-0 set yielded a Liana key")
 	}
 }
 ```
 
-- [ ] **Step 2: Run and see them fail.** `go test -count=1 -run 'KeyPath|UnknownInternal|LianaUnspendableKeyChunks' ./md/` — Expected: FAIL to compile, `undefined: KeyPathLianaUnspendable`.
+- [ ] **Step 2: Run and see them fail.** `go test -count=1 -run 'KeyPath|UnknownInternal|LianaUnspendableKeyFor' ./md/` — Expected: FAIL to compile, `undefined: KeyPathLianaUnspendable`.
 
 - [ ] **Step 3: Implement.**
 
@@ -929,30 +956,54 @@ Apply to `md/liana.go`:
 
 ```diff
 diff --git a/md/liana.go b/md/liana.go
-index 4b17724..89b42c8 100644
+index 4b17724..9dcbe19 100644
 --- a/md/liana.go
 +++ b/md/liana.go
-@@ -94,3 +94,23 @@ func collectKeyOccurrences(n node, out *[]uint8) {
+@@ -94,3 +94,47 @@ func collectKeyOccurrences(n node, out *[]uint8) {
  		}
  	}
  }
 +
-+// LianaUnspendableKeyChunks is the 65-byte key material (chain code ‖ the
-+// compressed H point) of a KEYED kind-1 chunk set's internal key: SPEC §2 over
-+// the card's own leaf keys, in wire order. The device derives the key path at
-+// 0/i and 1/i from it (SPEC §2, "derivation, not just rendering"), whatever the
-+// wallet's use-site -- §6 row 2 refuses any other use-site at mint.
++// LianaUnspendableKeyFor is the 65-byte key material (chain code ‖ the
++// compressed H point) of a kind-1 chunk set's internal key: SPEC §2 over the
++// leaf keys the CALLER supplies, keyed by placeholder index, taken in the
++// tree's key-occurrence order (collectKeyOccurrences, the walk
++// lianaLeafPubkeys uses). The device derives the key path at 0/i and 1/i from
++// it (SPEC §2, "derivation, not just rendering"), whatever the wallet's
++// use-site -- §6 row 2 refuses any other use-site at mint.
 +//
-+// An error for a set that is not kind 1, or whose leaf keys carry no xpub (a
-+// template): the recipe needs the real leaf keys, and there is no fallback.
-+func LianaUnspendableKeyChunks(strs []string) ([65]byte, error) {
++// THE KEYS COME FROM THE CALLER, NOT FROM THE CARD'S Pubkeys TLV (F-449 stage
++// 4 R0 I1). SPEC §7a.2 says the recipe runs "over the collected leaf keys", and
++// on the Wallet Policy route those are the seated mk1 key cards while the md1
++// is a key-less TEMPLATE with no TLV at all. Reading the TLV made every
++// template-plus-cards kind-1 wallet underivable. A keyed card's own keys reach
++// here the same way: ExpandWalletPolicyChunks reads them out of its TLV first.
++//
++// An error for a set that is not kind 1, or when a leaf's key was not supplied:
++// the recipe needs every real leaf key, and there is no fallback.
++func LianaUnspendableKeyFor(strs []string, xpubs map[uint8][65]byte) ([65]byte, error) {
 +	d, err := Reassemble(strs)
 +	if err != nil {
 +		return [65]byte{}, err
 +	}
-+	pks, err := lianaLeafPubkeys(d)
-+	if err != nil {
-+		return [65]byte{}, err
++	b, ok := d.tree.body.(trBody)
++	if d.tree.tag != tagTr || !ok || b.ik != InternalKeyLianaUnspendable {
++		return [65]byte{}, errLianaNotKind1
++	}
++	if b.tree == nil {
++		return [65]byte{}, errLianaNoLeaves
++	}
++	var idx []uint8
++	collectKeyOccurrences(*b.tree, &idx)
++	pks := make([][33]byte, 0, len(idx))
++	for _, i := range idx {
++		x, ok := xpubs[i]
++		if !ok {
++			return [65]byte{}, errLianaMissingKey
++		}
++		var pk [33]byte
++		copy(pk[:], x[32:65])
++		pks = append(pks, pk)
 +	}
 +	return lianaUnspendableKey(pks), nil
 +}
@@ -960,21 +1011,23 @@ index 4b17724..89b42c8 100644
 
 - [ ] **Step 4: Run.** `go vet ./md/ && go test -count=1 ./md/` → `ok`, **188** tests. Then `go test -count=1 -run 'TestPolicy|TestMd1|TestTemplate' ./gui/` → `ok` (no existing caller switches on a `KeyPath` value the old code could not produce).
 
-- [ ] **Step 5: Commit** `md: KeyPathLianaUnspendable, Template.KeyPath, LianaUnspendableKeyChunks (F-449 stage 4, SPEC §7)`.
+- [ ] **Step 5: Commit** `md: KeyPathLianaUnspendable, Template.KeyPath, LianaUnspendableKeyFor (F-449 stage 4, SPEC §7)`.
 
 ---
 
 ## Task 4 (fork, `gui/`): the device derives the Liana key (§7a.2) and refuses a kind it cannot (§7a.3, address half)
 
-**Why.** Stage 3 left `complexAddressDeriver`'s switch (`gui/policy_address.go:157-172` at `d2350cb`) with a `default:` that refuses kind 1, so kind-1 cards showed no address (the two `stillUnsupported` entries). This task adds the third arm. The switch moves into `taprootInternalKey` so the refusal of an UNKNOWN kind can be tested directly (no decoder yields one). The Liana key is computed ONCE per card, before any index, and derived with an EXPLICIT `<0;1>/*` (SPEC §2), never from the wallet's use-site.
+**Why.** Stage 3 left `complexAddressDeriver`'s switch (`gui/policy_address.go:157-172` at `d2350cb`) with a `default:` that refuses kind 1, so kind-1 cards showed no address (the two `stillUnsupported` entries). This task adds the third arm. The switch moves into `taprootInternalKey` so the refusal of an UNKNOWN kind can be tested directly (no decoder yields one). The Liana key is computed ONCE per card, before any index, from the `keys` the deriver is given (never the md1's TLV, R0 I1), and derived with an EXPLICIT `<0;1>/*` (SPEC §2), never from the wallet's use-site.
 
 **§8.3's device leg, three-way.** md vs device: `TestEveryKeyedVectorReachesAnAddress` over the two keyed kind-1 vectors (Rust md's addresses, 6 each), once their `stillUnsupported` entries are deleted. Liana vs device: `TestDeviceDerivesLianasOwnAddressesForKind1`, which builds each of the five ACCEPTED evidence wallets through the composer (`md.ComposeWithUnspendable` → `Bind` → `Chunks`) and compares receive and change 0..2 with `liana_receive`/`liana_change` in `md/testdata/liana_cases.json` (Liana v15.0's own output, pinned by stage 3). md vs Liana is Rust's (stage 1b). It also asserts the kind-0 twin derives a DIFFERENT receive 0 (§8.3's last sentence).
 
-**Files:** Create `gui/policy_address_liana_test.go`; Modify `gui/policy_address.go`, `gui/policy_address_test.go` (`stillUnsupported`, `:128-137`), `gui/taproot_script_path_test.go` (the arm at `:56-62`: stage 3's comment said the arm is unreachable and pointed at stage 4; it now says where kind 1 IS gated).
+**The template + key cards route (R0 I1).** The composer's multi-party output is a key-less TEMPLATE plate plus one mk1 card per cosigner, and the operator proves it on Wallet Policy: `walletPolicyConsentLines(template, cards)` seats the cards into `keys` and hands the TEMPLATE as `collected`. The first draft computed the Liana key from the md1's Pubkeys TLV, which a template does not have, so this route showed "This device can't derive addresses for this policy." while the kind-0 twin derived. `TestTemplatePlusKeyCardsDerivesTheLianaWallet` pins the fix: over `keyed_tr_liana_kofn_recovery` stripped to its template plus one mk1 card per slot, the consent shows Rust md 0.19.0's receive 0 (`bc1py0prh5dupvw3egy8acnvrh0kdnma9ywvrlza0547a4lzvw5sgmjqw56q3f`), as it does for the kind-0 twin and for `keyed_tr_with_leaf`. **Other key sources, checked:** `lianaInternalKey` is the only production caller of the recipe (`grep -rn "LianaUnspendableKey\|lianaLeafPubkeys\|lianaInternalKey(" gui md --include='*.go' | grep -v _test.go`); both routes into it (the composer's consent over its keyed chunks, and Wallet Policy over template + cards) pass the same `keys` the leaf scripts are built from.
+
+**Files:** Create `gui/policy_address_liana_test.go`; Modify `gui/policy_address.go`, `gui/key_card_seating_test.go` (`seatFixture` generalised to `seatFixtureFor(t, vector)`), `gui/policy_address_test.go` (`stillUnsupported`, `:128-137`), `gui/taproot_script_path_test.go` (the arm at `:56-62`: stage 3's comment said the arm is unreachable and pointed at stage 4; it now says where kind 1 IS gated).
 
 **Interfaces:**
-- Consumes: Task 3's `md.LianaUnspendableKeyChunks`; stage 3's three-state `md.EmitTapLeavesChunks`.
-- Produces: `func taprootInternalKey(ik md.InternalKeyKind, ikIndex uint8, byIndex map[uint8]bip380.Key, liana *bip380.Key, index uint32, change bool) (*secp256k1.PublicKey, error)`; `func lianaInternalKey(collected []string, network *chaincfg.Params) (bip380.Key, error)`.
+- Consumes: Task 3's `md.LianaUnspendableKeyFor`; stage 3's three-state `md.EmitTapLeavesChunks`.
+- Produces: `func taprootInternalKey(ik md.InternalKeyKind, ikIndex uint8, byIndex map[uint8]bip380.Key, liana *bip380.Key, index uint32, change bool) (*secp256k1.PublicKey, error)`; `func lianaInternalKey(collected []string, keys []md.ExpandedKey, network *chaincfg.Params) (bip380.Key, error)`; test helper `seatFixtureFor(t, vector) (template []string, cards []mk.Card, receive0 string)`.
 
 - [ ] **Step 1: Write the failing tests** (and empty `stillUnsupported`, which is itself a failing test until the arm exists).
 
@@ -1179,6 +1232,57 @@ func TestAnUnderivableInternalKeyKindIsRefusedNotFallenBack(t *testing.T) {
 		t.Fatalf("a kind-1 key with no computed Liana key derived (err %v)", err)
 	}
 }
+
+// TestTemplatePlusKeyCardsDerivesTheLianaWallet is R0 I1's route: the
+// composer's usual multi-party output is a key-less TEMPLATE plate plus one mk1
+// key card per cosigner, and an operator proves that wallet by bringing all of
+// them to Wallet Policy. The consent there must show Rust md 0.19.0's receive 0
+// for the kind-1 wallet, exactly as it does for the kind-0 twin and for a
+// tr wallet with a real key path.
+//
+// Mutation: lianaInternalKey building its map from the md1's OWN keys
+// (md.ExpandWalletPolicyChunks(collected), which on a template carry no xpub)
+// instead of `keys` -- the TLV read the first draft did -- fails the kind-1 row.
+func TestTemplatePlusKeyCardsDerivesTheLianaWallet(t *testing.T) {
+	for _, vec := range []string{"keyed_tr_liana_kofn_recovery", "keyed_compose_preset_kofn_recovery", "keyed_tr_with_leaf"} {
+		t.Run(vec, func(t *testing.T) {
+			tmpl, cards, want := seatFixtureFor(t, vec)
+			if _, keys, err := md.ExpandWalletPolicyChunks(tmpl); err != nil || allSlotsHaveXpub(keys) {
+				t.Fatalf("the fixture's md1 is not a key-less template (err %v)", err)
+			}
+			lines, err := walletPolicyConsentLines(tmpl, cards)
+			if err != nil {
+				t.Fatalf("consent refused: %v", err)
+			}
+			if joined := strings.Join(lines, "\n"); !strings.Contains(joined, want) {
+				t.Fatalf("the consent does not show Rust's receive 0 %s:\n%s", want, joined)
+			}
+		})
+	}
+}
+```
+
+Apply to `gui/key_card_seating_test.go`:
+
+```diff
+diff --git a/gui/key_card_seating_test.go b/gui/key_card_seating_test.go
+index 7b6eed9..79a8253 100644
+--- a/gui/key_card_seating_test.go
++++ b/gui/key_card_seating_test.go
+@@ -21,6 +21,13 @@ const seatVector = "keyed_tr_with_leaf"
+ 
+ // seatFixture returns (templateCards, keyCards, expectedReceive0).
+ func seatFixture(t *testing.T) ([]string, []mk.Card, string) {
++	t.Helper()
++	return seatFixtureFor(t, seatVector)
++}
++
++// seatFixtureFor is seatFixture over any keyed vector (F-449 stage 4 seats a
++// kind-1 wallet this way, R0 I1).
++func seatFixtureFor(t *testing.T, seatVector string) ([]string, []mk.Card, string) {
+ 	t.Helper()
+ 	keyed := loadVectorChunks(t, seatVector)
+ 	tmpl, err := md.StripToTemplate(keyed)
 ```
 
 Apply to `gui/policy_address_test.go`:
@@ -1242,7 +1346,7 @@ index 366891a..ecdc488 100644
 
 - [ ] **Step 2: Run and see them fail.**
 ```bash
-go test -count=1 -run 'TestDeviceDerives|TestEveryKeyedVector|TestAnUnderivable' ./gui/
+go test -count=1 -run 'TestDeviceDerives|TestTemplatePlusKeyCards|TestEveryKeyedVector|TestAnUnderivable' ./gui/
 ```
 Expected: FAIL to compile (`undefined: taprootInternalKey`). With only the test half of `TestEveryKeyedVectorReachesAnAddress` applied it fails naming `keyed_tr_liana_kofn_recovery ... reaches NO address route`.
 
@@ -1252,20 +1356,21 @@ Apply to `gui/policy_address.go`:
 
 ```diff
 diff --git a/gui/policy_address.go b/gui/policy_address.go
-index 37ae125..43b0a09 100644
+index 37ae125..2ead6b0 100644
 --- a/gui/policy_address.go
 +++ b/gui/policy_address.go
-@@ -134,6 +134,18 @@ func complexAddressDeriver(collected []string, keys []md.ExpandedKey) (func(uint
+@@ -134,6 +134,19 @@ func complexAddressDeriver(collected []string, keys []md.ExpandedKey) (func(uint
  		probe[i] = make([]byte, 32)
  	}
  	if ikIndex, ik, _, err := md.EmitTapLeavesChunks(collected, probe); err == nil {
 +		// THE LIANA KEY IS COMPUTED ONCE, before any index is asked for: it is
-+		// SPEC §2's recipe over the card's own leaf keys, which do not change
-+		// with the address index. A kind-1 set whose recipe cannot be computed
-+		// has no address, never the NUMS branch's (SPEC §7a row 1).
++		// SPEC §2's recipe over the leaf keys this deriver was GIVEN -- `keys`,
++		// the same keys every leaf script below is built from -- which do not
++		// change with the address index. A kind-1 set whose recipe cannot be
++		// computed has no address, never the NUMS branch's (SPEC §7a row 1).
 +		var liana *bip380.Key
 +		if ik == md.InternalKeyLianaUnspendable {
-+			lk, lerr := lianaInternalKey(collected, network)
++			lk, lerr := lianaInternalKey(collected, keys, network)
 +			if lerr != nil {
 +				return nil, false
 +			}
@@ -1274,7 +1379,7 @@ index 37ae125..43b0a09 100644
  		src = func(index uint32, change bool) (string, error) {
  			xonly := make(map[uint8][]byte, len(byIndex))
  			for i, k := range byIndex {
-@@ -153,23 +165,7 @@ func complexAddressDeriver(collected []string, keys []md.ExpandedKey) (func(uint
+@@ -153,23 +166,7 @@ func complexAddressDeriver(collected []string, keys []md.ExpandedKey) (func(uint
  			for _, l := range leaves {
  				scripts = append(scripts, address.LeafScript{Depth: l.Depth, Script: l.Script})
  			}
@@ -1299,7 +1404,7 @@ index 37ae125..43b0a09 100644
  			if err != nil {
  				return "", err
  			}
-@@ -202,6 +198,56 @@ func complexAddressDeriver(collected []string, keys []md.ExpandedKey) (func(uint
+@@ -202,6 +199,69 @@ func complexAddressDeriver(collected []string, keys []md.ExpandedKey) (func(uint
  	return src, true
  }
  
@@ -1337,8 +1442,21 @@ index 37ae125..43b0a09 100644
 +// use-site. Liana derives this key at 0/i and 1/i "in every port, independent
 +// of the wallet's use-site path" (§2), and §6 row 2 refuses any other use-site
 +// at mint, so the two can never disagree on a card this device composed.
-+func lianaInternalKey(collected []string, network *chaincfg.Params) (bip380.Key, error) {
-+	lk, err := md.LianaUnspendableKeyChunks(collected)
++//
++// OVER `keys`, NOT OVER THE CARD'S TLV (R0 I1). On the Wallet Policy route the
++// md1 is a key-less template and the keys are the seated mk1 cards; a recipe
++// that read the md1's Pubkeys TLV found nothing there, and every template +
++// cards kind-1 wallet showed "This device can't derive addresses" while its
++// NUMS twin derived. One key source for the leaves AND the internal key also
++// means the two can never come from different cards.
++func lianaInternalKey(collected []string, keys []md.ExpandedKey, network *chaincfg.Params) (bip380.Key, error) {
++	xpubs := make(map[uint8][65]byte, len(keys))
++	for _, k := range keys {
++		if k.XpubPresent {
++			xpubs[k.Index] = k.Xpub
++		}
++	}
++	lk, err := md.LianaUnspendableKeyFor(collected, xpubs)
 +	if err != nil {
 +		return bip380.Key{}, err
 +	}
@@ -1358,7 +1476,7 @@ index 37ae125..43b0a09 100644
  //
 ```
 
-- [ ] **Step 4: Run.** `go vet ./gui/` (only the two baseline `ArtifactDir` lines) and `go test -count=1 -run 'Address|Taproot|Underivable|DeviceDerives' ./gui/` → `ok`; with `-v`, `keyed_tr_liana_kofn_recovery: 6 addresses via the complex route` and five PASSing subtests of `TestDeviceDerivesLianasOwnAddressesForKind1`.
+- [ ] **Step 4: Run.** `go vet ./gui/` (only the two baseline `ArtifactDir` lines) and `go test -count=1 -run 'Address|Taproot|Underivable|DeviceDerives' ./gui/` → `ok`; with `-v`, `keyed_tr_liana_kofn_recovery: 6 addresses via the complex route` five PASSing subtests of `TestDeviceDerivesLianasOwnAddressesForKind1`, and three of `TestTemplatePlusKeyCardsDerivesTheLianaWallet`.
 
 - [ ] **Step 5: Commit** `gui: derive the Liana unspendable internal key; refuse a kind this firmware cannot derive (F-449 stage 4, SPEC §7a)`.
 
@@ -1582,8 +1700,10 @@ func TestAnUnnamedKeyPathIsRefusedBeforeConsent(t *testing.T) {
 // sends the card back to "display only" and fails on the Policy id.
 func TestInspectNamesTheLianaKindAndItsPolicyId(t *testing.T) {
 	chunks := loadVectorChunks(t, "keyed_tr_liana_kofn_recovery")
-	ctx := NewContext(newPlatform())
-	frame, quit := runUI(ctx, func() { gatheredDescriptorFlow(ctx, &descriptorTheme, chunks) })
+	p := newPlatform()
+	p.display = sh2DisplaySize
+	ctx := NewContext(p)
+	frame, drawer, quit := runUITouch(ctx, func() { gatheredDescriptorFlow(ctx, &descriptorTheme, chunks) })
 	defer quit()
 	var seen strings.Builder
 	for page := 0; page < 8; page++ {
@@ -1595,7 +1715,7 @@ func TestInspectNamesTheLianaKindAndItsPolicyId(t *testing.T) {
 		if uiContains(seen.String(), "Key path: Liana key") {
 			break
 		}
-		click(&ctx.Router, Button3) // page
+		tapNavSlot(t, ctx, drawer(), Button3) // page, BY TOUCH (R0 m2)
 	}
 	all := seen.String()
 	if uiContains(all, "display only") {
@@ -1871,11 +1991,15 @@ index 8bdc5e8..d121583 100644
 
 **Self-check.** `composerSelfCheck` (§8q, run at consent) gains the biconditional "chose Liana ⟺ the decoded card is kind 1".
 
-**Files:** Create `gui/composer_unspendable.go`, `gui/composer_unspendable_test.go`, `gui/composer_unspendable_sites_test.go`; Modify `gui/composer_state.go` (`:29`), `gui/composer_flow.go`, `gui/composer_selfcheck.go` (`:73`), `gui/composer_copy.go` (four bodies), `gui/composer_copy_test.go` (rows + count 87 → **91**).
+**The unmet request (R0 m1).** `composerCompose` also refuses a Liana choice that composed a REAL key path (`(md.Composed).UnspendableRequestUnmet`, SPEC §6 row 3, the signal md-cli warns on). The reset keeps the flow out of that state, so it cannot fire today; it runs before the stub screen shows an id, where the self-check only runs at consent.
+
+**The drop cause for a build failure (R0 n1)** says the device could not build the policy, not "Liana would not import this policy", because a compose error is not Liana's verdict.
+
+**Files:** Create `gui/composer_unspendable.go`, `gui/composer_unspendable_test.go`, `gui/composer_unspendable_sites_test.go`; Modify `gui/composer_state.go` (`:29`), `gui/composer_flow.go`, `gui/composer_selfcheck.go` (`:73`), `gui/composer_copy.go` (five bodies), `gui/composer_copy_test.go` (rows + count 87 → **92**).
 
 **Interfaces:**
 - Consumes: Task 2's `md.ComposeWithUnspendable`, `ValidateUnspendableShape`, `ErrUnspendableSortedMultiA`; Task 3's `md.KeyPathLianaUnspendable`; Task 5's `composerTrPreset`.
-- Produces: `composerState.unspendable md.UnspendableKind`; `composerUnspendableFires(*composerState) (bool, composerUnspendableDrop)`; `composerUnspendableStep(ctx, th, st) bool`; `composerCompose(st, declared) (md.Composed, error)`; `composerCopyUnspendableLead`, `composerCopyUnspendableRowNUMS`, `composerCopyUnspendableRowLiana`, `composerCopyLianaKeyDropped(cause string)`.
+- Produces: `composerState.unspendable md.UnspendableKind`; `composerUnspendableFires(*composerState) (bool, composerUnspendableDrop)`; `composerUnspendableStep(ctx, th, st) bool`; `composerCompose(st, declared) (md.Composed, error)`; `composerCopyUnspendableLead`, `composerCopyUnspendableRowNUMS`, `composerCopyUnspendableRowLiana`, `composerCopyLianaKeyDropped(cause string)`, `composerCopyLianaUnmet` (its text is the refusal composerCompose returns).
 
 - [ ] **Step 1: Write the failing tests.** Every screen test drives the screen BY TOUCH (`sessionHarness.tapRow` / `tapNav`); DEFAULT ROW is proven by consequence, because a highlight is a colour inversion `ExtractText` cannot see.
 
@@ -2080,10 +2204,17 @@ func TestComposerUnspendableResetIsThePredicate(t *testing.T) {
 	}
 
 	st = composerStateFor(composerTrPreset(t, "tiered-recovery"), md.UnspendableLiana)
+	ret = false
 	h = runUnspendableStep(t, st, &ret)
 	h.mustReach("Which key path?")
 	h.tapNav(Button3)
 	h.pump(8, "")
+	// THE STEP MUST HAVE RETURNED FORWARD (R0 m3): without this, a press that
+	// never registered leaves the kind at Liana too, and the half passes on a
+	// screen still waiting for input.
+	if !*h.done || !ret {
+		t.Fatalf("the re-entered step did not return forward (done %v, ret %v)", *h.done, ret)
+	}
 	if st.unspendable != md.UnspendableLiana {
 		t.Fatalf("an edit that keeps both conjuncts true reset the kind to %v", st.unspendable)
 	}
@@ -2093,7 +2224,7 @@ func TestComposerUnspendableResetIsThePredicate(t *testing.T) {
 // gets F-185's class check at the longest cause it can carry.
 func TestComposerLianaKeyDroppedFits(t *testing.T) {
 	for _, d := range []composerUnspendableDrop{
-		{notTr: true}, {keyPath: 8}, {class: "a policy this device cannot describe"},
+		{notTr: true}, {keyPath: 8}, {class: "two paths with one lock"}, {unbuilt: true},
 	} {
 		assertModalBodyFits(t, "the §0b reset signal", errorScreenBody,
 			composerCopyLianaKeyDropped(composerUnspendableDropCause(d)))
@@ -2136,14 +2267,14 @@ func TestComposerKeyPathChoiceIsPlacedBeforeTheChunks(t *testing.T) {
 	defer quit()
 	h := &sessionHarness{t: t, ctx: ctx, frame: frame, drawer: drawer, done: new(bool)}
 
+	// BY TOUCH THROUGHOUT (R0 m2): the SH2 has no directional buttons, so
+	// every row is tapped and every nav press is a tap on the nav slot.
 	h.mustReach("Build a new policy")
-	click(&ctx.Router, Down) // Scan cards -> Build a new policy
-	click(&ctx.Router, Button3)
+	h.choose(1) // Scan cards, [Build a new policy]
 	h.mustReach("Which script?")
-	click(&ctx.Router, Button3) // Taproot (tr)
+	h.choose(0) // [Taproot (tr)]
 	h.mustReach("Start from?")
-	click(&ctx.Router, Down, Down, Down) // -> kofn-recovery
-	click(&ctx.Router, Button3)
+	h.choose(3) // Build my own paths, plain-multisig, simple-timelocked-inheritance, [kofn-recovery]
 	h.mustReach("Done")
 	composerPickDone(t, h)
 
@@ -2157,7 +2288,7 @@ func TestComposerKeyPathChoiceIsPlacedBeforeTheChunks(t *testing.T) {
 		t.Fatalf("the stub screen does not show the Liana Template-ID %s:\n%q", liana, body)
 	}
 
-	click(&ctx.Router, Button1) // Back from the stub -> the path list
+	h.tapNav(Button1) // Back from the stub -> the path list
 	h.mustReach("Done")
 	composerPickDone(t, h)
 	h.mustReach("Which key path?")
@@ -2228,16 +2359,27 @@ func TestComposerSelfCheckSeesTheKeyPathChoice(t *testing.T) {
 // md.ComposeWith would build the NUMS wallet under a Liana choice, and the
 // cards minted from it would carry the other wallet's stub.
 //
-// md.Compose in composer_discard.go is the one exemption: it reads only the
-// slot map, which the kind does not move (SPEC §5).
+// EXEMPT BY ENCLOSING FUNCTION, NOT BY FILE (R0 m4): a file exemption let a
+// second compose inside composer_unspendable.go through unseen. Exactly three
+// functions may compose: composerCompose (the site), composerUnspendableFires
+// (composes kind 1 for itself, to evaluate §0b's predicate; it builds no
+// artifact), and composerShapeSignature (md.Compose; reads only the slot map,
+// which the kind does not move, SPEC §5).
 //
-// Mutation: composerArtifactsFor calling md.ComposeWith(st.list, declared)
-// again fails here.
+// Mutations: composerArtifactsFor calling md.ComposeWith(st.list, declared)
+// again fails; so does a second md.ComposeWithUnspendable added to
+// composerUnspendableStep.
 func TestComposerComposesOnlyThroughOneSite(t *testing.T) {
+	allowed := map[string]string{
+		"ComposeWith":            "composerCompose",
+		"ComposeWithUnspendable": "composerCompose|composerUnspendableFires",
+		"Compose":                "composerShapeSignature",
+	}
 	files, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
 	}
+	seen := map[string]int{}
 	for _, f := range files {
 		if strings.HasSuffix(f, "_test.go") {
 			continue
@@ -2251,26 +2393,61 @@ func TestComposerComposesOnlyThroughOneSite(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ast.Inspect(af, func(n ast.Node) bool {
-			sel, ok := n.(*ast.SelectorExpr)
-			if !ok {
-				return true
+		for _, decl := range af.Decls {
+			encl := "<package scope>"
+			if fd, ok := decl.(*ast.FuncDecl); ok {
+				encl = fd.Name.Name
 			}
-			if x, ok := sel.X.(*ast.Ident); !ok || x.Name != "md" {
-				return true
-			}
-			switch sel.Sel.Name {
-			case "ComposeWith", "ComposeWithUnspendable":
-				if f != "composer_unspendable.go" {
-					t.Errorf("%s: md.%s outside composerCompose", fset.Position(sel.Pos()), sel.Sel.Name)
+			ast.Inspect(decl, func(n ast.Node) bool {
+				sel, ok := n.(*ast.SelectorExpr)
+				if !ok {
+					return true
 				}
-			case "Compose":
-				if f != "composer_discard.go" {
-					t.Errorf("%s: md.Compose outside composerShapeSignature", fset.Position(sel.Pos()))
+				if x, ok := sel.X.(*ast.Ident); !ok || x.Name != "md" {
+					return true
 				}
-			}
-			return true
-		})
+				want, watched := allowed[sel.Sel.Name]
+				if !watched {
+					return true
+				}
+				seen[encl]++
+				ok = false
+				for _, a := range strings.Split(want, "|") {
+					ok = ok || a == encl
+				}
+				if !ok {
+					t.Errorf("%s: md.%s in %s; only %s may compose", fset.Position(sel.Pos()), sel.Sel.Name, encl, want)
+				}
+				return true
+			})
+		}
+	}
+	// The allowed sites must still exist, or the rule is guarding a name.
+	for _, fn := range []string{"composerCompose", "composerUnspendableFires", "composerShapeSignature"} {
+		if seen[fn] != 1 {
+			t.Errorf("%s composes %d times, want exactly 1", fn, seen[fn])
+		}
+	}
+}
+
+// TestComposerComposeRefusesAnUnmetLianaRequest is SPEC §6 row 3 on the
+// composer's mint path (R0 m1): a Liana choice over a shape whose first bare
+// single key became the internal key is refused before any chunk exists. The
+// reset keeps the flow out of this state, so it is constructed.
+//
+// Mutation: deleting the UnspendableRequestUnmet check in composerCompose fails.
+func TestComposerComposeRefusesAnUnmetLianaRequest(t *testing.T) {
+	realKey := md.PathList{Wrapper: md.ComposeTr, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 1, N: 1}},
+		{Keys: &md.KeySet{K: 1, N: 1}, Lock: &md.Lock{Kind: md.LockOlderBlocks, Value: 26280}},
+	}}
+	st := composerStateFor(realKey, md.UnspendableLiana)
+	if _, err := composerTemplateChunksFor(st); err == nil || err.Error() != composerCopyLianaUnmet() {
+		t.Fatalf("an unmet Liana request composed: err %v", err)
+	}
+	st.unspendable = md.UnspendableNums
+	if _, err := composerTemplateChunksFor(st); err != nil {
+		t.Fatalf("the same shape at NUMS refused: %v", err)
 	}
 }
 
@@ -2295,10 +2472,10 @@ Apply to `gui/composer_copy_test.go`:
 
 ```diff
 diff --git a/gui/composer_copy_test.go b/gui/composer_copy_test.go
-index 21c5f7e..7b5ccf5 100644
+index 21c5f7e..fecada5 100644
 --- a/gui/composer_copy_test.go
 +++ b/gui/composer_copy_test.go
-@@ -65,6 +65,14 @@ func composerCopyTable() []composerCopyRow {
+@@ -65,6 +65,16 @@ func composerCopyTable() []composerCopyRow {
  		// stays the diff target.
  		{"composerCopyLianaKeyPath", "8y", composerCopyLianaKeyPath(),
  			"KEY PATH: NONE (LIANA KEY) Spends use the script paths only. The key path is Liana's unspendable key, computed from this wallet's own keys. Liana (as of v15.0) and Bitcoin Core import this form. Nunchuk imports it only when the keys happen to be in sorted order. The same paths with the NUMS key are a different wallet with different addresses."},
@@ -2308,21 +2485,24 @@ index 21c5f7e..7b5ccf5 100644
 +			"NUMS point: Bitcoin Core imports it. Liana and Nunchuk do not."},
 +		{"composerCopyUnspendableRowLiana", "8y", composerCopyUnspendableRowLiana(),
 +			"Liana key: Liana (v15.0) and Bitcoin Core import it. Nunchuk only by chance."},
++		{"composerCopyLianaUnmet", "8y", composerCopyLianaUnmet(),
++			"The Liana key was chosen, but this policy has a real key path, so there is no unspendable key to choose. Go back to the key path screen."},
 +		{"composerCopyLianaKeyDropped", "8y", composerCopyLianaKeyDropped("Path 1 is one key with no lock, so it became the key path, and there is no unspendable key to choose."),
 +			"LIANA KEY DROPPED Path 1 is one key with no lock, so it became the key path, and there is no unspendable key to choose. This policy is back on the NUMS key path: its Template-ID and addresses are not the ones the Liana key gave."},
  		{"composerCopyMixedLockBases", "8g", composerCopyMixedLockBases(),
  			"MIXED LOCK BASES Some paths lock by block height and others by time. Nunchuk will refuse this wallet; Bitcoin Core imports it. Taproot accepts both, because it checks each path on its own."},
  		// §8x is the fable review r0 lens-5 I-1/I-2 addition: one consent
-@@ -457,8 +465,10 @@ func TestComposerCopyTableCoversEveryBody(t *testing.T) {
+@@ -457,8 +467,11 @@ func TestComposerCopyTableCoversEveryBody(t *testing.T) {
  	// nine applies, in Liana's own order of refusal.
  	// 87 SINCE F-449 STAGE 4 TASK 5 added §8y's kind-1 key-path line: the
  	// §8f body is false for kind 1 about Nunchuk, so it could not be reused.
 -	if declared != 87 {
 -		t.Errorf("composer_copy.go declares %d bodies, the plan and the table know 87 -- "+
-+	// 91 SINCE TASK 6 added the key-path choice screen's lead and two rows,
-+	// and the RESET signal that names which fact dropped a Liana choice.
-+	if declared != 91 {
-+		t.Errorf("composer_copy.go declares %d bodies, the plan and the table know 91 -- "+
++	// 92 SINCE TASK 6 added the key-path choice screen's lead and two rows,
++	// the RESET signal that names which fact dropped a Liana choice, and the
++	// unmet-request refusal composerCompose raises (R0 m1).
++	if declared != 92 {
++		t.Errorf("composer_copy.go declares %d bodies, the plan and the table know 92 -- "+
  			"if that is deliberate, update both", declared)
  	}
  }
@@ -2338,6 +2518,7 @@ Create `gui/composer_unspendable.go`:
 package gui
 
 import (
+	"errors"
 	"fmt"
 
 	"seedhammer.com/md"
@@ -2373,6 +2554,7 @@ type composerUnspendableDrop struct {
 	notTr   bool   // the wrapper has no taproot key path at all
 	keyPath int    // > 0: the operator's path number that became the real internal key
 	class   string // != "": Liana's first refusal class for the kind-1 composition
+	unbuilt bool   // the kind-1 composition itself failed; not a Liana verdict (R0 n1)
 }
 
 // composerUnspendableFires is §0b's FIRING PREDICATE, both conjuncts:
@@ -2395,18 +2577,18 @@ func composerUnspendableFires(st *composerState) (bool, composerUnspendableDrop)
 	}
 	c, err := md.ComposeWithUnspendable(st.list, composerDeclaredOrigins(st), md.UnspendableLiana)
 	if err != nil {
-		return false, composerUnspendableDrop{notTr: false, class: "a policy this device cannot build"}
+		return false, composerUnspendableDrop{unbuilt: true}
 	}
 	if p, real := c.InternalKeyPath(); real {
 		return false, composerUnspendableDrop{keyPath: p + 1}
 	}
 	chunks, err := c.Chunks()
 	if err != nil {
-		return false, composerUnspendableDrop{class: "a policy this device cannot build"}
+		return false, composerUnspendableDrop{unbuilt: true}
 	}
 	shape, err := md.PolicyShapeChunks(chunks)
 	if err != nil || !shape.Complete {
-		return false, composerUnspendableDrop{class: "a policy this device cannot describe"}
+		return false, composerUnspendableDrop{unbuilt: true}
 	}
 	if class := composerLianaOutsideModelClass(md.ScriptTr, shape); class != "" {
 		return false, composerUnspendableDrop{class: class}
@@ -2463,6 +2645,11 @@ func composerUnspendableDropCause(d composerUnspendableDrop) string {
 		return "Only a Taproot policy has a key path to choose."
 	case d.keyPath > 0:
 		return fmt.Sprintf("Path %d is one key with no lock, so it became the key path, and there is no unspendable key to choose.", d.keyPath)
+	case d.unbuilt:
+		// A compose or describe failure is not something Liana said. Today it
+		// is unreachable (composerTemplateChunksFor refuses first, a few lines
+		// later, with the real reason), and it must not read as a verdict.
+		return "This device could not build the policy with the Liana key."
 	default:
 		return "Liana would not import this policy (" + d.class + ")."
 	}
@@ -2477,6 +2664,17 @@ func composerCompose(st *composerState, declared []*md.SlotOrigin) (md.Composed,
 	c, err := md.ComposeWithUnspendable(st.list, declared, st.unspendable)
 	if err != nil {
 		return md.Composed{}, err
+	}
+	// A LIANA CHOICE THAT BUILT SOMETHING ELSE IS REFUSED, not carried on (SPEC
+	// §6 row 3; md-cli warns on the same signal, Composed::unspendable_request_
+	// unmet). composerUnspendableStep resets the kind whenever conjunct 1 fails,
+	// so this cannot fire through the flow today -- and it runs HERE, before
+	// the stub screen shows an id, rather than only at consent, where the
+	// self-check's biconditional is the later belt (R0 m1).
+	// The error's text IS the §8y body: composerShowRefusal draws err.Error()
+	// for an error composerRefusalBody does not map.
+	if c.UnspendableRequestUnmet() {
+		return md.Composed{}, errors.New(composerCopyLianaUnmet())
 	}
 	// SPEC §6's mint refusals (F-654), on the mint path and NOT in md's
 	// encodePayload, which Reassemble also runs over cards this device reads.
@@ -2589,10 +2787,10 @@ Apply to `gui/composer_copy.go`:
 
 ```diff
 diff --git a/gui/composer_copy.go b/gui/composer_copy.go
-index d121583..9bf99a7 100644
+index d121583..835bee4 100644
 --- a/gui/composer_copy.go
 +++ b/gui/composer_copy.go
-@@ -226,6 +226,37 @@ func composerCopyLianaKeyPath() string {
+@@ -226,6 +226,46 @@ func composerCopyLianaKeyPath() string {
  		"different wallet with different addresses."
  }
  
@@ -2627,6 +2825,15 @@ index d121583..9bf99a7 100644
 +		"key gave."
 +}
 +
++// composerCopyLianaUnmet is the refusal composerCompose raises when a Liana
++// choice composed a real key path instead (SPEC §6 row 3). Unreachable through
++// the flow -- the reset drops such a choice first -- and worded for the day it
++// is not.
++func composerCopyLianaUnmet() string {
++	return "The Liana key was chosen, but this policy has a real key path, " +
++		"so there is no unspendable key to choose. Go back to the key path screen."
++}
++
  // composerCopyMixedLockBases is the fable review r0 lens-2 I-2 notice, in the
  // register of §8g's Liana line: one sentence naming the wallet that refuses
  // and one naming the way round it.
@@ -2637,7 +2844,7 @@ index d121583..9bf99a7 100644
 go test -count=1 -run 'TestComposer|Liana|Unspendable|TestEmulatorWalks|Modal' ./gui/
 TMPDIR=/scratch/code/shibboleth/.tmp/f449s4-tmp /scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24 > $TMPDIR/gui-t6.txt 2>&1; tail -1 $TMPDIR/gui-t6.txt
 ```
-Expected: `ok`; then `RESULT: ok -- all 1396 tests ran across 24 shards` (1380 + 16). F12: nothing else moved.
+Expected: `ok`; then `RESULT: ok -- all 1398 tests ran across 24 shards` (1380 + 18). F12: nothing else moved.
 
 - [ ] **Step 5: Commit** `gui: the §0b key-path choice -- Liana's unspendable key on the device (F-449 stage 4)`.
 
@@ -3072,14 +3279,14 @@ go vet ./md/ && go vet ./gui/ 2>&1 | grep -v ArtifactDir | grep -v '^#'
 go test -count=1 $(go list ./... | grep -v '/gui$') > $TMPDIR/nongui.txt 2>&1; grep -vE '^ok|no test files' $TMPDIR/nongui.txt; grep -c '^ok' $TMPDIR/nongui.txt
 /scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui/ 24 > $TMPDIR/gui.txt 2>&1; tail -1 $TMPDIR/gui.txt
 ```
-Expected, measured at the end state: empty gofmt diff; vet clean but the two baseline lines; **55** `ok` and nothing else; `all 1396 tests ran`; md **188**.
+Expected, measured at the end state: empty gofmt diff; vet clean but the two baseline lines; **55** `ok` and nothing else; `all 1398 tests ran`; md **188**.
 
 - [ ] **Step 2: Firmware size.**
 ```bash
 export PATH=/nix/var/nix/profiles/default/bin:$PATH
 nix develop -c tinygo build -size short -o /dev/null -target pico-plus2 -stack-size 16kb -gc precise -opt 2 -scheduler tasks ./cmd/controller
 ```
-Measured: base **1,658,284 B flash / 63,352 B RAM**, end **1,665,220 / 63,376** (**+6,936 / +24**; the Liana recipe is live code from Task 3 on). If `nix develop` refuses the worktree's flake, `nix develop /scratch/code/shibboleth/seedhammer -c …` is how these were taken. Record both lines in the merge commit.
+Measured: base **1,658,284 B flash / 63,352 B RAM**, end **1,665,828 / 63,376** (**+7,544 / +24**; the Liana recipe is live code from Task 3 on). If `nix develop` refuses the worktree's flake, `nix develop /scratch/code/shibboleth/seedhammer -c …` is how these were taken. Record both lines in the merge commit.
 
 - [ ] **Step 3: The mutation pass.** Re-run the Self-Review's table against the real tree. For each row: apply, CHECK it applied (the text existed exactly once), check it COMPILED (a build failure reads as a pass in a naive grep), run the named test, confirm it fails, revert with `git checkout -- <file>` on a clean tree only. S8 must survive (it is the named gap); anything else surviving is a finding.
 
@@ -3194,7 +3401,7 @@ Expected, measured (`Bitcoin Core daemon version v30.99.0-64a7c7cbb975`): `[{"su
 | M7 | `keyPathOf`: Liana → `KeyPathNUMS` | `TestKeyPathNamesTheLianaKind` |
 | M8 | `summarize` drops `KeyPath: rootKeyPath(d.tree)` | `TestKeyPathNamesTheLianaKind` |
 | M9 | `keyPathOf`'s fall-through returns `(KeyPathNUMS, true)` | `TestAnUnknownInternalKeyKindIsNotDescribed` |
-| M10 | `LianaUnspendableKeyChunks` hashes no leaves | `TestLianaUnspendableKeyChunksIsTheRecipeOverTheCardsOwnLeaves` |
+| M10 | `LianaUnspendableKeyFor` hashes no leaves | `TestLianaUnspendableKeyForIsTheRecipeOverTheSuppliedLeaves` |
 | M11 | `finishComposed` writes a hardened wildcard | `TestTheComposerCannotReachSpecSixRowsTwoAndFour` |
 | A1 | `gui/policy_address.go`: the Liana arm returns `address.NUMSInternalKey()` (SPEC §7a row 1) | `TestDeviceDerivesLianasOwnAddressesForKind1` (all 5), `TestEveryKeyedVectorReachesAnAddress` (both), `TestAnUnderivableInternalKeyKindIsRefusedNotFallenBack` |
 | A2 | `taprootInternalKey` falls back to NUMS for an unknown kind | `TestAnUnderivableInternalKeyKindIsRefusedNotFallenBack` |
@@ -3205,7 +3412,7 @@ Expected, measured (`Bitcoin Core daemon version v30.99.0-64a7c7cbb975`): `[{"su
 | S2 | the template-engrave summary's Liana arm deleted | `TestEveryKeyPathPrintSiteNamesTheLianaKind` |
 | S3 | `md1KeyPathLine` names Liana as NUMS | `TestEveryKeyPathPrintSiteNamesTheLianaKind` |
 | S7 | `md1KeyPathUnknown` returns false | `TestAnUnnamedKeyPathIsRefusedBeforeConsent` |
-| **S8** | **the `md1KeyPathUnknown` call in `walletPolicyConsentLines` deleted** | **SURVIVES** (whole gui package) — the named gap: no decoder yields a fourth kind, see "What no gate covers" |
+| **S8** | **the `md1KeyPathUnknown` call in `walletPolicyConsentLines` deleted** | **SURVIVES** (the whole gui package runs; no test fails) — the named gap: no decoder yields a fourth kind, see "What no gate covers" |
 | P1 | `gui/composer_unspendable.go`: conjunct 1 deleted | `TestComposerUnspendablePredicateOnEveryTrPreset` (fires on simple-timelocked-inheritance) |
 | P2 | conjunct 2 deleted | `TestComposerUnspendablePredicateOnEveryTrPreset` |
 | P3 | the classifier run on the NUMS composition (class 2 not skipped) | `TestComposerUnspendablePredicateOnEveryTrPreset` |
@@ -3222,14 +3429,18 @@ Expected, measured (`Bitcoin Core daemon version v30.99.0-64a7c7cbb975`): `[{"su
 | S6 | `composerCompose` skips `ValidateUnspendableShape` | `TestComposerComposeRefusesSpecSix` |
 | X1 | `expect_composer.json`: the liana arm's `numsTemplateId` deleted | `TestShotsComposerExpectFixtureCoversEveryFieldTheWalkReads` |
 | I1 | the Liana arm returns `errUnderivableInternalKey` (stage 3's behaviour) | `TestInspectNamesTheLianaKindAndItsPolicyId` (the card falls to display-only) |
+| **K1** | `lianaInternalKey` builds its key map from the md1's OWN keys (`md.ExpandWalletPolicyChunks(collected)`, the TLV read of the first draft) instead of the deriver's `keys` (R0 I1) | `TestTemplatePlusKeyCardsDerivesTheLianaWallet` (the kind-1 row) |
+| U1 | `composerCompose` drops the `UnspendableRequestUnmet` refusal (R0 m1) | `TestComposerComposeRefusesAnUnmetLianaRequest` |
+| E1 | a second `md.ComposeWithUnspendable` added inside `composerUnspendableStep`, in the file the first draft exempted whole (R0 m4) | `TestComposerComposesOnlyThroughOneSite` |
+| R4 | the converse half's press-through deleted, so the step never returns (R0 m3) | `TestComposerUnspendableResetIsThePredicate` |
 
-The table is `/scratch/code/shibboleth/mnemonic-engrave/scripts/f449-stage4-mutations.sh` (with `mut.py`, which refuses a mutation that did not apply exactly once or did not compile); re-run at `d2350cb` + this plan: 36 caught, S8 survives.
+The table is `/scratch/code/shibboleth/mnemonic-engrave/scripts/f449-stage4-mutations.sh` (with `scripts/f449-stage4-mut.py`, which refuses a mutation that did not apply exactly once or did not compile); re-run at `d2350cb` + this plan after the R0 fold: **40 caught, S8 survives** (41 rows).
 
 Two mutations first **survived** while this plan was being written, and the tests were changed because of them:
 - `initial := 1` in front of the seeding loop was **inert** (the loop always overwrites it). The DEFAULT ROW test was rebuilt so its first-entry case starts from a ZERO-VALUE `composerState`, as `composerFlow` builds it; the real mutations (a constant seed, or md's two constants swapped) are D1-D3.
 - A 20-byte assertion over every `md1Summary` line failed on shipped lines (`@0 - m/48h/…`). The bound now covers the key-path lines this plan adds, which is the claim.
 
-**Type consistency.** `md.UnspendableKind` / `md.UnspendableNums` / `md.UnspendableLiana` / `md.ComposeWithUnspendable` / `(md.Composed).UnspendableRequestUnmet` / `(md.Composed).ValidateUnspendableShape` / `md.ErrUnspendableSortedMultiA` / `md.ErrUnspendableUseSite` / `md.ErrUnspendableNotRootTr` (Task 2); `md.KeyPathLianaUnspendable` / `keyPathOf` / `rootKeyPath` / `md.Template.KeyPath` / `md.LianaUnspendableKeyChunks` (Task 3); `taprootInternalKey` / `lianaInternalKey` (Task 4); `md1KeyPathLine` / `md1KeyPathUnknown` / `composerCopyLianaKeyPath` (Task 5); `composerState.unspendable` / `composerUnspendableFires` / `composerUnspendableDrop` / `composerUnspendableStep` / `composerUnspendableRows` / `composerUnspendableKinds` / `composerUnspendableDropCause` / `composerCompose` / the four `composerCopyUnspendable*`/`composerCopyLianaKeyDropped` bodies (Task 6). Each name was compiled at its task boundary by the apply gate.
+**Type consistency.** `md.UnspendableKind` / `md.UnspendableNums` / `md.UnspendableLiana` / `md.ComposeWithUnspendable` / `(md.Composed).UnspendableRequestUnmet` / `(md.Composed).ValidateUnspendableShape` / `md.ErrUnspendableSortedMultiA` / `md.ErrUnspendableUseSite` / `md.ErrUnspendableNotRootTr` (Task 2); `md.KeyPathLianaUnspendable` / `keyPathOf` / `rootKeyPath` / `md.Template.KeyPath` / `md.LianaUnspendableKeyFor` (Task 3); `taprootInternalKey` / `lianaInternalKey` / `seatFixtureFor` (Task 4); `md1KeyPathLine` / `md1KeyPathUnknown` / `composerCopyLianaKeyPath` (Task 5); `composerState.unspendable` / `composerUnspendableFires` / `composerUnspendableDrop` / `composerUnspendableStep` / `composerUnspendableRows` / `composerUnspendableKinds` / `composerUnspendableDropCause` / `composerCompose` / the four `composerCopyUnspendable*`/`composerCopyLianaKeyDropped` bodies / `composerCopyLianaUnmet` (Task 6). Each name was compiled at its task boundary by the apply gate.
 
 **Placeholder scan.** None. Follow-up IDs in Task 9 are "the next free ID at filing time" by design (stage 3 files F-654/F-655 first).
 

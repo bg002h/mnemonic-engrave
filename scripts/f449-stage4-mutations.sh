@@ -19,7 +19,7 @@ r M9 md/policy_shape.go '	return KeyPathNone, false
 r M10 md/liana.go '	return lianaUnspendableKey(pks), nil
 }' '	_ = pks
 	return lianaUnspendableKey(nil), nil
-}' ./md/ 'TestLianaUnspendableKeyChunks'
+}' ./md/ 'TestLianaUnspendableKeyFor'
 r M11 md/compose.go '			wildcardHardened: false,
 		},
 		tree: tree,' '			wildcardHardened: true,
@@ -94,6 +94,21 @@ r S6 gui/composer_unspendable.go '	if err := c.ValidateUnspendableShape(); err !
 		return md.Composed{}, err
 	}' '' ./gui/ 'TestComposerComposeRefusesSpecSix'
 r X1 cmd/emu/expect_composer.json '"numsTemplateId": "8107216456de60d05e57f7fe268824d8",' '' ./cmd/emu/ 'TestShotsComposerExpect'
+r K1 gui/policy_address.go '	for _, k := range keys {
+		if k.XpubPresent {
+			xpubs[k.Index] = k.Xpub' '	_, own, _ := md.ExpandWalletPolicyChunks(collected)
+	for _, k := range own {
+		if k.XpubPresent {
+			xpubs[k.Index] = k.Xpub' ./gui/ 'TestTemplatePlusKeyCards'
+r U1 gui/composer_unspendable.go '	if c.UnspendableRequestUnmet() {
+		return md.Composed{}, errors.New(composerCopyLianaUnmet())
+	}' '	_ = errors.New' ./gui/ 'TestComposerComposeRefusesAnUnmetLianaRequest'
+r E1 gui/composer_unspendable.go '	fire, drop := composerUnspendableFires(st)' '	_, _ = md.ComposeWithUnspendable(st.list, composerDeclaredOrigins(st), st.unspendable)
+	fire, drop := composerUnspendableFires(st)' ./gui/ 'TestComposerComposesOnlyThroughOneSite'
+r R4 gui/composer_unspendable_test.go '	h.tapNav(Button3)
+	h.pump(8, "")
+	// THE STEP MUST' '	h.pump(8, "")
+	// THE STEP MUST' ./gui/ 'TestComposerUnspendableResetIsThePredicate'
 r I1 gui/policy_address.go '		if liana == nil {
 			return nil, errUnderivableInternalKey
 		}
