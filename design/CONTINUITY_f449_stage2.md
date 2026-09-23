@@ -10,40 +10,21 @@
 `descriptor-mnemonic-md-cli-v0.19.0`. engrave merge `b8ee1ede`.
 
 ### Do this first
-**Next cycle after F-449 (operator, 2026-09-23):** the coordinator-compat
-cycle (`design/DESIGN_coordinator_compatibility.md`, plan 1b onward) starts
-once F-449's last stage (5) ships. Nunchuk and Core compatibility work belongs
-there, not in F-449. Carry into it: stage 4's "Bitcoin Core imports this form"
-for the Liana key was measured on a Core **v30.99 development build**, not a
-release (stage 4 plan, F7). Re-measure it on a released Core, or narrow the
-wording.
-
-**Stage 3 merge SHA (read by stage 4a Task 5 Step 0): fork `d2350cb`**
-(dm vectors `d269c556`).
-
-**Parallel state (2026-09-23):**
-- F-642 (toolkit): merged to toolkit master `642300b7` (0.104.0); push, tag
-  `mnemonic-toolkit-v0.104.0`, then the demo/sh2 install bump.
-- Stage 4a: DONE and reviewed (whole-branch 0C/0I) on branch `f449-stage4a`
-  `ed4b7792` (worktree me-worktrees/f449-stage4a). HELD, per below.
-- Stage 3: plan GREEN; implementing in dm-worktrees/sh-worktrees/me-worktrees
-  `f449-stage3*`; report design/agent-reports/f449-stage3-impl.md.
-- Stage 4: plan being authored against the stage-3 scratch end state in
-  .tmp/r0-s3/ -> design/IMPLEMENTATION_PLAN_f449_stage4_device.md.
-- Stage 5: `demo/sh2/update.sh` as root@quantoshi.xyz works (measured).
-
-**HOLD, updated 2026-09-23:** stage 3 is in fork main (`d2350cb`), and stage
-4a's Task 5 Step 0 passed (ancestry OK, `--- PASS` on the v8 probe), so stage
-4a is MERGED and `me` v0.11.0 may be tagged. **Still held:** do not
-`cargo install` master's `me` as the local binary until the boards run
-firmware that contains `d2350cb`. It confirms v8 cards that the currently
-flashed images cannot read.
-
-Stage 3: the Go port in the fork's `md/` (three-state kind, version-derived
-identity). Without it the DEVICE cannot read kind-1 plates. Rust-primary
-rule: port semantics from md-codec 0.47.0 and update the provenance pin.
-Also due: F-642 (toolkit pin bump, owned by the cycle), F-643 (stage 3),
-F-644 (stage 4), F-645 and F-646 (next dm release).
+**F-449 IS COMPLETE (2026-09-23).** Every stage has shipped:
+- 2: dm `cf35d61a`, md-cli 0.19.0;
+- 3: fork `d2350cb`, dm vectors `d269c556`;
+- 4a: me v0.11.0;
+- 4: fork `2c9eed3`;
+- 5: quantoshi.xyz/SH2/ serving the `2c9eed3` emulator;
+- F-642: toolkit v0.104.0.
+**Next (operator):** the coordinator-compat cycle
+(`design/DESIGN_coordinator_compatibility.md`, plan 1b onward). Carry in the
+Core dev-build caveat below.
+**Still held:** the local `me` install, and the boards run firmware older
+than `d2350cb`. Flashing is operator-gated (`~/bin/sh/sh2-flash`, never
+unattended); after it, lift the hold.
+Open follow-ups from this cycle: F-643..F-653, F-655..F-660 (each with an
+owning phase).
 
 ### How stage 2 went (for the next plan)
 Plan R0 3C/7I → R1 0C/7I → R2 0C/5I → R3 0C/2I → R4 GREEN. Every round after
