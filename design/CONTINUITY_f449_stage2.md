@@ -12,7 +12,8 @@
 ### Do this first
 **HOLD (stage 4a R0 M-2):** once stage 4a merges, master's `me` confirms v8
 cards that no board flashed before stage 3 can read. Do NOT tag `me` 0.11.0 and
-do NOT `cargo install` master's `me` as the local binary until stage 3 is in
+do NOT MERGE the `f449-stage4a` branch into master (stage 4a whole-branch M2),
+and do NOT `cargo install` master's `me` as the local binary, until stage 3 is in
 fork main (its merge SHA is recorded here) AND the boards are reflashed, or the
 operator says otherwise. Stage 4a's Task 5 Step 0 is the mechanical check.
 

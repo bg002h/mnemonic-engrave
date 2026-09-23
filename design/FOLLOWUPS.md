@@ -19764,6 +19764,11 @@ descriptor at admission or returns an `Err` rather than panicking. Afterwards
 stage 4a's skip in `descriptor_seam.rs` can go back to deriving and assert
 `Err`.
 
+**Also in scope (stage 4a whole-branch M4, pre-existing):** the same
+over-520-byte `sh(sortedmulti(2, 16 keys))` set, which only the library can
+build, bundles in `me` as "29 public plates" on both 0.10.0 and 0.11.0. The
+admission fix must make that set unmintable, so it can never be counted.
+
 ### F-652 — `me bundle` refuses origin-less templates that `md decode` reads (owning phase: none — ownerless UX residue) `#mnemonic-engrave` `#me` `#bundle`
 
 **Status:** OPEN
