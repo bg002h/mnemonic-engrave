@@ -19733,3 +19733,12 @@ NUMS wallet (`tr(50929b74…,multi_a(…))`), which is a different wallet. Resto
 should instead derive the Liana unspendable key from the leaves via md-codec's
 §2 derivation and print the Liana descriptor, with a vector against
 `cases.json`.
+
+### F-650 — mnemonic-gui does not know `mnemonic repair --json`'s new verdict `"unreadable_version"` (owning phase: **next mnemonic-gui schema-mirror sync after F-642 ships**) `#mnemonic-gui` `#schema-mirror`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-642 implementer's rulings. F-642
+adds the verdict value for a single card corrected at a wire version the
+toolkit cannot read (exit 4). The GUI's mirror of the repair JSON schema must
+accept it and render it. Until it does, the GUI may show an unknown-verdict
+error for a card that was in fact corrected.
