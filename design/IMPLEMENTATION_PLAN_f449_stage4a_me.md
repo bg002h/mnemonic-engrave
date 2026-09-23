@@ -868,7 +868,9 @@ In the test module, `the_mdmk_walk_is_blind_to_mt1_and_that_is_why_there_are_thr
   the post-change callers (`pack`, `show`, `--expect`), found by grep, not
   copied. It must also state the "one walk call per invocation" rule, which
   today appears only in that stale comment. Correct `expect.rs:55-61`, which
-  names the old walk.
+  names the old walk. The 4-line projection `mdmk_unconfirmed` keeps a one-line
+  doc: "Projection of [`mdmk_unconfirmed_why`]; kept for the frozen vectors."
+  (R1 residual M-3).
 
 - [ ] **Step 7: Commit.** Stage `crates/me-cli/src/sysw/record.rs`, `crates/me-cli/src/sysw/expect.rs`, `crates/me-cli/src/main.rs` and `crates/me-cli/tests/f449_stage4a.rs`. Subject: `me sysw: an md1 at an unsupported wire version is named, never reduced to "unconfirmed" (F-449 §6a)`.
 
@@ -926,7 +928,7 @@ This is the stage-2 plan's standing Task 7 rule: every stage ends with a sweep f
      `origin/main`, write `md/zz_stage4a_precondition_test.go` with
      `func TestStage4aPreconditionDecodesV8(t *testing.T)` calling
      `Decode("md1cpfdsssj6tvyywtsqrq0zjs4n7gdve74ar402")` and `t.Fatalf` on
-     error. Run `go test ./md/ -run TestStage4aPreconditionDecodesV8 -v`. The
+     error. Run `/scratch/code/shibboleth/.toolchain/go/bin/go test ./md/ -run TestStage4aPreconditionDecodesV8 -v`. The
      output must contain the literal `--- PASS: TestStage4aPreconditionDecodesV8`.
      `ok` alone is not enough, since a filter that matches nothing also says ok.
      Then remove the worktree. **MEASURED by the controller at `7b6f2fb`:
