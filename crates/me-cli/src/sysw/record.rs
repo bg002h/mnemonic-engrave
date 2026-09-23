@@ -178,6 +178,62 @@ pub fn decode_text(record: &str) -> Result<Zeroizing<String>, RecordError> {
 
 /// Indices of [`Class::MdMk`] records that are NOT decode-confirmed (spec §12.6).
 ///
+/// Projection of [`mdmk_unconfirmed_why`]; kept for the frozen vectors.
+pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
+    mdmk_unconfirmed_why(records)
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// Why an md1/mk1 record is unconfirmed.
+///
+/// F-449 stage 4a (SPEC_liana_unspendable_internal_key §6a, §8.9): the walk
+/// below reduced every decoder answer to `.is_ok()`, so a well-formed md1 at a
+/// wire version this build does not read was reported exactly like a broken
+/// one -- "could not decode", with nothing naming the version. The version is
+/// the one fact the operator needs (a newer `me`, or newer firmware, reads it),
+/// so it is carried out rather than discarded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Unconfirmed {
+    /// The real decoder refused it: an incomplete set, a foreign chunk, or a
+    /// string that passes its checksum and does not decode.
+    Undecodable,
+    /// An md1 whose header carries a wire version this build does not read.
+    /// The `u8` is that version.
+    UnsupportedWireVersion(u8),
+}
+
+impl Unconfirmed {
+    /// The operator-facing reason, for the `UnsupportedWireVersion` case; the
+    /// accepted set comes from md-codec's own `Display`, never a second copy.
+    pub fn version_note(&self) -> Option<String> {
+        match self {
+            Unconfirmed::Undecodable => None,
+            Unconfirmed::UnsupportedWireVersion(got) => Some(format!(
+                "an md1 this build of me does not read -- {}",
+                md_codec::Error::WireVersionMismatch { got: *got }
+            )),
+        }
+    }
+}
+
+/// Map an md-codec decode result to a verdict: `None` is confirmed.
+fn md_verdict<T>(r: Result<T, md_codec::Error>) -> Option<Unconfirmed> {
+    match r {
+        Ok(_) => None,
+        Err(md_codec::Error::WireVersionMismatch { got }) => {
+            Some(Unconfirmed::UnsupportedWireVersion(got))
+        }
+        Err(_) => Some(Unconfirmed::Undecodable),
+    }
+}
+
+/// [`Class::MdMk`] records that are NOT decode-confirmed (spec §12.6), each
+/// with the reason: `(index, why)` for every unconfirmed record, sorted by
+/// index. [`mdmk_unconfirmed`] is this with the reasons dropped, so the two can
+/// never disagree about WHICH records.
+///
 /// Groups by `(hrp, chunk_set_id)` exactly as `seal::record::decode_public_set`
 /// does (`crates/me-cli/src/seal/record.rs:192`) — R1-I2: filter the iteration,
 /// never the indices — but REPORTS instead of refusing: an incomplete or
@@ -198,16 +254,19 @@ pub fn decode_text(record: &str) -> Result<Zeroizing<String>, RecordError> {
 /// **Also emits the R2/R6 chunk_set_id mismatch warning** (stderr) for a
 /// CONFIRMED `mk1` group whose stamped id was not derived from its content
 /// — the third of me-cli's three reassembly surfaces
-/// (`design/agent-reports/impl-me-cli-csid-warning.md`). This is the one
-/// characterization the doc comments elsewhere on this call chain
-/// (`sysw/mt.rs`, `sysw/expect.rs`) get slightly stale by: "returns indices
-/// and says nothing else" was true of the RETURN VALUE (still is — no new
-/// variant, no changed shape) but is no longer true of every side effect.
-/// Fires at most once per confirmed mismatching group, from whichever of
-/// `report_unconfirmed` (`pack`) or `print_mdmk_confirmation` (`show`)
-/// calls this in a given process — each calls it exactly once per
-/// invocation, so no surface double-warns.
-pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
+/// (`design/agent-reports/impl-me-cli-csid-warning.md`). The return value says
+/// nothing about it; the side effect is on every call.
+///
+/// **Callers, and the one-walk-call rule.** Because of that side effect, each
+/// surface must call the walk ONCE per invocation — replace a call, never add
+/// one beside it (`tests/sysw_cli.rs` pins that `pack` and `show` do not
+/// double-warn). The callers are `report_unconfirmed` (`me sysw pack`),
+/// `print_records` (`me sysw show`) and `sysw::expect::check` (`--expect`),
+/// plus the projection [`mdmk_unconfirmed`] (the frozen vectors in
+/// `sysw/vectors.rs`). `me sysw pack --expect` reaches the walk twice, once
+/// through `check` and once through `report_unconfirmed`, when every
+/// expectation is met.
+pub fn mdmk_unconfirmed_why(records: &[String]) -> Vec<(usize, Unconfirmed)> {
     use std::collections::BTreeMap;
 
     // key: (hrp, chunk_set_id, uniq) -> the ORIGINAL indices in that card set.
@@ -215,7 +274,7 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
     // giving them all one key would let the first one to decode vouch for the
     // rest, which is precisely how smuggled entropy would slip through.
     let mut groups: BTreeMap<(char, Option<u32>, usize), Vec<usize>> = BTreeMap::new();
-    let mut out: Vec<usize> = Vec::new();
+    let mut out: Vec<(usize, Unconfirmed)> = Vec::new();
 
     for (i, r) in records.iter().enumerate() {
         if super::classify(r) != Class::MdMk {
@@ -239,7 +298,7 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
             // md1". `decode_public_set` has the same asymmetry and the same
             // answer, which is why the two walks still agree.
             // See `a_record_whose_card_identity_cannot_be_read_is_unconfirmed`.
-            None => out.push(i),
+            None => out.push((i, Unconfirmed::Undecodable)),
         }
     }
 
@@ -247,12 +306,12 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
         let set: Vec<&str> = idxs.iter().map(|&i| records[i].as_str()).collect();
         // The real decoders are the arbiter — semantics-bound, per §12.6. A
         // BCH verifier is not one: that is the whole point of the rule.
-        let confirmed = match (hrp, csid) {
-            ('d', Some(_)) => md_codec::reassemble(&set).is_ok(),
-            ('d', None) => md_codec::decode_md1_string(set[0]).is_ok(),
+        let verdict = match (hrp, csid) {
+            ('d', Some(_)) => md_verdict(md_codec::reassemble(&set)),
+            ('d', None) => md_verdict(md_codec::decode_md1_string(set[0])),
             // R2/R6 (`design/agent-reports/impl-me-cli-csid-warning.md`):
-            // bind the card on success (`.is_ok()`'s CONTROL-FLOW meaning is
-            // unchanged -- still `true` iff decode succeeded) to
+            // bind the card on success (the verdict is still `None` --
+            // confirmed -- iff decode succeeded) to
             // recompute-and-warn on a stamped/derived chunk_set_id
             // mismatch. The mutation gate for THIS surface is deleting the
             // `warn_chunk_set_id_mismatch` line in the `Ok` arm.
@@ -261,18 +320,18 @@ pub fn mdmk_unconfirmed(records: &[String]) -> Vec<usize> {
                     crate::csid_warn::warn_chunk_set_id_mismatch(
                         crate::csid_warn::chunk_set_id_comparison(&set, &card),
                     );
-                    true
+                    None
                 }
-                Err(_) => false,
+                Err(_) => Some(Unconfirmed::Undecodable),
             },
-            _ => false,
+            _ => Some(Unconfirmed::Undecodable),
         };
-        if !confirmed {
-            out.extend(idxs);
+        if let Some(why) = verdict {
+            out.extend(idxs.into_iter().map(|i| (i, why)));
         }
     }
 
-    out.sort_unstable();
+    out.sort_unstable_by_key(|&(i, _)| i);
     out
 }
 

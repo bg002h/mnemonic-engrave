@@ -135,3 +135,90 @@ fn bundle_names_the_version_of_a_chunk_it_cannot_read() {
     assert_eq!(r.code, 4, "{}", r.err);
     assert!(r.err.contains(V12_NAMED), "{}", r.err);
 }
+
+// ---- Task 3: §6a on `me sysw` -- REPORTED, never reduced to "unconfirmed". -
+
+#[test]
+fn the_walk_keeps_the_version_for_both_shapes() {
+    use mnemonic_engrave::sysw::record::{mdmk_unconfirmed_why, Unconfirmed};
+    for s in [V12_SINGLE.to_string(), v12_chunk()] {
+        assert_eq!(
+            mdmk_unconfirmed_why(&[s.clone()]),
+            vec![(0, Unconfirmed::UnsupportedWireVersion(12))],
+            "{s}"
+        );
+    }
+    assert_eq!(
+        mdmk_unconfirmed_why(&[V4_UNDECODABLE.to_string()]),
+        vec![(0, Unconfirmed::Undecodable)]
+    );
+}
+
+#[test]
+fn pack_names_the_wire_version_and_does_not_call_it_undecodable() {
+    let r = me(&["sysw", "pack", "--no-passphrase", V12_SINGLE], "");
+    assert_eq!(r.code, 0, "D6: it WARNS and proceeds: {}", r.err);
+    assert!(
+        r.err.contains(&format!(
+            "record 0, as given (records count from 0): an md1 this build of me does not \
+             read -- {V12_NAMED}"
+        )),
+        "{}",
+        r.err
+    );
+    assert!(r.err.contains("SECRET"), "{}", r.err);
+    assert!(!r.err.contains("could not decode"), "{}", r.err);
+}
+
+#[test]
+fn show_names_the_wire_version_beside_the_record() {
+    let dir = tempfile::tempdir().unwrap();
+    let bin = dir.path().join("p.bin");
+    let packed = me(
+        &[
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            V12_SINGLE,
+            "--out",
+            bin.to_str().unwrap(),
+        ],
+        "",
+    );
+    assert_eq!(packed.code, 0, "{}", packed.err);
+    let r = me(&["sysw", "show", bin.to_str().unwrap()], "");
+    assert_eq!(r.code, 0, "{}", r.err);
+    assert!(
+        r.out.contains(&format!(
+            "public record 0: md1/mk1 — unconfirmed — engraveable, but the device REPLACES \
+             the legend; an md1 this build of me does not read -- {V12_NAMED}"
+        )),
+        "{}",
+        r.out
+    );
+}
+
+/// `--expect descriptor` read the same walk and called a whole single card
+/// "present, but the set does not reassemble" -- false for this card.
+#[test]
+fn expect_descriptor_names_the_version_instead_of_calling_it_incomplete() {
+    let dir = tempfile::tempdir().unwrap();
+    let bin = dir.path().join("p.bin");
+    let r = me(
+        &[
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--expect",
+            "descriptor",
+            V12_SINGLE,
+            "--out",
+            bin.to_str().unwrap(),
+        ],
+        "",
+    );
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(!bin.exists(), "nothing written");
+    assert!(r.err.contains(V12_NAMED), "{}", r.err);
+    assert!(!r.err.contains("does not reassemble"), "{}", r.err);
+}

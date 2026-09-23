@@ -2108,11 +2108,20 @@ fn print_digest(blob: &[u8]) {
 /// diverge: secrets move out of the public section, so argv record 3 can be
 /// public record 1. Renumbering either would be worse than naming both.
 fn report_unconfirmed(records: &[String]) {
-    for i in mnemonic_engrave::sysw::record::mdmk_unconfirmed(records) {
-        eprintln!(
-            "me: record {i}, as given (records count from 0): an md1/mk1 this tool \
-             could not decode; the device will treat it as a SECRET"
-        );
+    for (i, why) in mnemonic_engrave::sysw::record::mdmk_unconfirmed_why(records) {
+        match why.version_note() {
+            // F-449 stage 4a (SPEC §6a): name the version, and do not claim the
+            // plate is broken -- a newer `me`, or newer firmware, may read it.
+            Some(note) => eprintln!(
+                "me: record {i}, as given (records count from 0): {note}. It cannot be \
+                 confirmed here, and a device that cannot read it either will treat it \
+                 as a SECRET"
+            ),
+            None => eprintln!(
+                "me: record {i}, as given (records count from 0): an md1/mk1 this tool \
+                 could not decode; the device will treat it as a SECRET"
+            ),
+        }
     }
     // `[mt-decode]` — the same rule for mt1 chunk sets, but PER SET rather
     // than per record. G-P3.7: ruling 2026-08-25 makes "loudly" normative and
@@ -2293,7 +2302,7 @@ fn print_records(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
     let records: Vec<String> = s.split('\n').map(str::to_owned).collect();
     // Both computed ONCE for the whole loop; each was recomputed per pass
     // before.
-    let mdmk_unconfirmed = sysw::record::mdmk_unconfirmed(&records);
+    let mdmk_unconfirmed = sysw::record::mdmk_unconfirmed_why(&records);
     let mt_unconfirmed = sysw::mt::mt_unconfirmed(&records);
 
     for (i, r) in records.iter().enumerate() {
@@ -2303,8 +2312,16 @@ fn print_records(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
         }
         match sysw::classify(r) {
             sysw::record::Class::MdMk => {
-                let state = confirmation_state(mdmk_unconfirmed.contains(&i));
-                println!("public record {i}: md1/mk1 — {state}");
+                let why = mdmk_unconfirmed
+                    .iter()
+                    .find(|(j, _)| *j == i)
+                    .map(|&(_, w)| w);
+                let state = confirmation_state(why.is_some());
+                match why.and_then(|w| w.version_note()) {
+                    // F-449 stage 4a (SPEC §6a): the same state, with the reason.
+                    Some(note) => println!("public record {i}: md1/mk1 — {state}; {note}"),
+                    None => println!("public record {i}: md1/mk1 — {state}"),
+                }
             }
             sysw::record::Class::Mt => {
                 let state = confirmation_state(mt_unconfirmed.contains(&i));
