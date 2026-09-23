@@ -551,11 +551,22 @@ carrying both: Liana v8.0 and v15.0 refuse `mixed-lock-bases-{wsh,tr}` with
 and the Go names "an absolute lock". The Rust order is the measured one (the
 table build reports three D3s with the Go order); the fork converges in plan 3.
 
-**Class 9 is narrower in Rust than in the Go [plan 1b].** The Go names every
-second unlocked path; Liana imports X24 (a second SINGLE-key unlocked path,
-folded into the primary: `ImportsAltered`) and refuses X25/X26 (a second
-MULTI-key one). Refusing X24 would be a D1, so the Rust clause refuses only a
-second unlocked path with more than one key.
+**Class 9 is narrower in Rust than in the Go [plan 1b, plan 1b R0 I-1].**
+The Go names every second unlocked path. Liana lifts the policy, and
+rust-miniscript's `normalized()` flattens every 1-of-n into bare keys, which
+Liana folds into the primary path: a second unlocked path that is a single key
+(X24) or a 1-of-n (R0's measured `wsh(or_d(multi(2,A,B),or_i(multi(1,C,D),
+and_v(v:pkh(E),older(100)))))`, imported by v15.0 as 2-of-4) is IMPORTED, read
+as altered (`ImportsAltered`). A second unlocked path that stays a threshold,
+`k >= 2` (X25, X26), is refused. The Rust clause refuses exactly `k >= 2`; a
+plan draft keyed on "more than one key" and falsely refused the 1-of-n case.
+
+**Liana's relative-lock class reads the lock VALUE [plan 1b R0 M-1].**
+`csv_check` accepts only a u16 block count, so `older` in blocks above 65535 is
+refused like one in time units (measured: `older(70000)`, *"Timelock value
+'70000' isn't valid or safe to use"*). The key abstracts lock values, so this
+must be a rule, not a cell: the clause declares `LOCK_VALUES` in its `ReadSet`,
+as does "two paths with one lock".
 
 **Measured refusals are admissible.** Ruling 3 said refusals are rule-derived;
 that was written before Nunchuk's round-trip check was understood. A refusal a

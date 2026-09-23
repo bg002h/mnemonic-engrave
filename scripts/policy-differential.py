@@ -376,6 +376,12 @@ class Runner:
         """-> (composed_json, used_experimental) or Refusal."""
         for experimental in ([False, True] if not policy.needs_experimental else [True]):
             rc, out, err = self._md([*policy.compose_args(experimental), "--json"])
+            # md-cli 0.20.0 (coordinator-compat plan 1b): `md compose` refuses a
+            # policy EVERY wallet coordinator refuses -- in practice a keyless
+            # `wsh` path -- and names `--md-only`. That is a documented stop, not
+            # a finding, so retry with the flag, exactly as for `--experimental`.
+            if rc != 0 and "--md-only" in err:
+                rc, out, err = self._md([*policy.compose_args(experimental), "--json", "--md-only"])
             if rc == 0:
                 try:
                     return json.loads(out), experimental

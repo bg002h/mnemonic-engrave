@@ -75,8 +75,8 @@ committed table is not what the committed evidence builds.
 The whole plan was applied to a scratch copy of `d269c556` and built. These
 are measurements, not predictions:
 
-- **526 evidence rows** from 21 engrave inputs (Liana 8.0 and 15.0, Nunchuk
-  2.1.1, Core 24.2-31.1). The build stores **228 cells**, explains **204
+- **532 evidence rows** from 23 engrave inputs (Liana 8.0 and 15.0, Nunchuk
+  2.1.1, Core 24.2-31.1). The build stores **230 cells**, explains **206
   refusals** by rules, and confirms **2 rows unkeyable** (a stale-key Liana
   control; Nunchuk's PR-1746 form). **Zero disagreements** after three fixes
   the build forced, all recorded in the design fold:
@@ -84,9 +84,28 @@ are measurements, not predictions:
     refused for its `<0;1>` (`Key path value '<0;1>' is not a valid
     uint32`), not for its miniscript. Spelling refusals are checked before
     clauses, in the build and at runtime.
-  - **Liana class 9 narrowed** (the design's "second unlocked path"): X24's
-    second SINGLE-key unlocked path is imported (folded, `ImportsAltered`
-    2-of-4); X25/X26's second MULTI-key one is refused.
+  - **Liana class 9 narrowed to `k >= 2`** (the design's "second unlocked
+    path"; R0 I-1). Liana lifts the policy, and rust-miniscript's
+    `normalized()` flattens every 1-of-n into bare keys, which Liana folds
+    into the primary: a second unlocked path that is a single key (X24) or a
+    1-of-n (R0's `cx-multi-then-1of2multi`,
+    `wsh(or_d(multi(2,A,B),or_i(multi(1,C,D),and_v(v:pkh(E),older(100)))))`,
+    imported by v15.0 as 2-of-4) is IMPORTED, read as altered. A second
+    unlocked path that stays a threshold (`k >= 2`: X25, X26, R0's
+    `cx-single-then-multi`) is refused. The first draft keyed on
+    `slots.len() >= 2` and falsely refused the 1-of-n case, including from
+    `md compose --wrapper wsh --path 2of2 --path 1of2 --path 1of1,older=100`;
+    R0 measured it, and its rows are now evidence (Task 0), so the build
+    D1-checks the boundary.
+  - **Liana's relative-lock clause reads the lock VALUE** (R0 M-1, M-4).
+    `csv_check` takes only a u16 block count, so an `older` in blocks above
+    65535 is refused like one in time units: R0 measured X24 with
+    `older(70000)`, which v15.0 refuses with `Timelock value '70000' isn't
+    valid or safe to use`, while the draft printed X24's `ImportsAltered`
+    cell for it (the key abstracts lock values). The clause (now "a relative
+    lock Liana cannot use") and "two paths with one lock" both declare
+    `LOCK_VALUES`. `md encode` refuses `older(70000)`, so only a card minted
+    elsewhere reaches this.
   - **D3, Liana checks time units before absolute locks:** the fork's
     order (class 5 `after`, then class 6 older-units) names "an absolute
     lock" for `mixed-lock-bases-{wsh,tr}`, whose Liana message at both 8.0
@@ -110,7 +129,8 @@ are measurements, not predictions:
   template and compose's refusal could never fire. With it, a keyless
   `--experimental` compose is refused by all three, which **changes four
   existing md-cli tests** (they gain `--md-only`; Task 8) — a behaviour
-  change the CHANGELOG states.
+  change the CHANGELOG states — **and one fork test** that shells out to the
+  installed `md` (F-669, Task 0; R0 I-2).
 - **The F-644 shapes** each print a Liana refusal on `md compose`, with or
   without `--unspendable liana` (Task 8's test).
 
@@ -169,8 +189,10 @@ mechanically, task by task, to a `git archive` of `d269c556`; Task 5's
 script was run against a clone of engrave `1154e716` carrying Task 0's
 probe files; `cargo xtask verdicts` generated the table; then the four
 commands ran at **each of the nine task boundaries: all green** — nextest
-1537 → 1538 → 1539 → 1540 → 1540 → 1548 → 1551 → 1555 → 1555 passed, 4
-skipped (pre-existing), doc/clippy/fmt rc 0. The assembled tree was compared
+1537 → 1538 → 1539 → 1540 → 1540 → 1549 → 1552 → 1556 → 1556 passed, 4
+skipped (pre-existing), doc/clippy/fmt rc 0. Re-run in full after the R0
+fold (`design/agent-reports/coord-compat-1b-plan-r0.md`), with the fold's
+three new mutations. The assembled tree was compared
 file-by-file with the tree the tests were developed in: identical.
 
 **Re-running it after a fold:** `/scratch/code/shibboleth/mnemonic-engrave/scripts/cc1b-plan-extract.py <this plan>`
@@ -178,14 +200,14 @@ applies the blocks task by task to a fresh `git archive` of `d269c556`, runs
 the plan's generator commands (Task 5's script against the engrave clone
 `/scratch/code/shibboleth/.tmp/cc1b-engrave-mirror`, which carries Task 0
 Step 1; Task 6's `cargo xtask verdicts`), and diffs each task's tree against
-the tree the gate ran on. It is scratch and uncommitted; if this plan is
-folded more than once, commit it as `scripts/plan-build-gate-cc1b.py`.
+the tree the gate ran on. The engrave clone also carries the R0 probes Task 0
+Step 1 now commits.
 
 **Coverage line — what that run does NOT cover:** Task 0 (engrave records and
 the evidence commit), the PR / push / tag steps, the Windows and macOS legs
 of CI (the `.gitattributes` lines in Task 5 exist for Windows and were not
 exercised), `--check` against the REAL engrave after Task 0 (Task 9 runs it),
-and the named mutations — 16 of them were run and each reddened its test (marked
+and the named mutations — 19 of them were run and each reddened its test (marked
 *measured* below); the rest are stated, not measured.
 
 ---
@@ -194,8 +216,9 @@ and the named mutations — 16 of them were run and each reddened its test (mark
 
 Not implementer work. Two commits on engrave `master`, before the worktree.
 
-- [ ] **Step 1: Commit the recon's Nunchuk probe as evidence** (R-1's
-  measured positive):
+- [ ] **Step 1: Commit the recon's Nunchuk probe and R0's Liana probes as
+  evidence** (R-1's measured positive; R0 I-1's 1-of-n fold and M-1's
+  `older(70000)`):
 
 ```sh
 cd /scratch/code/shibboleth/mnemonic-engrave
@@ -203,13 +226,21 @@ mkdir -p design/evidence/coord-compat-1b
 for x in py tsv out; do
   cp /scratch/code/shibboleth/.tmp/recon-1b-nunchuk-probe.$x design/evidence/coord-compat-1b/nunchuk-kind1-probe.$x
 done
+R=/scratch/code/shibboleth/.tmp/r0-cc1b
+cat $R/in2.jsonl  $R/in3.jsonl  > design/evidence/coord-compat-1b/liana-r0-probes-in.jsonl
+cat $R/out2.jsonl $R/out3.jsonl > design/evidence/coord-compat-1b/liana-r0-probes-out.jsonl
 git add design/evidence/coord-compat-1b
-git commit -m "evidence: the recon's Nunchuk kind-1 probe (R-1), libnunchuk a7cfb49"
+git commit -m "evidence: the recon's Nunchuk kind-1 probe (R-1) and plan 1b R0's Liana v15.0 probes"
 ```
 
-  The `.out` has three sections (`k1-liana-unsorted` REFUSE,
+  The Nunchuk `.out` has three sections (`k1-liana-unsorted` REFUSE,
   `pr1746-nunchuk-form` ACCEPT, `k1-liana-sorted` ACCEPT); the `.tsv` holds
-  their descriptors. The vendoring script reads exactly these two names.
+  their descriptors. The Liana pair has six rows, from the harness built at
+  `fable-liana-src-v15` (`v15.0`, `4684d5cb`; R0 report header):
+  `cx-multi-then-1of2multi` (imported, 2-of-4), `cx-single-then-multi`
+  (refused), `cx-multi-then-single` and `x24` (imported), `x24-older70000`
+  (refused, `Timelock value '70000'`), `x24-older100` (imported). The
+  vendoring script reads exactly these file names.
 
 - [ ] **Step 2: FOLLOWUPS (engrave `design/FOLLOWUPS.md`).** File the six
   deferred minors of `design/agent-reports/coord-compat-1a-final-review.md:368-377`
@@ -228,8 +259,28 @@ git commit -m "evidence: the recon's Nunchuk kind-1 probe (R-1), libnunchuk a7cf
   (convergence). File **F-667**: md-cli's
   `decompose/walk.rs:259-282` is a second copy of the kind-1 leaf-walk
   recogniser now public in `md_codec::descriptor_route` — owning phase: next
-  descriptor-mnemonic release. Commit: `records: file the 1a minors, re-own
-  F-644 and F-655 to coord-compat 1b`.
+  descriptor-mnemonic release. File **F-669** (R0 I-2): the fork test
+  `TestFableTwoKeylessPathsAgreeWithTheHostOracle`
+  (`gui/composer_fable_r0_funds_test.go:131-160` at `2c9eed3`) runs
+  `md compose --wrapper wsh --experimental` on five admitted keyless rows and
+  goes red once md 0.20.0 is on PATH (it refuses the none case); the fix is
+  `--md-only` in its args, so `admit` keeps meaning "the composer admits it" —
+  **owning phase: before md-cli 0.20.0 is installed on this box, i.e. plan
+  1b's release (Task 9)**. The fork's `oraclelive` compose tests use
+  hash-pinned md binaries (`oracle/pins.json`) and are unaffected until
+  repinned; record that a repin to ≥0.20.0 needs the same flag. File **F-670**
+  (R0 M-3): `mnemonic-secret` `crates/ms-cli/src/cmd/hashlock.rs:525` prints
+  `for md compose: --path <your other paths> --path keyless,…`, which under
+  `--wrapper wsh` now also needs `--experimental --md-only` (documentation
+  only: md's refusal names the flag) — owning phase: next mnemonic-secret
+  release. **Commit the working-tree edit to `scripts/policy-differential.py`**
+  in the same commit (R0 M-2, already made in engrave by this fold): its
+  `compose()` retries with `--md-only` when md's refusal names it, so a
+  keyless-`wsh` stop is expected rather than a finding (measured with the
+  plan's md, `--seed 7 --count 60 --no-core`: compose refusals 16 → 5, the
+  five left being the pre-existing two-keyless-paths refusal). Commit:
+  `records: file the 1a minors and R0's follow-ups, re-own F-644 and F-655
+  to coord-compat 1b; policy-differential retries --md-only`.
 
 - [ ] **Step 3: Worktree.**
   `git -C /scratch/code/shibboleth/descriptor-mnemonic worktree add -b cc-1b-verdicts /scratch/code/shibboleth/dm-worktrees/cc-1b d269c556`
@@ -1478,7 +1529,7 @@ cites):
 | | a path with no key | S | "All spend paths must require a signature" (v15.0, F-633) |
 | | one signer twice in a path | K | X11's message |
 | | a key used twice | K | design §1A `key_partition` (DuplicateKey) |
-| | legacy wrapper … a second unlocked multi-key path | S | the fork's `composerLianaOutsideModelClass` (`gui/composer_consent.go:396`, `2c9eed3`), ported with the double count removed, classes 5/6 swapped and class 9 narrowed (§2) |
+| | legacy wrapper … a second unlocked k-of-n path with k >= 2 | S, and S+`LOCK_VALUES` for the relative-lock and "two paths with one lock" clauses | the fork's `composerLianaOutsideModelClass` (`gui/composer_consent.go:396`, `2c9eed3`), ported with the double count removed, classes 5/6 swapped, class 6 widened to any relative lock `csv_check` refuses, and class 9 narrowed to `k >= 2` (§2) |
 | Nunchuk 2.1.1 | a path with no key (`wsh` only) | S | libnunchuk `a7cfb49` `descriptor.cpp:573`, `nunchukutils.cpp:1276`, `contrib/bitcoin` `miniscript.h:1617` |
 | | Liana's key is not the one Nunchuk derives | K | R-1; `descriptor.cpp:689-712`, `:646` |
 | Core 24.2-25.2 | `<0;1>` spelling (form); miniscript under tr; a path with no key | S | `src/script/descriptor.cpp` v24.2:1507/1525, v25.2:1510/1528; core-boundary |
@@ -2135,6 +2186,7 @@ use crate::skeleton::Skeleton;
 
 const S: ReadSet = ReadSet::STRUCTURE;
 const K: ReadSet = ReadSet::KEY_IDENTITY;
+const SV: ReadSet = ReadSet::STRUCTURE.with(ReadSet::LOCK_VALUES);
 
 const fn span(since: &'static str, until: &'static str) -> Span {
     Span {
@@ -2221,15 +2273,26 @@ const LIANA_CLAUSES: &[Clause] = &[
     },
     Clause {
         reason: Reason {
-            class: "a lock in time units",
-            cite: "liana csv_check :139-145; message \"Timelock value … isn't valid or safe to use\"",
+            class: "a relative lock Liana cannot use",
+            cite: "liana csv_check :139-145 (a u16 block count only); message \"Timelock value … isn't valid or safe to use\" (older-units-wsh; x24-older70000, plan 1b r0 M-1)",
         },
         // BEFORE "an absolute lock", unlike the Go (its class 6 after class
         // 5): Liana 8.0 and 15.0 refuse mixed-lock-bases-{wsh,tr}, which carry
         // both, with this class's message. The Go order is a D3 the table
         // build reports on three evidence rows.
-        reads: S,
-        fires: |s| any_lock(s, &[LockKind::OlderUnits]),
+        //
+        // Wider than the Go's "older in time units": `csv_check` takes only a
+        // u16 BLOCK count, so an `older` in blocks above 65535 is refused too
+        // (measured, `older(70000)`), and it reads the lock VALUE (r0 M-1, M-4).
+        reads: SV,
+        fires: |s| {
+            s.shape.branches.iter().any(|b| {
+                b.locks.iter().any(|l| {
+                    l.kind == LockKind::OlderUnits
+                        || (l.kind == LockKind::OlderBlocks && l.value > 0xFFFF)
+                })
+            })
+        },
     },
     Clause {
         reason: Reason {
@@ -2256,7 +2319,7 @@ const LIANA_CLAUSES: &[Clause] = &[
             class: "two paths with one lock",
             cite: "liana analysis.rs:624-626",
         },
-        reads: S,
+        reads: SV,
         fires: |s| {
             let mut seen: Vec<u32> = Vec::new();
             for b in &s.shape.branches {
@@ -2274,14 +2337,17 @@ const LIANA_CLAUSES: &[Clause] = &[
     },
     Clause {
         reason: Reason {
-            class: "a second unlocked multi-key path",
-            cite: "liana analysis.rs:611-616; evidence X24 (single key folded in, imported) vs X25/X26 (refused)",
+            class: "a second unlocked k-of-n path with k >= 2",
+            cite: "liana analysis.rs:611-616 after rust-miniscript semantic.rs:359-426 normalized(); evidence X24 and cx-multi-then-1of2multi (folded, imported) vs X25/X26 and cx-single-then-multi (refused)",
         },
         // NARROWER than the Go's class 9, which names every second unlocked
-        // path: Liana FOLDS a second single-key unlocked path into the
-        // primary and imports it (X24, measured), so refusing that would be a
-        // D1 false refusal. What it refuses is a second unlocked path with
-        // more than one key.
+        // path. Liana lifts the policy and `normalized()` flattens every
+        // 1-of-n into bare keys, which it then FOLDS into the primary path
+        // and imports (X24's single key; plan 1b r0 I-1's `multi(1,C,D)`,
+        // read as 2-of-4) -- refusing those would be a D1. What it refuses is
+        // a second unlocked path that stays a threshold: `k >= 2`. A second
+        // path that is an `and` of keys (k = 0, two slots) is refused by
+        // Liana too and missed here, which errs toward silence.
         reads: S,
         fires: |s| {
             s.shape
@@ -2289,14 +2355,15 @@ const LIANA_CLAUSES: &[Clause] = &[
                 .iter()
                 .filter(|b| unlocked(b))
                 .skip(1)
-                .any(|b| b.slots.len() >= 2)
+                .any(|b| b.k >= 2)
         },
     },
 ];
 
 /// Liana's primary path is the ONE unlocked path, read as `k`-of-`n`. It
-/// folds a second single-key unlocked path into it (X24: built as 2-of-3
-/// plus 1-of-1, read as 2-of-4), which is exactly an import "not as built".
+/// folds a second single-key or 1-of-n unlocked path into it (X24: built as
+/// 2-of-3 plus 1-of-1, read as 2-of-4), which is exactly an import "not as
+/// built".
 fn liana_reads_as_built(s: &Skeleton, d: &Description) -> bool {
     let mut primaries = s.shape.branches.iter().filter(|b| unlocked(b));
     let (Some(p), None) = (primaries.next(), primaries.next()) else {
@@ -2320,7 +2387,7 @@ fn liana_class_of_message(m: &str) -> Option<&'static str> {
     ) {
         Some("one signer twice in a path")
     } else if m.starts_with("Timelock value") {
-        Some("a lock in time units")
+        Some("a relative lock Liana cannot use")
     } else if m.starts_with("A Liana policy requires at least one recovery path") {
         Some("no locked path")
     } else {
@@ -2561,6 +2628,7 @@ Create `scripts/vendor-coord-evidence.sh`:
 #               "md" and "liana-unspendable-xpub"
 #   Liana 15.0  f449-stage2/liana-live-gate-{in,expected}.jsonl (all rows)
 #   Liana 15.0  f449-stage4/liana-probes-{parse-in,out}.jsonl (all rows)
+#   Liana 15.0  coord-compat-1b/liana-r0-probes-{in,out}.jsonl (plan 1b R0's probes)
 #   Nunchuk     composer-fable-r0/fable-nunchuk-harness-out.txt, "<name>.multipath"
 #               sections, descriptor from fable-liana-shapes.json's desc_md
 #   Nunchuk     coord-compat-1b/nunchuk-kind1-probe.{tsv,out} (the recon's probe)
@@ -2670,6 +2738,14 @@ for in_rel, out_rel in [("f449-stage2/liana-live-gate-in.jsonl", "f449-stage2/li
             continue
         row(id_, rec["name"], "liana", "15.0", "4684d5cb", "harnesses/liana unspendable", "v15.0", "multipath",
             at, din[rec["name"]], liana_outcome(rec), LIANA_UNKEYABLE.get(rec["name"]))
+
+# -- Liana 15.0, the plan 1b R0 review's probes (harness at fable-liana-src-v15,
+# `git describe` v15.0, 4684d5cb; agent-reports/coord-compat-1b-plan-r0.md).
+# Hand-built descriptors over the X24 keys: the 1-of-n fold (I-1) and older(70000) (M-1).
+din = {r["name"]: r["desc"] for r, _, _ in jsonl("coord-compat-1b/liana-r0-probes-in.jsonl")}
+for rec, id_, at in jsonl("coord-compat-1b/liana-r0-probes-out.jsonl"):
+    row(id_, rec["name"], "liana", "15.0", "4684d5cb", "plan 1b r0 probe (hand-built)", "2026-09-23",
+        "multipath", at, din[rec["name"]], liana_outcome(rec))
 
 # -- Nunchuk 2.1.1 (libnunchuk a7cfb49), fable r0, md 0.16.2 ----------------
 # agent-reports/composer-fable-r0-nunchuk.md:6 (md 0.16.2), recon §3c (a7cfb49 = 2.1.1's pin)
@@ -2802,7 +2878,7 @@ index 6509d3f..df4f561 100644
 
 ```sh
 scripts/vendor-coord-evidence.sh /scratch/code/shibboleth/mnemonic-engrave
-# expect: vendor-coord-evidence: 526 rows from 21 inputs
+# expect: vendor-coord-evidence: 532 rows from 23 inputs
 scripts/vendor-coord-evidence.sh --check /scratch/code/shibboleth/mnemonic-engrave
 # expect: vendor-coord-evidence: fresh
 ```
@@ -2840,6 +2916,8 @@ Replace `crates/md-codec/tests/coordinator.rs`; generated: `Cargo.lock`,
   | `imports_altered_is_derived_from_the_coordinators_own_reading` | `liana_reads_as_built` → `true`: `table_is_fresh` reds first, then this after regeneration (*measured*) |
   | `none_imports_only_when_every_run_refuses` | `all` → `any` (*measured*) |
   | `the_build_names_every_disagreement_class` | drop the D5 comparison (*measured*) |
+  | `liana_class_9_refuses_a_second_threshold_only_from_k_2` | `b.k >= 2` → `b.k >= 1` (the 1-of-2 row is refused; the build also reports a D1 on `liana-r0-probes-out.jsonl:1`) and → `b.k >= 3` (the 2-of-2 row is not refused; the build reports D2s on X25/X26) — both *measured* |
+  | xtask `table_is_fresh` (the relative-lock clause) | drop the `OlderBlocks > 0xFFFF` disjunct → D2 on `liana-r0-probes-out.jsonl:5`, `older(70000)` (*measured*) |
   | xtask `table_is_fresh` | delete any `Cell` line from `table.rs` |
 
 Replace `crates/md-codec/tests/coordinator.rs`:
@@ -3122,6 +3200,42 @@ fn imports_altered_is_derived_from_the_coordinators_own_reading() {
         "{:?}",
         of(&v, "nunchuk")
     );
+}
+
+/// Liana's class 9 boundary, `k >= 2`, pinned in BOTH directions (plan 1b
+/// r0 I-1). Liana's normaliser flattens a second unlocked 1-of-n into bare
+/// keys and folds them into the primary (measured: `cx-multi-then-1of2multi`
+/// imported as 2-of-4); a second unlocked 2-of-2 stays a threshold and is
+/// refused (`cx-single-then-multi`). Checked keyed AND as a template, because
+/// `md compose` reaches it keylessly. Mutations (both measured): `b.k >= 1`
+/// -> the 1-of-2 row is refused and this reds (the table build reds too, on a
+/// D1); `b.k >= 3` -> the 2-of-2 row is not refused and this reds.
+#[test]
+fn liana_class_9_refuses_a_second_threshold_only_from_k_2() {
+    const CLASS: &str = "a second unlocked k-of-n path with k >= 2";
+    let refuses_9 = |vs: &[CoordinatorVerdict]| matches!(of(vs, "liana")[..], [Verdict::Refuses { reason, .. }] if reason.class == CLASS);
+    let (d, folded) = keyed(&descriptor_named("liana", "cx-multi-then-1of2multi"));
+    assert_eq!(
+        folded.shape.branches[1].k, 1,
+        "precondition: the second path is 1-of-2"
+    );
+    // Measured at 15.0 only, so 8.0 is silent; no run refuses.
+    let v = verdicts(&folded, Some(Form::Multipath));
+    let liana = of(&v, "liana");
+    assert!(
+        liana.iter().any(|x| matches!(x, Verdict::ImportsAltered { as_read, .. } if as_read.threshold == Some((2, 4))))
+            && !liana.iter().any(|x| matches!(x, Verdict::Refuses { .. })),
+        "{liana:?}"
+    );
+    assert!(!refuses_9(&verdicts(&template_of(&d), None)));
+
+    let (d, refused) = keyed(&descriptor_named("liana", "cx-single-then-multi"));
+    assert_eq!(
+        refused.shape.branches[1].k, 2,
+        "precondition: the second path is 2-of-2"
+    );
+    assert!(refuses_9(&verdicts(&refused, Some(Form::Multipath))));
+    assert!(refuses_9(&verdicts(&template_of(&d), None)));
 }
 
 /// Ruling 2's none case: every coordinator refuses at every verified
@@ -3696,8 +3810,9 @@ Create `crates/xtask/src/main.rs`:
 //! file; everything that decides a verdict — keying, the rules, D1-D5 — is
 //! md-codec's own `coordinator::build`, so there is one implementation of the
 //! key and one of the rules. `--check` writes nothing and exits 1 when the
-//! committed table is not what the evidence builds; `table_is_fresh` below
-//! runs the same comparison inside the test suite.
+//! committed table is not what the evidence builds -- a local convenience.
+//! THE GATE is `table_is_fresh` below, which runs the same `generate` inside
+//! `cargo test`; CI never calls `--check`, and no test exercises `main`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -3895,7 +4010,7 @@ mod tests {
 cargo update --workspace --offline      # adds the xtask package to Cargo.lock; nothing else moves
 cargo xtask verdicts
 # expect: wrote crates/md-codec/src/coordinator/table.rs
-#         (526 rows: 228 cells stored, 204 refusals the rules explain, 2 unkeyable)
+#         (532 rows: 230 cells stored, 206 refusals the rules explain, 2 unkeyable)
 cargo xtask verdicts --check            # expect: fresh (...)
 ```
 
@@ -3915,7 +4030,7 @@ cargo xtask verdicts --check            # expect: fresh (...)
 `crates/md-cli/src/cmd/mod.rs`, `crates/md-cli/src/main.rs`.
 
 - [ ] **Step 1: The tests** — agreement with the library on every distinct
-  keyable evidence descriptor (73), card vs descriptor, and the single-chain
+  keyable evidence descriptor (78; the test's floor is 73), card vs descriptor, and the single-chain
   refusal. Mutation (measured, reds the first): print the key with its
   U+001F separators replaced by spaces.
 
@@ -4976,6 +5091,10 @@ index 75b9c7b..189b60b 100644
   `scripts/vendor-coord-evidence.sh --check /scratch/code/shibboleth/mnemonic-engrave`
   → `fresh`; `cargo xtask verdicts --check` → `fresh`.
 - [ ] **Step 3:** the gate. Commit `release: md-codec 0.48.0, md-cli 0.20.0`.
+- [ ] **Do NOT `cargo install` md 0.20.0 on this box until F-669's fork fix
+  (`--md-only` in `TestFableTwoKeylessPathsAgreeWithTheHostOracle`) has
+  landed** — installing it first turns the fork's `gui` shard red at its next
+  gate (R0 I-2).
 - [ ] **Step 4: The PR.** Push `cc-1b-verdicts` and open the pull request
   against `main` (`gh pr create --repo bg002h/descriptor-mnemonic`), body
   ending with the attribution lines. **Hand the operator the PR number for
