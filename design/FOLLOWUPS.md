@@ -19702,3 +19702,34 @@ F-641: the refusal names text the operator never wrote.
 **The fix.** Verify every template checksum over the operator's text, with a
 deprecation path for the synthetic-text checksum if any shipped tool emits
 one. Measure that before choosing.
+
+### F-647 — mnemonic-toolkit's manual and its manual lint do not cover `md compose` (owning phase: **next mnemonic-toolkit release after F-642**) `#mnemonic-toolkit` `#docs` `#lint-gap`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-642 implementer's report
+(`design/agent-reports/f642-toolkit-pin-bump-impl.md`, concern 2).
+
+`md compose`, including `--unspendable` (new in md-cli 0.19.0), is missing from
+the toolkit manual and from the manual lint's subcommand list, so no lint can
+catch its absence. This predates F-642. **Fix:** add `compose` to the lint's
+list (it should then fail), and write the section.
+
+### F-648 — md-cli `repair.rs`'s D26 "DIVERGENCE … until the toolkit adopts `correct_chunks`" block goes stale when F-642 ships (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#docs`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller. After F-642, `mnemonic repair` also keeps
+the correction on a single card at an unreadable wire version, but exits **4**
+(the toolkit's "corrected, not self-verified" code; controller ruling 8), where
+`md repair` exits 5. Rewrite the block to state that remaining 4-vs-5
+difference, and remove the "until the toolkit adopts" clause.
+
+### F-649 — `mnemonic restore` refuses a kind-1 (Liana unspendable) internal key rather than restoring it (owning phase: **F-449 cycle, toolkit side, after stage 5**) `#mnemonic-toolkit` `#restore` `#funds`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller. F-642 made `mnemonic restore` refuse a
+wire-kind-1 internal key with exit 2. That is fail-closed and correct for now:
+the implementer's mutation showed that without the refusal, restore prints a
+NUMS wallet (`tr(50929b74…,multi_a(…))`), which is a different wallet. Restore
+should instead derive the Liana unspendable key from the leaves via md-codec's
+§2 derivation and print the Liana descriptor, with a vector against
+`cases.json`.
