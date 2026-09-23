@@ -36,6 +36,47 @@ Every code block in Tasks 1 and 3 to 6 was applied to **scratch exports** of the
 
 The mutation results in the Self-Review were measured against that end state, and every one applied (checked, not assumed). **The existing `scripts/plan-build-gate-go.sh` cannot check this plan.** It assembles only new files named `md/compose*.go`, `mk/compose*.go`, `sysw/composer_*.go` and `gui/composer_*.go`, and every file here is either an existing file or a new file outside those patterns. So a reviewer should **not** read its exit code as a verdict. The scratch runs above are the gate. What they do **not** cover is listed under "What no gate covers".
 
+## R0 folds — BINDING additions to the tasks below (R0 GREEN, 0C/0I/5M/2N)
+
+Source: `design/agent-reports/f449-plan-stage3-r0.md`. These change the tasks
+they name. Where a task's text disagrees, this section wins.
+
+- **m1, Task 1 (Rust first) and Task 5 (Go): pin the READ side of the kind bit.**
+  Both languages' polarity tests pin only the write side. R0 measured that a
+  reader which always yields Liana at v8 passes md 179/179 and Rust
+  1536/1536, and so does a reader that reads a kind bit for a Slot key.
+  - **Task 1:** extend Rust's
+    `the_kind_bit_polarity_is_pinned_on_the_wire_not_just_round_tripped` to read
+    each golden back through `read_node`: `[0x06,0x00]`@8 → `NumsPoint`,
+    `[0x07,0x00]`@8 → `LianaUnspendable`, `[0x06]`@4 → `NumsPoint`. Also add
+    one Slot-at-v8 golden (no kind bit) read back as the slot.
+  - **Task 5:** give `TestKindBitPolarityIsPinnedOnTheWire` the same read-back
+    via `readNode(c.want, 0, c.version)` → `c.ik`, with the same Slot-at-v8
+    row.
+  - **Mutations to prove:** X1 (`if kind {` → `if kind || true {` in
+    `readNodeDepth`'s Tr arm), X2 (a kind bit read for a Slot at v8), and the
+    Rust twin of X1. Each must redden the new read-back, and none of them does
+    today.
+- **m2, Review Focus 2 and "What no gate covers" bullet 6:** correct both. On
+  the stage-3 inspect screen a kind-1 wallet shows `Complex policy - cannot
+  display safely` with its keys, and NO key-path line, NO `Policy id:` and NO
+  address. Task 8's sweep records that kind 1 loses the inspect `Policy id:`
+  line until stage 4.
+- **m3, Task 6 (`TestVersion8CardsAreReadOnEveryRoute`):** the single-card half
+  also asserts a POSITIVE: `uiContains(all.String(), "Keys: 3")`, or the
+  display title. Absences alone pass on a flow that draws nothing.
+- **m4, Task 8's §9 status line:** add "stage 3 alone lets the device copy
+  kind-1 cards verbatim without an address (`noAddressLines`); the engrave
+  refusal of §7a.3 is stage 4". No code change.
+- **m5, Task 5 Step 7:** the recursive `readNodeDepth(r, kiw, depth+1)` sites
+  number **10**, not 13. The compiler catches any site you miss.
+- **n1, Task 3 Step 4:** the `case md.InternalKeyLianaUnspendable:` Skip arm in
+  `gui/taproot_script_path_test.go` is unreachable for both kind-1 vectors,
+  because `md.TapLeavesChunks` errors first. Keep it, commented as
+  future-proofing. The real gate is `stillUnsupported`.
+- **n2:** engrave master has moved again. Re-grep the free follow-up IDs at
+  filing time (F-654 and F-655 were still free at R0).
+
 ## Global Constraints
 
 - **Rust leads, Go follows (CLAUDE.md).** Every Go behaviour in this plan is a port of md-codec 0.47.0. If a port step meets Rust behaviour that looks wrong, file a Rust follow-up and port Rust as it is. Never diverge in Go.
