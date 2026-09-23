@@ -19209,7 +19209,7 @@ coordinator's newest release outruns every verified version.
 
 ### F-635 — `me-bundle-silently-skips-an-undecodable-md1-plate`: a decode failure leaves the completeness claim computed from nothing (owning phase: **F-449 stage 4a**, `design/SPEC_liana_unspendable_internal_key.md` §8b) `#mnemonic-engrave` `#me` `#funds-adjacent`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in mnemonic-engrave `d25eee36` (F-449 stage 4a Task 2). The unchunked path now refuses an md1 plate that does not decode, as the chunked path already did: `BundleError::Md1WireVersion` names the version through md-codec's own `WireVersionMismatch` Display, and `BundleError::Md1Undecodable` names the codec error. The defect was live at wire version 4 as well as 8 (an origin-less `md encode` template, `md1yppqqxqu22z54hcefkda7r46w`, is now refused where 0.10.0 counted it as one plate). It is pinned by the five Task-2 tests in `crates/me-cli/tests/f449_stage4a.rs`.
 Filed 2026-09-21 during the F-449 journey walk (I6), which found it while
 checking what an older toolchain does with a version-8 plate.
 
