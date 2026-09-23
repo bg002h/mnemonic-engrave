@@ -5,18 +5,24 @@
 **Stage 1b is SHIPPED.** dm main `25acb33c` (md-codec 0.46.0, md-cli 0.18.0,
 1500/1500, CI green no bypass). engrave master `b5576365`+.
 
-**Stage 2 plan is GREEN (R4 0C/0I, Minors folded at `fa8bba6f`). IMPLEMENTING.**
+**Stage 2 is SHIPPED (2026-09-23).** descriptor-mnemonic main `cf35d61a`
+(md-codec 0.47.0, md-cli 0.19.0, CI green, no bypass), tag
+`descriptor-mnemonic-md-cli-v0.19.0`. engrave merge `b8ee1ede`.
 
-### Do this first (updated 2026-09-23)
-One opus implementer runs the whole plan in two worktrees:
-- dm `/scratch/code/shibboleth/dm-worktrees/f449-stage2` (branch `f449-stage2` @ 25acb33c)
-- engrave `/scratch/code/shibboleth/me-worktrees/f449-stage2` (branch `f449-stage2` @ fa8bba6f)
-Ledger + report: `.superpowers/sdd/IMPLEMENTATION_PLAN_f449_stage2_compose/`
-(`progress.md`, `implementation-report.md`; git-ignored). If interrupted, read
-the report's `Task N: complete` lines and resume at the first missing task.
-Then: MANDATORY opus whole-diff adversarial review (persisted to
-`design/agent-reports/f449-stage2-whole-branch.md`) → fold → merge → push via
-`scripts/push-via-staging.sh` → tag md-codec 0.47.0 / md-cli 0.19.0.
+### Do this first
+Stage 3: the Go port in the fork's `md/` (three-state kind, version-derived
+identity). Without it the DEVICE cannot read kind-1 plates. Rust-primary
+rule: port semantics from md-codec 0.47.0 and update the provenance pin.
+Also due: F-642 (toolkit pin bump, owned by the cycle), F-643 (stage 3),
+F-644 (stage 4), F-645 and F-646 (next dm release).
+
+### How stage 2 went (for the next plan)
+Plan R0 3C/7I → R1 0C/7I → R2 0C/5I → R3 0C/2I → R4 GREEN. Every round after
+R0 found its Importants in the PREVIOUS FOLD's remedies. Whole-branch review
+0C/1I (md repair misread a mixed card set as version 10); its fix leaked a
+second time (unrelated chunked cards), closed by ruling 7: the exit-5 branch
+is single-string only. Rulings 1-7 live in the SDD ledger (git-ignored) and in
+the merge commits.
 
 ### The plan
 `design/IMPLEMENTATION_PLAN_f449_stage2_compose.md` — 9 task headings
