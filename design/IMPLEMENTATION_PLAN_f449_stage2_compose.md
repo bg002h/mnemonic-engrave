@@ -8,7 +8,7 @@
 
 **Tech stack:** Rust (md-codec, md-cli), the committed `harnesses/liana` against a Liana **v15.0** checkout.
 
-**Spec:** `design/SPEC_liana_unspendable_internal_key.md` (GREEN). **Recon:** `design/RECON_f449_stage2.md` — read it first; it measures that three of SPEC §9's four stage-2 items already shipped in 1b.
+**Spec:** `design/SPEC_liana_unspendable_internal_key.md` (GREEN). **Recon:** `design/RECON_f449_stage2.md` — read it first; it measures what of SPEC §9's four stage-2 items 1b already shipped — two of the four, with §4a's JSON bump half shipped (R3 M-1; the recon's own "three" is the error NEW-I-4 corrected).
 
 **Baseline revisions:** `descriptor-mnemonic` main `25acb33c` (md-codec 0.46.0, md-cli 0.18.0, 1500/1500); `mnemonic-engrave` master `2855adea` (R1 M-d — the plan, every script it invokes and the `design/FOLLOWUPS.md` holding F-636/638/640/641 live in THIS repo, so a staleness check needs both revisions or half the citations have nothing to compare against).
 
@@ -61,6 +61,8 @@
 - **Create** `crates/md-cli/tests/liana_evidence_legs.rs` — C3's deferred descriptor- and address-equality legs (md-**cli**: they need the binary, and `all_cases()` is not `pub`; R2 M-j).
 - **Create** `scripts/gen-compose-golden.sh` + `crates/md-cli/tests/golden/compose_pre_unspendable.json` — the pre-flag regression floor (Task 1 Step 0).
 - **Modify** `crates/md-codec/Cargo.toml`, `crates/md-cli/Cargo.toml`, `CHANGELOG.md` — the release (Task 8).
+- **Modify** `crates/md-codec/src/chunk.rs` + `crates/md-codec/src/lib.rs` — the additive `pub fn correct_chunks` (Task 2c, R3-I-1); `decode_with_correction` and `Error` keep their shapes.
+- **Modify** `crates/md-cli/src/cmd/repair.rs` — the corrected-but-unsupported-version branch and the D26 divergence line (Task 2c).
 - **Create** `scripts/liana-live-gate.sh` — the re-runnable §8.8 gate.
 - **Create** `design/evidence/f449-stage2/` — harness input/output committed as evidence.
 - **Not touched:** the wire format, `tree.rs`, `identity.rs`, `validate.rs`. Stage 1b settled those and this stage adds no wire behaviour.
@@ -340,7 +342,10 @@ site — never by a clap default, for the reason above.
   longer moves the omitted-flag case, so the old two-mutation set would have
   left the outer comparison unproven.
   (a) Swap the arms in Step 6 so `Nums` yields `LianaUnspendable`
-      → the **OUTER** golden comparison reddens on every `tr` row.
+      → the **OUTER** golden comparison reddens on 5 of the 6 `tr` rows
+      (R3 N-1: `simple-timelocked-inheritance` has a real key path,
+      `"internal_key_path": 0`, so no mutation of the unspendable choice
+      reaches it; the same holds for (c)).
   (b) Map `None` to `UnspendableKind::Liana` at the call site — the default
       arm → the **OUTER** comparison reddens. This is the mutation that would
       otherwise ship wire version 8 from a flagless compose, and it is the
@@ -387,7 +392,8 @@ cargo nextest run --locked --all-features
   key is a taproot concept. Test all four wrappers × both values — and, the
   assertion that catches a refusal gated on the wrong thing, that the
   **flagless** invocation still exits 0 under each of the three non-`tr`
-  wrappers. That is the same property Task 1's eight non-`tr` golden rows
+  wrappers. Use `plain-multisig` for `sh` and `sh-wsh` (R3 N-2): the other
+  five presets exit 1 there. That is the same property Task 1's eight non-`tr` golden rows
   assert; asserting it here too is what makes this task's own commit safe.
 
 - [ ] **Step 2: `--json`'s third state (§4a).** R0 I-4: 1b shipped
@@ -467,8 +473,13 @@ outcome available here.
   primary + one timelocked recovery), which is precisely what Liana accepts.
   **The "no unlocked path" half must count the key path when it carries a real
   key, and Steps 3 and 4 must be mutually exclusive by construction:** Step 4
-  fires on `ik.is_some()`, so Step 3's condition requires `ik.is_none()`.
-  Test that exactly one of the two fires on `simple-timelocked-inheritance`.
+  fires on `ik.is_some()`, so **the "no unlocked path" half** of Step 3's
+  condition requires `ik.is_none()`. **The hashlock half does not (R3 M-5):**
+  Liana declines a hashlock leaf whatever the key path holds, so
+  `--path 1of1 --path 1of1,sha256=…,older=100 --unspendable liana` prints both
+  warnings, and that is correct. Test that exactly one fires on
+  `simple-timelocked-inheritance`, and that both fire on the hashlock
+  example.
 
 - [ ] **Step 4: SPEC §6 row 3's warn** — `--unspendable liana` where
   `internal_key_path(list)` is `Some`, so a real key was extracted and there
@@ -502,7 +513,9 @@ trigger is a version outside the accepted set (e.g. **12**), not 8.
 The fix site was wrong too: `details` are discarded inside
 `decode_with_correction` — at **`chunk.rs:658`** (`decode_md1_string(&corrected_strings[0])?`)
 and `:666` (`reassemble(&corrected_refs)?`), both re-grepped for this fold;
-R2 N-f measured 658, not the 659 the draft carried — not in `repair.rs`.
+R2 N-f measured 658, not the 659 the draft carried. **Both files change
+(R3-I-1 c):** the correction is recovered in `chunk.rs`, and `repair.rs`
+gains the branch that reports it.
 
 - [ ] **Step 1: The trigger is reachable and the gap is REAL — MEASURED, so
   the self-close branch is closed (R2 §2).** Construct the chunk rather than
@@ -528,10 +541,29 @@ R2 N-f measured 658, not the 659 the draft carried — not in `repair.rs`.
   the pair at the head of the task to confirm nothing has moved, then commit
   the two constructed strings as test fixtures so no one re-derives the recipe.
 
-- [ ] **Step 2:** carry `details` through `chunk.rs:658`/`:666` so a
-  successful correction is not thrown away when the version check fails
-  afterwards. (Step 1 has already shown the gap is real; the "only if" branch
-  the draft carried is gone.)
+- [ ] **Step 2: ADD a function — change no existing public shape (R3-I-1).**
+  `decode_with_correction` is `pub` (re-exported at `lib.rs:51`) and
+  `md_codec::Error` is not `#[non_exhaustive]`. The toolkit depends on both
+  shapes, MEASURED at mnemonic-toolkit: `error.rs:520-616` matches
+  `md_codec::Error` exhaustively with no wildcard; `error.rs:1081`
+  destructures and `:1272` constructs `WireVersionMismatch { got }` without
+  `..`; `repair.rs:1667-1668` destructures `Ok((_descriptor, corrections))`.
+  So a new `Error` variant, new fields on `WireVersionMismatch`, or a new
+  return type each break the toolkit's pin bump at compile time. **Only an
+  added function does not, and it is the prescribed shape:**
+
+  - Extract the per-chunk BCH loop (`chunk.rs:547-631` at `25acb33c`, the
+    `for (chunk_index, chunk) in strings.iter().enumerate()` block) into
+    `pub fn correct_chunks(strings: &[&str]) -> Result<(Vec<String>, Vec<CorrectionDetail>), Error>`,
+    re-exported beside `decode_with_correction` in `lib.rs`. It returns the
+    corrected strings and the details, and decodes nothing.
+  - `decode_with_correction` calls it and then decodes, exactly as today:
+    same signature, same errors, same order. The existing repair and
+    correction tests are the regression floor for that. **Do not touch
+    `Error`.**
+  - The single-string pre-pass needs the first corrected string's symbols.
+    Re-derive them from `corrected_strings[0]` with `parse_chunk_symbols`
+    rather than widening the new function's return type to carry them.
 
 - [ ] **Step 3: the exit code — RULED: reuse `5`, mint nothing (R2 NEW-I-2).**
   MEASURED: "unsupported version after a successful correction" and "BCH
@@ -544,8 +576,13 @@ R2 N-f measured 658, not the 659 the draft carried — not in `repair.rs`.
   question cannot be dodged.
 
   **Resolution: exit `5` (REPAIR_APPLIED).** A correction *was* applied; `5`
-  is already distinct from `2`; the code → meaning mapping the other three
-  CLIs share is unchanged, so no code is minted and no other repo is touched.
+  is already distinct from `2`; and the code → meaning mapping the other three
+  CLIs share is unchanged, so no code is minted. **But `mnemonic repair`
+  diverges on this card, and the plan records that rather than denying it
+  (R3-I-1 b).** MEASURED by R3: `mnemonic repair` on the v12 card below exits
+  **2** (*"post-correction decode failed: wire-format version mismatch"*),
+  routed through `repair.rs:1736-1739`'s `Err(other)` arm. After this task,
+  `md repair` exits 5 on the same input.
   D28 (*"NO partial corrected chunks are emitted on stdout in the atomic-fail
   case"*, `repair.rs:10-12`) is likewise intact — at exit 5 this is not the
   atomic-fail case, and what reaches stdout is a complete, BCH-valid md1
@@ -553,15 +590,41 @@ R2 N-f measured 658, not the 659 the draft carried — not in `repair.rs`.
   exactly what the operator needs in order to take the recovered card to a
   newer binary.
 
-  Assert four things: stdout carries the corrected string; the exit is **5**;
-  stderr names the version AND the accepted set; and the uncorrectable v4
-  control still exits **2 with empty stdout**. Add one line to `repair.rs`'s
-  D26 block recording that `5` covers this case, so the next reader of the
-  parity contract does not read it as a divergence.
+  **The `repair.rs` branch.** In `run()`'s `Err(e)` arm, and only when `e`
+  is `Error::WireVersionMismatch { .. }`, call `md_codec::correct_chunks`. If
+  it returns `Ok` with **non-empty** details, emit the report and return `5`.
+  Otherwise keep today's behaviour exactly: `eprintln!` and return `2` with
+  empty stdout.
+  - **Output (R3 M-4).** Text and `--json` go through the existing
+    `emit_text` / `emit_json` with the corrected chunks and the per-chunk
+    positions, so the JSON is the same D27 `RepairJson` shape and needs no
+    descriptor. **No output-class advisory:** there is no `Descriptor` to
+    classify, and guessing is the L4 mislabel. Stderr carries instead
+    `md: repair: corrected, but this build cannot read wire version N
+    (accepted: …); take the corrected card to a newer md`.
+  - **Never reuse the success path's `any_correction ? 5 : 0` line for this
+    branch (R3 M-6).** A clean v12 card has no corrections to report, and that
+    line would return 0 ("already valid") for a card this build cannot read.
+
+  Assert **five** things:
+  1. stdout carries the corrected string;
+  2. the exit is **5**;
+  3. stderr names the version AND the accepted set;
+  4. the uncorrectable v4 control still exits **2 with empty stdout**;
+  5. **a CLEAN v12 card (zero errors) exits 2 with empty stdout**. This is
+     the control that catches a reused `any_correction ? 5 : 0` (R3 M-6).
+
+  Then **one line in `repair.rs`'s D26 block that records the divergence**:
+  `md repair` exits 5 on a corrected card whose wire version this build does
+  not support, while `mnemonic repair` exits 2 on it until the toolkit adopts
+  `correct_chunks` (owned by Task 8 Step 5's follow-up). Do not call it
+  parity.
   **If the implementer concludes `5` is wrong, that is a spec escalation, not
   an implementer's choice — stop and say so.**
 
-- [ ] **Step 4:** prove it can fail. **Step 5: Gate and commit** (descriptor-mnemonic).
+- [ ] **Step 4:** prove it can fail, including the clean-v12 control: mutate
+  the new branch to return `if details.is_empty() { 0 } else { 5 }` and show
+  assertion 5 reddens. **Step 5: Gate and commit** (descriptor-mnemonic).
 
 ---
 
@@ -632,9 +695,13 @@ output are in `design/agent-reports/f449-plan-stage2-r0.md` Appendix A and
 
 - [ ] **Step 1: Vector the accepted nested case** into `cases.json`
   (descriptor B: four keys, reusing the corpus's existing key set and internal
-  key — the smallest diff, and reachable via `--path`, not any preset). Record
-  its verdict, its two inferred recovery paths (`older` 26280 / 52560) and its
-  addresses, exactly as the harness returned them.
+  key — the smallest diff, and reachable via `--path`, not any preset). It
+  enters `cases.json` **only through the regenerator (Step 2) — never by hand**.
+  The regenerator's case schema (`vendor-liana-evidence.sh:195-205`) has no
+  field for recovery paths, so the two inferred recovery paths (`older`
+  26280 / 52560) are recorded in the harness output committed under
+  `design/evidence/f449-stage2/` (Step 5) and do not appear in `cases.json`
+  (R3-I-2).
 
 - [ ] **Step 2: ORDERING and the REGENERATOR (R0 I-5, R1 I-e, R2 NEW-I-3).**
   Task 4's assertions now derive their counts from the corpus, so adding a
@@ -662,14 +729,36 @@ output are in `design/agent-reports/f449-plan-stage2-r0.md` Appendix A and
   Those two JSONLs are the script's ONLY inputs (`:65-66`). The evidence
   directory Step 5 creates is provenance for a human, **not** an input the
   script reads — saying so here is what stops the next reader from "fixing"
-  the script by pointing it at the wrong path. All four edits land **in the
-  same commit as the vector**.
+  the script by pointing it at the wrong path.
 
-  **Then prove it mechanically, because two rounds of warning-paragraphs have
-  now failed to:** re-run `./scripts/vendor-liana-evidence.sh <path-to-mnemonic-engrave>`
-  and assert `git diff --exit-code crates/md-codec/tests/fixtures/liana/cases.json`
-  comes back clean. A regeneration that reproduces the committed corpus
-  byte-for-byte is the only evidence that the vector survives the next one.
+  **Both new JSONL records need the fields the script keys on (R3 M-2):**
+  `"variant": "liana-unspendable-xpub"` (`load_variant` drops any other
+  record, `:150-151`) and `name`. The in-record's `desc` must have the
+  internal key as its **first** xpub, followed by the leaf xpubs
+  (`:168-174`). `expected_xpub` is copied from it and never recomputed, so
+  assert it against md's derivation (Global Constraints: recompute every
+  probe's internal key) before committing.
+
+  **The four edits span TWO repos, so the order is (R3-I-2):**
+  1. **mnemonic-engrave:** commit the two JSONL records (edits 3–4) and note
+     the SHA. The regenerator stamps `git rev-parse HEAD` of that repo into
+     **every** case's `source_commit` (`:75`, `:204`). Running it over
+     uncommitted records stamps a commit that does not contain the new
+     evidence, and nothing downstream reads `source_commit` to notice.
+  2. **descriptor-mnemonic:** edit `NAMES` and `ACCEPTED_NAMES` (edits 1–2),
+     run `./scripts/vendor-liana-evidence.sh <mnemonic-engrave at that SHA>`,
+     and commit the regenerated `cases.json` in the same commit as the two
+     list edits.
+
+  **The proof — do NOT use `git diff --exit-code`, which fails on a clean
+  tree.** R3 measured this: the regenerator re-stamps all eight existing
+  cases (`b1eaaee9` → HEAD), so an unedited re-run already diffs 16 lines.
+  Re-stamping is **expected**. Assert instead:
+  - the regenerated file contains the new case with `accepted: true`;
+  - apart from `source_commit`, no line of the eight existing cases changed:
+    `git diff -U0 -- crates/md-codec/tests/fixtures/liana/cases.json | grep '^[-+] ' | grep -v source_commit`
+    prints nothing except the new case's own lines;
+  - every case's `source_commit` equals the SHA from step 1.
 
 - [ ] **Step 3: `scripts/liana-live-gate.sh`** (mnemonic-engrave). Locate the
   checkout, build the harness, run every vendored case plus controls, diff
@@ -819,8 +908,8 @@ deliberately; it must never be relaxed to make a red row green.
 never mentions, and it does so silently. Measured over stage 1b alone, five
 times:
 
-- SPEC §9's stage-2 row listed four items; **three had already shipped in 1b**
-  — the spec was stale about its own stage boundaries, and a plan written from
+- SPEC §9's stage-2 row listed four items; **two had already shipped in 1b,
+  and §4a's JSON bump half** (R3 M-1) — the spec was stale about its own stage boundaries, and a plan written from
   it without measuring would have scheduled work already done.
 - SPEC §8.10's mutation list was missing two whole CLASSES that only execution
   surfaced (a symmetric polarity inversion; a pattern-match weakening).
@@ -893,13 +982,17 @@ Stage 1b gave the identical work its own Task 10 **and a gating constraint**
 task is that one, transcribed to stage 2's numbers.
 
 **Files (all descriptor-mnemonic):** `crates/md-codec/Cargo.toml`,
-`crates/md-cli/Cargo.toml`, `CHANGELOG.md`.
+`crates/md-cli/Cargo.toml`, `Cargo.lock` (R3 M-3: both workspace members
+are locked at `:489-490` / `:512-513`, so `--locked` fails until it is
+regenerated in the same commit), `CHANGELOG.md`.
 
 - [ ] **Step 1: The numbers.** md-codec `0.46.0 → 0.47.0`, md-cli
   `0.18.0 → 0.19.0` (measured current values). Stage 2 adds a public
   `enum UnspendableKind`, a parameter to `compose::compose` and
-  `compose::compose_with` (both `pub`), and a parameter to `lower_tr` (which
-  is `pub(super)`, so that one is not a public break). Under the repo's
+  `compose::compose_with` (both `pub`), a parameter to `lower_tr` (which
+  is `pub(super)`, so that one is not a public break), and the additive
+  `pub fn correct_chunks` (Task 2c). `Error` and `decode_with_correction`
+  are unchanged. Under the repo's
   pre-1.0 convention that the second component is the breaking-change axis,
   that is a minor bump on each crate.
 
@@ -914,7 +1007,8 @@ task is that one, transcribed to stage 2's numbers.
   selector at the lowering site. md-cli: `--unspendable`, its refusal under
   non-`tr` wrappers, the §6 refusal and the two warns, compose's `--json`
   third state, and `md repair`'s exit-5 mapping for a corrected-but-unsupported
-  version (Task 2c). Match the shape of the `## md-cli [0.18.0] — 2026-09-22`
+  version (Task 2c), **naming the divergence from `mnemonic repair`**. md-codec
+  also lists `correct_chunks`. Match the shape of the `## md-cli [0.18.0] — 2026-09-22`
   entry already in the file.
 
 - [ ] **Step 4: Gate and commit** — `cargo nextest run --locked --all-features`,
@@ -925,6 +1019,10 @@ task is that one, transcribed to stage 2's numbers.
   (re-grepped for this fold — R2 cited `:873-875`, and the spec is 863 lines
   long) says the toolkit pins md-codec by git tag, so stage 1 did not break
   it, but it is *"in scope for this cycle"* and gets its pin bump and a golden
-  refresh **after stage 2**. File it as a follow-up owned by the cycle,
+  refresh **after stage 2**. That follow-up must also carry the convergence
+  from Task 2c (R3-I-1): route `mnemonic repair`'s `WireVersionMismatch`
+  through `correct_chunks` so it exits 5 on a corrected card as `md repair`
+  does. It is additive, so the pin bump compiles without it. File it as a
+  follow-up owned by the cycle,
   naming the tag this task creates — `mnemonic-engrave`'s `design/FOLLOWUPS.md`,
   per the two-repos constraint.
