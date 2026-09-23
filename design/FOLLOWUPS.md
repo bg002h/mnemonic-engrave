@@ -19586,3 +19586,34 @@ get a worse message than the common ones.
 position — parse position, not a three-byte prefix — rather than pattern
 matching on preceding text. Same class as F-638 and F-636: the refusal is
 right, the explanation names the wrong thing.
+
+### F-642 — mnemonic-toolkit's md-codec pin bump to `md-codec-v0.47.0`, a golden refresh, and `mnemonic repair`'s convergence on `correct_chunks` (owning phase: **F-449 cycle, after stage 2's tag** — the toolkit side) `#mnemonic-toolkit` `#md-codec` `#pin-bump`
+
+**Status:** OPEN
+Filed 2026-09-23 by F-449 stage 2 Task 8 Step 5 (plan
+`design/IMPLEMENTATION_PLAN_f449_stage2_compose.md`), which puts the toolkit
+side out of that stage and into the cycle.
+
+**What.** SPEC_liana_unspendable_internal_key.md §9a's closing paragraph: the
+toolkit pins md-codec by git tag (0.45.0 today), is not broken by F-449, but
+is in scope for this cycle and gets its pin bump and a golden refresh after
+stage 2. The tag to move to is the one stage 2's release creates,
+**`md-codec-v0.47.0`** (descriptor-mnemonic `972da724`; the tag itself is cut
+by the controller after review, per that plan's "no md-codec tag until Task 8
+lands").
+
+**Three pieces, all toolkit-side:**
+1. **The pin bump**, and the compile repairs it forces. The toolkit matches
+   `md_codec::Error` exhaustively with no wildcard (`error.rs:520-616`, per
+   the stage 2 plan's measurement), so 0.46.0's new variants and 0.47.0's
+   `UnspendableUseSiteNotCanonical { idx: Option<u8> }` need arms.
+2. **The golden refresh** — `inspect`'s `template:` line comes from
+   `descriptor_to_template`, which renders kind 1 as `UNSPENDABLE(liana)`
+   since 0.46.0.
+3. **Convergence on `correct_chunks`** (stage 2 plan R3-I-1): route
+   `mnemonic repair`'s `WireVersionMismatch` through
+   `md_codec::correct_chunks` so it exits 5 on a corrected card whose wire
+   version it cannot read, as `md repair` does since md-cli 0.19.0
+   (descriptor-mnemonic `4c35175e`). Until then the two diverge, and
+   `md repair`'s D26 block says so rather than claiming parity. Additive, so
+   piece 1 compiles without it.
