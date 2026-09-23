@@ -29,7 +29,7 @@
 - **Modify** `crates/md-codec/src/compose/mod.rs` — thread the kind through `Composed`/the lowering entry; add the "requested liana but a key was extracted" signal.
 - **Modify** `crates/md-cli/src/cmd/compose.rs:590` — `run()` gains the parameter; clap gains `--unspendable`.
 - **Modify** `crates/md-cli/src/main.rs` (or wherever `Compose` is declared) — the flag.
-- **Create** `crates/md-cli/tests/compose_unspendable.rs` — the flag's own tests.
+- **Create** `crates/md-cli/tests/cli_compose_unspendable.rs` — the flag's own tests.
 - **Create** `crates/md-codec/tests/liana_evidence_legs.rs` — C3's deferred descriptor- and address-equality legs.
 - **Create** `scripts/liana-live-gate.sh` — the re-runnable §8.8 gate.
 - **Create** `design/evidence/f449-stage2/` — harness input/output committed as evidence.
@@ -42,14 +42,39 @@
 **Files:**
 - Modify: `crates/md-codec/src/compose/tr.rs`, `crates/md-codec/src/compose/mod.rs`
 - Modify: `crates/md-cli/src/cmd/compose.rs`, the clap declaration
-- Test: `crates/md-cli/tests/compose_unspendable.rs` (create)
+- Test: `crates/md-cli/tests/cli_compose_unspendable.rs` (create)
 
 **Interfaces produced:** `compose::UnspendableKind { Nums, Liana }` (default `Nums`); `lower_tr(list, declared, unspendable)`; `compose::run(wrapper, paths, preset, experimental, json, unspendable)`.
 
 - [ ] **Step 1: Write the failing test — the default is byte-identical to today**
 
+Create `crates/md-cli/tests/cli_compose_unspendable.rs`:
+
 ```rust
-// crates/md-cli/tests/compose_unspendable.rs
+// crates/md-cli/tests/cli_compose_unspendable.rs
+use std::process::Command as StdCommand;
+
+/// Run `md` with `args`, returning `(stdout, stderr, exit code)`. Every call
+/// site must bind and check all three — a bare `md(&[...]);` asserts nothing.
+///
+/// DEFINED HERE, deliberately: md-cli's tests have NO shared helper, and the
+/// two that exist have DIFFERENT signatures — `cli_compose.rs:8` is
+/// `fn md() -> Command` (assert_cmd), `liana_input_side.rs:33` is this one.
+/// Copied verbatim from the latter rather than invented, so one vocabulary
+/// covers both Liana test files. Omitting it is an E0425 the build gate
+/// caught in this plan's own first draft.
+fn md(args: &[&str]) -> (String, String, i32) {
+    let out = StdCommand::new(assert_cmd::cargo::cargo_bin("md"))
+        .args(args)
+        .output()
+        .expect("invoke md");
+    (
+        String::from_utf8_lossy(&out.stdout).into_owned(),
+        String::from_utf8_lossy(&out.stderr).into_owned(),
+        out.status.code().expect("md exited normally"),
+    )
+}
+
 /// The regression floor. Composing WITHOUT the flag must not move a byte,
 /// for every vendored preset — this is what lets the flag ship without a
 /// re-vector of the whole corpus.
@@ -68,9 +93,11 @@ fn omitting_the_flag_is_byte_identical_to_the_previous_release() {
 
 - [ ] **Step 2: Run it — expect FAIL** (`error: unexpected argument '--unspendable'`).
 
-Run: `cargo nextest run --locked -p md-cli --test compose_unspendable`
+Run: `cargo nextest run --locked -p md-cli --test cli_compose_unspendable`
 
 - [ ] **Step 3: Write the failing test for what the flag actually does**
+
+Add to `crates/md-cli/tests/cli_compose_unspendable.rs`:
 
 ```rust
 /// `liana` swaps the internal key's KIND and nothing else: the taptree, the
@@ -95,6 +122,9 @@ fn liana_changes_the_internal_key_and_nothing_else() {
 
 - [ ] **Step 5: Add the kind to the composer**
 
+Add to `compose/mod.rs` (a FRAGMENT — an addition to an existing file, so
+the gate must not assemble over it):
+
 ```rust
 // crates/md-codec/src/compose/mod.rs
 /// Which unspendable taproot internal key a `tr` composition should use when
@@ -110,6 +140,10 @@ pub enum UnspendableKind {
 
 - [ ] **Step 6: Select at the one site**
 
+In `compose/tr.rs` (a FRAGMENT — a match arm inside a struct literal, so the
+build gate deliberately does not assemble it; it needs a reviewer's execution
+pass):
+
 ```rust
 // crates/md-codec/src/compose/tr.rs -- lower_tr gains `unspendable: UnspendableKind`
             internal_key: match ik {
@@ -124,6 +158,8 @@ pub enum UnspendableKind {
 This is the ONLY behavioural line in the task. Everything else is plumbing.
 
 - [ ] **Step 7: Thread it through `compose::run` and clap**
+
+In `cmd/compose.rs` (also a FRAGMENT — a clap attribute on a field):
 
 ```rust
 #[arg(long, value_name = "KIND", default_value = "nums")]
@@ -152,11 +188,13 @@ cargo nextest run --locked --all-features
 
 ## Task 2: SPEC §6 row 3 — requesting `liana` where a key is extracted WARNS
 
-**Files:** `crates/md-codec/src/compose/{tr.rs,mod.rs}`, `crates/md-cli/src/cmd/compose.rs`, `crates/md-cli/tests/compose_unspendable.rs`.
+**Files:** `crates/md-codec/src/compose/{tr.rs,mod.rs}`, `crates/md-cli/src/cmd/compose.rs`, `crates/md-cli/tests/cli_compose_unspendable.rs`.
 
 **Interfaces consumed:** Task 1's `UnspendableKind`.
 
 - [ ] **Step 1: Write the failing test**
+
+Add to `crates/md-cli/tests/cli_compose_unspendable.rs`:
 
 ```rust
 /// SPEC §6 row 3 (fable M-6). When the first listed path is a bare single
@@ -264,6 +302,13 @@ These are one class — *the refusal is correct, the explanation names the wrong
 **Placeholder scan.** Run `./scripts/plan-api-check.sh` against this file before dispatching Task 1; `UnspendableKind`, `lower_tr`'s new parameter and `compose::run`'s new parameter are symbols this plan CREATES and must appear in the ALLOW list as such, not as pre-existing.
 
 **Type consistency.** `InternalKey::{Slot,NumsPoint,LianaUnspendable}` is stage 1a's shipped shape; `UnspendableKind` is new and distinct from it — the former is a wire concept, the latter a request. Do not merge them.
+
+**Build-gate coverage — stated, not assumed.** `scripts/plan-build-gate-md.sh`
+extracts only blocks preceded by an anchor naming a `.rs` file, and only whole
+items compile. Task 1 Steps 6 and 7 are FRAGMENTS — a match arm inside a
+struct literal, and a clap attribute on a field — so they are deliberately
+unanchored and are NOT gated. They still need a reviewer's execution pass. A
+gate that hid this would be worse than no gate.
 
 **The one risk worth naming.** Task 1's default-equality test is the stage's regression floor, and it is only as wide as the presets it lists. Extend it to every preset the composer supports before relying on it.
 
