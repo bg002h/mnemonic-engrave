@@ -137,3 +137,26 @@ Toolchain 1.85.0; `CARGO_TARGET_DIR=/scratch/code/shibboleth/me-worktrees/f449-s
   Task 3). This is a follow-up candidate, not filed. (3) Plan-prose nit: M3 is caught by the `contains("unsupported md1
   wire version")` assertion, not the `!contains("does not decode")` the plan names. (4) The `[0.11.0]` date may need
   moving at tag time.
+
+## Fix round — whole-branch review M1 — commit `ed4b7792`
+
+- (a) New `BundleError::Md1MissingOrigin(String, u8)`, mapped from `MissingExplicitOrigin` on the unchunked path AND on
+  the chunked path. The chunked path had said "md1 set … is incomplete/inconsistent" for a whole set; I measured that
+  with `md1ffxweqqpqggqps8zjs4qqyhaq7eqm6qq6k`. The message now says the plate carries no key origin, so `me` cannot
+  count what a restore needs, and that `md decode` still reads it. It names the remedy: `md encode --path <PATH>`, or
+  inline origins, or engrave the complete set. **I ran the remedy:** `md encode --path bip48` and inline origins each give
+  exit 0 plus a TEMPLATE note, for the tr fixture and for the wsh/older(144) example.
+  - **Ruling:** the remedy names `--path` and inline origins, not `--fingerprint`. md-cli's help says `--fingerprint`
+    supplies a master fingerprint, not an origin PATH, and `--path` alone was measured to fix the refusal. *Cost if
+    wrong:* none; the remedy text is correct as measured.
+  - **Ruling:** the chunked path is included. It is the same class, and its "incomplete" wording was equally false.
+    *Cost if wrong:* one extra arm the controller could ask to be split out.
+- Tests: the v4 origin-less test now asserts the new wording and the remedy, and forbids "does not decode". Its old
+  `"requires explicit origin"` assertion is removed. New test: `a_chunked_origin_less_template_is_not_called_incomplete`.
+- (b) The CHANGELOG `[0.11.0]` now carries a separate "Newly refused" bullet. It covers every template shape with no
+  canonical derivation path encoded without origins (wsh miniscript, hashlocks, timelocks, tr script trees; 12 of 20 in
+  the review), and gives the remedy. `Md1MissingOrigin` is added to the library breaks. M3's date is untouched.
+- Gate: nextest `-p mnemonic-engrave` **676 run, 676 passed, 2 skipped**; fmt and clippy clean.
+- Mutations: **M11** (drop the unchunked arm) KILLED `a_version_4_origin_less_…`, whose stderr fell back to "does not
+  decode". **M12** (drop the chunked arm) KILLED `a_chunked_origin_less_…` at the `!contains("incomplete")` assertion.
+  Both reverted → green.
