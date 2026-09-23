@@ -28,7 +28,7 @@ and Liana then **ACCEPTS** that exact string and returns receive/change
 addresses. This is the first time md's own output has been fed to Liana's
 importer as a single unbroken chain.
 
-## F-640 — nested taptrees look UNOBTAINABLE, not merely unmeasured
+## F-640 — CORRECTED: my inference here was UNSOUND
 
 §8.1 asks for "a nested taptree that Liana ACCEPTS". Two independent
 constructions are now refused:
@@ -46,11 +46,32 @@ xkey"* because I typed an xpub from memory. That is a PARSE refusal and says
 nothing about policy. Any future probe must include a known-good control in
 the same run, as this one did.
 
-This does not yet prove no nested shape is acceptable — Liana's policy model
-may admit some other arrangement — but it shifts F-640 from "we have not
-measured it" to "two constructions say no, and the next step is to decide
-whether §8.1 is closeable at all". Stage 2 should settle that with the
-harness rather than carry it further.
+**CORRECTION, 2026-09-22, from the stage-2 R0 review (C-3).** The inference
+above — two nested refusals, therefore nesting is the cause — is **unsound**,
+and I verified why against Liana's own source rather than taking the reviewer's
+word: `liana/src/descriptors/analysis.rs:592-598` calls `tree.lift()` to lift
+the taptree into a SEMANTIC POLICY before comparing anything. Tree *shape* is
+flattened away. Liana's policy model cannot see nesting at all, so nesting
+cannot be what either refusal was about — both must be explained by LEAF
+CONTENT, which is also consistent with the corpus, where `hashlock-gated` and
+`X20-tr-hashlock-known` are refused at depth 1.
+
+I have since failed to construct an accepted nested taptree three times, each
+with a control passing in the same run (the third used two recovery branches
+at ONE timelock, so it was not a decaying policy either). That is evidence
+about my constructions, not about Liana.
+
+**Status: UNSETTLED.** Whether a nested ACCEPT is constructible is open. What
+is now established is the mechanism, which means §8.1's requirement is not
+obviously unobtainable and the spec should NOT be amended on the strength of
+my refusals. Stage 2 settles it by searching the policy space, not by
+inferring from two failures.
+
+**The lesson, recorded because it is mine:** three constructions that all
+failed shared a property I never varied, and I read the shared failure as
+evidence about the dimension I *had* varied. A negative is only as wide as
+what you searched — and here the mechanism was one file away and would have
+told me the dimension I was varying was invisible to the thing under test.
 
 ## Carried into stage 2
 
