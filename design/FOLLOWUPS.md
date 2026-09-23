@@ -19508,9 +19508,28 @@ comment is the defect and must say why. See also F-449 stage 1b's extension of
 
 ### F-640 — SPEC §8.1's "a nested taptree that Liana ACCEPTS" has no evidence and is NOT delivered by stage 1b (owning phase: **F-449 stage 2**, the live Liana run) `#descriptor-mnemonic` `#md-codec` `#evidence-gap`
 
-**Status:** OPEN — a deliberate, recorded non-delivery, not an oversight.
+**Status:** CLOSED 2026-09-23 by F-449 stage 2 Task 5 — descriptor-mnemonic `db660c45` (the vector), mnemonic-engrave `0c51d3cc` (the evidence records) and `2b153a98` (the live gate).
 Filed 2026-09-22 from the Task 8 independent review (M3), which noted the gap
 was stated in the test comment but never filed anywhere durable.
+
+**Closure.** Liana **v15.0** (`4684d5cb`) **ACCEPTS** a nested taptree, so
+§8.1 is satisfiable and the spec is not amended. The vector is
+`nested-2of2-two-recoveries-tr` in descriptor-mnemonic's
+`crates/md-codec/tests/fixtures/liana/cases.json` —
+`{multi_a(2,A,B),{and_v(pk(C),older(26280)),and_v(pk(D),older(52560))}}`,
+which md composes with `md compose --wrapper tr --path 2of2 --path
+1of1,older=26280 --path 1of1,older=52560 --unspendable liana`, and from which
+Liana infers two recovery paths (older 26280 and 52560). Evidence:
+`design/evidence/composer-fable-r0/fable-liana-parse-{in,out-v15}.jsonl`
+(the regenerator's inputs) and `design/evidence/f449-stage2/liana-live-gate-expected.jsonl`
+(first line: Liana tag and commit), re-runnable with `scripts/liana-live-gate.sh`.
+What it pins: `the_recipe_reproduces_every_golden_xpub` derives its internal
+key over the nested leaf order, and `liana_evidence_legs.rs` checks md's
+descriptor and six addresses against Liana's record — so a traversal-order
+error in md now fails against Liana's own answer, not only against md.
+The two earlier "nested is refused" readings were a KEY artifact (a stale
+internal key carried over a changed leaf set), not policy: see
+`design/RECON_f449_stage2.md` and the R0 report's Appendix A.
 
 **What §8.1 asks for.** A vector proving leaf-traversal order against a nested
 taptree **that Liana accepted**. Ordering matters because SPEC §2 hashes leaf
