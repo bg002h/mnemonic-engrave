@@ -19859,3 +19859,22 @@ Filed 2026-09-23 by the controller from the F-449 stage 4a implementer's report
 warning prints twice, exit 0. The "one walk call per invocation" rule, which
 stage 4a wrote into `mdmk_unconfirmed_why`'s doc, is therefore false on this
 path; the doc says so. **Fix:** walk once and pass the result to both.
+
+### F-657 — neither md reader cross-checks a chunk header's wire version against the payload header's (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#validation`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 3 whole-branch review
+(`design/agent-reports/f449-stage3-whole-branch.md`, m1). This predates stage 3,
+and Go matches Rust exactly. The fix is Rust-primary: md-codec refuses a set
+whose chunk-header and payload-header versions disagree, with a test vector.
+The Go port then converges on it.
+
+### F-658 — neither md reader enforces SPEC §6 row 6 (minimum wire version) at decode (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#validation`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the same review (m2). A non-minimal v8
+card, such as kind 0 or a slot key at v8, is accepted by both readers, and they
+agree on every forged card the review built. Rule on it first: SPEC §6 row 6
+may deliberately be mint-only, which is the "mint policy never decides
+readability" rule. If so, record that here and close. Otherwise refuse it
+Rust-first.

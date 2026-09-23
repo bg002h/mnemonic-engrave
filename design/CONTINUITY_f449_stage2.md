@@ -10,6 +10,9 @@
 `descriptor-mnemonic-md-cli-v0.19.0`. engrave merge `b8ee1ede`.
 
 ### Do this first
+**Stage 3 merge SHA (read by stage 4a Task 5 Step 0): fork `d2350cb`**
+(dm vectors `d269c556`).
+
 **Parallel state (2026-09-23):**
 - F-642 (toolkit): merged to toolkit master `642300b7` (0.104.0); push, tag
   `mnemonic-toolkit-v0.104.0`, then the demo/sh2 install bump.
