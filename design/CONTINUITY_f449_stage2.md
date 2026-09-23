@@ -10,6 +10,14 @@
 `descriptor-mnemonic-md-cli-v0.19.0`. engrave merge `b8ee1ede`.
 
 ### Do this first
+**Next cycle after F-449 (operator, 2026-09-23):** the coordinator-compat
+cycle (`design/DESIGN_coordinator_compatibility.md`, plan 1b onward) starts
+once F-449's last stage (5) ships. Nunchuk and Core compatibility work belongs
+there, not in F-449. Carry into it: stage 4's "Bitcoin Core imports this form"
+for the Liana key was measured on a Core **v30.99 development build**, not a
+release (stage 4 plan, F7). Re-measure it on a released Core, or narrow the
+wording.
+
 **Stage 3 merge SHA (read by stage 4a Task 5 Step 0): fork `d2350cb`**
 (dm vectors `d269c556`).
 
