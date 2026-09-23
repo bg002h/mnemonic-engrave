@@ -19680,3 +19680,22 @@ The card is `md encode "tr(UNSPENDABLE(liana),{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})"`
 decode` downgrades to a partial decode, so a DAMAGED card of this shape
 cannot be repaired even though its undamaged twin reads. Repair should keep
 its correction whenever decode would read the card, partial or not.
+
+### F-646 — `@i` templates verify a `#checksum` over the synthetic-xpub text, not the text the operator wrote (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 2 fix wave, where the
+implementer measured it. It predates the stage and was left unchanged.
+
+**Reproduction** (md-cli 0.19.0 at descriptor-mnemonic `6f2fb760`):
+`wsh(pk(@0/<0;1>/*))#xufrs4zk` is accepted, but `#vdujlgv8`, the BIP-380
+checksum of the text the operator typed, is refused.
+
+**Why it matters now.** Stage 2's M-5 fix made MARKER templates verify over
+the operator's text. So md now checks a checksum over two different texts
+depending on whether the template has a marker. This is the same class as
+F-641: the refusal names text the operator never wrote.
+
+**The fix.** Verify every template checksum over the operator's text, with a
+deprecation path for the synthetic-text checksum if any shipped tool emits
+one. Measure that before choosing.
