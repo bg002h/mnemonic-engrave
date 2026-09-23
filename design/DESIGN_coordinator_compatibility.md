@@ -508,7 +508,9 @@ Six mechanisms:
    measured: `bitcoind --version` on this box prints
    `Bitcoin Satellite version v0.2.4` for what the matrix calls "Core 25.0".
    A hand-typed label is how a verdict comes to name a release nobody ran. **Liana's is now committed** (`harnesses/liana/`,
-   `606ab180`) and was used to re-measure at v15.0; Nunchuk's and Core's still
+   `606ab180`) and was used to re-measure at v15.0 — and since F-449 stage 2
+   it is re-run as a gate, `scripts/liana-live-gate.sh`, which pins the tag and
+   commit and diffs against a committed expectation; Nunchuk's and Core's still
    live in `/scratch/.tmp`, outside all three repos. Re-measurement without a
    committed harness is a research project every time, and under ruling 6 that
    means the registry can grow rules but never evidence for those two:

@@ -209,7 +209,7 @@ expose it):
    `parent_fingerprint = 00000000`, `child_number = 0`.
 5. **Version bytes come from the render-time network selector**
    (`md descriptor --network`, `md address --network`;
-   `crates/md-cli/src/main.rs:1081, 1120`), not from the wire. Mainnet → `xpub`,
+   `crates/md-cli/src/main.rs:1102, 1141` at stage 2 — `network_str` in the `Descriptor` and `Address` arms), not from the wire. Mainnet → `xpub`,
    testnet/signet/regtest → `tpub`.
 6. Render with `origin: None`, derivation paths `<0;1>`, unhardened wildcard.
 
@@ -227,7 +227,12 @@ Liana accepted** — all **mainnet `xpub`**, all **one-level** taptrees with
 - the **nested taptree** order (`{A,{B,C}}`) appears only in
   `preset-decaying-multisig-tr`, which Liana **refused on policy shape**, so no
   ACCEPT backs it. It is right by reading rust-miniscript's `TapTreeIter`
-  (left-first DFS) but is not measured (fable M-2);
+  (left-first DFS) but is not measured (fable M-2). **CLOSED by stage 2
+  (F-640):** Liana v15.0 ACCEPTS `nested-2of2-two-recoveries-tr`,
+  `{multi_a(2,A,B),{and_v(pk(C),older(26280)),and_v(pk(D),older(52560))}}`,
+  now vectored in `cases.json` (descriptor-mnemonic `db660c45`) and re-run by
+  `scripts/liana-live-gate.sh` (this repo, `2b153a98`). The earlier refusals
+  were a stale-internal-key artefact, not nesting (R0 Appendix A);
 - no evidence shape has a **`sortedmulti_a` leaf** (fable I-2a).
 
 **A property worth pinning.** The chain code depends on the ordered multiset of
@@ -273,7 +278,7 @@ into version 8 rather than spending 12 separately.
 reproduced by the author).
 
 md1 auto-dispatches single-payload vs chunked on **bit 0 of the first symbol**,
-before any header is parsed (`decode.rs:191-193`; again at `chunk.rs:650-651`;
+before any header is parsed (`decode.rs:191-193`; again at `chunk.rs:666`, the `chunked_flag` read in `decode_with_correction`'s single-string pre-pass, at stage 2;
 Go at `md/chunk.go:193`, `md/md.go:1235`). For a single payload the first symbol
 is `[divergent][v3][v2][v1][v0]`, so **bit 0 is `v0`**. Therefore every usable
 single-payload version must be **even**. Computed:
@@ -445,10 +450,11 @@ The marker is the only correct spelling, not a shortcut.
 string component and by `tests/render_abstract.rs` — never re-parsed. But
 `descriptor_to_template`'s output is a **documented input**
 (`README.md:129`, `md descriptor --template`), emitted by `md compose`
-(`compose/mod.rs:632`) and printed by `md decode`/`md inspect`. It re-enters
+(`compose/mod.rs:673` at stage 2, `template_with_origins`) and printed by `md decode`/`md inspect`. It re-enters
 through `parse_template` → `substitute_synthetic` → `Descriptor::from_str` →
-`walk_tr` (`md-cli/src/parse/template.rs:1589-1632`), which accepts exactly `H`
-or `@N`. So §4a is mandatory, not optional.
+`walk_tr` (`md-cli/src/parse/template.rs:1738-1814` at stage 2), which accepted
+exactly `H` or `@N` when this was written (1b added the marker's reserved
+synthetic key as a third input). So §4a is mandatory, not optional.
 
 Note `format/text.rs:269-274` ships a render-reparse **fixpoint assertion** whose
 corpus is `wsh`-only — it would stay green while the invariant it names is false
@@ -519,6 +525,12 @@ The template grammar gains a substitution rule for `UNSPENDABLE(liana)`
 (`format/json.rs:326`, `docs/json-schema-v1.md`) and `md compose --json`'s
 internal-key field need a third state. This is a **breaking change to a
 published v1 schema** and must be versioned as one, not slipped in.
+**Both halves shipped:** decode's in stage 1b (`unspendable_kind`, schema
+`md-cli/2`); compose's in stage 2 (descriptor-mnemonic `d802e331`): `md
+compose --json` carries `unspendable_kind: "liana_unspendable"` for kind 1,
+absent otherwise, with decode's vocabulary. The schema string stays
+`md-cli/2` — the version minted for this third state — because no compose
+object emitted before stage 2 could carry kind 1.
 
 ### 4b. Reconciling the coordinator-compat design
 
@@ -556,7 +568,7 @@ literal in a position BIP-388 wants to hold a placeholder.
 | --- | --- |
 | `kind = 1` with a **`sortedmulti_a` leaf anywhere in the tree** | REFUSE, as a **belt against a port error**. §2 hashes the leaves' *account-level* 33-byte pubkeys, which are index-independent, so a correct implementation's chain code does not vary with the address index — r1 gave that as the reason and it was wrong. The real risk is that `MultiALeafScript` (`address/taproot_script_path.go:261-270`) sorts the **serialized derived** x-only keys when building the script, and a port that feeds that already-sorted list into the recipe silently diverges (fable M-8). Reachability: the device composer emits `sortedmulti_a` only for `plain-multisig` (out of scope, §0a), but **`md encode` accepts one in any tree shape** (RUN), so the refusal is not vacuous. Cost is near-zero — Liana emits `multi_a`, never `sortedmulti_a` |
 | `kind = 1` with a use-site path other than `<0;1>` | REFUSE. `md encode` accepts `<2;3>`, `<0;1;2>` and `<0;1>/*h` under `tr(H,…)` today (RUN). Liana pairs alternatives positionally and would derive from `0/i` while a use-site-following device derives from `2/i` (fable I-2b). Refusing is narrower than reconciling, and keeps §8.3 honest |
-| `kind = 1` with a real internal key extracted | unrepresentable in §3f's sum type. `--unspendable liana` on a path list containing a bare single is a **no-op today**; it must WARN, not silently ignore (fable M-6) |
+| `kind = 1` with a real internal key extracted | unrepresentable in §3f's sum type. `--unspendable liana` on a path list whose first bare single became the internal key has no unspendable key to choose; it WARNS, never silently ignores (fable M-6) — shipped in stage 2 (descriptor-mnemonic `d5fedae6`): `warning: --unspendable liana has no effect: path N is a bare single key …`, signalled by `Composed::unspendable_request_unmet` |
 | `kind = 1` **nested** under `sh`/`wsh` | REFUSE. r0's "any wrapper other than `tr`" was ambiguous between vacuous and this (opus M1); this is the non-vacuous reading and the one that needs a check |
 | a version-8 payload reaching a version-4 decoder | `WireVersionMismatch` — single-string via `Header::read` (the dispatch routes it correctly at 8), chunked via `chunk.rs:70` with `got: 8` |
 | version 8 on a descriptor whose root `Tag::Tr` (there is at most one, `decode.rs:97-104`) is at `kind = 0` — or which has no `tr` at all | REFUSE at **encode** (minimum-version rule). Accepted at decode so old payloads never become invalid — but note this admits a hand-crafted second encoding of a kind-0 wallet with a different `WalletDescriptorTemplateId` (opus/fable M-4). Documented, not reachable through any encoder |
@@ -583,7 +595,7 @@ exist.
 | surface | today | required |
 | --- | --- | --- |
 | old device, chunked plate | `md.ParseChunkHeader` errors → `gatherIgnored` → **"Not an md1 descriptor chunk."** | a **false statement** about a plate the constellation cut. `gatherIgnored` must be split so a well-formed md1 at an unsupported version says so, and names the version. **This crosses a package boundary:** `errWireVersion` is unexported (`md/md.go:22`), so package `md` must first expose a sentinel or typed error before `gui` can distinguish the case — the sentinel is a `md/` change (stage 3); `gatherIgnored` itself is `gui/` (`gui/mk1_inspect.go:36`, returned at `gui/md1_gather.go:33,39`, printed at `:122`), so BOTH packages have work at that stage |
-| `md repair`, older binary | the BCH correction loop **succeeds**, then `decode_with_correction` rejects version 8 and `repair.rs:88-96` returns `Ok(2)`, **discarding the successful correction** — and exit 2 is the atomic-fail code | distinguish "BCH capacity exceeded" from "corrected fine, but this wire version is unsupported"; never discard a correction that succeeded |
+| `md repair`, older binary | the BCH correction loop **succeeds**, then `decode_with_correction` rejects the version and `repair.rs` returns `Ok(2)`, **discarding the successful correction** — and exit 2 is the atomic-fail code. **Fixed in md-cli 0.19.0 (stage 2, descriptor-mnemonic `4c35175e`)** for any version outside the accepted set: exit **5** with the corrected card on stdout and the version named on stderr; binaries before 0.19.0 still behave as described, and `mnemonic repair` still exits 2 until the toolkit adopts `md_codec::correct_chunks` | distinguish "BCH capacity exceeded" from "corrected fine, but this wire version is unsupported"; never discard a correction that succeeded |
 | `WireVersionMismatch` Display | `"wire-format version mismatch: got 8, expected 4"` (`error.rs:33`) | "expected 4" becomes false the moment the decoder accepts `{4, 8}`; the message must name the accepted set |
 
 The host error names the version and the device error does not, so §3d's *"loud
@@ -677,8 +689,11 @@ already records" was false.
 1. **Recipe vectors.** md-codec derives the §2 xpub for all eight evidence
    shapes, byte-identical. Plus **new vectors** for the three unmeasured gaps in
    §2: a `tpub` wallet, a nested taptree that Liana ACCEPTS, and — if §6 did not
-   refuse it — a `sortedmulti_a` leaf.
-2. **Descriptor equality**, for the four ACCEPT shapes, **including the
+   refuse it — a `sortedmulti_a` leaf. (The nested ACCEPT is delivered by stage
+   2: `nested-2of2-two-recoveries-tr`, F-640, see §2.)
+2. **Descriptor equality**, for every ACCEPT shape (four at stage 1b; five
+   since stage 2 vectored the nested one — the CLI legs derive the count from
+   the corpus), **including the
    descriptor checksum** (`#8jc8gq6v` etc. appear in the evidence). r0 left this
    undefined, which is the difference between a gate and a formatting failure
    (opus I4/M4).
@@ -721,7 +736,7 @@ already records" was false.
    | §0b DEFAULT ROW | two assertions, because one cannot fail: on FIRST entry the widget opens on the NUMS row (asserted on the first page), and **on RE-ENTRY after choosing kind 1 it opens on the kind-1 row** | 4 |
    | §0b COPY | both rows name their coordinators and say the two are different wallets | 4 |
    | §6a old-device message | a version-8 chunk yields "unsupported wire version", never "Not an md1 descriptor chunk." | 3 |
-   | §6a `md repair` | a v8 chunk with a correctable BCH error KEEPS the correction and reports an unsupported wire version, distinctly from the atomic-fail exit | 2 |
+   | §6a `md repair` | a chunk at a wire version OUTSIDE the accepted set (v8 is accepted since 1b, so the reachable trigger is e.g. 12) with a correctable BCH error KEEPS the correction and reports the unsupported wire version, exiting **5** (REPAIR_APPLIED), distinctly from the atomic-fail exit 2 | 2 — DONE (`4c35175e`) |
    | §6a error Display | `WireVersionMismatch`'s message names the accepted set, not "expected 4" | 1b |
    | §8b `me` fail-open | a bundle never states a plate count it did not compute | 4a |
    | `me` record confirmation | an unsupported wire version is REPORTED, never silently reduced to "unconfirmed" (`sysw/record.rs:251-252`) | 4a |
@@ -795,7 +810,7 @@ runbook has the two commands; not a gate.
 | --- | --- | --- |
 | **1a** | behaviour-preserving `InternalKey` refactor, wire untouched (§3f) | suite green at 1400+, no wire bytes changed |
 | **1b** | version 8, the kind bit, §2 derivation, §4 rendering, §4a's `md decompose` recogniser and `md encode` refusal, §6 refusals | §8 vectors **1, 2, 5, 6, 7, 10** — every leg runnable in Rust alone. (§8.9 is a table of per-stage rows, not a single-stage item; §8.10 is the mutation pass and was item 9 before r3b inserted the gate table) |
-| **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes |
+| **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a). **Status:** `md descriptor` kind 1 and the substitution rule shipped in 1b; the JSON bump's decode half in 1b and its compose half in stage 2; `--unspendable` in stage 2 (descriptor-mnemonic `6e918a8f`..`8d6697fe`, md-codec 0.47.0 / md-cli 0.19.0) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes. **Both run:** §8.2's CLI legs in `crates/md-cli/tests/liana_evidence_legs.rs`; §8.8 is `scripts/liana-live-gate.sh` (Liana v15.0, 11 verdicts, PASS) |
 | **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
 | **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
 | **4a** | `me` (this repo): §9a's four pieces — the unpin plus its `[patch.crates-io]` override, §3f's type-change repairs to `me`'s own source, §6a's message at `sysw/record.rs:251-252`, and **§8b's fail-open fix at `bundle.rs:371`** | **§8.9's `me` rows.** NOT "me round-trips a version-8 payload": measured, that already passes on the pinned 0.42 with no change at all, because `me convert` validates only the codex32/BCH layer (`me-cli/src/lib.rs:75-83` → `validate.rs:95-100`), which is version-agnostic. A gate the status quo satisfies is not a gate |
