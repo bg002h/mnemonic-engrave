@@ -1127,6 +1127,7 @@ fn the_encoder_produces_every_canonical_the_file_carries() {
 fn the_two_derivations_agree_wherever_both_can_derive() {
     let d = doc();
     let (mut agreed, mut against_file) = (0usize, 0usize);
+    let mut oversize: Vec<&str> = Vec::new();
     for r in rows(&d) {
         let input = r["input"].as_str().unwrap();
         let Ok(parsed) = mnemonic_engrave::descriptor::cascade::cascade(
@@ -1135,8 +1136,23 @@ fn the_two_derivations_agree_wherever_both_can_derive() {
             continue;
         };
         let per_key = mnemonic_engrave::descriptor::derive::address_0(&parsed);
-        let twin = mnemonic_engrave::descriptor::md1::derivation_twin(&parsed)
-            .ok()
+        // F-449 stage 4a: md-codec 0.47 under rust-miniscript ff4732e PANICS
+        // deriving a script over the 520-byte P2SH limit (0.42 under 13.1.0
+        // returned Err). Production never calls the twin on such a row --
+        // admission refuses it first (`row_key_count_exceeded`) -- so the
+        // differential skips exactly the rows admission refuses for that
+        // reason, and names them below. Tracked upstream as F-651.
+        use mnemonic_engrave::descriptor::{admit, refusal::Row};
+        let over_limit = matches!(
+            admit::admit(&parsed, admit::Path::Md1),
+            Err(ref e) if e.row == Row::KeyCountExceeded
+        );
+        if over_limit {
+            oversize.push(name(r));
+        }
+        let twin = (!over_limit)
+            .then(|| mnemonic_engrave::descriptor::md1::derivation_twin(&parsed).ok())
+            .flatten()
             .and_then(|(b, i)| {
                 let net = mnemonic_engrave::descriptor::md1::network(&parsed);
                 mnemonic_engrave::descriptor::md1::address(&b, 0, i?, net).ok()
@@ -1153,6 +1169,15 @@ fn the_two_derivations_agree_wherever_both_can_derive() {
             against_file += 1;
         }
     }
+    // Pinned by NAME, so the skip cannot quietly widen to a row that derives.
+    assert_eq!(
+        oversize,
+        [
+            "narrowed/sh-sortedmulti-16-keys",
+            "narrowed/wsh-sortedmulti-21-keys"
+        ],
+        "the twin is skipped on exactly the key-count-exceeded rows"
+    );
     assert!(
         agreed >= 25,
         "only {agreed} rows exercised the differential — the loop has gone vacuous"

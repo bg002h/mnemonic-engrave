@@ -765,8 +765,8 @@ already records" was false.
    | §6a old-device message | a chunk at a version OUTSIDE the accepted set (e.g. 12) yields the named-version message ("This firmware cannot read md1 version 12.") on the gather, inspect and bundle surfaces, never "Not an md1 descriptor chunk." — and a version-8 chunk is READ (stage-3 firmware accepts {4, 8}). A board not flashed with stage 3 still says "Not an md1 descriptor chunk." about a v8 plate; no code can fix a board already in the field, so the stage 5 runbook must say to flash before reading kind-1 plates | 3 — DONE (fork `e2b4c6f`, `gui/md1_version_test.go`) |
    | §6a `md repair` | a chunk — a SINGLE string — at a wire version OUTSIDE the accepted set (v8 is accepted since 1b, so the reachable trigger is e.g. 12) with a correctable BCH error KEEPS the correction and reports the unsupported wire version, exiting **5** (REPAIR_APPLIED), distinctly from the atomic-fail exit 2. **A multi-string call failing on the wire version exits 2 with empty stdout** (ruling 7): a build cannot know the chunk-header layout of a version it does not support, so it cannot tell one card's chunks from mixed or unrelated strings | 2 — DONE (`4c35175e`; single-string only since descriptor-mnemonic `23203195`) |
    | §6a error Display | `WireVersionMismatch`'s message names the accepted set, not "expected 4" | 1b |
-   | §8b `me` fail-open | a bundle never states a plate count it did not compute | 4a |
-   | `me` record confirmation | an unsupported wire version is REPORTED, never silently reduced to "unconfirmed" (`sysw/record.rs:251-252`) | 4a |
+   | §8b `me` fail-open | a bundle never states a plate count it did not compute | 4a — DONE (mnemonic-engrave `d25eee36`) |
+   | `me` record confirmation | an unsupported wire version is REPORTED, never silently reduced to "unconfirmed" (`sysw/record.rs:251-252` at me 0.10.0) | 4a — DONE (mnemonic-engrave `57822135`; `pack`, `show` and `--expect`) |
 
 10. **Mutation testing.** Every property above must be shown to FAIL when the code
    it guards is broken: flip the concat order, sort the keys, deduplicate them,
@@ -793,7 +793,7 @@ already records" was false.
 
 ### 8b. `me`'s silent skip — a fail-open that version 8 ACTIVATES
 
-`crates/me-cli/src/bundle.rs:371`:
+`crates/me-cli/src/bundle.rs:371`, at me 0.10.0:
 
 ```rust
 if let Ok(d) = md_codec::decode::decode_md1_string(s) {
@@ -810,11 +810,21 @@ zero values. The comment three lines above says why that decode is there:
 *"a check that covered only the chunked shape would be a completeness claim
 with a hole in it."*
 
-This is latent today and **version 8 activates it**: an older `me` — and
-`crates/me-cli/Cargo.toml:26` pins `md-codec = "0.42"` from crates.io, which
-this cycle cannot bump there because md-codec is unpublished — fails the decode
-on every kind-1 plate and then emits a bundle whose *"backup needs N plates"*
-claim was computed from nothing.
+**Version 8 activates it**: an older `me` — `me` 0.10.0 pinned
+`md-codec = "0.42"` from crates.io, which this cycle could not bump there
+because md-codec is unpublished — fails the decode on every kind-1 plate and
+then emits a bundle whose *"backup needs N plates"* claim was computed from
+nothing. **It was not only latent, though: it was live at wire version 4 too**
+(measured at stage 4a). A real `md encode` output — an origin-less 2-key `tr`
+template, `md1yppqqxqu22z54hcefkda7r46w` (md-cli 0.19.0) — fails strict decode
+with `MissingExplicitOrigin`, and `me` 0.10.0 bundled it as *"backup needs 1
+public plate"* with no TEMPLATE note.
+
+**Status:** fixed at stage 4a, mnemonic-engrave `d25eee36` (F-635 closed). The
+unchunked path refuses, as the chunked path already did: `Md1WireVersion` names
+the version, and `Md1Undecodable` names the codec error. The origin-less v4
+template is therefore **newly refused**; F-652 carries counting it correctly
+through a partial decode instead.
 
 **Ruling.** A decode failure on a plate that feeds a completeness claim is
 reported, never skipped. `me bundle` either refuses the payload naming the
@@ -840,7 +850,7 @@ runbook has the two commands; not a gate.
 | **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a). **Status:** `md descriptor` kind 1 and the substitution rule shipped in 1b; the JSON bump's decode half in 1b and its compose half in stage 2; `--unspendable` in stage 2 (descriptor-mnemonic `6e918a8f`..`8d6697fe`, md-codec 0.47.0 / md-cli 0.19.0) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes. **Both run:** §8.2's CLI legs in `crates/md-cli/tests/liana_evidence_legs.rs`; §8.8 is `scripts/liana-live-gate.sh` (Liana v15.0, 11 verdicts, PASS) |
 | **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped. **Status:** SHIPPED 2026-09-23: fork main merge `d2350cb` (branch `f449-stage3` at `43294c6`); the Go vectors are vendored from descriptor-mnemonic `430ea478`, merged to dm main as `d269c556`. Landed beyond the row: §2's recipe ported into `md/` (test-only at this stage), the bundle surface of §6a, the `md1_encoding_id` assertion in the keyed conformance gate, and the ADDRESS half of §7a.3. Moved: the Go composer's Liana selection and §6's kind-1 mint refusals to stage 4 (F-654). Stage 3 alone lets the device copy kind-1 cards verbatim without an address (`noAddressLines`); the engrave refusal of §7a.3 is stage 4. Also until stage 4: a kind-1 wallet on the inspect screen shows its keys but NO `Policy id:` line (its kind-0 twin shows one) and no address — measured at `43294c6` | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
 | **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
-| **4a** | `me` (this repo): §9a's four pieces — the unpin plus its `[patch.crates-io]` override, §3f's type-change repairs to `me`'s own source, §6a's message at `sysw/record.rs:251-252`, and **§8b's fail-open fix at `bundle.rs:371`** | **§8.9's `me` rows.** NOT "me round-trips a version-8 payload": measured, that already passes on the pinned 0.42 with no change at all, because `me convert` validates only the codex32/BCH layer (`me-cli/src/lib.rs:75-83` → `validate.rs:95-100`), which is version-agnostic. A gate the status quo satisfies is not a gate |
+| **4a** | `me` (this repo): §9a's four pieces — the unpin plus its `[patch.crates-io]` override, §3f's type-change repairs to `me`'s own source, §6a's message at `sysw/record.rs:251-252`, and **§8b's fail-open fix at `bundle.rs:371`**. **Status:** implemented on branch `f449-stage4a` — mnemonic-engrave `a16da983` (the unpin to md-codec 0.47.0 by git rev `cf35d61a`, plus the patch), `d25eee36` (§8b / F-635) and `57822135` (§6a on `me sysw`). `--expect` turned out to be a THIRD reader of the `sysw/record.rs` walk, beside `pack` and `show`, and it was fixed with them: it had called a whole card at an unsupported version "does not reassemble" | **§8.9's `me` rows.** NOT "me round-trips a version-8 payload": measured, that already passes on the pinned 0.42 with no change at all, because `me convert` validates only the codex32/BCH layer (`me-cli/src/lib.rs:75-83` → `validate.rs:95-100`), which is version-agnostic. A gate the status quo satisfies is not a gate |
 | **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ with `demo/sh2/update.sh` | site 200, `application/wasm`, and the emulator reaches §0b's screen |
 
 **Every §8 item has an owning stage, and no item is left unowned** (opus I3 and
@@ -873,15 +883,26 @@ four — three invisible from that description, plus §8b's fail-open, which r3b
 had assigned here separately and r4 then dropped from the content column:
 
 1. **The unpin needs a `[patch.crates-io]` override.** Pointing
-   `crates/me-cli/Cargo.toml:26` at the local md-codec 0.45.1 and running
+   `crates/me-cli/Cargo.toml`'s md-codec pin at md-codec's git rev and running
    `cargo check -p mnemonic-engrave --all-targets` does **not** compile: the
    graph also needs a `miniscript` patch. Stage 4a names the pin and not the
    override, so an implementer hits a wall that reads like a broken workspace.
+   **As shipped:** the pin is the git rev `cf35d61a` (md-codec 0.47.0; a rev,
+   never a path or a tag), and the root `[patch.crates-io]` pins rust-miniscript
+   at `ff4732e5`, equal to descriptor-mnemonic's own. **The patch alone is
+   silently unused:** `Cargo.lock` held miniscript 13.1.0, above the rev's
+   13.0.0, so cargo warned "Patch … was not used in the crate graph" and failed
+   identically until `cargo update -p miniscript` moved the lock onto the rev.
 2. **§3f's type change breaks `me`'s own source.** §3f enumerates its blast
    radius carefully — 88 md-codec sites, the fork's `md/`+`gui/`, four non-test
    md-cli sites, and it even clears a fifth — and `me` is on none of those
    lists. It is a `md_codec` consumer like any other and its `Body::Tr` uses
-   break with them.
+   break with them. **Measured blast radius:** one struct literal
+   (`crates/me-cli/src/descriptor/md1.rs:351-357`, 2 × E0559; now
+   `InternalKey::Slot(0)`), plus one test the rust-miniscript patch turns from
+   an `Err` into a **panic**: `descriptor_seam`'s derivation differential, on the
+   rows admission refuses as key-count-exceeded. It is an md-codec defect, and
+   `me` production never reaches it. Filed as F-651.
 3. **§8b's fail-open at `bundle.rs:371`** — a decode failure that leaves the
    bundle's completeness claim computed from nothing. Filed as F-635.
 4. **The real version-sensitive surface is `sysw/record.rs:251-252`**, not
@@ -891,11 +912,12 @@ had assigned here separately and r4 then dropped from the content column:
    on `me`. That is what stage 4a's gate points at.
 
 **`me` is downstream and its pin is not bumpable the usual way** (journey I6).
-`crates/me-cli/Cargo.toml:26` pins `md-codec = "0.42"` from **crates.io**
-(`Cargo.lock`: `source = "registry+…crates.io-index"`), while md-codec is
+`crates/me-cli/Cargo.toml:26` pinned `md-codec = "0.42"` (through me 0.10.0) from **crates.io**
+(`Cargo.lock`: `source = "registry+…crates.io-index"`), while md-codec was
 developed unpublished. `me` is the tool in *this* repo that carries md1 to a
 SeedHammer II, so a version-8 payload reaches it — and r2's downstream list
-named only `mnemonic-toolkit`. Stage 4a owns it.
+named only `mnemonic-toolkit`. Stage 4a owns it. **Status:** since stage 4a
+(`a16da983`) the pin is a git rev, `cf35d61a`, md-codec 0.47.0.
 
 **`mnemonic-toolkit` is downstream** (opus M5): `render.rs:9-12` records that its
 `inspect` renders the same `template:` line via `descriptor_to_template`,

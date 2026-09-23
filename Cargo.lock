@@ -545,9 +545,8 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "md-codec"
-version = "0.42.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "336f2c0c7f8d394136992f0b9f3d527f94a2023b55772dbed07ac09e9abcfd8f"
+version = "0.47.0"
+source = "git+https://github.com/bg002h/descriptor-mnemonic?rev=cf35d61af0f058029df841f4882945e53f86cd4b#cf35d61af0f058029df841f4882945e53f86cd4b"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -563,9 +562,8 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
 name = "miniscript"
-version = "13.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd35e2c377504e50159561884b03610711db6c2fec6c89f2b98d94016684726b"
+version = "13.0.0"
+source = "git+https://github.com/rust-bitcoin/rust-miniscript?rev=ff4732e5f75aa555682343cb180fa72ee3e8e9d5#ff4732e5f75aa555682343cb180fa72ee3e8e9d5"
 dependencies = [
  "bech32",
  "bitcoin",
@@ -585,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "mnemonic-engrave"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "aes-gcm",
  "assert_cmd",

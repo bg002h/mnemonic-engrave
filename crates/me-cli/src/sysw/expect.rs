@@ -52,9 +52,12 @@
 //! Presence is not enough: a half-transmitted set is present and useless.
 //!
 //! 1. the HRP walk above, for presence and for which card kind;
-//! 2. [`super::record::mdmk_unconfirmed`], for `md1`/`mk1` set completeness —
-//!    but it **discards the HRP**, so its indices are mapped back through
-//!    [`super::record::card_hrp`] to learn which kind is broken;
+//! 2. [`super::record::mdmk_unconfirmed_why`], for `md1`/`mk1` set
+//!    completeness — but it **discards the HRP**, so its indices are mapped
+//!    back through [`super::record::card_hrp`] to learn which kind is broken.
+//!    It keeps the REASON (F-449 stage 4a): an md1 at a wire version this
+//!    build does not read becomes [`Unmet::UnreadableVersion`], never
+//!    [`Unmet::Incomplete`]'s "does not reassemble";
 //! 3. [`super::mt::mt_unconfirmed`], because walk 2 is **blind to `mt1`
 //!    entirely** — it filters on `Class::MdMk`, and an `mt1` chunk is
 //!    `Class::Mt`. Measured on three of six even chunks:
@@ -65,7 +68,7 @@
 //! transaction as complete: §6g's own failure mode surviving inside §6g's own
 //! remedy.
 
-use super::record::{card_hrp, mdmk_unconfirmed, Class};
+use super::record::{card_hrp, mdmk_unconfirmed_why, Class, Unconfirmed};
 use super::Admission;
 
 /// A kind a container may be required to hold.
@@ -142,6 +145,11 @@ pub enum Unmet {
     /// Records of this kind are present, but the set does not reassemble —
     /// so what is there cannot be restored from.
     Incomplete { kind: Kind, indices: Vec<usize> },
+    /// A record of this kind is present, but it is an md1 at a wire version
+    /// this build does not read (F-449 stage 4a, SPEC §6a). Reported apart
+    /// from [`Unmet::Incomplete`], whose "does not reassemble" would be a
+    /// false statement about a card that may be whole.
+    UnreadableVersion { kind: Kind, index: usize, got: u8 },
 }
 
 /// Parse `--expect`'s comma-separated value.
@@ -199,7 +207,7 @@ pub fn parse_kinds(spec: &str) -> Result<Vec<Kind>, String> {
 /// expectation was met.
 pub fn check(records: &[String], kinds: &[Kind], adm: Admission) -> Vec<Unmet> {
     // Walk 2 and walk 3, computed once each rather than per kind.
-    let mdmk_bad = mdmk_unconfirmed(records);
+    let mdmk_bad = mdmk_unconfirmed_why(records);
     let mt_bad = super::mt::mt_unconfirmed(records);
 
     let mut out = Vec::new();
@@ -222,11 +230,23 @@ pub fn check(records: &[String], kinds: &[Kind], adm: Admission) -> Vec<Unmet> {
             // presence IS completeness for it.
             Kind::Descriptor | Kind::Cosigner => {
                 let want = if kind == Kind::Descriptor { 'd' } else { 'k' };
-                mdmk_bad
-                    .iter()
-                    .copied()
-                    .filter(|&i| card_hrp(&records[i]) == Some(want))
-                    .collect()
+                let mut broken = Vec::new();
+                for &(i, why) in &mdmk_bad {
+                    if card_hrp(&records[i]) != Some(want) {
+                        continue;
+                    }
+                    match why {
+                        Unconfirmed::UnsupportedWireVersion(got) => {
+                            out.push(Unmet::UnreadableVersion {
+                                kind,
+                                index: i,
+                                got,
+                            })
+                        }
+                        Unconfirmed::Undecodable => broken.push(i),
+                    }
+                }
+                broken
             }
             // Walk 3. `mt_unconfirmed` only ever names Class::Mt records and
             // set-level problems among them, so a `tx:`-only stream leaves it
@@ -273,6 +293,13 @@ pub fn describe(u: &Unmet) -> String {
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        Unmet::UnreadableVersion { kind, index, got } => format!(
+            "--expect {} was not met: record {index} (records count from 0) is of that \
+             kind, but it is an md1 this build of me does not read -- {}.\n      \
+             It may be a whole card; this build cannot confirm it. Nothing was written.",
+            kind.name(),
+            md_codec::Error::WireVersionMismatch { got: *got }
+        ),
     }
 }
 
@@ -309,7 +336,7 @@ mod tests {
     fn the_mdmk_walk_is_blind_to_mt1_and_that_is_why_there_are_three() {
         let half = recs(&MT_EVEN[..3]);
         assert_eq!(
-            mdmk_unconfirmed(&half),
+            crate::sysw::record::mdmk_unconfirmed(&half),
             Vec::<usize>::new(),
             "the md/mk walk sees NOTHING WRONG with half a transaction"
         );

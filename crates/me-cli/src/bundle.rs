@@ -31,8 +31,23 @@ pub enum BundleError {
     /// An mk1 string carries a `SingleString` header (no chunk_set_id) —
     /// unsupported for bundle (only synthetic ≤56-byte cards hit this).
     Mk1SingleString(String),
-    /// An md1 string has an unsupported wire version.
-    Md1WireVersion(String),
+    /// An md1 string has a wire version this build does not read. The `u8` is
+    /// the version the header carries, so the refusal can NAME it (SPEC
+    /// §8b/§6a: an older `me` meeting a newer plate must say which).
+    Md1WireVersion(String, u8),
+    /// An unchunked md1 plate passed BCH validation but did not decode. The
+    /// plate count is a completeness claim, and it cannot be computed from a
+    /// plate that does not decode (F-635), so the bundle is refused.
+    Md1Undecodable(String, md_codec::Error),
+    /// An md1 plate (or chunk set) whose shape has no canonical derivation
+    /// path and which was encoded WITHOUT key origins
+    /// (`md_codec::Error::MissingExplicitOrigin`). It is not broken: `md
+    /// decode` reads it as a VERIFY-ME template. But the strict decode that
+    /// computes the plate count refuses it, so no count is stated. The `u8` is
+    /// the first placeholder with no origin. Whole-branch review M1: this was
+    /// reported as "does not decode" (single) and "incomplete/inconsistent"
+    /// (chunked), and neither is true.
+    Md1MissingOrigin(String, u8),
     /// An md1 chunk header could not be read for another reason.
     Md1HeaderRead(String, md_codec::Error),
     /// An mk1 chunk set failed reassembly/integrity.
@@ -93,7 +108,30 @@ impl std::fmt::Display for BundleError {
             BundleError::Mk1SingleString(_) => {
                 write!(f, "mk1 SingleString header: unsupported for bundle (no chunk_set_id)")
             }
-            BundleError::Md1WireVersion(_) => write!(f, "unsupported md1 wire version"),
+            // The accepted set is md-codec's, rendered through its own
+            // Display -- a second spelling of "4, 8" here would drift the day
+            // the codec accepts 12.
+            BundleError::Md1WireVersion(_, got) => write!(
+                f,
+                "unsupported md1 wire version: {} -- this build of me cannot read \
+                 this plate, so it states no plate count for it",
+                md_codec::Error::WireVersionMismatch { got: *got }
+            ),
+            BundleError::Md1MissingOrigin(_, idx) => write!(
+                f,
+                "md1 plate carries no key origin for @{idx}: this policy's shape has no \
+                 canonical derivation path, so `me` cannot count what a restore needs from \
+                 it, and states no plate count (`md decode` still reads it, as a VERIFY-ME \
+                 template). Re-encode it WITH origins -- `md encode --path <PATH>`, or \
+                 inline origins such as `@0/48'/0'/0'/2'/<0;1>/*` -- or engrave the \
+                 complete set that carries them"
+            ),
+            BundleError::Md1Undecodable(_, e) => write!(
+                f,
+                "md1 plate does not decode ({e}) -- it passes its checksum, but the \
+                 plate count is computed from what the plate encodes, so no count \
+                 can be stated for it"
+            ),
             BundleError::Md1HeaderRead(_, e) => write!(f, "cannot read md1 chunk header: {e}"),
             BundleError::SetIncompleteMk(id, e) => {
                 write!(f, "mk1 set {id} is incomplete/inconsistent: {e}")
@@ -207,8 +245,8 @@ pub fn parse_line(s: &str) -> Result<Parsed, BundleError> {
                 Err(md_codec::Error::ChunkHeaderChunkedFlagMissing) => {
                     Ok(Parsed::Md1Single { s: s.to_string() })
                 }
-                Err(md_codec::Error::WireVersionMismatch { .. }) => {
-                    Err(BundleError::Md1WireVersion(s.to_string()))
+                Err(md_codec::Error::WireVersionMismatch { got }) => {
+                    Err(BundleError::Md1WireVersion(s.to_string(), got))
                 }
                 Err(e) => Err(BundleError::Md1HeaderRead(s.to_string(), e)),
             }
@@ -368,11 +406,27 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         // Decoded for the SAME reason as the chunked path below; a one-plate
         // wallet can carry a hashlock too, and a check that covered only the
         // chunked shape would be a completeness claim with a hole in it.
-        if let Ok(d) = md_codec::decode::decode_md1_string(s) {
-            hashlock_kinds.extend(descriptor_hash_kinds(&d));
-            key_slots = key_slots.max(d.n as usize);
-            keyless_template |= !d.is_wallet_policy();
-        }
+        //
+        // F-635 (SPEC_liana_unspendable_internal_key §8b): this was
+        // `if let Ok(d) = …`, so a plate that did not decode was SKIPPED while
+        // still being pushed below -- `key_slots`, `keyless_template` and
+        // `hashlock_kinds` kept their zero values and the checklist stated a
+        // count computed from nothing. Measured on me 0.10.0: a version-8 2-key
+        // TEMPLATE plate printed "backup needs 1 public plate" with no template
+        // note. The chunked path below already refuses via `?`; this is now
+        // the same rule for the unchunked shape.
+        let d = md_codec::decode::decode_md1_string(s).map_err(|e| match e {
+            md_codec::Error::WireVersionMismatch { got } => {
+                BundleError::Md1WireVersion(s.clone(), got)
+            }
+            md_codec::Error::MissingExplicitOrigin { idx } => {
+                BundleError::Md1MissingOrigin(s.clone(), idx)
+            }
+            e => BundleError::Md1Undecodable(s.clone(), e),
+        })?;
+        hashlock_kinds.extend(descriptor_hash_kinds(&d));
+        key_slots = key_slots.max(d.n as usize);
+        keyless_template |= !d.is_wallet_policy();
         plates.push(PlateEntry {
             plate: 0,
             of: 0,
@@ -394,8 +448,13 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             .expect("md1_order only holds ids inserted into md1_groups");
         chunks.sort_by_key(|(i, _)| *i);
         let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
-        let d = md_codec::chunk::reassemble(&refs)
-            .map_err(|e| BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e))?;
+        let d = md_codec::chunk::reassemble(&refs).map_err(|e| match e {
+            // The set is WHOLE; it lacks origins (review M1).
+            md_codec::Error::MissingExplicitOrigin { idx } => {
+                BundleError::Md1MissingOrigin(fmt_chunk_set_id(id), idx)
+            }
+            e => BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e),
+        })?;
         // F-557: the checklist makes a COMPLETENESS claim ("backup needs N
         // plates"), and for a hashlock wallet the plate it does not count is
         // the one that opens the hashed path. The reassemble above already
@@ -555,7 +614,15 @@ mod tests {
             BundleError::Classify(CANARY.into(), ClassifyError::UnknownHrp("zz".into())),
             BundleError::Validate(CANARY.into(), ValidateError::MkCorrected(2)),
             BundleError::Mk1SingleString(CANARY.into()),
-            BundleError::Md1WireVersion(CANARY.into()),
+            BundleError::Md1WireVersion(CANARY.into(), 12),
+            BundleError::Md1MissingOrigin(CANARY.into(), 0),
+            BundleError::Md1Undecodable(
+                CANARY.into(),
+                md_codec::Error::BitStreamTruncated {
+                    requested: 14,
+                    available: 1,
+                },
+            ),
             BundleError::Md1HeaderRead(
                 CANARY.into(),
                 md_codec::Error::ChunkHeaderChunkedFlagMissing,
@@ -1068,7 +1135,7 @@ mod tests {
         let s = md1_wireversion_fixture();
         assert!(matches!(
             parse_line(&s),
-            Err(BundleError::Md1WireVersion(_))
+            Err(BundleError::Md1WireVersion(_, 0))
         ));
     }
 

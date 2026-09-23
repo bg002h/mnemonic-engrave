@@ -7,7 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-23
+
+`me` reads md1 wire version 8 (F-449 kind 1, the Liana unspendable internal
+key), and it never states a plate count, or a card confirmation, that it did
+not compute.
+
 ### Changed
+
+- **md-codec 0.47.0 by git rev** (descriptor-mnemonic `cf35d61a`,
+  `descriptor-mnemonic-md-cli-v0.19.0`), in place of crates.io 0.42, with the
+  root `[patch.crates-io]` pinning rust-miniscript at `ff4732e5`, which
+  md-codec 0.47 requires. `me` now decodes version-8 md1 plates, which it did
+  not before: `me bundle` counts a version-8 template's key slots and prints
+  its TEMPLATE note, and `me sysw` confirms a version-8 card.
+- A testnet key (`tpub`) in a `key:` record is refused as unsupported
+  ("complex-policy derivation is mainnet-only (SPEC §4f)"), with its own error
+  variant, where it was admitted and seated before (`1cbecbfd`).
+
+### Fixed
+
+- **`me bundle` never counts a plate it cannot decode (F-635).** An unchunked
+  md1 plate that passed its checksum but did not decode was skipped for the
+  completeness claim while still being counted as a plate, so the checklist
+  could say "backup needs 1 public plate" for a template with no TEMPLATE
+  note. It is now refused (exit 4), as the chunked shape already was: an
+  unsupported wire version is named ("got 12; accepted versions: 4, 8"), and
+  any other failure names the codec error. It was affected at wire version 4
+  as well as 8.
+- **Newly refused: any template whose shape has no canonical derivation path,
+  encoded without key origins.** That is wsh miniscript, hashlocks, timelocks
+  and tr script trees (for example `md encode` of
+  `wsh(or_d(pk(@0/<0;1>/*),and_v(v:pkh(@1/<0;1>/*),older(144))))` with no
+  `--path`); a review measured 12 of 20 template shapes in this class. 0.10.0
+  counted such a plate as "backup needs 1 public plate" with no TEMPLATE note;
+  it now exits 4 saying the plate carries no key origin, so `me` cannot count
+  what a restore needs. The plate is not broken, and `md decode` still reads it
+  as a VERIFY-ME template. The chunked form was already refused, but it was
+  called "incomplete/inconsistent"; it now gets the same message. **Remedy:**
+  re-encode with origins (`md encode --path <PATH>`, or inline origins such as
+  `@0/48'/0'/0'/2'/<0;1>/*`), or engrave the complete set that carries them.
+  `md compose` output carries inline origins and is unaffected.
+- `me sysw pack`, `me sysw show` and `--expect descriptor|cosigner` name an md1
+  at a wire version this build does not read, instead of calling it
+  undecodable ("could not decode") or, under `--expect`, a set that "does not
+  reassemble". `pack` still warns and proceeds.
+
+### Note
+
+- `me` now confirms version-8 (Liana kind-1) cards. A SeedHammer II board
+  flashed BEFORE the F-449 stage 3 firmware cannot read them, and treats such
+  a card as a secret. Reflash before engraving a version-8 card.
+
+### Breaking (library)
+
+- `bundle::BundleError::Md1WireVersion(String)` is now `(String, u8)`, which
+  carries the version, and `BundleError` gains `Md1Undecodable(String,
+  md_codec::Error)` and `Md1MissingOrigin(String, u8)`.
+- `sysw::expect::Unmet` gains `UnreadableVersion { kind, index, got }`.
+- New: `sysw::record::Unconfirmed` and `sysw::record::mdmk_unconfirmed_why`
+  (`mdmk_unconfirmed` keeps its signature).
+
+## [0.10.0] - 2026-09-16
+
+The §6 hash-kind record grammar (SPEC_hashlock_kinds phase 3). ms-codec is
+pinned by git rev.
+
+### Changed
+
+- A `hash:` record carries its kind: `ComposerRecord::Hash` carries a
+  `HashLock` (which hash, and the digest at that kind's width), not a bare
+  `[u8; 32]`, and `hash_record()` takes a `HashLock` and applies §6's producer
+  rule: bare for sha256, tagged for the other three. **Breaking (library).**
+- `ComposerRecordError::Hash` carries `Option<RecordHashKind>`, so the §8n
+  refusal names the kind's OWN width: `hash: <kind> needs exactly <N>
+  lowercase hex characters`, plus a distinct line for an unrecognised token,
+  where it used to say `hash: must be exactly 64 hex characters` whatever the
+  kind.
+- `me sysw show` names a hash record's kind instead of calling everything
+  sha256.
+- ms-codec is a git rev pin (mnemonic-secret), not a crates.io version.
 - `sysw::composer_records::phrase_record` returns `Zeroizing<String>`: it is the
   one constructor in that family carrying a secret, and its three siblings build
   public data and keep their plain `String` (F-493). No caller changed — the
@@ -20,6 +99,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sentence now appears only for a well-formed 33-byte payload under a foreign
   id — the one string that can genuinely also be a seed backup (F-504). The
   same records are refused; only the text changed.
+
+### Note
+
+- NOT BREAKING on the wire: a bare `hash:` record packs and decodes exactly as
+  before, which is why §6 kept the bare form for sha256 rather than tagging
+  all four.
 
 ## [0.9.0] - 2026-09-06
 
