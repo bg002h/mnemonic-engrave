@@ -556,7 +556,9 @@ gains the branch that reports it.
     `for (chunk_index, chunk) in strings.iter().enumerate()` block) into
     `pub fn correct_chunks(strings: &[&str]) -> Result<(Vec<String>, Vec<CorrectionDetail>), Error>`,
     re-exported beside `decode_with_correction` in `lib.rs`. It returns the
-    corrected strings and the details, and decodes nothing.
+    corrected strings and the details, and decodes nothing. Give it the same
+    `strings.is_empty() → ChunkSetEmpty` guard (R4 N-1): it is a new `pub`
+    API.
   - `decode_with_correction` calls it and then decodes, exactly as today:
     same signature, same errors, same order. The existing repair and
     correction tests are the regression floor for that. **Do not touch
@@ -601,18 +603,25 @@ gains the branch that reports it.
     descriptor. **No output-class advisory:** there is no `Descriptor` to
     classify, and guessing is the L4 mislabel. Stderr carries instead
     `md: repair: corrected, but this build cannot read wire version N
-    (accepted: …); take the corrected card to a newer md`.
+    (accepted: …)`, then advice **worded on `got` (R4 M-1)**: *"take the
+    corrected card to a newer md"* only when `got` is even and above 8;
+    otherwise *"this looks like a pre-v0.30 or misread card"*. Pre-v0.30
+    cards share the HRP and `MD_REGULAR_CONST`, so they pass BCH and reach
+    this branch, and no newer md reads version 0 or 2.
   - **Never reuse the success path's `any_correction ? 5 : 0` line for this
     branch (R3 M-6).** A clean v12 card has no corrections to report, and that
     line would return 0 ("already valid") for a card this build cannot read.
 
-  Assert **five** things:
+  Assert **six** things:
   1. stdout carries the corrected string;
   2. the exit is **5**;
   3. stderr names the version AND the accepted set;
   4. the uncorrectable v4 control still exits **2 with empty stdout**;
   5. **a CLEAN v12 card (zero errors) exits 2 with empty stdout**. This is
-     the control that catches a reused `any_correction ? 5 : 0` (R3 M-6).
+     the control that catches a reused `any_correction ? 5 : 0` (R3 M-6);
+  6. **a legacy card** (R4 M-1): `md1qppqqxzxpp29gtcfh4dhmh72l6atuttfxe3cw2xenm`,
+     a `md-codec-v0.16.2` string with one error at data position 7 (got 0),
+     exits 5 and its stderr does NOT say "newer md".
 
   Then **one line in `repair.rs`'s D26 block that records the divergence**:
   `md repair` exits 5 on a corrected card whose wire version this build does
@@ -622,9 +631,11 @@ gains the branch that reports it.
   **If the implementer concludes `5` is wrong, that is a spec escalation, not
   an implementer's choice — stop and say so.**
 
-- [ ] **Step 4:** prove it can fail, including the clean-v12 control: mutate
-  the new branch to return `if details.is_empty() { 0 } else { 5 }` and show
-  assertion 5 reddens. **Step 5: Gate and commit** (descriptor-mnemonic).
+- [ ] **Step 4:** prove it can fail, including the clean-v12 control: **drop
+  the non-empty guard** and return `if details.is_empty() { 0 } else { 5 }`,
+  which models the reuse R3 M-6 describes, then show assertion 5 reddens. R4 M-2
+  measured that the return-only mutation is inert: the guard keeps the clean
+  card at exit 2. **Step 5: Gate and commit** (descriptor-mnemonic).
 
 ---
 
@@ -757,8 +768,13 @@ output are in `design/agent-reports/f449-plan-stage2-r0.md` Appendix A and
   - the regenerated file contains the new case with `accepted: true`;
   - apart from `source_commit`, no line of the eight existing cases changed:
     `git diff -U0 -- crates/md-codec/tests/fixtures/liana/cases.json | grep '^[-+] ' | grep -v source_commit`
-    prints nothing except the new case's own lines;
-  - every case's `source_commit` equals the SHA from step 1.
+    prints nothing except the new case's own lines and the separating
+    `},` / `{` lines git attributes to the insertion (R4 N-2);
+  - every case's `source_commit` equals the SHA from step 1;
+  - **that SHA contains the evidence (R4 M-3).** Uniform stamps pass even over
+    uncommitted records, so check the commit itself:
+    `git -C <engrave> show <sha>:design/evidence/composer-fable-r0/fable-liana-parse-in.jsonl | grep -c '"<new-name>"'`
+    prints `1`, and the same for `fable-liana-parse-out-v15.jsonl`.
 
 - [ ] **Step 3: `scripts/liana-live-gate.sh`** (mnemonic-engrave). Locate the
   checkout, build the harness, run every vendored case plus controls, diff
