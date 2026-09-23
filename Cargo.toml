@@ -10,3 +10,14 @@ opt-level = 2
 
 [profile.dev]
 opt-level = 2
+
+# md-codec (crates/me-cli/Cargo.toml) is built against rust-miniscript at this
+# rev, not a crates.io release: it carries PR #953 (taptree Display) and #915
+# (`sortedmulti` as a Terminal), in no release through 13.1.0. The rev MUST
+# equal descriptor-mnemonic's own `[patch.crates-io]` at the md-codec rev pinned
+# there, or md-codec does not compile. Adding this line is not enough on its
+# own: Cargo.lock held miniscript 13.1.0 (> this rev's 13.0.0), so the patch is
+# ignored ("Patch ... was not used in the crate graph") until
+# `cargo update -p miniscript` moves the lock onto it.
+[patch.crates-io]
+miniscript = { git = "https://github.com/rust-bitcoin/rust-miniscript", rev = "ff4732e5f75aa555682343cb180fa72ee3e8e9d5" }

@@ -23,7 +23,16 @@ path = "src/lib.rs"
 # A PATH dependency: `cargo publish mnemonic-io-lib` is irreversible and
 # operator-gated, and nothing here needs it published to build or test.
 mnemonic-io-lib = { path = "../mnemonic-io-lib" }
-md-codec = "0.42"
+# A GIT dependency pinned to a rev, not a crates.io version (F-449 stage 4a,
+# SPEC_liana_unspendable_internal_key §9a). md-codec is unpublishable while it
+# depends on the rust-miniscript git patch below, so crates.io stopped at 0.42
+# -- which reads no wire version but 4, and fails every version-8 plate.
+# cf35d61a is `descriptor-mnemonic-md-cli-v0.19.0` (md-codec 0.47.0). A rev,
+# not the tag: a tag can be moved, a rev cannot. Same shape as mnemonic-toolkit.
+#
+# NEEDS the root `[patch.crates-io]` miniscript override: md-codec 0.47 calls
+# APIs that exist only at that rev (`derive_at_index`, `Terminal::SortedMultiA`).
+md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "cf35d61af0f058029df841f4882945e53f86cd4b" }
 # §5.4's `address 0:` line -- the executable check the operator makes before
 # anything is engraved. `md_codec::Descriptor::derive_address` is the derivation
 # (md-codec's `derive` feature is default-on and already in this tree), and its
