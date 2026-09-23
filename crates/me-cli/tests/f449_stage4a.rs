@@ -18,6 +18,18 @@
 use assert_cmd::Command;
 
 const V8_TEMPLATE: &str = "md1cpfdsssj6tvyywtsqrq0zjs4n7gdve74ar402";
+const V12_SINGLE: &str = "md1uzfdsssjjtvyyw2fdssj54qqxppcgscu5e7m9jgawlhg";
+const V4_UNDECODABLE: &str = "md1yrlllllllllllllllllltrn9jd5mjtn77";
+const V4_ORIGINLESS_TEMPLATE: &str = "md1yppqqxqu22z54hcefkda7r46w";
+/// md-codec's own rendering of the refusal. Asserted as a substring so the
+/// accepted set is read from the codec, never restated here.
+const V12_NAMED: &str = "wire-format version mismatch: got 12; accepted versions: 4, 8";
+
+fn v12_chunk() -> String {
+    let mut payload = vec![0u8; 13];
+    payload[0] = 0xC8;
+    md_codec::codex32::wrap_payload(&payload, 100).unwrap()
+}
 
 struct Out {
     code: i32,
@@ -62,4 +74,64 @@ fn sysw_confirms_a_version_8_card() {
         mnemonic_engrave::sysw::record::mdmk_unconfirmed(&[V8_TEMPLATE.to_string()]),
         Vec::<usize>::new()
     );
+}
+
+// ---- Task 2: F-635, the fail-open at bundle.rs's unchunked path. ----------
+
+/// §8.9 row "`me` fail-open": a bundle never states a plate count it did
+/// not compute.
+#[test]
+fn bundle_refuses_an_unchunked_plate_at_an_unsupported_version() {
+    let r = me(&["bundle"], &format!("{V12_SINGLE}\n"));
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(r.out.is_empty(), "no manifest: {}", r.out);
+    assert!(!r.err.contains("backup needs"), "no count: {}", r.err);
+    assert!(r.err.contains("unsupported md1 wire version"), "{}", r.err);
+    assert!(r.err.contains(V12_NAMED), "the version is NAMED: {}", r.err);
+    assert!(!r.err.contains("does not decode"), "{}", r.err);
+}
+
+#[test]
+fn bundle_refuses_an_unchunked_plate_that_does_not_decode() {
+    let r = me(&["bundle"], &format!("{V4_UNDECODABLE}\n"));
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(r.out.is_empty(), "no manifest: {}", r.out);
+    assert!(!r.err.contains("backup needs"), "no count: {}", r.err);
+    assert!(r.err.contains("md1 plate does not decode"), "{}", r.err);
+}
+
+/// F-635 is not only a version-8 problem: this is a REAL encoder output at
+/// wire version 4 -- md-cli 0.19.0, `md encode
+/// "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})"`
+/// -- an origin-less 2-key TEMPLATE that strict decode refuses
+/// (`MissingExplicitOrigin`). me 0.10.0 bundled it as "backup needs 1 public
+/// plate" with no template note; the chunked shape of the same class was
+/// already refused (`SetIncompleteMd`).
+#[test]
+fn a_version_4_origin_less_template_is_refused_not_miscounted() {
+    let r = me(&["bundle"], &format!("{V4_ORIGINLESS_TEMPLATE}\n"));
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(r.out.is_empty(), "{}", r.out);
+    assert!(!r.err.contains("backup needs"), "{}", r.err);
+    assert!(r.err.contains("requires explicit origin"), "{}", r.err);
+}
+
+/// A decodable plate beside the bad one does not rescue the bundle: the
+/// refusal is per plate, not "at least one plate decoded".
+#[test]
+fn a_good_plate_does_not_carry_a_bad_one() {
+    let r = me(&["bundle"], &format!("{V8_TEMPLATE}\n{V12_SINGLE}\n"));
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(r.out.is_empty(), "{}", r.out);
+    // R0 Nit: the refusal must name the BAD plate's version, so a refusal
+    // caused by the good plate cannot pass this test.
+    assert!(r.err.contains(V12_NAMED), "{}", r.err);
+}
+
+/// The chunked shape already refused; it now NAMES the version too.
+#[test]
+fn bundle_names_the_version_of_a_chunk_it_cannot_read() {
+    let r = me(&["bundle"], &format!("{}\n", v12_chunk()));
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(r.err.contains(V12_NAMED), "{}", r.err);
 }
