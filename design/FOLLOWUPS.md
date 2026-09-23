@@ -19742,3 +19742,44 @@ adds the verdict value for a single card corrected at a wire version the
 toolkit cannot read (exit 4). The GUI's mirror of the repair JSON schema must
 accept it and render it. Until it does, the GUI may show an unknown-verdict
 error for a card that was in fact corrected.
+
+### F-651 — `md_codec::Descriptor::derive_address` panics on a descriptor `md_codec::split` admits (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#panic`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 4a plan
+(`design/IMPLEMENTATION_PLAN_f449_stage4a_me.md`, finding F5), measured by its
+author.
+
+With md-codec 0.47.0 and the miniscript patch, `derive_address` on
+`sh(sortedmulti(2, 16 keys))` PANICS inside rust-miniscript (`ff4732e5`
+`src/lib.rs:355`: "Script cannot be larger than 520 bytes, but got 547 bytes").
+Under miniscript 13.1.0 the same call returned `Err(AddressDerivationFailed)`.
+`md_codec::split` admits the descriptor (29 chunks). `me` is unaffected in
+production because its CLI refuses that row at admission first
+(`descriptor_refusals::row_key_count_exceeded`), but its
+`descriptor_seam` test hits the panic.
+
+**Fix (Rust-primary, with a test vector):** md-codec either refuses the
+descriptor at admission or returns an `Err` rather than panicking. Afterwards
+stage 4a's skip in `descriptor_seam.rs` can go back to deriving and assert
+`Err`.
+
+### F-652 — `me bundle` refuses origin-less templates that `md decode` reads (owning phase: none — ownerless UX residue) `#mnemonic-engrave` `#me` `#bundle`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 4a plan. After stage
+4a's F-635 fix, both the unchunked and the chunked path refuse an origin-less
+template plate that `md decode` reads with VERIFY-ME. That refusal is safe; the
+plate was previously miscounted. `DecodeOpts::partial()` (md-codec
+`decode.rs:55`) would decode it, and `key_slots` / `keyless_template` /
+`hashlock_kinds` do not depend on origins, so `me` could count it correctly
+instead of refusing it.
+
+### F-653 — `me`'s fuzz workspace cannot build (owning phase: none — ownerless test-infra residue) `#mnemonic-engrave` `#me` `#fuzz`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 4a plan.
+`crates/me-cli/fuzz/Cargo.lock` is frozen at `mnemonic-engrave 0.3.0` and
+`md-codec 0.40.0`; `cargo check --locked` fails there at `8aea0d36`. Since
+stage 4a it also needs the root's `[patch.crates-io]`, because patches do not
+cross workspaces. The fuzz workspace is not in CI.
