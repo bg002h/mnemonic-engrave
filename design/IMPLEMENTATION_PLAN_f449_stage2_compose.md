@@ -18,8 +18,10 @@
 - **`liana` is not always achievable.** When `internal_key_path(list)` is `Some`, the composer extracts a real key and there is no unspendable internal key to choose. SPEC §6 row 3: that combination **WARNS**, never silently no-ops.
 - **The harness is the oracle, not our opinion.** Any claim that Liana accepts or refuses a shape must come from `harnesses/liana` output committed as evidence, with a known-good control in the same run.
 - **A probe that refuses on a parse error proves nothing about policy.** `"Error while parsing xkey"` is a malformed input, not a verdict. Every probe carries a control; a run whose control fails is void.
-- **TWO REPOS, and every step must say which** (R0 I-1). `scripts/phase-gate.sh`,
-  `scripts/plan-api-check.sh` and all `crates/` work are **descriptor-mnemonic**.
+- **TWO REPOS, and every step must say which** (R0 I-1). `scripts/phase-gate.sh` and all `crates/` work are **descriptor-mnemonic**.
+  `scripts/plan-api-check.sh` is **mnemonic-engrave** (measured — it exists in
+  no other repo), which matters because the Self-Review makes running it a
+  pre-dispatch gate.
   `design/FOLLOWUPS.md` (which holds F-636/638/640/641), `design/evidence/`,
   `harnesses/liana` and `scripts/followups-status.sh` are **mnemonic-engrave**.
   descriptor-mnemonic has its OWN `design/FOLLOWUPS.md` containing none of
@@ -64,6 +66,15 @@
 - Test: `crates/md-cli/tests/cli_compose_unspendable.rs` (create)
 
 **Interfaces produced:** `compose::UnspendableKind { Nums, Liana }` (default `Nums`); `lower_tr(list, declared, unspendable)`; `compose::run(wrapper, paths, preset, experimental, json, unspendable)`.
+
+- [ ] **Step 0: Generate and commit the golden BEFORE anything else (R0 C-2, R1 I-g).**
+  `scripts/gen-compose-golden.sh` runs the CURRENT `md` — 0.18.0, no flag —
+  over every preset and every wrapper, writing
+  `crates/md-cli/tests/golden/compose_pre_unspendable.json`. **Commit it in
+  its own commit, before the flag exists.** Two reasons, and the second is the
+  point: Step 1's `include_str!` cannot compile without it, and a golden
+  generated after the flag lands would be blessed by the very code it guards
+  — the defect C-2 was raised against. Do NOT stub it to make the build pass.
 
 - [ ] **Step 1: Write the failing test — the default is byte-identical to today**
 
@@ -110,21 +121,34 @@ fn omitting_the_flag_is_byte_identical_to_the_previous_release() {
     // The golden is generated ONCE from md-cli 0.18.0 (pre-flag) by
     // `scripts/gen-compose-golden.sh` and committed. It is an external fact,
     // so a parse bug in THIS binary cannot move both sides of the comparison.
+    // Read at RUNTIME, not `include_str!`. A compile-time include makes a
+    // missing golden a BUILD error, which invites stubbing the file to get
+    // green -- and a stub blessed by this binary is the exact defect the
+    // golden exists to prevent. At runtime a missing golden is a loud,
+    // specific test failure instead.
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/golden/compose_pre_unspendable.json");
+    let raw = std::fs::read_to_string(path).unwrap_or_else(|e| {
+        panic!("golden missing ({e}) -- run scripts/gen-compose-golden.sh with the PRE-flag md and commit it: {path}")
+    });
     let golden: BTreeMap<String, String> =
-        serde_json::from_str(include_str!("golden/compose_pre_unspendable.json"))
-            .expect("golden parses");
+        serde_json::from_str(&raw).expect("golden parses");
     assert!(golden.len() >= 6, "the floor must cover EVERY preset, got {}", golden.len());
     for (invocation, expected) in &golden {
         let args: Vec<&str> = invocation.split(' ').collect();
         let (out, err, code) = md(&args);
         assert_eq!(code, 0, "{invocation}: {err}");
         assert_eq!(&out, expected, "{invocation} moved against 0.18.0");
-        // and explicit `nums` must equal the default
-        let mut with = args.clone();
-        with.extend_from_slice(&["--unspendable", "nums"]);
-        let (out2, err2, code2) = md(&with);
-        assert_eq!(code2, 0, "{invocation} --unspendable nums: {err2}");
-        assert_eq!(out, out2, "{invocation}: explicit nums != default");
+        // Explicit `nums` must equal the default -- but ONLY for `tr`.
+        // Task 1b refuses the flag under wsh/sh/sh-wsh (there is no taproot
+        // internal key there), so appending it to those rows would assert
+        // exit 0 on an invocation this stage deliberately makes fail.
+        if args.contains(&"tr") {
+            let mut with = args.clone();
+            with.extend_from_slice(&["--unspendable", "nums"]);
+            let (out2, err2, code2) = md(&with);
+            assert_eq!(code2, 0, "{invocation} --unspendable nums: {err2}");
+            assert_eq!(out, out2, "{invocation}: explicit nums != default");
+        }
     }
 }
 ```
@@ -219,12 +243,7 @@ Parse it with an explicit error naming both values; do not accept a prefix or a 
   draft could not catch and is the reason the golden exists — if (b) stays
   green the floor is still vacuous. Paste all four results.
 
-- [ ] **Step 9b: Generate and commit the golden FIRST.** `scripts/gen-compose-golden.sh`
-  runs the CURRENT `md` (0.18.0, no flag) over every preset and every
-  `--wrapper`, writing `crates/md-cli/tests/golden/compose_pre_unspendable.json`.
-  Commit it **before** adding the flag, in its own commit, so the golden is
-  provably pre-flag output and `git log` shows it could not have been
-  generated by the code it guards.
+(The golden is Step 0; it must exist before Step 1 compiles.)
 
 - [ ] **Step 10: Gate and commit.**
 
@@ -296,10 +315,15 @@ outcome available here.
   composes that preset at exit 0 — the test that catches gating on the shape
   instead of the flag.
 
-- [ ] **Step 3: WARN — the Liana-policy cases.** `hashlock-gated` and
-  `decaying-multisig` compose fine and md can encode them; they are simply
-  not importable by Liana today. Warn on stderr, naming the preset and that
-  the wallet is valid but Liana will refuse it. Exit 0.
+- [ ] **Step 3: WARN — the Liana-policy cases, keyed on the SHAPE not the name.**
+  **R1 I-f:** keying on preset name misses every `--path`-built equivalent.
+  Measured: `--path 2of3 --path 1of1,sha256=…,older=100` composes at exit 0
+  with a NUMS internal key and no preset at all, so a name-keyed warning is
+  silent on exactly the hand-built wallet an operator is most likely to get
+  wrong. Detect the composed shape — a hashlock leaf present, or no
+  non-timelocked path — and warn on that. `hashlock-gated` and
+  `decaying-multisig` then fall out as instances rather than special cases.
+  Warn on stderr; exit 0; test BOTH the preset and the `--path` spelling.
 
 - [ ] **Step 4: SPEC §6 row 3's warn** — `--unspendable liana` where
   `internal_key_path(list)` is `Some`, so a real key was extracted and there
@@ -315,14 +339,33 @@ outcome available here.
 
 ---
 
-## Task 2c: SPEC §8.9's stage-2 row — `md repair` keeps a correction
+## Task 2c: SPEC §8.9's stage-2 row — a correction survives an UNSUPPORTED version
 
-**R0 I-2: the plan scheduled this nowhere and did not list it as absent.** SPEC §8.9 assigns to **stage 2** that `md repair` on a v8 chunk with a correctable BCH error KEEPS the correction and reports an unsupported wire version, distinctly from the atomic-fail exit. Confirmed at `repair.rs:88-96`: it discards `details` and returns `Ok(2)`.
+**R1 I-c corrected this task; my first draft could not fire.** I wrote it
+against a **v8** chunk. Measured at `25acb33c`: `header.rs:36-38`'s
+`is_supported_version` returns true for `WF_UNSPENDABLE_VERSION`, and a
+corrupted v8 card repairs cleanly at **exit 0** keeping the correction. The
+row is about a version this build does **not** support — so the reachable
+trigger is a version outside the accepted set (e.g. **12**), not 8.
 
-- [ ] **Step 1:** write the failing test — a v8 chunk with a single correctable error; assert the corrected payload survives AND the exit distinguishes "unsupported version" from "could not correct".
-- [ ] **Step 2:** fix `repair.rs` to carry `details` through.
-- [ ] **Step 3:** prove the test fails without the fix.
-- [ ] **Step 4: Gate and commit** (descriptor-mnemonic).
+The fix site was wrong too: `details` are discarded inside
+`decode_with_correction` (`chunk.rs:659`/`:666`), not in `repair.rs`.
+
+- [ ] **Step 1: Prove the trigger is reachable BEFORE writing the fix.**
+  Construct a chunk at an unsupported version with one correctable BCH error
+  and show today's behaviour. If it already keeps the correction and reports
+  the version distinctly, **this task is already satisfied — say so, record
+  the measurement, and close it without a code change.** A task whose gate
+  already passes is not work.
+
+- [ ] **Step 2:** only if Step 1 shows a real gap — carry `details` through
+  `chunk.rs:659`/`:666` so a successful correction is not thrown away when the
+  version check fails afterwards.
+
+- [ ] **Step 3:** test that the corrected payload survives AND that the exit
+  distinguishes "unsupported version" from "could not correct".
+
+- [ ] **Step 4:** prove it can fail. **Step 5: Gate and commit** (descriptor-mnemonic).
 
 ---
 
@@ -341,13 +384,25 @@ Stage 1b deferred these because they needed md-cli. They are now buildable.
 
 **Files:** `crates/md-codec/tests/liana_evidence_legs.rs` (create) — or md-cli if it needs the binary; choose by what the assertion needs and say why in the file's doc comment.
 
-- [ ] **Step 1: Descriptor equality against the four ACCEPT shapes**
+**R1 I-e — do not hardcode the corpus's shape.** Task 5 adds a fifth ACCEPT
+case, which falsifies any assertion naming "four" or "24". **Derive both
+counts from the corpus at run time** and assert only that the set is
+non-empty and that every ACCEPT case passes. A hardcoded count is precisely
+what breaks the next time the corpus grows.
 
-For each vendored case whose recorded Liana verdict is ACCEPT, assert that `md`'s rendered descriptor equals the evidence's descriptor **byte-exact including the checksum**. The whole-branch review measured 8/8 for this; that measurement lives in a transcript and dies with it. This is the same property as an assertion.
+**And the regenerator will erase a hand-added case.**
+`scripts/vendor-liana-evidence.sh` rewrites `cases.json` **wholesale** from a
+hardcoded 8-name list. Task 5's new vector must be added to that list in the
+same commit, or the next regeneration silently deletes it and these tests go
+green over a corpus that lost its only nested ACCEPT.
 
-- [ ] **Step 2: Address equality against the four ACCEPT shapes**
+- [ ] **Step 1: Descriptor equality against every ACCEPT shape**
 
-Each ACCEPT case records Liana's own first three receive and change addresses. Assert md derives the same 24. Use the recorded values as the oracle — do not recompute them from the descriptor with the same code under test, which would assert only that md agrees with itself.
+For each vendored case whose recorded Liana verdict is ACCEPT, assert that `md`'s rendered descriptor equals the evidence's descriptor **byte-exact including the checksum**, for every case the corpus marks ACCEPT — count derived, not written down. The whole-branch review measured 8/8; that measurement lives in a transcript and dies with it. This is the same property as an assertion.
+
+- [ ] **Step 2: Address equality against every ACCEPT shape**
+
+Each ACCEPT case records Liana's own first three receive and change addresses. Assert md derives the same set — six per ACCEPT case, count derived from the corpus. Use the recorded values as the oracle — do not recompute them from the descriptor with the same code under test, which would assert only that md agrees with itself.
 
 - [ ] **Step 3: Run both — expect PASS** (the data already agrees; these tests pin it).
 
@@ -373,11 +428,15 @@ output are in `design/agent-reports/f449-plan-stage2-r0.md` Appendix A and
   its verdict, its two inferred recovery paths (`older` 26280 / 52560) and its
   addresses, exactly as the harness returned them.
 
-- [ ] **Step 2: ORDERING (R0 I-5).** Task 4 pins "the four ACCEPT shapes / the
-  same 24 addresses". Adding a fifth ACCEPT here falsifies those counts. Either
-  run this step BEFORE Task 4, or write Task 4's assertions to derive their
-  counts from the corpus rather than hardcoding four and 24. **Deriving is
-  preferred** — a hardcoded count is the thing that breaks next time too.
+- [ ] **Step 2: ORDERING and the REGENERATOR (R0 I-5, R1 I-e).** Task 4's
+  assertions now derive their counts from the corpus, so adding a fifth ACCEPT
+  here no longer falsifies them — confirm that before relying on it.
+
+  Separately and more dangerously: `scripts/vendor-liana-evidence.sh` rebuilds
+  `cases.json` **wholesale** from a hardcoded 8-name list. Add this case to
+  that list **in the same commit as the vector**, or the next regeneration
+  deletes the corpus's only nested ACCEPT and every test stays green over the
+  loss.
 
 - [ ] **Step 3: `scripts/liana-live-gate.sh`** (mnemonic-engrave). Locate the
   checkout, build the harness, run every vendored case plus controls, diff
@@ -435,12 +494,12 @@ These are one class — *the refusal is correct, the explanation names the wrong
 **Type consistency.** `InternalKey::{Slot,NumsPoint,LianaUnspendable}` is stage 1a's shipped shape; `UnspendableKind` is new and distinct from it — the former is a wire concept, the latter a request. Do not merge them.
 
 **Build-gate coverage — stated, not assumed.** `scripts/plan-build-gate-md.sh`
-cannot compile Task 1's golden test end to end, because `include_str!` needs
-`crates/md-cli/tests/golden/compose_pre_unspendable.json`, which **Step 9b
-generates**. Verified by hand instead: with a stub golden dropped into the
-gate's scratch copy the test compiles and links clean, so the only ungated
-part is the artifact's existence, not the test's logic. The reviewer should
-still confirm Step 9b's script actually emits the shape the test deserialises.
+compiles Task 1's golden test, which reads its golden at RUNTIME rather than
+via `include_str!` — so the gate proves the test's logic without the artifact,
+and a missing golden is a loud test failure rather than a build error that
+invites stubbing. What the gate does NOT cover is whether
+`scripts/gen-compose-golden.sh` emits the shape the test deserialises; that
+needs a reviewer's execution pass.
 
 **Build-gate coverage — stated, not assumed.** `scripts/plan-build-gate-md.sh`
 extracts only blocks preceded by an anchor naming a `.rs` file, and only whole
@@ -488,9 +547,12 @@ reason.
   outstanding. Anything already shipped moves out with the commit that shipped
   it named. This is the check that would have saved this plan's own recon.
 
-- [ ] **Step 3: Rule on §8.1** (carried from Task 4 Step 3). If the evidence
-  says no nested shape is acceptable, AMEND the spec. Leaving an unsatisfiable
-  requirement in place makes every future stage's acceptance ambiguous.
+- [ ] **Step 3: §8.1 is CLOSED, not open.** R0 C-3 settled it and I
+  reproduced it: Liana v15.0 accepts a nested taptree, so §8.1 is satisfiable
+  and the "amend the spec" branch my first draft carried is **deleted** — it
+  rested on a premise measured false. Confirm here only that Task 5 vectored
+  the accepted case and that F-640 is marked CLOSED in **mnemonic-engrave**'s
+  `design/FOLLOWUPS.md`, citing the evidence file.
 
 - [ ] **Step 4: Re-run the measurable claims.** Any spec sentence citing a
   count, a file:line or a command's output gets re-run, not re-read. Cite the
