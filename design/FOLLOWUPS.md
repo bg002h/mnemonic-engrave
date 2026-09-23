@@ -19537,3 +19537,32 @@ traversal is wrong in a way Liana's is not, every existing test still passes.
 **Carry into stage 2's brief.** Alongside C3's evidence legs (descriptor- and
 address-equality against the ACCEPT shapes), which are deferred to the same
 place for the same reason: they need `md decompose` / `md descriptor`.
+
+### F-641 — `wsh(tr(UNSPENDABLE(liana),…))` and `xtr(…)` satisfy the marker-position check and then fail naming a synthetic key (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
+
+**Status:** OPEN — pre-existing, message quality only, NOT introduced by
+stage 1b (the whole-branch fix re-review measured `prefix == tip`).
+Filed 2026-09-22 from that review's Nit.
+
+**The defect.** `validate_marker_position` asks only whether the marker is
+preceded by the three bytes `tr(`. Two shapes satisfy that without the marker
+being a root `tr()`'s internal key:
+
+- `wsh(tr(UNSPENDABLE(liana),…))` — a nested `tr`, which §6 row 4 refuses
+  anyway, but later and with a different explanation;
+- `xtr(UNSPENDABLE(liana),…)` — any identifier ENDING in `tr`.
+
+Both then fail downstream naming the substituted 64-hex synthetic key rather
+than the marker the operator actually typed, so the message does not mention
+the thing they wrote.
+
+**Why it is not blocking.** Both refuse — nothing mints, nothing is engraved.
+The stage-1b fix closed the case that mattered (a marker anywhere else now
+gets a clean, specific refusal) and the UTF-8 panic that fix introduced is
+closed too (F-449 whole-branch r2). What remains is that two rare spellings
+get a worse message than the common ones.
+
+**The fix.** Check the marker sits at the root descriptor's internal-key
+position — parse position, not a three-byte prefix — rather than pattern
+matching on preceding text. Same class as F-638 and F-636: the refusal is
+right, the explanation names the wrong thing.
