@@ -5,20 +5,22 @@
 **Stage 1b is SHIPPED.** dm main `25acb33c` (md-codec 0.46.0, md-cli 0.18.0,
 1500/1500, CI green no bypass). engrave master `b5576365`+.
 
-**Stage 2 is at plan review round 2.** No code written yet.
+**Stage 2 is at plan review round 3.** No code written yet.
 
-### Do this first
-1. Read `design/agent-reports/f449-plan-stage2-r2.md` (the R2 verdict — it was
-   in flight when this file was written; it persists itself).
-2. If `ready for implementation: no` → fold into
-   `design/IMPLEMENTATION_PLAN_f449_stage2_compose.md`, re-gate with
-   `./scripts/plan-build-gate-md.sh <plan>`, re-dispatch R3 (opus).
-3. If yes → execute with superpowers:subagent-driven-development.
+### Do this first (updated 2026-09-23)
+R2 returned 0C/5I and is FOLDED at `387d4cc4` (build gate exit 0, 67/67).
+R3 (opus, scoped to "did the fold close NEW-I-1..5, did it add a defect")
+writes `design/agent-reports/f449-plan-stage2-r3.md`.
+1. If that file is absent, R3 was lost: re-dispatch it with the same scope.
+2. `ready for implementation: no` → persist commit, fold, re-gate with
+   `./scripts/plan-build-gate-md.sh <plan>`, commit, dispatch R4.
+3. `yes` → execute with superpowers:subagent-driven-development (one
+   implementer, in a descriptor-mnemonic worktree).
 
 ### The plan
 `design/IMPLEMENTATION_PLAN_f449_stage2_compose.md` — 9 task headings
 (1, 1b, 2, 2c, 3=pointer, 4, 5, 6, 7). Review history: r0 3C/7I → r1 0C/7I →
-r2 pending. Reports in `design/agent-reports/f449-plan-stage2-r{0,1}.md`.
+r2 0C/5I (folded 387d4cc4) → r3 pending. Reports in `design/agent-reports/f449-plan-stage2-r{0,1,2}.md`.
 Recon: `design/RECON_f449_stage2.md`.
 
 ### What stage 2 actually is
