@@ -67,6 +67,19 @@ Each was measured, not read from a doc comment. A reviewer can re-run the comman
 | F13 | Stage-4-owned follow-ups at `fe73cca6`: **F-644** and **F-654** (`grep -n "F-449 stage 4\*\*" design/FOLLOWUPS.md`). F-633 is owned by the coordinator-compat cycle, but SPEC §7 makes its copy gating here. The highest ID is F-658, so new entries start at F-659. | `grep` |
 | F14 | `composerRestoreDoc` (`gui/composer_flow.go:528`) tells an operator who cut a template and NO cards that "This backup is a key-less TEMPLATE plus its key cards … restore needs the mk1 key cards listed below" — none are listed. Pre-existing (F-544); filed, not fixed (Task 9). | the liana arm's `l06-` frames |
 
+## R1 Nits — BINDING notes for the implementer (plan GREEN at R1, 0C/0I/0M/3N)
+
+Source: `design/agent-reports/f449-plan-stage4-r1.md`.
+- **N3:** DELETE the retired TLV walk `lianaLeafPubkeys` from `md/liana.go`,
+  and move any test that used it onto `LianaUnspendableKeyFor`. A second copy
+  of the key walk is how the two routes diverge again. Prove the deletion
+  with `go build ./... && go vet ./md/`.
+- **N1:** where the plan says "4 in production" for `ComposeWith`, it means 3
+  call sites plus the definition. Write 3 in any comment you copy.
+- **N2:** the new comment on the "could not build" drop cause gives the two
+  screens in the wrong order. Write them in the order the operator meets them
+  (measure it).
+
 ## Global Constraints
 
 - **Rust leads, Go follows.** Every normative behaviour here exists in md-codec 0.47.0 / md-cli 0.19.0 (the compose request, `validate_unspendable_shape`, `KeyPathKind::LianaUnspendable`). Port names and semantics as Rust has them. If a port step meets Rust behaviour that looks wrong, file a Rust follow-up and port Rust as it is.
