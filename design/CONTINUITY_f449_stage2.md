@@ -5,17 +5,18 @@
 **Stage 1b is SHIPPED.** dm main `25acb33c` (md-codec 0.46.0, md-cli 0.18.0,
 1500/1500, CI green no bypass). engrave master `b5576365`+.
 
-**Stage 2 is at plan review round 4.** No code written yet.
+**Stage 2 plan is GREEN (R4 0C/0I, Minors folded at `fa8bba6f`). IMPLEMENTING.**
 
 ### Do this first (updated 2026-09-23)
-R2 0C/5I folded at `387d4cc4`; R3 0C/2I folded at `fab1c881` (gate exit 0).
-R4 (opus, scoped to "did the fold close R3-I-1/I-2, did it add a defect")
-writes `design/agent-reports/f449-plan-stage2-r4.md`.
-1. If that file is absent, R4 was lost: re-dispatch it with the same scope.
-2. `ready for implementation: no` → persist commit, fold, re-gate with
-   `./scripts/plan-build-gate-md.sh <plan>`, commit, dispatch R5.
-3. `yes` → execute with superpowers:subagent-driven-development (one
-   implementer, in a descriptor-mnemonic worktree).
+One opus implementer runs the whole plan in two worktrees:
+- dm `/scratch/code/shibboleth/dm-worktrees/f449-stage2` (branch `f449-stage2` @ 25acb33c)
+- engrave `/scratch/code/shibboleth/me-worktrees/f449-stage2` (branch `f449-stage2` @ fa8bba6f)
+Ledger + report: `.superpowers/sdd/IMPLEMENTATION_PLAN_f449_stage2_compose/`
+(`progress.md`, `implementation-report.md`; git-ignored). If interrupted, read
+the report's `Task N: complete` lines and resume at the first missing task.
+Then: MANDATORY opus whole-diff adversarial review (persisted to
+`design/agent-reports/f449-stage2-whole-branch.md`) → fold → merge → push via
+`scripts/push-via-staging.sh` → tag md-codec 0.47.0 / md-cli 0.19.0.
 
 ### The plan
 `design/IMPLEMENTATION_PLAN_f449_stage2_compose.md` — 9 task headings
