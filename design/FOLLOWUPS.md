@@ -19827,7 +19827,7 @@ cross workspaces. The fuzz workspace is not in CI.
 
 ### F-654 — The Go composer has no Liana kind and no §6 kind-1 mint refusals (owning phase: **F-449 stage 4**) `#seedhammer` `#md` `#compose` `#liana`
 
-**Status:** CLOSED 2026-09-23 — seedhammer `8d21b07`, `d64695c` (branch `f449-stage4`, not yet merged: the landing replaces these with the fork merge SHA)
+**Status:** CLOSED 2026-09-23 — seedhammer `8d21b07`, `d64695c` (branch `f449-stage4`), landed in fork main as merge `2c9eed3`
 
 **Closed by F-449 stage 4.** `md.ComposeWithUnspendable` ports md-codec's
 `UnspendableKind` request (fork `8d21b07`, `md/compose_unspendable.go`), and
