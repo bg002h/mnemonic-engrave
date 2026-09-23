@@ -16,7 +16,8 @@
 #                      which is a small tmpfs on the author's box)
 #
 # NEVER A SILENT PASS (plan Task 5 Step 4, R0 I-7). §8.8 is REQUIRED: a missing
-# checkout, a checkout at another tag, a failed build or a failed control is a
+# checkout, a checkout at another tag or at another commit than the
+# expectation records, a failed build or a failed control is a
 # loud non-zero exit naming the fix. The stage may not close on a skip.
 #
 # THE LIANA PATH. `harnesses/liana/Cargo.toml` takes Liana as a Cargo PATH
@@ -87,6 +88,18 @@ if [[ "$tag" != "$want_tag" ]]; then
   echo "liana-live-gate: FAIL -- $checkout is at '${tag:-<untagged>}' ($commit), not $want_tag." >&2
   echo "  The expectation was measured at $want_tag; run: git -C \"$checkout\" checkout $want_tag" >&2
   exit 1
+fi
+# The expectation records the Liana COMMIT, not just the tag (a tag can be
+# moved or re-cut): a verify run must be at that exact commit, or the
+# comparison is against a Liana nobody measured. `--update` is what re-records
+# it. Checked before the build, so a wrong checkout costs nothing.
+if [[ $update -eq 0 && -f "$expected" ]]; then
+  exp_commit=$(head -1 "$expected" | python3 -c 'import json,sys; print(json.load(sys.stdin)["liana_commit"])')
+  if [[ "$commit" != "$exp_commit" ]]; then
+    echo "liana-live-gate: FAIL -- $checkout is $want_tag at $commit, but the expectation was recorded at $exp_commit." >&2
+    echo "  Check out $exp_commit, or re-measure with --update and review the diff." >&2
+    exit 1
+  fi
 fi
 if [[ -n "$(git -C "$checkout" status --porcelain --untracked-files=no)" ]]; then
   echo "liana-live-gate: FAIL -- $checkout has local modifications; the verdict would not be $want_tag's." >&2
@@ -206,5 +219,4 @@ if ! diff -u <(tail -n +2 "$expected") "$work/out.jsonl" >&2; then
   echo "liana-live-gate: FAIL -- Liana $want_tag ($commit) disagrees with the committed expectation" >&2
   exit 1
 fi
-exp_commit=$(head -1 "$expected" | python3 -c 'import json,sys; print(json.load(sys.stdin)["liana_commit"])')
-echo "liana-live-gate: PASS -- $(wc -l < "$work/out.jsonl") verdicts match; Liana $want_tag at $commit (expectation recorded at $exp_commit)"
+echo "liana-live-gate: PASS -- $(wc -l < "$work/out.jsonl") verdicts match; Liana $want_tag at $commit, the commit the expectation records"
