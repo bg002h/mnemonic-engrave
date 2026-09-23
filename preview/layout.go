@@ -40,7 +40,12 @@ func engrave_(mode, s string, qrc *qr.Code) (engrave.Engraving, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown mode %q", mode)
 	}
-	return backup.EngraveText(params, backup.Text{Paragraphs: []backup.Paragraph{p}, Font: sh.Font}), nil
+	// The fork's EngraveText returns an error (upstream v1.4.2's did not):
+	// it refuses a multi-paragraph plate that carries a QR
+	// (backup.ErrMultiParagraphQR). Unreachable from here -- this call passes
+	// exactly one paragraph -- but propagated rather than discarded, so that
+	// a future caller passing more gets the refusal instead of a nil plate.
+	return backup.EngraveText(params, backup.Text{Paragraphs: []backup.Paragraph{p}, Font: sh.Font})
 }
 
 // engraveBest renders the first fitting mode (text+qr > text > qr), like validateMdmk.

@@ -19365,10 +19365,44 @@ phrasing should be added with the fix.
 
 ### F-637 — `me bundle --preview` renders with PRISTINE UPSTREAM, while the device runs the FORK (owning phase: **unowned — operator decision pending**) `#mnemonic-engrave` `#me-preview` `#preview-vs-device`
 
-**Status:** OPEN — awaiting an operator ruling on which of the two fixes.
+**Status:** CLOSED 2026-09-22 — **operator ruled: use the fork.** Option 1
+taken. The submodule now tracks `https://github.com/bg002h/seedhammer.git`
+pinned at fork main `7b6f2fb`, replacing upstream `713aee2` (v1.4.2).
 Raised 2026-09-22 by the operator asking whether the vendored pin being a
 release behind is the right arrangement. Measured below; the version number
 turned out to be the wrong question.
+
+**What the switch proved — the divergence was LIVE, not theoretical.** The
+build FAILED on the first attempt: the fork's `backup.EngraveText` returns
+`(engrave.Engraving, error)` where upstream v1.4.2's returned a single value,
+because the fork added `ErrMultiParagraphQR` — it REFUSES a multi-paragraph
+plate that carries a QR. Preview had no idea that refusal existed, so it
+would have rendered a clean picture of a plate the device declines to cut.
+That is the harness-substitution class this repo has a standing rule about,
+and it was reachable.
+
+Two call sites needed the error propagated rather than discarded:
+`preview/layout.go:43` (passes one paragraph, so unreachable there today) and
+`scripts/f423-fit-measure/main.go:145` (passes up to three, text-only, so also
+unreachable — but a fit-measurement script that dropped a refusal would report
+a FIT for a plate that cannot be cut).
+
+**Rendered output is byte-identical.** `preview`'s `TestRenderGoldens` pins a
+SHA-256 over the DECODED RGBA pixels plus a whole-SVG hash and M/C command
+counts — any stroke, coordinate or canvas change flips it. It passes unchanged
+against the fork, confirming the purely-additive font diff: the 25 `engrave`
+and 2 `font/sh` commits move zero pixels for what preview renders. Fidelity
+gained at no visual change.
+
+All five submodule-bound Go modules build and vet clean; `preview`'s tests
+pass. (`scripts/rehearsal-blinky` does not build under plain Go — it imports
+`machine` and is TinyGo-only. Pre-existing and unrelated.)
+
+**Accepted cost, recorded so it is not rediscovered as a surprise:** that
+directory is no longer a pristine vendor tree, so "what did upstream ship" is
+no longer answerable there, and preview now shares the fork's `engrave` code
+rather than independently checking it. Deliberate: preview's job is to predict
+the device.
 
 **The arrangement.** `preview/go.mod` does
 `replace seedhammer.com => ../third_party/seedhammer`, so the sidecar imports

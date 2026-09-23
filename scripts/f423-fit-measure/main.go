@@ -142,9 +142,18 @@ func main() {
 			Paragraphs: paras,
 			Font:       fnt,
 		}
-		plan := backup.EngraveText(params, plate)
-		err := fitCheck(plan)
+		// The fork's EngraveText returns an error (upstream v1.4.2's did not):
+		// it refuses a multi-paragraph plate carrying a QR
+		// (backup.ErrMultiParagraphQR). These paragraphs are text-only, so it
+		// cannot fire here -- but a measurement script that silently dropped a
+		// refusal would report a fit for a plate the device would not cut.
+		plan, engErr := backup.EngraveText(params, plate)
 		names := names[:n]
+		if engErr != nil {
+			fmt.Printf("N=%d strings (%v): REFUSED by EngraveText -- %v\n", n, names, engErr)
+			continue
+		}
+		err := fitCheck(plan)
 		if err != nil {
 			fmt.Printf("N=%d strings (%v): FAILS toPlate's bounds check -- %v\n", n, names, err)
 		} else {
