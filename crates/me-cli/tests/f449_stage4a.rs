@@ -21,6 +21,9 @@ const V8_TEMPLATE: &str = "md1cpfdsssj6tvyywtsqrq0zjs4n7gdve74ar402";
 const V12_SINGLE: &str = "md1uzfdsssjjtvyyw2fdssj54qqxppcgscu5e7m9jgawlhg";
 const V4_UNDECODABLE: &str = "md1yrlllllllllllllllllltrn9jd5mjtn77";
 const V4_ORIGINLESS_TEMPLATE: &str = "md1yppqqxqu22z54hcefkda7r46w";
+/// The same policy, `md encode --force-chunked` (md 0.18.0): one chunk, a WHOLE
+/// set, with no origins.
+const V4_ORIGINLESS_CHUNKED: &str = "md1ffxweqqpqggqps8zjs4qqyhaq7eqm6qq6k";
 /// md-codec's own rendering of the refusal. Asserted as a substring so the
 /// accepted set is read from the codec, never restated here.
 const V12_NAMED: &str = "wire-format version mismatch: got 12; accepted versions: 4, 8";
@@ -107,13 +110,43 @@ fn bundle_refuses_an_unchunked_plate_that_does_not_decode() {
 /// (`MissingExplicitOrigin`). me 0.10.0 bundled it as "backup needs 1 public
 /// plate" with no template note; the chunked shape of the same class was
 /// already refused (`SetIncompleteMd`).
+///
+/// Whole-branch review M1: the refusal must say what is TRUE -- `md decode`
+/// reads this plate (VERIFY-ME), so "does not decode" is false -- and name
+/// the remedy.
 #[test]
 fn a_version_4_origin_less_template_is_refused_not_miscounted() {
     let r = me(&["bundle"], &format!("{V4_ORIGINLESS_TEMPLATE}\n"));
     assert_eq!(r.code, 4, "{}", r.err);
     assert!(r.out.is_empty(), "{}", r.out);
-    assert!(!r.err.contains("backup needs"), "{}", r.err);
-    assert!(r.err.contains("requires explicit origin"), "{}", r.err);
+    assert_origin_refusal(&r.err);
+}
+
+/// The chunked shape of the same plate: the set is WHOLE, so it must not be
+/// called "incomplete/inconsistent" either.
+#[test]
+fn a_chunked_origin_less_template_is_not_called_incomplete() {
+    let r = me(&["bundle"], &format!("{V4_ORIGINLESS_CHUNKED}\n"));
+    assert_eq!(r.code, 4, "{}", r.err);
+    assert!(r.out.is_empty(), "{}", r.out);
+    assert!(!r.err.contains("incomplete"), "{}", r.err);
+    assert_origin_refusal(&r.err);
+}
+
+fn assert_origin_refusal(err: &str) {
+    assert!(!err.contains("backup needs"), "no count: {err}");
+    assert!(
+        !err.contains("does not decode"),
+        "md decode reads it: {err}"
+    );
+    assert!(
+        err.contains("md1 plate carries no key origin for @0"),
+        "says what is true: {err}"
+    );
+    assert!(
+        err.contains("`md encode --path <PATH>`") && err.contains("complete set that carries them"),
+        "names the remedy: {err}"
+    );
 }
 
 /// A decodable plate beside the bad one does not rescue the bundle: the

@@ -33,10 +33,21 @@ not compute.
   could say "backup needs 1 public plate" for a template with no TEMPLATE
   note. It is now refused (exit 4), as the chunked shape already was: an
   unsupported wire version is named ("got 12; accepted versions: 4, 8"), and
-  any other failure names the codec error. **Newly refused:** an origin-less
-  template from `md encode` (e.g. `tr(<key>,{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})`),
-  which strict decode rejects and 0.10.0 counted as one plate. It was affected
-  at wire version 4 as well as 8.
+  any other failure names the codec error. It was affected at wire version 4
+  as well as 8.
+- **Newly refused: any template whose shape has no canonical derivation path,
+  encoded without key origins.** That is wsh miniscript, hashlocks, timelocks
+  and tr script trees (for example `md encode` of
+  `wsh(or_d(pk(@0/<0;1>/*),and_v(v:pkh(@1/<0;1>/*),older(144))))` with no
+  `--path`); a review measured 12 of 20 template shapes in this class. 0.10.0
+  counted such a plate as "backup needs 1 public plate" with no TEMPLATE note;
+  it now exits 4 saying the plate carries no key origin, so `me` cannot count
+  what a restore needs. The plate is not broken, and `md decode` still reads it
+  as a VERIFY-ME template. The chunked form was already refused, but it was
+  called "incomplete/inconsistent"; it now gets the same message. **Remedy:**
+  re-encode with origins (`md encode --path <PATH>`, or inline origins such as
+  `@0/48'/0'/0'/2'/<0;1>/*`), or engrave the complete set that carries them.
+  `md compose` output carries inline origins and is unaffected.
 - `me sysw pack`, `me sysw show` and `--expect descriptor|cosigner` name an md1
   at a wire version this build does not read, instead of calling it
   undecodable ("could not decode") or, under `--expect`, a set that "does not
@@ -52,7 +63,7 @@ not compute.
 
 - `bundle::BundleError::Md1WireVersion(String)` is now `(String, u8)`, which
   carries the version, and `BundleError` gains `Md1Undecodable(String,
-  md_codec::Error)`.
+  md_codec::Error)` and `Md1MissingOrigin(String, u8)`.
 - `sysw::expect::Unmet` gains `UnreadableVersion { kind, index, got }`.
 - New: `sysw::record::Unconfirmed` and `sysw::record::mdmk_unconfirmed_why`
   (`mdmk_unconfirmed` keeps its signature).

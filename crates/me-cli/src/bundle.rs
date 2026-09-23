@@ -39,6 +39,15 @@ pub enum BundleError {
     /// plate count is a completeness claim, and it cannot be computed from a
     /// plate that does not decode (F-635), so the bundle is refused.
     Md1Undecodable(String, md_codec::Error),
+    /// An md1 plate (or chunk set) whose shape has no canonical derivation
+    /// path and which was encoded WITHOUT key origins
+    /// (`md_codec::Error::MissingExplicitOrigin`). It is not broken: `md
+    /// decode` reads it as a VERIFY-ME template. But the strict decode that
+    /// computes the plate count refuses it, so no count is stated. The `u8` is
+    /// the first placeholder with no origin. Whole-branch review M1: this was
+    /// reported as "does not decode" (single) and "incomplete/inconsistent"
+    /// (chunked), and neither is true.
+    Md1MissingOrigin(String, u8),
     /// An md1 chunk header could not be read for another reason.
     Md1HeaderRead(String, md_codec::Error),
     /// An mk1 chunk set failed reassembly/integrity.
@@ -107,6 +116,15 @@ impl std::fmt::Display for BundleError {
                 "unsupported md1 wire version: {} -- this build of me cannot read \
                  this plate, so it states no plate count for it",
                 md_codec::Error::WireVersionMismatch { got: *got }
+            ),
+            BundleError::Md1MissingOrigin(_, idx) => write!(
+                f,
+                "md1 plate carries no key origin for @{idx}: this policy's shape has no \
+                 canonical derivation path, so `me` cannot count what a restore needs from \
+                 it, and states no plate count (`md decode` still reads it, as a VERIFY-ME \
+                 template). Re-encode it WITH origins -- `md encode --path <PATH>`, or \
+                 inline origins such as `@0/48'/0'/0'/2'/<0;1>/*` -- or engrave the \
+                 complete set that carries them"
             ),
             BundleError::Md1Undecodable(_, e) => write!(
                 f,
@@ -401,6 +419,9 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             md_codec::Error::WireVersionMismatch { got } => {
                 BundleError::Md1WireVersion(s.clone(), got)
             }
+            md_codec::Error::MissingExplicitOrigin { idx } => {
+                BundleError::Md1MissingOrigin(s.clone(), idx)
+            }
             e => BundleError::Md1Undecodable(s.clone(), e),
         })?;
         hashlock_kinds.extend(descriptor_hash_kinds(&d));
@@ -427,8 +448,13 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
             .expect("md1_order only holds ids inserted into md1_groups");
         chunks.sort_by_key(|(i, _)| *i);
         let refs: Vec<&str> = chunks.iter().map(|(_, s)| s.as_str()).collect();
-        let d = md_codec::chunk::reassemble(&refs)
-            .map_err(|e| BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e))?;
+        let d = md_codec::chunk::reassemble(&refs).map_err(|e| match e {
+            // The set is WHOLE; it lacks origins (review M1).
+            md_codec::Error::MissingExplicitOrigin { idx } => {
+                BundleError::Md1MissingOrigin(fmt_chunk_set_id(id), idx)
+            }
+            e => BundleError::SetIncompleteMd(fmt_chunk_set_id(id), e),
+        })?;
         // F-557: the checklist makes a COMPLETENESS claim ("backup needs N
         // plates"), and for a hashlock wallet the plate it does not count is
         // the one that opens the hashed path. The reassemble above already
@@ -589,6 +615,7 @@ mod tests {
             BundleError::Validate(CANARY.into(), ValidateError::MkCorrected(2)),
             BundleError::Mk1SingleString(CANARY.into()),
             BundleError::Md1WireVersion(CANARY.into(), 12),
+            BundleError::Md1MissingOrigin(CANARY.into(), 0),
             BundleError::Md1Undecodable(
                 CANARY.into(),
                 md_codec::Error::BitStreamTruncated {
