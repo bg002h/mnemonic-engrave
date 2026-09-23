@@ -256,7 +256,7 @@ fish:   history clear-session
 
 ## 3b · Two recoveries the toolkit can already do
 
-`mnemonic` (mnemonic-toolkit v0.103.2) is the constellation's swiss-army tool.
+`mnemonic` (mnemonic-toolkit v0.104.0) is the constellation's swiss-army tool.
 Two of its searches are worth showing, because they answer questions people
 actually arrive with. **Both were run to produce the output below.**
 
