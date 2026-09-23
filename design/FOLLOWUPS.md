@@ -19326,7 +19326,7 @@ pass the suite. Add one compound fixture asserting "an absolute lock" wins.
 
 ### F-636 — the disjoint-multipath refusal names md's limit, not the real problem, when the repeated key is the recognised Liana-unspendable one (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `8d6697fe` (F-449 stage 2 Task 6). `check_no_repeated_key` takes the recognised internal key and, when the repeated key IS it, says the wallet's provably unspendable internal key sits at a spending leaf that can never be satisfied — keeping the BIP-388 citation where the paths also overlap. Every such group was already refused; other repeated-key shapes keep their messages. Pinned by `liana_input_side.rs`'s two recognised-key repeat tests (the disjoint one's `UNSUPPORTED` assertion retired deliberately).
 Filed 2026-09-22 from the Task 6 fix-round re-review (0C/0I/1M) in F-449
 stage 1b. The behaviour is correct and gated; only the wording is off.
 
@@ -19460,7 +19460,7 @@ fork divergence entirely in place.
 
 ### F-638 — `UnspendableUseSiteNotCanonical` names no `@N`, and from the override half it describes a field the operator can see is correct (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#message-precision`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `8d6697fe` (F-449 stage 2 Task 6). `UnspendableUseSiteNotCanonical { idx: Option<u8> }`: the override half carries the placeholder, and the message names `@idx` and says the shared use-site is canonical; `None` (the shared half) keeps the old wording. Message-only — the refused set is unchanged. Pinned by `the_use_site_refusal_names_the_placeholder_that_diverged` (md-codec) and `encode_names_the_key_whose_use_site_diverged` (md-cli).
 Filed 2026-09-22 from the Task 7 independent review (M3), F-449 stage 1b.
 
 **The defect.** The variant is a unit variant and the message reads *"wire
@@ -19485,11 +19485,11 @@ two numbers and no cause).
 
 ### F-639 — `verify.rs:62` re-encodes a decoded card under `Admission::Enforce`, eleven lines below a comment stating the opposite intent (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#mint-policy-vs-decode`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `bcaa251b` (F-449 stage 2, controller ruling). `md verify` compares and mints nothing, so BOTH sides now serialise with the new additive `md_codec::encode_payload_unadmitted` (no admission policy; comparison and hashing only, never minting). The comment was right and the code was the defect. Reachable, MEASURED at 25acb33c: a §6 kind-1 `sortedmulti_a` card decoded at exit 0 while `md verify` against its own template refused with the mint error (exit 1). Pinned by `cmd_verify::verify_checks_a_mint_refused_card_instead_of_refusing_it` and the class gate `mint_policy_does_not_reach_decode.rs`.
 Filed 2026-09-22 from the Task 7 independent review, which flagged it as
 out of scope for that task but newly relevant.
 
-**The defect.** `crates/md-codec/src/verify.rs:62` re-encodes an
+**The defect.** `crates/md-cli/src/cmd/verify.rs:62` re-encodes an
 already-decoded card under `Admission::Enforce`, while a comment eleven lines
 above states the opposite intent. Pre-existing, and **unreachable for the four
 §6 rules** — the reviewer confirmed that — but Task 7 widened what flows
@@ -19508,9 +19508,28 @@ comment is the defect and must say why. See also F-449 stage 1b's extension of
 
 ### F-640 — SPEC §8.1's "a nested taptree that Liana ACCEPTS" has no evidence and is NOT delivered by stage 1b (owning phase: **F-449 stage 2**, the live Liana run) `#descriptor-mnemonic` `#md-codec` `#evidence-gap`
 
-**Status:** OPEN — a deliberate, recorded non-delivery, not an oversight.
+**Status:** CLOSED 2026-09-23 by F-449 stage 2 Task 5 — descriptor-mnemonic `db660c45` (the vector), mnemonic-engrave `0c51d3cc` (the evidence records) and `2b153a98` (the live gate).
 Filed 2026-09-22 from the Task 8 independent review (M3), which noted the gap
 was stated in the test comment but never filed anywhere durable.
+
+**Closure.** Liana **v15.0** (`4684d5cb`) **ACCEPTS** a nested taptree, so
+§8.1 is satisfiable and the spec is not amended. The vector is
+`nested-2of2-two-recoveries-tr` in descriptor-mnemonic's
+`crates/md-codec/tests/fixtures/liana/cases.json` —
+`{multi_a(2,A,B),{and_v(pk(C),older(26280)),and_v(pk(D),older(52560))}}`,
+which md composes with `md compose --wrapper tr --path 2of2 --path
+1of1,older=26280 --path 1of1,older=52560 --unspendable liana`, and from which
+Liana infers two recovery paths (older 26280 and 52560). Evidence:
+`design/evidence/composer-fable-r0/fable-liana-parse-{in,out-v15}.jsonl`
+(the regenerator's inputs) and `design/evidence/f449-stage2/liana-live-gate-expected.jsonl`
+(first line: Liana tag and commit), re-runnable with `scripts/liana-live-gate.sh`.
+What it pins: `the_recipe_reproduces_every_golden_xpub` derives its internal
+key over the nested leaf order, and `liana_evidence_legs.rs` checks md's
+descriptor and six addresses against Liana's record — so a traversal-order
+error in md now fails against Liana's own answer, not only against md.
+The two earlier "nested is refused" readings were a KEY artifact (a stale
+internal key carried over a changed leaf set), not policy: see
+`design/RECON_f449_stage2.md` and the R0 report's Appendix A.
 
 **What §8.1 asks for.** A vector proving leaf-traversal order against a nested
 taptree **that Liana accepted**. Ordering matters because SPEC §2 hashes leaf
@@ -19540,8 +19559,9 @@ place for the same reason: they need `md decompose` / `md descriptor`.
 
 ### F-641 — `wsh(tr(UNSPENDABLE(liana),…))` and `xtr(…)` satisfy the marker-position check and then fail naming a synthetic key (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
 
-**Status:** OPEN — pre-existing, message quality only, NOT introduced by
-stage 1b (the whole-branch fix re-review measured `prefix == tip`).
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `8d6697fe` (F-449 stage 2 Task 6). **Structure consulted:** rust-miniscript's own expression tree, `miniscript::expression::Tree` — the parser `Descriptor::from_str` builds on. Every textual occurrence of `UNSPENDABLE(liana)` must be a whole marker node (name `UNSPENDABLE`, one child `liana`), located at the ROOT node's first child, with the root node named exactly `tr`; nodes are matched by byte position. `wsh(tr(M,…))`, `sh(tr(M,…))`, `xtr(M,…)` and an embedded `xUNSPENDABLE(liana)` now get the existing marker refusal verbatim, never the synthetic hex. Pinned by `a_marker_under_a_nested_or_lookalike_tr_names_the_marker_not_a_synthetic_key`.
+Pre-existing, message quality only, NOT introduced by stage 1b (the
+whole-branch fix re-review measured `prefix == tip`).
 Filed 2026-09-22 from that review's Nit.
 
 **The defect.** `validate_marker_position` asks only whether the marker is
@@ -19566,3 +19586,119 @@ get a worse message than the common ones.
 position — parse position, not a three-byte prefix — rather than pattern
 matching on preceding text. Same class as F-638 and F-636: the refusal is
 right, the explanation names the wrong thing.
+
+### F-642 — mnemonic-toolkit's md-codec pin bump to md-codec 0.47.0 (`descriptor-mnemonic-md-cli-v0.19.0`), a golden refresh, and `mnemonic repair`'s convergence on `correct_chunks` (owning phase: **F-449 cycle, after stage 2's tag** — the toolkit side) `#mnemonic-toolkit` `#md-codec` `#pin-bump`
+
+**Status:** OPEN
+Filed 2026-09-23 by F-449 stage 2 Task 8 Step 5 (plan
+`design/IMPLEMENTATION_PLAN_f449_stage2_compose.md`), which puts the toolkit
+side out of that stage and into the cycle.
+
+**What.** SPEC_liana_unspendable_internal_key.md §9a's closing paragraph: the
+toolkit pins md-codec by git **rev** (`b2c5d693`, which is
+`descriptor-mnemonic-md-cli-v0.17.0` and md-codec 0.45.0; measured at
+`crates/mnemonic-toolkit/Cargo.toml:71`), is not broken by F-449, but is in
+scope for this cycle and gets its pin bump and a golden refresh after stage 2.
+The target is stage 2's release: tag **`descriptor-mnemonic-md-cli-v0.19.0`**
+on descriptor-mnemonic `cf35d61a` (the stage 2 merge; md-codec 0.47.0). The
+repo stopped cutting `md-codec-v*` tags after `md-codec-v0.7.1`, so the md-cli
+tag is the one to pin.
+
+**Three pieces, all toolkit-side:**
+1. **The pin bump**, and the compile repairs it forces. The toolkit matches
+   `md_codec::Error` exhaustively with no wildcard (`error.rs:520-616`, per
+   the stage 2 plan's measurement), so 0.46.0's new variants and 0.47.0's
+   `UnspendableUseSiteNotCanonical { idx: Option<u8> }` need arms.
+2. **The golden refresh** — `inspect`'s `template:` line comes from
+   `descriptor_to_template`, which renders kind 1 as `UNSPENDABLE(liana)`
+   since 0.46.0.
+3. **Convergence on `correct_chunks`** (stage 2 plan R3-I-1): route
+   `mnemonic repair`'s `WireVersionMismatch` through
+   `md_codec::correct_chunks` so it exits 5 on a corrected card whose wire
+   version it cannot read, as `md repair` does since md-cli 0.19.0
+   (descriptor-mnemonic `4c35175e`, narrowed to SINGLE-STRING input by ruling 7
+   at `23203195`; a multi-string set at such a version exits 2 in both). Until then the two diverge, and
+   `md repair`'s D26 block says so rather than claiming parity. Additive, so
+   piece 1 compiles without it.
+
+### F-643 — `md repair`'s exit-5 branch drops decode as a second check behind a BCH miscorrection (owning phase: **F-449 stage 3**) `#descriptor-mnemonic` `#md-cli` `#repair`
+
+**Status:** OPEN
+Filed 2026-09-23 from the F-449 stage 2 whole-branch review
+(`design/agent-reports/f449-stage2-whole-branch.md`, M-2).
+
+**The defect.** Before md-cli 0.19.0, a codeword with more than 4 errors
+that BCH mis-corrected onto a DIFFERENT valid codeword was still refused by
+the decode that followed (exit 2). The new unsupported-version branch
+(descriptor-mnemonic `4c35175e`, guarded by `6f2fb760`) does not decode: if
+the mis-corrected header lands outside the accepted set {4, 8} — 14 of 16
+version values — `md repair` exits 5 and prints a WRONG "corrected" string.
+
+**Reproduction / rate.** Reviewer's measurement, 60,000 random trials on a
+v4 card: 5 errors 0 miscorrections, 6 errors 1 (caught by decode at a later
+field), 9 errors 0, 20 errors 0 — on the order of 1e-5 or less. The only
+consequence is a string no md decodes, so it is logged, not blocking.
+
+**Direction.** Stage 3 touches the same dispatch in Go; decide there whether
+the exit-5 branch should require a structural check the version-independent
+part of the payload can pass.
+
+### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **F-449 stage 4**) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
+
+**Status:** OPEN
+Filed 2026-09-23 from the F-449 stage 2 whole-branch review (M-7), widening
+the implementer's own concern (4).
+
+**Reproduction** (md-cli 0.19.0, each exit 0 with no Liana warning):
+- `md compose --wrapper tr --path 2of3,unsorted --path 2of2 --unspendable liana` (two unlocked primaries)
+- `md compose --wrapper tr --path 2of2 --path 1of1,after=800000 --unspendable liana` (absolute-timelock recovery)
+- `md compose --wrapper tr --path 2of2 --path 1of1,older=100 --path 1of1,older=100 --unspendable liana` (duplicate recovery timelock)
+- `md compose --wrapper tr --path 2of3,unsorted --experimental --unspendable liana` (no recovery path)
+
+**Why not blocking.** Liana refuses these at IMPORT, loudly and before any
+funding, so the outcome is not worse than silence.
+
+**The rule for the fix.** The harness is the oracle: gather Liana's own
+verdicts for each shape through `scripts/liana-live-gate.sh` (add them as
+probes, each with its internal key recomputed over its own leaves) BEFORE
+adding any warning, and key each warning on the composed shape.
+
+### F-645 — `md repair` refuses a damaged `tr(UNSPENDABLE(liana),…)` card that `md decode` reads (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#repair` `#restore`
+
+**Status:** OPEN
+Filed 2026-09-23 from the controller's measurement during the F-449 stage 2
+review; pre-existing in md-cli 0.18.0.
+
+**Reproduction** (md-cli 0.19.0 at descriptor-mnemonic `6f2fb760`, and 0.18.0):
+```
+$ md repair md1gppqqxq799p20d5hxuzu2c9la
+md: repair: non-canonical wrapper requires explicit origin for @0, but none provided
+exit 2
+$ md decode md1gppqqxq799p20d5hxuzu2c9la
+exit 4   # VERIFY-ME: a partial decode, origin unspecified
+```
+The card is `md encode "tr(UNSPENDABLE(liana),{pk(@0/<0;1>/*),pk(@1/<0;1>/*)})"`.
+
+**The defect.** `md repair` refuses on a decode-side origin rule that `md
+decode` downgrades to a partial decode, so a DAMAGED card of this shape
+cannot be repaired even though its undamaged twin reads. Repair should keep
+its correction whenever decode would read the card, partial or not.
+
+### F-646 — `@i` templates verify a `#checksum` over the synthetic-xpub text, not the text the operator wrote (owning phase: **next descriptor-mnemonic release after F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
+
+**Status:** OPEN
+Filed 2026-09-23 by the controller from the F-449 stage 2 fix wave, where the
+implementer measured it. It predates the stage and was left unchanged.
+
+**Reproduction** (md-cli 0.19.0 at descriptor-mnemonic `6f2fb760`):
+`wsh(pk(@0/<0;1>/*))#xufrs4zk` is accepted, but `#vdujlgv8`, the BIP-380
+checksum of the text the operator typed, is refused.
+
+**Why it matters now.** Stage 2's M-5 fix made MARKER templates verify over
+the operator's text. So md now checks a checksum over two different texts
+depending on whether the template has a marker. This is the same class as
+F-641: the refusal names text the operator never wrote.
+
+**The fix.** Verify every template checksum over the operator's text, with a
+deprecation path for the synthetic-text checksum if any shipped tool emits
+one. Measure that before choosing.
