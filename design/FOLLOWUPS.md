@@ -19589,7 +19589,7 @@ right, the explanation names the wrong thing.
 
 ### F-642 — mnemonic-toolkit's md-codec pin bump to md-codec 0.47.0 (`descriptor-mnemonic-md-cli-v0.19.0`), a golden refresh, and `mnemonic repair`'s convergence on `correct_chunks` (owning phase: **F-449 cycle, after stage 2's tag** — the toolkit side) `#mnemonic-toolkit` `#md-codec` `#pin-bump`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 by mnemonic-toolkit `642300b7` (merge of `f642-md-codec-0.47`), released as tag `mnemonic-toolkit-v0.104.0`. Pieces 1-3 all delivered; piece 3 exits **4** rather than 5 (controller ruling 8: the toolkit reserves 5 for self-verified corrections). Residue filed as F-647, F-648, F-649 and F-650. Reviews: `design/agent-reports/f642-toolkit-pin-bump-review.md` (0C/1I) and `-review-fix1.md` (0C/0I).
 Filed 2026-09-23 by F-449 stage 2 Task 8 Step 5 (plan
 `design/IMPLEMENTATION_PLAN_f449_stage2_compose.md`), which puts the toolkit
 side out of that stage and into the cycle.
