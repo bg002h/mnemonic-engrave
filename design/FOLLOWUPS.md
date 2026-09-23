@@ -19326,7 +19326,7 @@ pass the suite. Add one compound fixture asserting "an absolute lock" wins.
 
 ### F-636 — the disjoint-multipath refusal names md's limit, not the real problem, when the repeated key is the recognised Liana-unspendable one (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `8d6697fe` (F-449 stage 2 Task 6). `check_no_repeated_key` takes the recognised internal key and, when the repeated key IS it, says the wallet's provably unspendable internal key sits at a spending leaf that can never be satisfied — keeping the BIP-388 citation where the paths also overlap. Every such group was already refused; other repeated-key shapes keep their messages. Pinned by `liana_input_side.rs`'s two recognised-key repeat tests (the disjoint one's `UNSUPPORTED` assertion retired deliberately).
 Filed 2026-09-22 from the Task 6 fix-round re-review (0C/0I/1M) in F-449
 stage 1b. The behaviour is correct and gated; only the wording is off.
 
@@ -19460,7 +19460,7 @@ fork divergence entirely in place.
 
 ### F-638 — `UnspendableUseSiteNotCanonical` names no `@N`, and from the override half it describes a field the operator can see is correct (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#message-precision`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `8d6697fe` (F-449 stage 2 Task 6). `UnspendableUseSiteNotCanonical { idx: Option<u8> }`: the override half carries the placeholder, and the message names `@idx` and says the shared use-site is canonical; `None` (the shared half) keeps the old wording. Message-only — the refused set is unchanged. Pinned by `the_use_site_refusal_names_the_placeholder_that_diverged` (md-codec) and `encode_names_the_key_whose_use_site_diverged` (md-cli).
 Filed 2026-09-22 from the Task 7 independent review (M3), F-449 stage 1b.
 
 **The defect.** The variant is a unit variant and the message reads *"wire
@@ -19559,8 +19559,9 @@ place for the same reason: they need `md decompose` / `md descriptor`.
 
 ### F-641 — `wsh(tr(UNSPENDABLE(liana),…))` and `xtr(…)` satisfy the marker-position check and then fail naming a synthetic key (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-cli` `#message-precision`
 
-**Status:** OPEN — pre-existing, message quality only, NOT introduced by
-stage 1b (the whole-branch fix re-review measured `prefix == tip`).
+**Status:** CLOSED 2026-09-23 in descriptor-mnemonic `8d6697fe` (F-449 stage 2 Task 6). **Structure consulted:** rust-miniscript's own expression tree, `miniscript::expression::Tree` — the parser `Descriptor::from_str` builds on. Every textual occurrence of `UNSPENDABLE(liana)` must be a whole marker node (name `UNSPENDABLE`, one child `liana`), located at the ROOT node's first child, with the root node named exactly `tr`; nodes are matched by byte position. `wsh(tr(M,…))`, `sh(tr(M,…))`, `xtr(M,…)` and an embedded `xUNSPENDABLE(liana)` now get the existing marker refusal verbatim, never the synthetic hex. Pinned by `a_marker_under_a_nested_or_lookalike_tr_names_the_marker_not_a_synthetic_key`.
+Pre-existing, message quality only, NOT introduced by stage 1b (the
+whole-branch fix re-review measured `prefix == tip`).
 Filed 2026-09-22 from that review's Nit.
 
 **The defect.** `validate_marker_position` asks only whether the marker is
