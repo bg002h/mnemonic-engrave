@@ -55,7 +55,7 @@
 | F9 | md-codec 0.47 on the fixtures: `V12_SINGLE` → `WireVersionMismatch{got:12}`; `v12_chunk()` → `parse_line` `Md1WireVersion`, and `decode_md1_string` → `WireVersionMismatch{got:12}`; `V4_UNDECODABLE` → `BitStreamTruncated{requested:14, available:1}`; the origin-less v8 template `md1gppqqxq799p20d5hxuzu2c9la` → `MissingExplicitOrigin{idx:0}`. That last one is why the v8 fixture carries origins. | RUN |
 | F10 | `sysw/record.rs:251-252` reduces `reassemble`/`decode_md1_string` to `.is_ok()`. `me sysw pack` then says `an md1/mk1 this tool could not decode` (`main.rs:2110-2116`), `show` says `unconfirmed — engraveable, but the device REPLACES the legend` (`main.rs:2306-2307`, `:2323-2329`), and **`--expect descriptor` says the card "does not reassemble"** (`sysw/expect.rs:202`, `:263-274`), which is false for a whole single card. None of the three names a version. | read + RUN |
 | F11 | `me` has **no vendoring check** (there is no `ci/` directory, and `release.yml` has no vendor step). `ms`'s `ci/repro/vendor-freshness.sh` has no counterpart here. | `ls`, grep |
-| F12 | The fuzz crate (`crates/me-cli/fuzz/`, its own workspace, not in CI) is already stale: its lock says `mnemonic-engrave 0.3.0` and `md-codec 0.40.0`, and `cargo check --locked` there fails with "lock file needs to be updated". After the unpin it would also need the `[patch.crates-io]`. It is out of scope → F-649. | RUN |
+| F12 | The fuzz crate (`crates/me-cli/fuzz/`, its own workspace, not in CI) is already stale: its lock says `mnemonic-engrave 0.3.0` and `md-codec 0.40.0`, and `cargo check --locked` there fails with "lock file needs to be updated". After the unpin it would also need the `[patch.crates-io]`. It is out of scope → F-653. | RUN |
 | F13 | **`crates/me-cli/CHANGELOG.md` has no `[0.10.0]` section**, although `v0.10.0` is tagged (2026-09-16, object `1fa8dd99`). Its `[Unreleased]` holds F-493/F-504, both of which are ancestors of `v0.10.0`. Nothing records `1cbecbfd` (the tpub refusal, post-0.10.0) either. | `git merge-base --is-ancestor`, read |
 | F14 | Releases: the tag is `v<ver>` (annotated, message from a file), and `release.yml` builds and signs on `refs/tags/v*`. The release commit touches exactly `crates/me-cli/Cargo.toml`, `Cargo.lock` and `crates/me-cli/CHANGELOG.md` (`9e4ccad2`). `me-preview`'s version must equal `me`'s (`tests/cli.rs:22-23`; the release sets it by `-ldflags -X main.version`). | `git show --stat`, read |
 | F15 | `demo/sh2` (stage 5) embeds no `me` download. `demo/sh2/build-payload.sh:117,122` runs `me sysw pack` / `me sysw show` **from PATH**, so stage 5 depends on the local `me` being ≥ 0.11.0 (Task 5 Step 8). | grep |
@@ -86,7 +86,7 @@ These are the five failure modes the spec implies that are most likely to reach 
 - **Modify** `crates/me-cli/src/sysw/expect.rs:68`, `:139-145`, `:202`, `:224-230`, `:263-275`, and test `:312`. `Unmet::UnreadableVersion` (Task 3).
 - **Create** `crates/me-cli/tests/f449_stage4a.rs`. This task's tests, which grow task by task.
 - **Modify** `crates/me-cli/CHANGELOG.md` (Task 5), `design/FOLLOWUPS.md` (Task 4), `design/SPEC_liana_unspendable_internal_key.md` (Task 4).
-- **Not touched:** `validate.rs`, `convert`, `seal/record.rs` (its `decode_public_set` already refuses, with md-codec's message), `crates/mnemonic-io-lib`, the fuzz crate (F-649), and the fork.
+- **Not touched:** `validate.rs`, `convert`, `seal/record.rs` (its `decode_public_set` already refuses, with md-codec's message), `crates/mnemonic-io-lib`, the fuzz crate (F-653), and the fork.
 
 ---
 
@@ -884,7 +884,7 @@ This is the stage-2 plan's standing Task 7 rule: every stage ends with a sweep f
 
 - [ ] **Step 4: Re-run the citations** with a command, not by eye: `scripts/plan-cite-check.sh design/SPEC_liana_unspendable_internal_key.md`. Paste the output into the commit. Read every line it prints for the sections you touched, because printing a line proves it exists, not that it says what the sentence claims.
 
-- [ ] **Step 5: Commit records separately from code.** Stage `design/FOLLOWUPS.md` and `design/SPEC_liana_unspendable_internal_key.md`. Subject: `records: F-449 stage 4a -- F-635 closed, F-651..F-649 filed, spec §8b/§8.9/§9/§9a reconciled`.
+- [ ] **Step 5: Commit records separately from code.** Stage `design/FOLLOWUPS.md` and `design/SPEC_liana_unspendable_internal_key.md`. Subject: `records: F-449 stage 4a -- F-635 closed, F-651..F-653 verified, spec §8b/§8.9/§9/§9a reconciled`.
 
 - [ ] **Step 6: Whole-diff review (mandatory, risk set: a funds-adjacent completeness claim).** The controller dispatches one **opus** adversarial execution review over `git diff master..f449-stage4a`. The report goes to `design/agent-reports/f449-stage4a-whole-diff.md`, written by the agent. The brief states what is already machine-verified (the execution gate and M1-M10 above), so reviewer budget goes to what tools cannot reach:
   - (a) is there a fourth reader of the walk;
@@ -961,7 +961,7 @@ This is the stage-2 plan's standing Task 7 rule: every stage ends with a sweep f
 
 FOLLOWUPS owned by stage 4a: F-635 only (F16), closed in Task 4.
 
-**Deliberately absent, owned elsewhere:** the Go port and the device (stages 3 and 4), `demo/sh2` (stage 5), the toolkit pin (F-642), the md-codec panic (F-651, descriptor-mnemonic), partial-decode counting (F-652), and the fuzz crate (F-649).
+**Deliberately absent, owned elsewhere:** the Go port and the device (stages 3 and 4), `demo/sh2` (stage 5), the toolkit pin (F-642), the md-codec panic (F-651, descriptor-mnemonic), partial-decode counting (F-652), and the fuzz crate (F-653).
 
 **Placeholder scan.** Placeholders appear in three kinds of spot:
 - `<date>`, `<Task 2 SHA>` and `<release date>` are filled at execution time.
