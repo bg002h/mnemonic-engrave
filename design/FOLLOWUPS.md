@@ -19505,3 +19505,35 @@ already-engraved card can be read.
 and delete or correct the comment. If `Enforce` is deliberate here, the
 comment is the defect and must say why. See also F-449 stage 1b's extension of
 `tests/mint_policy_does_not_reach_decode.rs`, the designated class gate.
+
+### F-640 — SPEC §8.1's "a nested taptree that Liana ACCEPTS" has no evidence and is NOT delivered by stage 1b (owning phase: **F-449 stage 2**, the live Liana run) `#descriptor-mnemonic` `#md-codec` `#evidence-gap`
+
+**Status:** OPEN — a deliberate, recorded non-delivery, not an oversight.
+Filed 2026-09-22 from the Task 8 independent review (M3), which noted the gap
+was stated in the test comment but never filed anywhere durable.
+
+**What §8.1 asks for.** A vector proving leaf-traversal order against a nested
+taptree **that Liana accepted**. Ordering matters because SPEC §2 hashes leaf
+pubkeys in wire order — get the traversal wrong and the recipe produces a
+different xpub, so the wallet Liana derives is not the wallet the card
+describes.
+
+**Why it cannot be delivered here.** The vendored evidence contains exactly
+one nested taptree, `preset-decaying-multisig-tr` (`{A,{B,C}}`), and **Liana
+REFUSED it** on policy shape. No accepted case in the corpus is nested. So
+there is no ACCEPT backing any traversal order.
+
+**What stage 1b delivers instead.** Task 4's
+`the_chain_code_depends_on_the_KEYS_not_the_TREE` pins the ordering against
+the golden xpub — recipe agreement, the strongest evidence available. Task 8's
+test comment states plainly that this is recipe-agreement and **not** a
+measured Liana import, so no later reader mistakes it for evidence.
+
+**What would close it.** A Liana-accepted nested shape measured through the
+harness — stage 2's live run. Until then the traversal order for nested
+taptrees is pinned by self-consistency only: md agrees with md. If md's
+traversal is wrong in a way Liana's is not, every existing test still passes.
+
+**Carry into stage 2's brief.** Alongside C3's evidence legs (descriptor- and
+address-equality against the ACCEPT shapes), which are deferred to the same
+place for the same reason: they need `md decompose` / `md descriptor`.
