@@ -1,0 +1,37 @@
+{
+ "release_dir": "/scratch/code/shibboleth/.tmp/core-releases/25.0",
+ "version": "/Satoshi:25.0.0/",
+ "chain": "main",
+ "REP": {
+  "getdescriptorinfo_multipath": "error code: -5\nerror message:\nMulti: Key path value '<0;1>' is not a valid uint32",
+  "getdescriptorinfo_c0": "error code: -5\nerror message:\nMiniscript expressions can only be used in wsh",
+  "getdescriptorinfo_c1": "error code: -5\nerror message:\nMiniscript expressions can only be used in wsh",
+  "verdict_import": "REFUSE (getdescriptorinfo)",
+  "addr_match": null
+ },
+ "K1": {
+  "getdescriptorinfo_multipath": "error code: -5\nerror message:\ntr(): Key path value '<0;1>' is not a valid uint32",
+  "getdescriptorinfo_c0": "error code: -5\nerror message:\nMiniscript expressions can only be used in wsh",
+  "getdescriptorinfo_c1": "error code: -5\nerror message:\nMiniscript expressions can only be used in wsh",
+  "verdict_import": "REFUSE (getdescriptorinfo)",
+  "addr_match": null
+ },
+ "ALL15": {
+  "preset-kofn-recovery-wsh": "ACCEPT addr==md",
+  "preset-simple-timelocked-inheritance-tr": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "preset-kofn-recovery-tr": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "preset-tiered-recovery-tr": "REFUSE: error code: -5 error message: 'and_v(v:multi_a(1,[66d455ea/48'/0'/0'/3']xpub6DXuQW1Q2JpZyteDRGW1pD34uhumfnZJfTsmjDkgd4xcq3L5XX2KUE1n4rmvcDT3RmdchfhbD9DkvSyVhUMB",
+  "preset-hashlock-gated-tr": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "preset-decaying-multisig-tr": "REFUSE: error code: -5 error message: 'and_v(v:multi_a(2,[73c5da0a/48'/0'/0'/3']xpub6DXuQW1Q2JpZyweiMewTZuMPvjG8hKhV2qoF6wL9VFxsMBExtbfqAAoR4oMG4GyxFzVdfas1v2eAdfLxyjc4",
+  "hashlock-gated-tr-hash160": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "mixed-lock-bases-tr": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "same-seed-two-paths-tr": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "X09-tr-1of1-2of3older": "REFUSE: error code: -5 error message: 'and_v(v:multi_a(2,[3f635a63/48'/0'/1'/3']xpub6DXuQW1Q2Jpa1UavR7Se7NgKcQRQXyxqRjsqLybQB5JiYZcfLV93enNpsEdDHHWMjqiRqht5LHedAHPGsT3q",
+  "X10-tr-1of1-tworec": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "X18-tr-inherit-older5": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "X19-tr-kofn-nums-older5": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "X20-tr-hashlock-known": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "X23-tr-1of1-1of1older-h-spelling": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh",
+  "X26-tr-2of3-1of1-unlocked-plus-rec": "REFUSE: error code: -5 error message: Miniscript expressions can only be used in wsh"
+ }
+}

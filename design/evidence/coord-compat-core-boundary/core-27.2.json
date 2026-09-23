@@ -1,0 +1,95 @@
+{
+ "release_dir": "/scratch/code/shibboleth/.tmp/core-releases/27.2",
+ "version": "/Satoshi:27.2.0/",
+ "chain": "main",
+ "REP": {
+  "getdescriptorinfo_multipath": "error code: -5\nerror message:\nMulti: Key path value '<0;1>' is not a valid uint32",
+  "getdescriptorinfo_c0": "ok",
+  "getdescriptorinfo_c1": "ok",
+  "derive_recv": [
+   "bc1pac935qvs2pj56zc7a0ruawaz2493rpenejg6qzt95znhvtv9pcnq84yvl5",
+   "bc1pwcf67z9r4eru9qwsn8rstdvgc7qxcaley3r90tfr57xtm7k7579sygxgny",
+   "bc1pdtqc0hhjkcc4ld973nrg576kfyfsxpsaulfarkpw78p46jme05fsjxqtxz"
+  ],
+  "derive_chg": [
+   "bc1p577upehm4u8735lgmklhhvgyt5ykkm5q9u2uqqvv42anj6rvd8qqs9t6ng",
+   "bc1pm5088whm4z0w359mdhp6sc3cshu7daencugt7urxnmqe8r5cl3qql6nx7m",
+   "bc1pxg6ng2guy2svwhk0lsf8958kqr5yj7556pqtf9sfu88dv3z670jsq7rxvk"
+  ],
+  "createwallet": "ok",
+  "importdescriptors": [
+   {
+    "success": true
+   },
+   {
+    "success": true
+   }
+  ],
+  "getnewaddress": [
+   "bc1pac935qvs2pj56zc7a0ruawaz2493rpenejg6qzt95znhvtv9pcnq84yvl5",
+   "bc1pwcf67z9r4eru9qwsn8rstdvgc7qxcaley3r90tfr57xtm7k7579sygxgny",
+   "bc1pdtqc0hhjkcc4ld973nrg576kfyfsxpsaulfarkpw78p46jme05fsjxqtxz"
+  ],
+  "getrawchangeaddress": [
+   "bc1p577upehm4u8735lgmklhhvgyt5ykkm5q9u2uqqvv42anj6rvd8qqs9t6ng",
+   "bc1pm5088whm4z0w359mdhp6sc3cshu7daencugt7urxnmqe8r5cl3qql6nx7m",
+   "bc1pxg6ng2guy2svwhk0lsf8958kqr5yj7556pqtf9sfu88dv3z670jsq7rxvk"
+  ],
+  "verdict_import": "ACCEPT",
+  "addr_match": true
+ },
+ "K1": {
+  "getdescriptorinfo_multipath": "error code: -5\nerror message:\ntr(): Key path value '<0;1>' is not a valid uint32",
+  "getdescriptorinfo_c0": "ok",
+  "getdescriptorinfo_c1": "ok",
+  "derive_recv": [
+   "bc1pj6davmeetfe2uutrjlgxcjytq50ggvyd82xtxx2eazm24hsdhlnqxvh4v4",
+   "bc1ptg5kylzsp4kxnjwl7dpg02drvhjg0egvtg9v5k6lf0p0u2zfzc6s0jtmaq",
+   "bc1p5xnuzf59j5q9j5huc3rlp6r0y3j7390k0m08q4mjht62mnh8j43qnwv69g"
+  ],
+  "derive_chg": [
+   "bc1pa656rnpy2dqf6gevkxw72fz7kx02zpmru507nft9cft8l0dru3vqejq0yf",
+   "bc1prc820f7ctrq6ad6wtfwq62dfw7jssx9cc0gy3swysw30r9077weqp2h7nq",
+   "bc1pvglxdkwzrkdha7n9f775y7v3gelan3lec3sdgt95cpxyg33tgnzsd65e2s"
+  ],
+  "createwallet": "ok",
+  "importdescriptors": [
+   {
+    "success": true
+   },
+   {
+    "success": true
+   }
+  ],
+  "getnewaddress": [
+   "bc1pj6davmeetfe2uutrjlgxcjytq50ggvyd82xtxx2eazm24hsdhlnqxvh4v4",
+   "bc1ptg5kylzsp4kxnjwl7dpg02drvhjg0egvtg9v5k6lf0p0u2zfzc6s0jtmaq",
+   "bc1p5xnuzf59j5q9j5huc3rlp6r0y3j7390k0m08q4mjht62mnh8j43qnwv69g"
+  ],
+  "getrawchangeaddress": [
+   "bc1pa656rnpy2dqf6gevkxw72fz7kx02zpmru507nft9cft8l0dru3vqejq0yf",
+   "bc1prc820f7ctrq6ad6wtfwq62dfw7jssx9cc0gy3swysw30r9077weqp2h7nq",
+   "bc1pvglxdkwzrkdha7n9f775y7v3gelan3lec3sdgt95cpxyg33tgnzsd65e2s"
+  ],
+  "verdict_import": "ACCEPT",
+  "addr_match": true
+ },
+ "ALL15": {
+  "preset-kofn-recovery-wsh": "ACCEPT addr==md",
+  "preset-simple-timelocked-inheritance-tr": "ACCEPT addr==md",
+  "preset-kofn-recovery-tr": "ACCEPT addr==md",
+  "preset-tiered-recovery-tr": "ACCEPT addr==md",
+  "preset-hashlock-gated-tr": "ACCEPT addr==md",
+  "preset-decaying-multisig-tr": "ACCEPT addr==md",
+  "hashlock-gated-tr-hash160": "ACCEPT addr==md",
+  "mixed-lock-bases-tr": "ACCEPT addr==md",
+  "same-seed-two-paths-tr": "ACCEPT addr==md",
+  "X09-tr-1of1-2of3older": "ACCEPT addr==md",
+  "X10-tr-1of1-tworec": "ACCEPT addr==md",
+  "X18-tr-inherit-older5": "ACCEPT addr==md",
+  "X19-tr-kofn-nums-older5": "ACCEPT addr==md",
+  "X20-tr-hashlock-known": "ACCEPT addr==md",
+  "X23-tr-1of1-1of1older-h-spelling": "ACCEPT addr==md",
+  "X26-tr-2of3-1of1-unlocked-plus-rec": "ACCEPT addr==md"
+ }
+}
