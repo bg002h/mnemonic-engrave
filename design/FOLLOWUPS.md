@@ -19587,7 +19587,7 @@ position — parse position, not a three-byte prefix — rather than pattern
 matching on preceding text. Same class as F-638 and F-636: the refusal is
 right, the explanation names the wrong thing.
 
-### F-642 — mnemonic-toolkit's md-codec pin bump to `md-codec-v0.47.0`, a golden refresh, and `mnemonic repair`'s convergence on `correct_chunks` (owning phase: **F-449 cycle, after stage 2's tag** — the toolkit side) `#mnemonic-toolkit` `#md-codec` `#pin-bump`
+### F-642 — mnemonic-toolkit's md-codec pin bump to md-codec 0.47.0 (`descriptor-mnemonic-md-cli-v0.19.0`), a golden refresh, and `mnemonic repair`'s convergence on `correct_chunks` (owning phase: **F-449 cycle, after stage 2's tag** — the toolkit side) `#mnemonic-toolkit` `#md-codec` `#pin-bump`
 
 **Status:** OPEN
 Filed 2026-09-23 by F-449 stage 2 Task 8 Step 5 (plan
@@ -19595,12 +19595,14 @@ Filed 2026-09-23 by F-449 stage 2 Task 8 Step 5 (plan
 side out of that stage and into the cycle.
 
 **What.** SPEC_liana_unspendable_internal_key.md §9a's closing paragraph: the
-toolkit pins md-codec by git tag (0.45.0 today), is not broken by F-449, but
-is in scope for this cycle and gets its pin bump and a golden refresh after
-stage 2. The tag to move to is the one stage 2's release creates,
-**`md-codec-v0.47.0`** (descriptor-mnemonic `972da724`; the tag itself is cut
-by the controller after review, per that plan's "no md-codec tag until Task 8
-lands").
+toolkit pins md-codec by git **rev** (`b2c5d693`, which is
+`descriptor-mnemonic-md-cli-v0.17.0` and md-codec 0.45.0; measured at
+`crates/mnemonic-toolkit/Cargo.toml:71`), is not broken by F-449, but is in
+scope for this cycle and gets its pin bump and a golden refresh after stage 2.
+The target is stage 2's release: tag **`descriptor-mnemonic-md-cli-v0.19.0`**
+on descriptor-mnemonic `cf35d61a` (the stage 2 merge; md-codec 0.47.0). The
+repo stopped cutting `md-codec-v*` tags after `md-codec-v0.7.1`, so the md-cli
+tag is the one to pin.
 
 **Three pieces, all toolkit-side:**
 1. **The pin bump**, and the compile repairs it forces. The toolkit matches
@@ -19614,7 +19616,8 @@ lands").
    `mnemonic repair`'s `WireVersionMismatch` through
    `md_codec::correct_chunks` so it exits 5 on a corrected card whose wire
    version it cannot read, as `md repair` does since md-cli 0.19.0
-   (descriptor-mnemonic `4c35175e`). Until then the two diverge, and
+   (descriptor-mnemonic `4c35175e`, narrowed to SINGLE-STRING input by ruling 7
+   at `23203195`; a multi-string set at such a version exits 2 in both). Until then the two diverge, and
    `md repair`'s D26 block says so rather than claiming parity. Additive, so
    piece 1 compiles without it.
 
