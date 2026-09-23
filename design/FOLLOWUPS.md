@@ -19621,7 +19621,7 @@ tag is the one to pin.
    `md repair`'s D26 block says so rather than claiming parity. Additive, so
    piece 1 compiles without it.
 
-### F-643 — `md repair`'s exit-5 branch drops decode as a second check behind a BCH miscorrection (owning phase: **F-449 stage 3**) `#descriptor-mnemonic` `#md-cli` `#repair`
+### F-643 — `md repair`'s exit-5 branch drops decode as a second check behind a BCH miscorrection (owning phase: **next descriptor-mnemonic release after F-449 stage 2**, re-owned from F-449 stage 3) `#descriptor-mnemonic` `#md-cli` `#repair`
 
 **Status:** OPEN
 Filed 2026-09-23 from the F-449 stage 2 whole-branch review
@@ -19642,6 +19642,29 @@ consequence is a string no md decodes, so it is logged, not blocking.
 **Direction.** Stage 3 touches the same dispatch in Go; decide there whether
 the exit-5 branch should require a structural check the version-independent
 part of the payload can pass.
+
+**Ruling (F-449 stage 3).** Re-owned to the next descriptor-mnemonic release
+after F-449 stage 2, with F-645/F-646/F-648/F-651. Still OPEN.
+- **The Go side has no exit-5 analogue.** The device's only correction path is
+  typed entry, "Fix?" and `codex32.Correct` (fork `gui/gui.go:1296` at
+  `43294c6`). The operator confirms a per-position diff against the card
+  (`confirmCorrectionFlow`, `gui/codex32_polish.go:336`), and the corrected
+  string then goes through the full decoder (`mdmkFlow` → `md.Decode` /
+  `Reassemble`) before anything uses it. The device never presents a corrected
+  string it has not decoded.
+- **"Require a structural check the version-independent part can pass" is
+  unimplementable.** Past the 5-bit header, a single card's layout at an
+  unsupported version is unknowable — the same reason ruling 7 cut the exit-5
+  branch to single strings.
+- **The remedy is wording**, and stage 3 applies it on the device: the message
+  states what the card *declares* ("This firmware cannot read md1 version N."),
+  never that it is intact or from a newer tool. Stage 3 thereby creates the
+  device's own analogue of this finding (R0 ruling f): a miscorrection that
+  lands on v12 now shows that sentence, which is why it is observation-only.
+  For md-cli, the exit-5 stderr's "take the corrected card to a newer md, which
+  may read wire version {got}" should add that a correction beyond BCH capacity
+  can also land here. Message precision, not blocking; it belongs to that
+  release.
 
 ### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **F-449 stage 4**) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
 
@@ -19783,6 +19806,42 @@ Filed 2026-09-23 by the controller from the F-449 stage 4a plan.
 `md-codec 0.40.0`; `cargo check --locked` fails there at `8aea0d36`. Since
 stage 4a it also needs the root's `[patch.crates-io]`, because patches do not
 cross workspaces. The fuzz workspace is not in CI.
+
+### F-654 — The Go composer has no Liana kind and no §6 kind-1 mint refusals (owning phase: **F-449 stage 4**) `#seedhammer` `#md` `#compose` `#liana`
+
+**Status:** OPEN
+Filed 2026-09-23 from F-449 stage 3 (plan Task 8 Step 2; fork `f449-stage3`
+at `43294c6`).
+
+- `md.ComposeWith` (fork `md/compose.go:653`) has no counterpart to
+  md-codec's `UnspendableKind` parameter (stage 2, `compose/tr.rs`); its one
+  `trBody` literal picks NUMS or Slot only.
+- SPEC §6's kind-1 mint refusals (`validate_unspendable_shape`,
+  `validate_minimal_wire_version`, `crates/md-codec/src/validate.rs:585` and
+  `:709`, reached from `encode.rs:251-252` under `Admission::Enforce`) are not
+  ported.
+- Both belong with the first Go **producer** of kind 1, which is stage 4's
+  choice screen. No device path mints kind 1 at stage 3.
+- **Constraint for whoever does it:** the refusals must NOT go into
+  `encodePayload`. Go `Reassemble` re-encodes every decoded card for the
+  chunk-set-id check (`Reassemble` → `computeEncodingID` → `encodePayload`),
+  so a refusal there makes the device reject cards Rust decodes (Rust keeps
+  them mint-only).
+
+### F-655 — `skeleton_key_conformance.rs`'s kind-1 recogniser has no near-miss vector (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#md-codec` `#test-gap`
+
+**Status:** OPEN
+Filed 2026-09-23 from F-449 stage 3 Task 1 Step 9 (dm `430ea478`,
+branch `f449-stage3-vectors`).
+
+Replacing `is_liana_unspendable_key`'s recipe equality (`want == xkey`) with
+`true` keeps `skeleton_key_conformance` green (measured 2/2): the dm corpus
+has no near-miss internal key, so the recogniser's precision is not gated in
+Rust. The Go port's equivalent IS gated (`TestLianaReductionRefusesANearMiss`,
+which alone catches M7). **Direction:** add a near-miss kind-1 descriptor to
+the Rust harness — a recipe output over a different leaf order (e.g. the same
+four keys reversed) — and assert the recogniser refuses it, as the fork's test
+does.
 
 ### F-656 — `me sysw pack --expect` runs the confirmation walk twice, so its warnings print twice (owning phase: none — ownerless residue) `#mnemonic-engrave` `#me` `#sysw`
 
