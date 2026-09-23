@@ -28,7 +28,7 @@ and Liana then **ACCEPTS** that exact string and returns receive/change
 addresses. This is the first time md's own output has been fed to Liana's
 importer as a single unbroken chain.
 
-## F-640 — CORRECTED: my inference here was UNSOUND
+## F-640 — RESOLVED: a nested taptree IS accepted; §8.1 is satisfiable
 
 §8.1 asks for "a nested taptree that Liana ACCEPTS". Two independent
 constructions are now refused:
@@ -83,3 +83,59 @@ told me the dimension I was varying was invisible to the thing under test.
   harness is the oracle and it now runs.
 - **§6 row 3** — `--unspendable liana` on a path list that already has a bare
   single key must WARN, not silently no-op (fable M-6).
+
+
+---
+
+## F-640 RESOLVED — 2026-09-22, after the stage-2 R0 review (C-3)
+
+**Liana v15.0 ACCEPTS a nested taptree.** Reproduced by me independently of
+the reviewer, with the flat control accepted in the same run:
+
+```
+B-nested-verify  ACCEPTED  recovery=[{older 26280, single}, {older 52560, single}]
+CONTROL-flat     ACCEPTED  recovery=[{older 26280, single}]
+```
+
+The accepted shape is `{multi_a(2,A,B),{and_v(pk,older(26280)),and_v(pk,older(52560))}}`
+— genuinely depth 2 — and Liana infers TWO recovery paths from it. **§8.1 is
+satisfiable and F-640 closes by vectoring this case**, not by amending the
+spec. Full descriptors in `design/agent-reports/f449-plan-stage2-r0.md`
+Appendix A.
+
+### Why all three of my probes failed, and why the control did not catch it
+
+The variable was never the tree. It was **the internal key**.
+
+`analysis.rs:596-600` recomputes the unspendable xpub **from the descriptor's
+own leaves** and compares it to the one present. On mismatch it does not
+refuse directly — it falls through to `or(Key(internal_key), tree)`, which
+yields two non-timelocked paths and therefore `IncompatibleDesc`. So **three
+distinct causes emit one identical message**:
+
+| cause | example | message |
+| --- | --- | --- |
+| genuine policy refusal | two recoveries at ONE timelock (`analysis.rs:659`) | *not compatible with a Liana spending policy* |
+| internal key ≠ recipe over THESE leaves | my probe 2 | the same string |
+| internal key is the raw NUMS point | reviewer's probe F | the same string |
+
+My probe 2 took "real keys from an accepted case" — carrying the accepted
+case's **internal key** along with them while changing the **leaf set**. The
+recipe then no longer matched, so it refused for a KEY reason that reads
+exactly like a POLICY reason.
+
+### The lesson: a control is not sufficient when it carries its own correctness
+
+This is the sharper half, and it generalises beyond Liana. My control passed
+in every run — because a control carries its **own** correct internal key.
+Control-passes-probe-fails therefore proved nothing about the dimension I
+thought I was testing.
+
+**A probe needs its own validity rule, not just a control.** For this harness:
+recompute the internal key for the probe's exact leaf set and assert it
+before sending. Stage 2's gate must enforce that, or the next person repeats
+this with a clean-looking control beside them.
+
+See [[negatives-inherit-the-search-scope]] — and note this is the stronger
+form: the negative inherited not the search scope but an *unvaried
+precondition* that the error message actively disguised.
