@@ -49,6 +49,17 @@ is itself a measured fact about `from_str`'s API stability.
 
 Inputs for both: `fable-liana-parse-in.jsonl`, 289 descriptors.
 
+**One record appended since (F-449 stage 2, F-640):** `nested-2of2-two-recoveries-tr`
+(variant `liana-unspendable-xpub`) — the nested taptree Liana v15.0 ACCEPTS,
+`{multi_a(2,A,B),{and_v(pk(C),older(26280)),and_v(pk(D),older(52560))}}`,
+composed by `md compose --wrapper tr --path 2of2 --path 1of1,older=26280
+--path 1of1,older=52560 --unspendable liana`. It was measured at **v15.0
+only**, so `fable-liana-parse-in.jsonl` now holds 290 lines,
+`fable-liana-parse-out-v15.jsonl` 290, and the v8.0 `fable-liana-parse-out.jsonl`
+still 289. Its internal key was recomputed over its own leaves before it was
+sent (the probe rule; `scripts/liana-live-gate.sh`). The table below is the
+289-record v8.0 -> v15.0 comparison and is unchanged.
+
 **Result of the v8.0 -> v15.0 re-measurement (F-633), seven majors apart:**
 
 - 289 of 289 verdicts identical
