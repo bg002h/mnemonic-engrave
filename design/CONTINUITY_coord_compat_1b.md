@@ -30,3 +30,11 @@ for ultrareview.
   same pattern as `vendor-liana-evidence.sh`. The md-codec xtask builds the
   table from the vendored copy. Cost if wrong: a second vendoring path to
   maintain.
+
+**PR OPEN (2026-09-23): bg002h/descriptor-mnemonic#31** (branch `cc-1b-verdicts`
+at `9196b13c`, md-codec 0.48.0 / md-cli 0.20.0). The engrave records are
+merged (`bc846b37`, which contains the vendored `engrave_commit` 7ca9d2f8).
+Waiting on the operator's `/code-review ultra 31`. After it: fold the
+findings on the branch, then merge the PR with a merge commit (not a squash),
+tag `descriptor-mnemonic-md-cli-v0.20.0`, bump demo/sh2's install block, and
+do F-669 before any local `md` 0.20.0 install.
