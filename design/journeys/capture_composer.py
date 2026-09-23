@@ -52,6 +52,8 @@ EXPECTED = {
               "c03-start-from.png", "c04-lock-echo-p0.png", "c05-hash-rule.png",
               "c07-seat-slot0.png", "c08-seat-slot2-seed.png"],
     "keyless": ["c00a-boot-offer.png", "k01-door.png", "k04-census.png"],
+    # F-449 stage 4: the key-path choice screen and the Liana-key census.
+    "liana": ["c00a-boot-offer.png", "l01-key-path.png", "l05-census.png"],
 }
 
 
@@ -232,9 +234,24 @@ async def drive(port, shot_port, legs):
     return results
 
 
+def read_liana():
+    """F-449 stage 4's oracle: `md compose --unspendable liana` over kofn-recovery,
+    and the NUMS twin's id, which the walk asserts the device does NOT show."""
+    ids = need("liana-kofn.id.txt")
+    nums = need("liana-kofn-nums-twin.id.txt")
+    template_id = field(ids, "wallet-descriptor-template-id")
+    return {
+        "templateId": template_id,
+        "templateStub": template_id[:8],
+        "numsTemplateId": field(nums, "wallet-descriptor-template-id"),
+        "entries": 1,
+        "strings": need("liana-kofn.md1.txt"),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arm", choices=["keyed", "keyless", "both"], default="both")
+    ap.add_argument("--arm", choices=["keyed", "keyless", "liana", "both"], default="both")
     # THE NEGATIVE CONTROL, AS A COMMAND. A comparison nobody has made fail is
     # not evidence it can. This corrupts ONE character of ONE expected address
     # and requires the walk to notice -- exit 0 only if the capture FAILED.
@@ -271,7 +288,7 @@ def main():
     # wasm, starts a browser, or needs a device. That is the point -- the
     # fixture has to be cheap to regenerate or it will not be regenerated.
     if a.emit_expect or a.check_expect:
-        built = {"keyed": read_keyed(), "keyless": read_keyless()}
+        built = {"keyed": read_keyed(), "keyless": read_keyless(), "liana": read_liana()}
         blob = json.dumps(built, indent=2, sort_keys=True) + "\n"
         target = a.emit_expect or a.check_expect
         if a.emit_expect:
@@ -323,6 +340,11 @@ def main():
         legs.append(("keyless", "keyless", None, kl))
         print(f"host: key-less template id {kl['templateId']}, "
               f"{len(kl['strings'])} md1 string(s), {len(kl['strings'][0])} chars")
+
+    if a.arm in ("liana", "both"):
+        li = read_liana()
+        legs.append(("liana", "liana", None, li))
+        print(f"host: Liana-key template id {li['templateId']} (NUMS twin {li['numsTemplateId']})")
 
     print(f"emulator: {EMU}")
     if not a.no_build:

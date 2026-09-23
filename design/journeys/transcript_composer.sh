@@ -382,6 +382,35 @@ gate "keyless Template-ID" \
 echo
 run "$MD" decode "$KEYLESS_MD1"
 
+echo "########## 7. THE LIANA ARM (F-449 stage 4) -- the same kofn-recovery tree, two wallets"
+echo
+echo "The device's key-path choice builds the LEFT one; the right one is what"
+echo "pressing through the NUMS row builds. Different Template-IDs, because the"
+echo "kind bit is part of the tree the id hashes (SPEC §3e)."
+echo
+gate "md is 0.19.0 (the first with --unspendable)" "$("$MD" --version)" "md 0.19.0"
+LIANA_TEMPLATE="$("$MD" compose --wrapper tr --preset kofn-recovery,2of3,older=26280 --unspendable liana 2>/dev/null)"
+NUMS_TWIN="$("$MD" compose --wrapper tr --preset kofn-recovery,2of3,older=26280 2>/dev/null)"
+printf '%s\n' "$LIANA_TEMPLATE" > "$OUT/liana-kofn.template"
+run cat "$OUT/liana-kofn.template"
+gate "liana template" "$LIANA_TEMPLATE" \
+  "tr(UNSPENDABLE(liana),{multi_a(2,@0/48'/0'/0'/3'/<0;1>/*,@1/48'/0'/1'/3'/<0;1>/*,@2/48'/0'/2'/3'/<0;1>/*),and_v(v:pk(@3/48'/0'/3'/3'/<0;1>/*),older(26280))})"
+runcap "$OUT/liana-kofn.md1.txt" '^md1' \
+  "$MD" encode "$LIANA_TEMPLATE" --force-chunked --group-size 0
+gate "liana md1 string" "$(cat "$OUT/liana-kofn.md1.txt")" \
+  "md13ls8aqqxq6tvyyykjmpprj6tvyy495kcgfwtsqrq0zjqgsexd9dcqqqv65q3cm0m0nz2h7w9"
+runcap "$OUT/liana-kofn.id.txt" '^(wallet-descriptor-template-id|md1-encoding-id):|^  @' \
+  "$MD" inspect "$(cat "$OUT/liana-kofn.md1.txt")"
+gate "liana Template-ID" \
+  "$(awk -F': ' '/^wallet-descriptor-template-id:/{print $2}' "$OUT/liana-kofn.id.txt")" \
+  "f99cc42e1ff68bae546c4d1070e5963f"
+runcap "$OUT/liana-kofn-nums-twin.id.txt" '^(wallet-descriptor-template-id|md1-encoding-id):' \
+  "$MD" inspect "$("$MD" encode "$NUMS_TWIN" --force-chunked --group-size 0 2>/dev/null | grep '^md1')"
+gate "NUMS twin Template-ID" \
+  "$(awk -F': ' '/^wallet-descriptor-template-id:/{print $2}' "$OUT/liana-kofn-nums-twin.id.txt")" \
+  "8107216456de60d05e57f7fe268824d8"
+run "$MD" decode "$(cat "$OUT/liana-kofn.md1.txt")"
+
 echo "########## Artifacts for the device half"
 run ls -la "$OUT" "$OUT/cards"
 
