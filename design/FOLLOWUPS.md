@@ -19666,9 +19666,9 @@ after F-449 stage 2, with F-645/F-646/F-648/F-651. Still OPEN.
   can also land here. Message precision, not blocking; it belongs to that
   release.
 
-### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **next descriptor-mnemonic release**; device half closed at F-449 stage 4) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
+### F-644 — `--unspendable liana` composes several shapes Liana refuses at import, without a warning (owning phase: **coordinator-compat plan 1b, Task 8** (md-cli half); device half closed at F-449 stage 4) `#descriptor-mnemonic` `#md-cli` `#liana` `#evidence-gap`
 
-**Status:** OPEN — owning phase: the next descriptor-mnemonic release (the md-cli half; the device half is closed)
+**Status:** OPEN — owning phase: coordinator-compat plan 1b, Task 8 (the md-cli half; the device half is closed). Re-owned 2026-09-23: plan 1b's coordinator verdict on `md compose` replaces `liana_refuse_or_warn` and prints a Liana refusal for each shape.
 
 **Ruling at F-449 stage 4 (2026-09-23).** *Device half: done.* §0b's
 conjunct 2 (`composerLianaOutsideModelClass` on the kind-1 composition)
@@ -19858,9 +19858,9 @@ at `43294c6`).
   so a refusal there makes the device reject cards Rust decodes (Rust keeps
   them mint-only).
 
-### F-655 — `skeleton_key_conformance.rs`'s kind-1 recogniser has no near-miss vector (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#md-codec` `#test-gap`
+### F-655 — `skeleton_key_conformance.rs`'s kind-1 recogniser has no near-miss vector (owning phase: **coordinator-compat plan 1b, Task 2**) `#descriptor-mnemonic` `#md-codec` `#test-gap`
 
-**Status:** OPEN
+**Status:** OPEN — owning phase: coordinator-compat plan 1b, Task 2 (the recogniser moves into `md_codec::descriptor_route` and gains its near-miss unit test there)
 Filed 2026-09-23 from F-449 stage 3 Task 1 Step 9 (dm `430ea478`,
 branch `f449-stage3-vectors`).
 
@@ -19935,3 +19935,95 @@ screen; keyed-B's census pages), and stayed so from 2026-09-16 until stage 4
 re-greened it (fork `a66491f`). **Direction:** run the `keyless` and `liana`
 arms (no payload, ~30 s each, measured 28 s) in a scheduled or pre-push job,
 or name the walk in the flash checklist.
+
+### F-661 — `plain_multi` has no `nkeys == slots.len()` guard (owning phase: **coordinator-compat plan 1b, Task 1**) `#descriptor-mnemonic` `#md-codec`
+
+**Status:** OPEN — owning phase: coordinator-compat plan 1b, Task 1 (closes there)
+Filed 2026-09-23 from the 1a final review's deferred minors
+(`design/agent-reports/coord-compat-1a-final-review.md:368-377`, #1; recon §1d).
+
+`policy_shape.rs`'s `branch_of` reports `plain_multi`'s `indices.len()`
+(duplicates included) as `n`, so `wsh(multi(2,@0,@0,@1))` reads 2-of-3 over two
+keys while the same multi behind a lock reads 0-of-0 (`sole_multi` takes the
+guard). Owned "before plan 1b's first rule reads `k`/`n`".
+
+### F-662 — the 20→32 zero-pad of a hash lock lives in two places (owning phase: **none — ownerless residue**) `#descriptor-mnemonic` `#md-codec`
+
+**Status:** OPEN — owning phase: none (ownerless residue)
+Filed 2026-09-23 from the 1a final review's deferred minors (#2). Both sites
+execute (census 6 and 4), `copy_from_slice` is length-checked, and the padding
+is unobservable through `HashLock`'s hand-written `Eq`, so a silent divergence
+is not constructible. **Direction:** one helper, called from both.
+
+### F-663 — `validate.rs`'s `1 << 22` literal at three sites (owning phase: **none — ownerless residue**) `#descriptor-mnemonic` `#md-codec`
+
+**Status:** OPEN — owning phase: none (ownerless residue)
+Filed 2026-09-23 from the 1a final review's deferred minors (#3). Verified
+different in purpose from band classification (`CONSENSUS_BITS` is BIP-68
+truncation detection; one site selects a units word for an error message).
+**Direction:** name the constant.
+
+### F-664 — `skeleton()` accepts what `validate()` rejects (owning phase: **none — ownerless residue**) `#descriptor-mnemonic` `#md-codec`
+
+**Status:** OPEN — owning phase: none (ownerless residue)
+Filed 2026-09-23 from the 1a final review's deferred minors (#4). Consistent with
+the crate's decode-side position ("hashing a card is not minting one"); making
+`skeleton()` stricter would be the defect. Cross-reference F-634 (the decoder
+admits `wsh(tr(...))`). Record, not fix.
+
+### F-665 — the defensive `root_kind` arms (three, N-1) (owning phase: **none — ownerless residue**) `#descriptor-mnemonic` `#md-codec`
+
+**Status:** OPEN — owning phase: none (ownerless residue)
+Filed 2026-09-23 from the 1a final review's deferred minors (#5; the review's
+N-1 counts three, not one). Defensive arms on a `pub fn` with hand-buildable
+input; keeping them is right. Record only.
+
+### F-666 — the descriptor walker pins only the rendered projection (owning phase: **none — ownerless residue**) `#descriptor-mnemonic` `#md-codec`
+
+**Status:** OPEN — owning phase: none (ownerless residue)
+Filed 2026-09-23 from the 1a final review's deferred minors (#6). Under
+`is_nums` the `key_index` push sits inside `if !*is_nums`, so no reader
+(renderer, `policy_shape`, `skeleton_key`) sees it — a genuine don't-care. Plan
+1b moved the walker from `tests/skeleton_key_conformance.rs` into
+`md_codec::descriptor_route`; the property carries over unchanged.
+
+### F-667 — md-cli's kind-1 leaf-walk recogniser is a second copy of `md_codec::descriptor_route`'s (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#md-cli`
+
+**Status:** OPEN — owning phase: the next descriptor-mnemonic release
+Filed 2026-09-23 from coordinator-compat plan 1b. `crates/md-cli/src/decompose/walk.rs:259-282`
+(at dm `d269c556`) recognises the Liana-unspendable internal key by its own
+leaf walk; plan 1b made the same recogniser public in
+`md_codec::descriptor_route`. A second copy of a rule is the defect.
+**Direction:** md-cli calls the library.
+
+### F-668 — the fork's `composerLianaOutsideModelClass` checks `after` before older-units; Liana checks units first (owning phase: **coordinator-compat plan 3 (convergence)**) `#seedhammer` `#liana` `#convergence`
+
+**Status:** OPEN — owning phase: coordinator-compat plan 3 (convergence)
+Filed 2026-09-23 from coordinator-compat plan 1b §2. The fork checks class 5
+(`after`) before class 6 (`older` in time units), so for `mixed-lock-bases-{wsh,tr}`
+it names "an absolute lock"; Liana 8.0 and 15.0 both refuse those with
+`Timelock value '4194404' isn't valid or safe to use` (the units check). The
+Rust rule set (plan 1b) uses the measured order; swapping it to the Go order
+reproduces exactly three D3 disagreements. Rust leads; the Go port converges.
+
+### F-669 — fork test `TestFableTwoKeylessPathsAgreeWithTheHostOracle` goes red once md 0.20.0 is on PATH (owning phase: **coordinator-compat plan 1b release (Task 9) — before md-cli 0.20.0 is installed on this box**) `#seedhammer` `#md-cli` `#test`
+
+**Status:** OPEN — owning phase: before md-cli 0.20.0 is installed on this box (plan 1b's release, Task 9)
+Filed 2026-09-23 from coordinator-compat plan 1b R0 I-2. The test
+(`gui/composer_fable_r0_funds_test.go:131-160` at fork `2c9eed3`) runs
+`md compose --wrapper wsh --experimental` on five admitted keyless rows via the
+installed `md`; md-cli 0.20.0 refuses the none case (no coordinator imports a
+keyless `wsh` path) unless `--md-only` is given. **Fix:** add `--md-only` to its
+args, so `admit` keeps meaning "the composer admits it". The fork's
+`oraclelive` compose tests use hash-pinned md binaries (`oracle/pins.json`) and
+are unaffected until repinned; a repin to ≥0.20.0 needs the same flag. Do not
+`cargo install` md 0.20.0 locally until this lands.
+
+### F-670 — ms-cli's hashlock hint for `md compose` omits `--experimental --md-only` under `--wrapper wsh` (owning phase: **next mnemonic-secret release**) `#mnemonic-secret` `#docs`
+
+**Status:** OPEN — owning phase: the next mnemonic-secret release
+Filed 2026-09-23 from coordinator-compat plan 1b R0 M-3.
+`crates/ms-cli/src/cmd/hashlock.rs:525` prints
+`for md compose: --path <your other paths> --path keyless,…`; under
+`--wrapper wsh` md-cli 0.20.0 also needs `--experimental --md-only`.
+Documentation only: md's refusal names the flag.
