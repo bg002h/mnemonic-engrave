@@ -11,7 +11,19 @@ second fold (`…-spec-r2-verify.md`, 1C/7I/5M/1N new); and r4
 (`…-spec-r4.md`, 0C/2I/2M/1N new), whose judgement was that a fifth design
 round would be the wrong instrument and whose recommended sequence this
 revision follows.
-Brainstorm 2026-09-20. Not a spec yet.
+Brainstorm 2026-09-20. Not a spec yet; plan 1a and plan 1b are both planned
+straight from this document.
+
+**Fourth fold (2026-09-23), before plan 1b.** Every change is tagged with its
+source: **[recon]** = `design/agent-reports/coord-compat-1b-recon.md`
+(measured at descriptor-mnemonic `d269c556`, fork `2c9eed3`);
+**[core-boundary]** = `design/agent-reports/coord-compat-core-boundary.md` and
+`design/evidence/coord-compat-core-boundary/`; **[R-1]**, **[R-2]** = the
+controller rulings in `design/CONTINUITY_coord_compat_1b.md`; **[plan 1b]** =
+measured while authoring `IMPLEMENTATION_PLAN_coordinator_compat_1b_verdicts.md`
+against a scratch build of `d269c556`. Citations below are re-measured at
+`d269c556` (descriptor-mnemonic) and `2c9eed3` (fork) unless a line says
+otherwise.
 
 The architect's verdict was *"the family of architecture is right; the
 instance is not yet safe"*, and it still stands — the registry, the
@@ -44,7 +56,15 @@ all three, a named subset, or none — and "none" must be loud.
    shapes, Core 25.0 accepts 39 and Core 31.1 accepts 54 — fifteen shapes
    differ, mostly tapscript miniscript — and the device cannot know which Core
    the operator runs. The exact boundary release **must be measured**, not
-   inferred from the 25-vs-31 gap.
+   inferred from the 25-vs-31 gap. **MEASURED [core-boundary]: 26.0.** On
+   official release binaries (sha256 and guix.sigs verified) 24.2, 25.0 and
+   25.2 refuse all 15 discriminating `tr` shapes and 26.0, 26.2, 27.2, 28.4,
+   29.4, 30.3 and 31.1 accept all 15 with md's addresses; no release lies
+   between 25.2 and 26.0. The "Core 25.0" of the 56-shape matrix identifies
+   itself as `Bitcoin Satellite v0.2.4`, not Core; its refusals agree with the
+   genuine 25.0/25.2 binaries. A second, SEPARATE boundary: the `<0;1>`
+   multipath spelling is refused by `getdescriptorinfo` through 28.4 and
+   parsed from 29.4 (not bracketed tighter).
 2. **The "none" case is a loud confirm-to-proceed**, not a refusal. A policy no
    coordinator imports is still restorable by `md`, and §8a already handles
    exactly this for key-less paths as a confirm-to-proceed. The advanced choice
@@ -62,6 +82,25 @@ all three, a named subset, or none — and "none" must be loud.
    blocked on a TTY and looked like a hang.
 6. **Designed for growth**: more versions of each coordinator, and more
    coordinators, are expected.
+
+## Controller rulings before plan 1b (settled; do not re-litigate)
+
+Recorded in `design/CONTINUITY_coord_compat_1b.md`, 2026-09-23.
+
+- **R-1, the Nunchuk leaf order.** The SkeletonKey stays
+  coordinator-independent. Nunchuk's kind-1 cell is a source-derived,
+  KEY-DEPENDENT rule: it accepts only if the card's leaf pubkeys are already in
+  sorted, unique order (libnunchuk `a7cfb49` `src/descriptor.cpp`: the
+  `GetUnspendableXpub` re-derivation at `:689-712` and the re-render check at
+  `:640-648`). A template has no keys, so it is `Unproven { KeysAbsent }`.
+  Cost if wrong: evidence keyed by skeleton alone would need a key-order field
+  added later. **How the rule stays inside ruling 3:** the rule only REFUSES
+  (unsorted); "accept iff sorted" is carried by a measured positive for the
+  sorted card, not asserted by the rule.
+- **R-2, evidence transport.** Evidence recorded in mnemonic-engrave is
+  VENDORED into descriptor-mnemonic by a script with a freshness check (the
+  `vendor-liana-evidence.sh` pattern), and the md-codec xtask builds the table
+  from the vendored copy. Cost if wrong: a second vendoring path to maintain.
 
 ## Section 1 — the data model (REVISED after review)
 
@@ -99,6 +138,15 @@ spelling refused 30/30 while multipath imported 20/20, same shape — so a
 measured refusal with no renderer would print a claim the evidence does not
 support.
 
+**Core's verdict is renderer-dependent too [recon §3b, core-boundary].** The
+paragraph above presented renderer dependence as Nunchuk's property. Core
+26.0-28.4 import the per-chain spelling of a policy and refuse its `<0;1>`
+spelling with `Key path value '<0;1>' is not a valid uint32`, so a Core
+verdict names its form as well. Plan 1b's measurement found the order too
+[plan 1b]: Core parses key expressions before the script, so on 24.2-25.2 a
+multipath `tr` miniscript is refused for its `<0;1>`, not for its miniscript
+— a spelling refusal is checked FIRST.
+
 ### 1A. Types — normative
 
 The review found `Skeleton`, `Span`, `RendererId`, `Description` and
@@ -115,6 +163,10 @@ struct Skeleton {
     fp_partition: Vec<Vec<Vec<u8>>>,  // [path][group][slot]: slots sharing a fingerprint
     key_partition: Vec<Vec<u8>>,      // whole-policy [group][slot]: same (xpub, origin_path)
     keys_present: bool,        // false for a template-only payload (r2 C-2)
+    // [R-1] key MATERIAL, NOT in the key: for `tr`, whether the tap-leaf key
+    // occurrences' pubkeys, in wire order, are strictly ascending (sorted and
+    // unique). None when not `tr` or no keys. Nunchuk's Liana-key rule reads it.
+    leaf_keys_ascending: Option<bool>,
     // NO key_path field: it would duplicate shape.KeyPath, and a ported rule
     // reading the duplicate is how I-9 re-opens. One field, extended below.
 }
@@ -205,7 +257,8 @@ port of `policy_shape.go` yields a `Skeleton` whose central field cannot be
 filled, because:
 
 1. **`Branch` keeps a COUNT, not the slots.** `branchOf`
-   (`md/policy_shape.go:239-245`) builds `keys := map[uint8]struct{}{}` — the
+   (`md/policy_shape.go:239-245` when written; `:265-271` at fork `2c9eed3`
+   [recon]) builds `keys := map[uint8]struct{}{}` — the
    placeholder indices the branch references — then writes `br.Keys =
    len(keys)` and **discards the map**. `fp_partition` needs *which* slots,
    per path. So the ported `Branch` must retain the index set.
@@ -214,7 +267,10 @@ filled, because:
    an unspendable xpub. Right that the distinction matters — Nunchuk treats
    it as a different wallet and F-449 records it — **wrong about where it
    lived, measured so during plan 1a:**
-   `Body::Tr { is_nums, key_index, tree }` (`crates/md-codec/src/tree.rs:49-57`)
+   `Body::Tr { is_nums, key_index, tree }` (then `crates/md-codec/src/tree.rs:49-57`;
+   at `d269c556` it is `Body::Tr { internal_key: InternalKey, tree }`,
+   `tree.rs:69`, with `enum InternalKey { Slot(u8), NumsPoint, LianaUnspendable }`
+   at `tree.rs:23-30` [recon])
    made `is_nums` the only internal-key discriminant on the md1 wire, and an
    unspendable xpub was an ordinary `key_index`, structurally identical to a
    spendable one. **CORRECTION (F-449 stage 1b, Task 10): that is no longer
@@ -277,7 +333,7 @@ semantic reading, and coordinators do not parse semantics, they parse text.
 Two md1 trees with identical `PolicyShape` but different fragments (`or_i` vs
 `or_d`) can differ in importability. The key is md-codec's **existing**
 canonical payload — placeholders renumbered by first appearance
-(`crates/md-codec/src/canonicalize.rs:168`) — rendered as a template with lock values and digests alike replaced by
+(`crates/md-codec/src/canonicalize.rs:159` [recon]) — rendered as a template with lock values and digests alike replaced by
 `kind#class`, and origins erased (one spelling; an earlier draft said "digests
 by their kind" here and `sha256(#1)` thirty-five lines later — r4 NEW-I2):
 
@@ -305,9 +361,28 @@ of the design rather than folklore:
 - **The key is renderer-independent by construction**, which is why the
   renderer rides on the evidence tuple. A coordinator that parses text — all
   three measured do — can disagree across spellings of one key.
+- **The key hides the ORDER of the leaf keys [recon §3c].** Measured with
+  libnunchuk `a7cfb49` (Nunchuk 2.1.1's pin): two kind-1 cards with
+  byte-identical SkeletonKeys, differing only in the order of their leaf
+  pubkeys, are REFUSED and ACCEPTED respectively. Nunchuk re-derives Liana's
+  key over its signers' pubkeys sorted and deduplicated
+  (`src/descriptor.cpp:689-712`, `std::sort` + `std::unique` at `:700-701`)
+  and refuses unless the re-render equals the input (`:646`); Liana hashes
+  them in wire order with duplicates. **Ruled [R-1]:** the key stays
+  coordinator-independent; the Nunchuk cell is a KEY-DEPENDENT, source-derived
+  rule — refuse unless the leaf pubkeys are already strictly ascending — read
+  from `Skeleton::leaf_keys_ascending`, a non-key field. A template has no
+  keys, so it is `Unproven { KeysAbsent }` for Nunchuk. The positive for a
+  sorted card is still measured-only (the recon's probe, committed as
+  evidence by plan 1b).
 
-Any of these turning into a real disagreement surfaces as a **D1/D2 build
-failure**, not as a silent wrong verdict. That is the containment.
+Any of these turning into a real disagreement surfaces as a **build
+failure**, not as a silent wrong verdict. That is the containment — but only
+with a fifth class [recon §1c, R-1]: D1-D4 below are all RULE vs EVIDENCE, and
+two evidence rows with one key and opposite outcomes had no class. **D5
+evidence-conflict** is that class; a key-dependent rule (R-1) is how such a
+pair is resolved, because the rule explains one row and the other is then the
+only cell.
 
 **THE KEY'S MEMBERSHIP, settled here because a plan may not choose it** (r4).
 `SkeletonKey` — the thing hashed, printed by `md shape-key`, and used to key
@@ -328,21 +403,39 @@ and **nothing else**. Specifically:
   does not make a template-only card a different policy from the same card
   seated.
 - **A "path" for `tr` is a taptree LEAF, plus the key path as path 0 when the
-  internal key is not NUMS.** **CORRECTION (plan 1a, Task 4):** an earlier
+  internal key is a real key slot (`InternalKey::Slot`) — NOT merely "not
+  NUMS" [recon]: a Liana key (wire kind 1) is not NUMS and pushes NO path 0,
+  because an unspendable key spends nothing (`policy_shape.rs:301`, gated on
+  `InternalKey::Slot`; Liana v15.0's evidence agrees).** **CORRECTION (plan 1a, Task 4):** an earlier
   draft said `walkTapTree` "already defines this decomposition and the port
   inherits it". That is factually wrong — the Go appends one branch per **leaf
   only**, and the key-path branch does not exist there. It is an ADDITION the
   Rust port makes deliberately, implemented at `policy_shape.rs`'s `Tag::Tr`
-  arm, gated on `!is_nums`, pushed before `walk_tap_tree` so it lands at index
+  arm, gated on `InternalKey::Slot` (it was `!is_nums` before F-449 stage 1b
+  [recon]), pushed before `walk_tap_tree` so it lands at index
   0. It matters because the next plan's rules read `shape.branches`, and a
   spendable internal key IS an unlocked spend path: a rule counting unlocked
   paths would undercount every such taproot.
 
-**The key's serialized form** is the template, a `U+001F` separator, then the
-partitions rendered as `[path][group][slot]` with slots ascending, groups
-ordered by their lowest slot, and paths in template traversal order. That
-serialization is the thing hashed, the thing `md shape-key` prints and the
-thing the evidence table is keyed by — one spelling, defined once.
+**The key's serialized form** is THREE `U+001F`-separated fields [recon]: the
+template; the partitions (`fp_partition` then `key_partition`, each a
+self-delimiting bracket expression, rendered as `[path][group][slot]` with
+slots ascending, groups ordered by their lowest slot, and paths in template
+traversal order); and the key-path kind (`NotTaproot`, `Nums`, `Xpub`,
+`LianaUnspendable`). `skeleton.rs:313-319` at `d269c556` is the one spelling;
+an earlier draft of this paragraph named two fields and omitted the third.
+That serialization is the thing hashed, the thing `md shape-key` prints and
+the thing the evidence table is keyed by — one spelling, defined once.
+
+**A template's key is NOT its seated card's key [plan 1b].** 1a's partitions
+render EMPTY for a card with no key TLV (`[[][][]][]`, the module doc of
+`skeleton.rs`), not as singletons, so the template-only card and the same card
+seated have different keys — measured on X24. The key-membership clause below
+("`keys_present` ... does not make a template-only card a different policy")
+is therefore true of the KEY MEMBERSHIP and false of the rendered key. It is
+harmless for verdicts, because (a2) already forbids a template any positive
+whatever the key, and plan 1b pins that by a test that clears only
+`keys_present` on a seated Skeleton (keeping its key) and asserts no positive.
 
 Slot ids are **0-based** (they are `@i` placeholder indices, and `@0` is a real
 placeholder); equality classes are **1-based** (they are a counter, and `#0`
@@ -359,11 +452,11 @@ would have been costed from. Measured (r2 C-1, and independently by the
 controller at `b6e20412`):
 
 - **Genuinely already owned:** `render::descriptor_to_template(&Descriptor)`
-  (`crates/md-codec/src/render.rs:52`) takes the **decoded** descriptor, emits
+  (`crates/md-codec/src/render.rs:146` at `d269c556` [recon]) takes the **decoded** descriptor, emits
   `@i` placeholders and **erases origins**; placeholder renumbering is real
-  (`canonicalize::canonicalize_placeholder_indices`, `crates/md-codec/src/canonicalize.rs:168`).
+  (`canonicalize::canonicalize_placeholder_indices`, `crates/md-codec/src/canonicalize.rs:159` [recon]).
 - **Not owned:** lock values and digests render **literally**
-  (`crates/md-codec/src/render.rs:159`, `crates/md-codec/src/render.rs:171`, and the two hash renderers) — the key needs a
+  (`crates/md-codec/src/render.rs:280` and `:299` at `d269c556`, and the two hash renderers at `:426`/`:466` [recon]; plan 1a shipped the abstracting mode beside them) — the key needs a
   rendering MODE that abstracts them. The **per-path** fingerprint partition
   needs a spend-path decomposition that exists **nowhere in Rust**:
   `compose::SpendPath` is the *input* model, `md decompose`'s `Occurrence`
@@ -429,8 +522,40 @@ coordinator keeps the model honest about both.
 order of refusal**, each clause citing the source that establishes it, and it
 returns the FIRST class that applies — which is what makes the reason named the
 one the coordinator would actually hit first. `composerLianaOutsideModelClass`
-(fork `gui/composer_consent.go:381`) is the working template; it moves to Rust
-and the Go becomes the convergence port.
+(fork `gui/composer_consent.go:396` at `2c9eed3`, was `:381` [recon]) is the
+working template; it moves to Rust and the Go becomes the convergence port.
+
+**Three traps in that move [recon §1d].**
+
+- **Double count.** The Go adds one unlocked path for a spendable key path
+  (`if shape.KeyPath == md.KeyPathSpendable { unlocked++ }`,
+  `composer_consent.go:423`) because the Go walk has no key-path branch. The
+  Rust walk already carries that branch as an unlocked `Branch` 0, so a
+  verbatim port counts a spendable key path TWICE. The Rust rule counts
+  branches only. Plan 3's cross-language vectors must allow for the Go and
+  Rust `branches` lengths differing on every `tr` policy with a real key path.
+- **Kind-1 rulings carry over.** Class 2 fires on NUMS only and the unlocked
+  count adds a real key only, so a Liana key is neither (stage-4 F2,
+  `TestComposerLianaClassRulings`).
+- **A second host-side Liana classifier already ships:** md-cli's
+  `liana_refuse_or_warn` (`crates/md-cli/src/cmd/compose.rs:638-666`), which
+  warns on a hashlock and on every-path-timelocked under `--unspendable liana`
+  and which F-644 asks to widen. Plan 1b REPLACES its two Liana warnings with
+  the registry's verdict rather than adding a third copy; its SPEC §6 refusal
+  and its "has no effect" warning are md's own rules and stay.
+
+**Liana checks older-units before `after` [plan 1b].** The Go's classes 5
+(`after`) and 6 (older in time units) are in the wrong order for a policy
+carrying both: Liana v8.0 and v15.0 refuse `mixed-lock-bases-{wsh,tr}` with
+*"Timelock value '4194404' isn't valid or safe to use"* — the units check —
+and the Go names "an absolute lock". The Rust order is the measured one (the
+table build reports three D3s with the Go order); the fork converges in plan 3.
+
+**Class 9 is narrower in Rust than in the Go [plan 1b].** The Go names every
+second unlocked path; Liana imports X24 (a second SINGLE-key unlocked path,
+folded into the primary: `ImportsAltered`) and refuses X25/X26 (a second
+MULTI-key one). Refusing X24 would be a D1, so the Rust clause refuses only a
+second unlocked path with more than one key.
 
 **Measured refusals are admissible.** Ruling 3 said refusals are rule-derived;
 that was written before Nunchuk's round-trip check was understood. A refusal a
@@ -452,11 +577,20 @@ not a contract:
 | **D2 missed-refusal** | admits | refused | widen the rule; the measured refusal stands meanwhile |
 | **D3 reason-drift** | refuses for X | refused for Y | re-attribute the class; the verdict is unaffected |
 | **D4 orphan-evidence** | no rule spans it | any | add a `RuleSet` for that version, or drop the row |
+| **D5 evidence-conflict** [recon, R-1] | — | two rows, one key/coordinator/version/form, opposite outcomes | a key-dependent rule that explains one row (R-1's shape), or drop a row |
 
 **D3 is not hypothetical:** F-633 measured Liana v15 refusing the two key-less
 shapes for *"All spend paths must require a signature"* while our classifier
 names *"a hash lock"* — same verdict, different reason. Today nothing would
 classify that; under D3 it is a build failure with an obvious resolution.
+
+**D3 only compares messages that NAME a class [recon].** Liana's refusal text
+for EVERY kind-1 refusal in evidence is one generic string, *"Descriptor is not
+compatible with a Liana spending policy."* (live gate 4 of 4 plus the control;
+probes 5 of 5), and CONTINUITY_f449_stage2 records it covers at least three
+causes. A generic message cannot be attributed, so D3 is inapplicable to it:
+the verdict is checked, the reason is not. Each coordinator declares the
+messages that do name a class; everything else is generic.
 
 **`Description` is DERIVED, never hand-authored** (r2 I-7). It is the
 coordinator's own parsed reading of the policy, recorded by the harness —
@@ -475,6 +609,18 @@ direction: positives quietly stop firing, or fire on the wrong shape.
 **Gates:** vectors pin every `(shape, coordinator, version)` cell; a
 conformance test asserts `chunks -> key == descriptor -> key` for every
 evidence row; and the rule/evidence build fails on an unresolved disagreement.
+**"Every evidence row" means the evidence, not the vector corpus [recon §1b]:**
+plan 1a's gate ran over 48 vendored vectors, which contain 0 of the 11 Liana
+live-gate rows and 1 of the 56 matrix shapes, and md-codec had no library
+route from descriptor text to a key (the walker was test-private). Plan 1b
+promotes that walker into md-codec and runs the gate over the vendored
+evidence rows themselves.
+
+**Evidence transport [R-2].** Evidence is recorded in mnemonic-engrave, where
+the harnesses live, and VENDORED into descriptor-mnemonic by a script with a
+freshness check — the `vendor-liana-evidence.sh` pattern. The table build
+reads the vendored copy only, so a step-1 gate never depends on another
+repository being checked out.
 
 ## Section 3 — staleness (FIRST-CLASS, at the operator's direction)
 
@@ -491,7 +637,10 @@ tags: our rules were read at **v8.0 (2024-11-08)**; Liana ships **v15.0
 and one change is semantic — at v15.0 the import path passes
 `/* compile = */ false`, so the import-time `InvalidPolicy` refusal class no
 longer exists. The device is shipping a present-tense claim about Liana today
-from a 21-month-old reading (**F-633**).
+from a 21-month-old reading (**F-633**). **Half-fixed [recon]:** §8x now says
+"Liana (as of v15.0)" (`gui/composer_copy.go:316`), but every Core claim on the
+device is still unversioned ("Bitcoin Core imports it"), and the Core boundary
+now measured makes those claims false for Core 24.2-25.2.
 
 Six mechanisms:
 
@@ -510,8 +659,12 @@ Six mechanisms:
    A hand-typed label is how a verdict comes to name a release nobody ran. **Liana's is now committed** (`harnesses/liana/`,
    `606ab180`) and was used to re-measure at v15.0 — and since F-449 stage 2
    it is re-run as a gate, `scripts/liana-live-gate.sh`, which pins the tag and
-   commit and diffs against a committed expectation; Nunchuk's and Core's still
-   live in `/scratch/.tmp`, outside all three repos. Re-measurement without a
+   commit and diffs against a committed expectation. **Core's is now committed
+   as a probe [recon, core-boundary]:** `design/evidence/coord-compat-core-boundary/probe.py`
+   run against official release binaries (and, earlier, the one-shot
+   `design/evidence/f449-stage4/core-kofn-import.sh` on a dev build, which the
+   release-binary run supersedes). Nunchuk's still lives only in
+   `/scratch/code/shibboleth/.tmp/fable-nunchuk-lib/build/fableharness`. Re-measurement without a
    committed harness is a research project every time, and under ruling 6 that
    means the registry can grow rules but never evidence for those two:
    refusals forever, positives never.
@@ -520,8 +673,14 @@ Six mechanisms:
    that fails, or degrades the row to `Unproven` with a stated reason, when the
    newest known release is more than one major past every verified version.
    **This is the one gate that turns "we should re-measure" into a command that
-   fails.** It would fail today on Liana (8.0 verified, 15.0 known) and on
-   Nunchuk.
+   fails.** ~~It would fail today on Liana (8.0 verified, 15.0 known) and on
+   Nunchuk.~~ **Not on Liana any more [recon]:** v15.0 is verified (289/289,
+   and the live gate pins `v15.0`/`4684d5cb`), and `git ls-remote --tags`
+   finds no newer release tag. **Nunchuk is unknown:** libnunchuk upstream
+   HEAD `33f7dc3` is 204 commits past `a7cfb49` and `src/descriptor.cpp`
+   changed (`ParseTrDescriptor` key-path handling, musig;
+   `GetUnspendableXpub` and the round-trip check are untouched), but whether
+   the APP moved past 2.1.1 was not measured.
 5. **A renderer gate:** re-render every evidence descriptor with the current
    `md` and diff. Any byte change retires every Nunchuk positive until
    re-measured — automatically, in the build, not by someone remembering that
@@ -542,13 +701,14 @@ version to the bytes that produced it stays intact.
 | 1 provenance in every verdict | 1 (md-codec) |
 | 2 no open-ended span | 1 (md-codec) |
 | 3 committed harnesses | 2 — **Liana's is done** (`harnesses/liana/`) |
-| 4 `KNOWN_RELEASES` + freshness gate | 2 — **red today**: Liana 8.0 verified vs 15.0 known, Nunchuk likewise |
+| 4 `KNOWN_RELEASES` + freshness gate | 2 — no longer red for Liana (15.0 verified, 15.0 newest) [recon]; Nunchuk's app version unmeasured |
 | 5 renderer gate | 2 |
 | 6 evidence snapshot + verdict diff | 2 |
 
-Mechanism 4 being red on the day it lands is intended: it is the gate that
+Mechanism 4 being red on the day it lands was intended: it is the gate that
 turns "we should re-measure" into a command that fails, and F-633 is the
-proof it would have fired.
+proof it would have fired. Whether it is red when it lands now turns on
+Nunchuk alone [recon].
 
 **What this design deliberately does NOT build:** a freshness threshold in days
 evaluated on the device. The device cannot tell the time (§6b says so in its
@@ -577,14 +737,36 @@ not.
    Refusals are never collapsed; each names its reason.
 
 **One copy of the verdict, not two.** No summary line on the consent *plus* a
-detail screen elsewhere — five hand-written coordinator notices already ship
-(§8a, §8f, §8x and two more), and this design retires them rather than adding a
-sixth.
+detail screen elsewhere — hand-written coordinator notices already ship, and
+this design retires them rather than adding another.
 
-**A gate asserts that no `composerCopy*` body names a coordinator** (r3 M-3) —
-the bodies become reason strings and the consent prints from the registry, but
-without the gate a sixth hand-written notice grows exactly as the first five
-did, unnoticed.
+**The inventory, recounted [recon §2, recounted mechanically by plan 1b].**
+"Five (§8a, §8f, §8x and two more)" was already ambiguous at `7b6f2fb`, where
+SEVEN `composerCopy*` bodies named a coordinator. At `2c9eed3`, scanning the
+string literals (comments stripped) of every non-test function in `gui/*.go`
+and `md/*.go` (137 files), **19 functions** mention a coordinator:
+
+- **11 carry a coordinator VERDICT:** ten `composerCopy*` bodies —
+  `KeylessPath` :94, `NUMS` :199, `LianaKeyPath` :220, `UnspendableRowNUMS`
+  :241, `UnspendableRowLiana` :247, `MixedLockBases` :284,
+  `OutsideLianaModel` :314, `SameSeedThreshold` :324, `SameSeedBelow` :332,
+  `DuplicateKeys` :633 (all `gui/composer_copy.go`) — plus
+  `composerUnspendableDropCause` (`gui/composer_unspendable.go:125`, literal
+  at :141), which is not a `composerCopy*`.
+- **4 name only the KEY KIND** "Liana key": `composerCopyLianaKeyDropped` :254,
+  `composerCopyLianaUnmet` :264, `md1KeyPathLine` (`gui/md1_inspect.go:202`),
+  `policySummaryLines` (`gui/template_engrave.go:151`).
+- **4 use the generic word** "coordinator": `composerCopyNothingChecked` :460,
+  `multisigBuildExperimentalWarningBody` (`gui/multisig_build.go:880`),
+  `buildReviewLines` (`:1632`), `templateConsentLines`
+  (`gui/template_engrave.go:63`).
+
+**A gate asserts that no verdict body names a coordinator** (r3 M-3) — the
+bodies become reason strings and the consent prints from the registry, but
+without the gate another hand-written notice grows exactly as these did,
+unnoticed. As worded ("no `composerCopy*` body") it would FIRE on the two
+key-kind bodies and MISS `composerUnspendableDropCause` [recon]; plan 3's gate
+needs a key-kind exemption and must scan beyond `composerCopy*`.
 
 **Gates this repo already knows how to write:** assert the first-frame row
 count against the registry size (the kind-picker lesson — a paginated screen
@@ -602,7 +784,7 @@ is the moment ruling 2's loud stop belongs, and it exits non-zero naming
 **`--md-only`** (r2 I-8) as the flag that proceeds. `md descriptor` **reads**
 an existing card, usually one already engraved: refusing there would deny an
 operator the descriptor for a wallet they already hold, which is a regression
-`crates/md-codec/src/validate.rs:449-458` documents in its own words. It prints the same notice on
+`crates/md-codec/src/validate.rs:444-453` (at `d269c556` [recon]) documents in its own words. It prints the same notice on
 stderr and exits 0.
 
 The flag is on `md compose` alone, because it is the only command that can
@@ -631,7 +813,10 @@ Each step with its gate. Nothing starts in the fork.
    the four `Verdict` kinds, and the generated `verdicts` table with vectors
    pinning every `(shape, coordinator, version)` cell. **The table generator
    is a step-1 `xtask`, not `md shape-key`** (r2 I-1) — step 1's gate needs
-   the table, so it cannot be built by a step-2 binary; `md shape-key` in
+   the table, so it cannot be built by a step-2 binary. **No `xtask` exists
+   yet [recon]:** plan 1a put the one key transcript in
+   `crates/md-codec/examples/dump_skeleton_keys.rs`; plan 1b creates
+   `crates/xtask` (`cargo xtask verdicts`); `md shape-key` in
    step 2 is a thin CLI over the same library function, and a test asserts
    the two agree. *Gate:* the conformance test (`chunks -> key ==
    descriptor -> key` for every evidence row) and the rule/evidence build.
@@ -672,25 +857,46 @@ Writing one plan for all three would produce a document whose later half is
 written against a tree that does not exist yet — the staleness this cycle has
 already measured in a plan's own citations.
 
-## Open, and blocking a spec
+## Settled since the third fold
 
-- **The Core boundary release is unmeasured.** Ruling 1 requires it measured.
-  `design/COORDINATOR_COMPAT_MEASUREMENTS.md` narrows it to one capability —
-  all 15 discriminating shapes are `tr` with a tapscript-miniscript leaf, zero
-  `wsh`/`sh` shapes differ — so the measurement is one representative
-  descriptor per candidate release, not 15 shapes across 6. Until then the
-  honest verdict for such a policy is `Unproven`.
+- **The Core boundary release — MEASURED [core-boundary]: 26.0** (ruling 1
+  above). Every release 24.2-25.2 refuses the representative `tr` +
+  tapscript-miniscript descriptor with `Miniscript expressions can only be used
+  in wsh`; every release 26.0-31.1 imports it with md's receive and change
+  addresses. The "one capability" claim holds across releases: all 15
+  discriminating shapes flip together, at 26.0, and the `wsh` control is
+  accepted by all ten releases. F-449's kind-1 descriptor first imports at
+  26.0, with receive/change 0..2 equal to Liana v15.0's, replacing the
+  v30.99 dev-build-only evidence. The `<0;1>` spelling is a second boundary,
+  between 28.4 and 29.4. Not measured: point releases between the ones
+  listed, release candidates, spending, and the GUI.
+- **The Nunchuk leaf-order question [recon §3c] — ruled [R-1]** (§1A's blind
+  spots).
+- **How evidence in mnemonic-engrave reaches a table built inside md-codec
+  [recon §6] — ruled [R-2]** (§2's evidence transport).
+
+## Open, and blocking a spec
 - ~~Liana must be re-measured at v15.0~~ — **DONE** (`606ab180`): 289/289
   verdicts identical to v8.0, 73/73 accepted policies identical in inferred
   policy and addresses, 10 refusals changed message only. F-633 stays open on
   the unqualified present tense, which §3 fixes, not on a wrong verdict.
 - **`K`, the collapse threshold**, is a measurement against the real frame, not
-  a number to pick here.
+  a number to pick here. (A fork measurement; it does not block plan 1b.)
+- **Nunchuk's own unspendable form (PR-1746) has no md1 encoding [recon §4].**
+  Its real internal key is an origin-less xpub; `md decompose` reads it as a
+  plain `Slot`, so it reaches the classifier as `KeyPathKind::Xpub` plus an
+  unlocked branch 0 — a spendable-looking key path. Encoding it is a normative
+  wire change (risk set (c)) that would spend the last usable wire version.
+  A future wire question, not in plans 1b, 2 or 3; meanwhile no rule may emit
+  a Nunchuk positive for an `Xpub` internal key on the assumption that it
+  spends, and the evidence build marks such rows unkeyable.
 
 ## Measured context this design rests on
 
 `design/IMPORTABILITY_composer_shapes.md` — 56 shapes (30 device-composed,
 26 `md compose`), generated from `design/evidence/composer-fable-r0/`.
 Totals: Nunchuk OK 20 of 30 measured; Liana OK 17 of 56; Core 25.0 OK 39 of 56;
-Core 31.1 OK 54 of 56. Every preset is in the measured set, so for
+Core 31.1 OK 54 of 56. (The "Core 25.0" binary was Bitcoin Satellite v0.2.4
+[core-boundary]; `design/evidence/coord-compat-core-boundary/` is the Core
+evidence plan 1b vendors.) Every preset is in the measured set, so for
 preset-built policies — the common case — a measured positive can fire.
