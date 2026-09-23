@@ -760,12 +760,19 @@ favour of Wallet Policy > Build a new policy. No enforcement by operator ruling.
 > KEY PATH: NONE (NUMS)
 > Spends use the script paths only. Bitcoin Core imports this form. Nunchuk
 > cannot import a NUMS policy at all: for Nunchuk, use wsh, or a tr policy
-> whose first path is a single key. Liana and BIP-388 signers need an
-> unspendable xpub instead (see F-449), which is a different wallet with
-> different addresses.
+> whose first path is a single key. Liana needs its own unspendable key
+> instead, which this device offers where Liana can import the policy; that is
+> a different wallet with different addresses.
 
 (fable review r0, L2 I-1: libnunchuk 2.1.1 refuses 7 of 7 composer NUMS shapes;
-the unspendable-xpub form derives other addresses, §5c. 272 chars, headroom 277.)
+the unspendable-xpub form derives other addresses, §5c. "272 chars, headroom
+277" was measured on an earlier wording and was already stale before F-449
+stage 4: the body stage 4 found is 328 bytes and the amended one 360, title
+included, measured with len() at fork `a054ead`; headroom not re-derived.
+Amended at F-449 stage 4, F-633's copy half: the last sentence no longer
+points at F-449; it says the device now offers Liana's key where Liana can
+import the policy (§8y). The Nunchuk sentence stays true for NUMS; it is
+false for kind 1 some of the time, which is why §8y is a separate body.)
 
 ### 8g. Same seed twice in one path (C29): the first body when the shared seed's slots in that path reach the threshold, the second otherwise
 
@@ -1018,8 +1025,9 @@ flow with no sources.
 ### 8x. Outside Liana's model (fable review r0, lens 5 I-1 and I-2) — a notice on the consent, naming the FIRST class that applies
 
 > OUTSIDE LIANA'S MODEL
-> Liana takes one unlocked path, at least one path locked by older in
-> blocks, and no hash. This policy: <class>. Bitcoin Core imports it.
+> Liana (as of v15.0) takes one unlocked path, at least one path locked by
+> older in blocks, and no hash. This policy: <class>. Bitcoin Core
+> imports it.
 
 `<class>` is one of nine phrases, checked in Liana 8.0's own order of refusal
 (`liana` crate `src/descriptors/analysis.rs` at tag v8.0; measured 17 of 56
@@ -1038,6 +1046,62 @@ A real spendable taproot key path counts as an unlocked path (every shipped
 `tr` preset puts its primary there), so Liana's own accepted `tr` shape does
 not misread as class 7. Silent exactly when Liana 8.0 accepts. Same-seed
 inside one path stays §8g's line. Fold `fa070df0`; 1374/1374.
+
+Amended at F-449 stage 4 (F-633's copy half): "Liana (as of v15.0)". F-633
+re-measured the same 289 descriptors at v15.0: 289/289 verdicts identical to
+v8.0. **Liana's key (wire kind 1) is neither class 2 nor an unlocked path**
+(SPEC_liana_unspendable_internal_key §7): class 2 tests `== KeyPathNUMS` and the
+unlocked count tests `== KeyPathSpendable`, so `KeyPathLianaUnspendable` passes
+the first and is not counted by the second; `tr(<Liana key>,
+and_v(v:pk(@0),older(26280)))` stays class 7 (`TestComposerLianaClassRulings`).
+
+### 8y. The Liana unspendable key (F-449 stage 4, SPEC_liana_unspendable_internal_key §0b and §7)
+
+The key-path line a Liana-key policy shows at consent (§7's print-site arm; not
+§8f, whose Nunchuk sentence is false for kind 1 some of the time):
+
+> KEY PATH: NONE (LIANA KEY)
+> Spends use the script paths only. The key path is Liana's unspendable key,
+> computed from this wallet's own keys. Liana (as of v15.0) and Bitcoin Core
+> import this form. Nunchuk imports it only when the keys happen to be in
+> sorted order. The same paths with the NUMS key are a different wallet with
+> different addresses.
+
+The Key path choice screen (§0b), between the path list and the stub screen,
+offered only when the internal key is NUMS today AND the kind-1 composition is
+inside Liana's model with class 2 skipped. The lead, then the two rows; row 0 is
+the first-entry default:
+
+> Which key path? The two are DIFFERENT WALLETS, with different addresses. It
+> cannot be changed after engraving.
+
+> NUMS point: Bitcoin Core imports it. Liana and Nunchuk do not.
+
+> Liana key: Liana (v15.0) and Bitcoin Core import it. Nunchuk only by chance.
+
+§0b RESET's signal, when a Liana choice is dropped because the predicate no
+longer admits it. `<cause>` is one sentence naming the fact that moved:
+"Only a Taproot policy has a key path to choose.", "Path <n> is one key with
+no lock, so it became the key path, and there is no unspendable key to
+choose.", "Liana would not import this policy (<class>)." with a §8x class,
+or "This device could not build the policy with the Liana key." Shown with the
+cause `composerCopyTable` pins:
+
+> LIANA KEY DROPPED
+> Path 1 is one key with no lock, so it became the key path, and there is no
+> unspendable key to choose. This policy is back on the NUMS key path: its
+> Template-ID and addresses are not the ones the Liana key gave.
+
+The refusal `composerCompose` raises if a Liana choice ever composes a real
+key path (SPEC §6 row 3; unreachable through the flow, since the reset drops
+such a choice first):
+
+> The Liana key was chosen, but this policy has a real key path, so there is
+> no unspendable key to choose. Go back to the key path screen.
+
+(Fork `a054ead`, `d64695c`. The Go `composerCopyTable` carries each body above
+verbatim, and `TestComposerCopyIsVerbatimFromTheSpec` holds the device strings
+to the table. No test reads THIS file, so the table is the diff target.)
 
 ## 9. Device work items (fork)
 
