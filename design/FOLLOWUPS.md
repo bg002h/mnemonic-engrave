@@ -19423,3 +19423,51 @@ therefore change nothing that matters — it is the wrong fix.
 
 Do NOT simply bump to v1.4.3 — that reads as fixing it while leaving the
 fork divergence entirely in place.
+
+### F-638 — `UnspendableUseSiteNotCanonical` names no `@N`, and from the override half it describes a field the operator can see is correct (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#message-precision`
+
+**Status:** OPEN
+Filed 2026-09-22 from the Task 7 independent review (M3), F-449 stage 1b.
+
+**The defect.** The variant is a unit variant and the message reads *"wire
+kind 1 (Liana unspendable internal key) requires the canonical `<0;1>/*`
+use-site path…"*. That is accurate when the SHARED use-site diverged. When it
+fires from the per-key override half — added in `6ae02466` — the operator's
+shared use-site **is** canonical, so the message points them at something
+they can look at and confirm is correct, on a template that may carry four
+keys, with no locator for the one that actually diverged.
+
+`validate.rs`'s own doc comment says *"the operator does not care which field
+carried the divergence"* — true of the FIELD, and the reason both halves
+share one variant. It is not true of the KEY.
+
+**The fix.** Carry `idx: u8` on the override branch and name the placeholder:
+one field on the variant. Same class as F-582 (a verify message that named
+two numbers and no cause).
+
+**Not blocking.** It fails closed, names the rule, and cites the reason.
+
+---
+
+### F-639 — `verify.rs:62` re-encodes a decoded card under `Admission::Enforce`, eleven lines below a comment stating the opposite intent (owning phase: **F-449 stage 2**) `#descriptor-mnemonic` `#md-codec` `#mint-policy-vs-decode`
+
+**Status:** OPEN
+Filed 2026-09-22 from the Task 7 independent review, which flagged it as
+out of scope for that task but newly relevant.
+
+**The defect.** `crates/md-codec/src/verify.rs:62` re-encodes an
+already-decoded card under `Admission::Enforce`, while a comment eleven lines
+above states the opposite intent. Pre-existing, and **unreachable for the four
+§6 rules** — the reviewer confirmed that — but Task 7 widened what flows
+through that path, so the gap between the comment and the code now matters
+more than it did.
+
+This is the same shape as the 2026-09-19 regression recorded at
+`encode.rs:116-131`, where mint-side refusals leaking into a read path made a
+shipped 2-of-2 stop reading. A mint policy must never decide whether an
+already-engraved card can be read.
+
+**The fix.** Establish which of the two the code should do, make it do that,
+and delete or correct the comment. If `Enforce` is deliberate here, the
+comment is the defect and must say why. See also F-449 stage 1b's extension of
+`tests/mint_policy_does_not_reach_decode.rs`, the designated class gate.
