@@ -279,7 +279,7 @@ reproduced by the author).
 
 md1 auto-dispatches single-payload vs chunked on **bit 0 of the first symbol**,
 before any header is parsed (`decode.rs:191-193`; again at `chunk.rs:666`, the `chunked_flag` read in `decode_with_correction`'s single-string pre-pass, at stage 2;
-Go at `md/chunk.go:193`, `md/md.go:1235`). For a single payload the first symbol
+Go at `md/chunk.go:193`, `md/md.go:1309` — re-resolved at fork `43294c6`; it was `:1236` at `7b6f2fb`, cited `:1235` earlier). For a single payload the first symbol
 is `[divergent][v3][v2][v1][v0]`, so **bit 0 is `v0`**. Therefore every usable
 single-payload version must be **even**. Computed:
 
@@ -298,7 +298,7 @@ ver div  first-symbol  byte0  chunked_flag  routes-to
 At version 5 a single-string plate routes to the chunk reassembler, which reads
 bits 4..1 as its version and reports `WireVersionMismatch { got: 2 }` — the
 error `header.rs:100-110` reserves for a *pre-redesign v0.x card*. The device
-(`gui/multisig_verify.go:834`, `gui/md1_gather.go:31`, `sysw/confirm.go:123`)
+(`gui/multisig_verify.go:834`, `gui/md1_gather.go:34` (was `:31` before stage 3), `sysw/confirm.go:123`)
 and `md repair` go through the dispatch; host `md decode`/`descriptor`/`verify`
 call `decode_md1_string` directly. So a v5 plate would **decode on the host and
 be refused on the device that cut it**, naming a version no encoder ever emitted.
@@ -373,6 +373,14 @@ the fork mirrors the structure 3-for-3 with `writeNode` equally version-less
 | `md/encode.go:417` | the wire payload |
 | `md/template_id.go:53` | `WalletDescriptorTemplateId` |
 | `md/walletpolicyid.go:42` | `WalletPolicyId` |
+
+**Status (stage 3, fork `43294c6`):** DONE. `writeNode` takes a fourth
+`wireVersion` parameter, and every writer passes `descriptor.wireVersion()`:
+`md/encode.go:469` (the payload; `:417` before stage 3), `md/template_id.go:53`,
+`md/walletpolicyid.go:42`, and a fourth writer the table above missed —
+`split`'s chunk header, `md/chunk.go:158`. Gated by
+`TestKind0AndKind1TwinsNeverShareAnIdentity` (both ids, both stub flavours and
+the encoding id) and by Go-equals-Rust on all three ids for both kind-1 records.
 
 Leaving these at a constant version reintroduces §3e's collision **on the
 surface where the plates physically are**, because these are exactly the values
@@ -594,12 +602,16 @@ exist.
 
 | surface | today | required |
 | --- | --- | --- |
-| old device, chunked plate | `md.ParseChunkHeader` errors → `gatherIgnored` → **"Not an md1 descriptor chunk."** | a **false statement** about a plate the constellation cut. `gatherIgnored` must be split so a well-formed md1 at an unsupported version says so, and names the version. **This crosses a package boundary:** `errWireVersion` is unexported (`md/md.go:22`), so package `md` must first expose a sentinel or typed error before `gui` can distinguish the case — the sentinel is a `md/` change (stage 3); `gatherIgnored` itself is `gui/` (`gui/mk1_inspect.go:36`, returned at `gui/md1_gather.go:33,39`, printed at `:122`), so BOTH packages have work at that stage |
+| old device, chunked plate | `md.ParseChunkHeader` errors → `gatherIgnored` → **"Not an md1 descriptor chunk."** | a **false statement** about a plate the constellation cut. `gatherIgnored` must be split so a well-formed md1 at an unsupported version says so, and names the version. **This crosses a package boundary:** `errWireVersion` was unexported (`md/md.go:22` at `7b6f2fb`), so package `md` had to expose a typed error before `gui` could distinguish the case. **Status (stage 3, fork `43294c6`): DONE.** `errWireVersion` is gone; `md.ErrUnsupportedWireVersion` + `*md.WireVersionError{Got}` (`md/md.go:26`, `:32`). `gatherIgnored` (`gui/mk1_inspect.go:36`, returned at `gui/md1_gather.go:40,46`, printed at `:135`) is split by a new `gatherUnsupportedVersion` (`gui/mk1_inspect.go:43`), and the message is `gui/md1_version.go`'s one helper, "This firmware cannot read md1 version N." The same fix covers two more surfaces this row did not name: the inspect single card (`gui/gui.go:2788`) and the bundle channel (`gui/bundle.go:244,262`, `gui/bundle_flow.go:100`), plus the gather's FIRST chunk (`gui/md1_gather.go:100`) |
 | `md repair`, older binary | the BCH correction loop **succeeds**, then `decode_with_correction` rejects the version and `repair.rs` returns `Ok(2)`, **discarding the successful correction** — and exit 2 is the atomic-fail code. **Fixed in md-cli 0.19.0 (stage 2, descriptor-mnemonic `4c35175e`, single-string only per `23203195`)** for a single card at any version outside the accepted set: exit **5** with the corrected card on stdout (a multi-string set at such a version still exits 2) and the version named on stderr; binaries before 0.19.0 still behave as described, and `mnemonic repair` still exits 2 until the toolkit adopts `md_codec::correct_chunks` | distinguish "BCH capacity exceeded" from "corrected fine, but this wire version is unsupported"; never discard a correction that succeeded |
 | `WireVersionMismatch` Display | `"wire-format version mismatch: got 8, expected 4"` (`error.rs:33`) | "expected 4" becomes false the moment the decoder accepts `{4, 8}`; the message must name the accepted set |
 
 The host error names the version and the device error does not, so §3d's *"loud
 and correctly named"* is true of Rust and false of the fork until this is done.
+**Done in stage 3 on the device (fork `43294c6`).** It stays false on any board
+not yet flashed with stage 3: that firmware still says "Not an md1 descriptor
+chunk." about a v8 plate, and no code can fix a board already in the field — the
+stage 5 runbook must say to flash before reading kind-1 plates.
 
 ## 7. Verdict integration
 
@@ -644,7 +656,10 @@ and correctly named"* is true of Rust and false of the fork until this is done.
 
 `gui/policy_address.go:132-158` has exactly **two** internal-key branches, and
 `md.EmitTapLeavesChunks` returns a two-state `(keyIndex, isNums)`
-(`md/tapleaves.go:188`, `:204`). Per §5 the derived xpub takes no slot, so
+(`md/tapleaves.go:188`, `:204`). *(As of `7b6f2fb`. **Stage 3, fork `43294c6`:**
+`EmitTapLeavesChunks` and `TapLeavesChunks` return `md.InternalKeyKind`, three
+states — `md/tapleaves.go:194`, `:210`, and `:81` for `TapLeavesChunks` — and the
+caller is a three-way `switch ik` at `gui/policy_address.go:157`.)* Per §5 the derived xpub takes no slot, so
 `byIndex` can never hold it. A kind-1 wallet therefore lands in one of two
 wrong places:
 
@@ -656,7 +671,7 @@ wrong places:
 **Required work, scheduled in §9 and not merely gated:**
 
 1. `md.EmitTapLeavesChunks` returns a **three-state** internal-key kind
-   (stage 3, with the rest of the Go port).
+   (stage 3, with the rest of the Go port). **DONE, fork `43294c6`.**
 2. A **third branch** in `gui/policy_address.go` that recomputes §2 over the
    collected leaf keys and derives at `0/i` / `1/i` (stage 4).
 3. **A refusal, not a fallback.** If the device meets an internal-key kind it
@@ -667,7 +682,14 @@ wrong places:
    `complexAddressSource` (`gui/policy_address.go:88`, the entry point every
    screen goes through) probes `src(0, false)` and returns `nil, false` rather
    than falling back — the probe itself is in `complexAddressDeriver` at
-   `:188-190`, which is where an implementer should grep. The engrave half is new, and it applies to a policy whose
+   `:199-201` (`:188-190` before stage 3), which is where an implementer should grep.
+   **Status (stage 3, fork `43294c6`): the ADDRESS half of this refusal shipped.**
+   The `switch ik` `default:` arm returns `errUnderivableInternalKey`
+   (`gui/policy_address.go:171`, declared at `:93`), which the probe turns into
+   "no address source". It is gated by `TestEveryKeyedVectorReachesAnAddress`'s
+   `stillUnsupported` entries for both keyed kind-1 vectors, which FAIL the day
+   stage 4 derives kind 1; grouping kind 1 with NUMS reddens them (mutation G6).
+   The ENGRAVE half stays stage 4. The engrave half is new, and it applies to a policy whose
    internal-key kind *this firmware cannot derive* — not to the shipped D3/D4
    paths that deliberately engrave without an address. State it that way, or it
    reads as a blanket "no address, no engrave" and retires working behaviour.
@@ -715,7 +737,12 @@ already records" was false.
    **mk1 `policy_id_stub`**. Every existing v4 id byte-preserved. r0 had no id
    vector at all; r2 had one but scheduled it in Rust only, leaving the Go half
    — the half the operator actually reads — with no owner. **Rust leg: stage 1b.
-   Go leg: stage 3.**
+   Go leg: stage 3.** *(Stage 3, fork `43294c6`: "a different 12-word phrase"
+   has **no Go surface** — `md/` ports no phrase; `grep -n -i phrase
+   md/walletpolicyid.go md/template_id.go md/identity.go` finds nothing. So the
+   Go leg is both ids, both mk1 stub flavours and the md1 encoding id:
+   `TestKind0AndKind1TwinsNeverShareAnIdentity`, plus Go-equals-Rust on all
+   three ids in `TestKeyedConformanceAgreesWithRust`.)*
 6. **Structure-independence pin.** All three of `kofn-recovery`,
    `tiered-recovery` and `decaying-multisig` over the same four keys derive one
    internal key — the third is the nested case.
@@ -735,7 +762,7 @@ already records" was false.
    | §0b RESET | **the predicate is re-evaluated, not the edit detected.** Set kind 1, Back-edit to a shape where a conjunct is false (e.g. give the primary a bare single key, making the internal key real), and assert the kind is 0. **And the converse, which is the half that catches an over-eager reset:** Back-edit in a way that keeps both conjuncts true and assert the kind is **still 1** | 4 |
    | §0b DEFAULT ROW | two assertions, because one cannot fail: on FIRST entry the widget opens on the NUMS row (asserted on the first page), and **on RE-ENTRY after choosing kind 1 it opens on the kind-1 row** | 4 |
    | §0b COPY | both rows name their coordinators and say the two are different wallets | 4 |
-   | §6a old-device message | a version-8 chunk yields "unsupported wire version", never "Not an md1 descriptor chunk." | 3 |
+   | §6a old-device message | a chunk at a version OUTSIDE the accepted set (e.g. 12) yields the named-version message ("This firmware cannot read md1 version 12.") on the gather, inspect and bundle surfaces, never "Not an md1 descriptor chunk." — and a version-8 chunk is READ (stage-3 firmware accepts {4, 8}). A board not flashed with stage 3 still says "Not an md1 descriptor chunk." about a v8 plate; no code can fix a board already in the field, so the stage 5 runbook must say to flash before reading kind-1 plates | 3 — DONE (fork `e2b4c6f`, `gui/md1_version_test.go`) |
    | §6a `md repair` | a chunk — a SINGLE string — at a wire version OUTSIDE the accepted set (v8 is accepted since 1b, so the reachable trigger is e.g. 12) with a correctable BCH error KEEPS the correction and reports the unsupported wire version, exiting **5** (REPAIR_APPLIED), distinctly from the atomic-fail exit 2. **A multi-string call failing on the wire version exits 2 with empty stdout** (ruling 7): a build cannot know the chunk-header layout of a version it does not support, so it cannot tell one card's chunks from mixed or unrelated strings | 2 — DONE (`4c35175e`; single-string only since descriptor-mnemonic `23203195`) |
    | §6a error Display | `WireVersionMismatch`'s message names the accepted set, not "expected 4" | 1b |
    | §8b `me` fail-open | a bundle never states a plate count it did not compute | 4a |
@@ -811,7 +838,7 @@ runbook has the two commands; not a gate.
 | **1a** | behaviour-preserving `InternalKey` refactor, wire untouched (§3f) | suite green at 1400+, no wire bytes changed |
 | **1b** | version 8, the kind bit, §2 derivation, §4 rendering, §4a's `md decompose` recogniser and `md encode` refusal, §6 refusals | §8 vectors **1, 2, 5, 6, 7, 10** — every leg runnable in Rust alone. (§8.9 is a table of per-stage rows, not a single-stage item; §8.10 is the mutation pass and was item 9 before r3b inserted the gate table) |
 | **2** | `md compose --unspendable liana\|nums` (default `nums`), `md descriptor` kind 1, the `UNSPENDABLE(liana)` template substitution rule, the JSON schema version bump (§4a). **Status:** `md descriptor` kind 1 and the substitution rule shipped in 1b; the JSON bump's decode half in 1b and its compose half in stage 2; `--unspendable` in stage 2 (descriptor-mnemonic `6e918a8f`..`8d6697fe`, md-codec 0.47.0 / md-cli 0.19.0) | §8.2 **and §8.8, the live `harnesses/liana` install run** — the first stage that can render the descriptor the harness consumes. **Both run:** §8.2's CLI legs in `crates/md-cli/tests/liana_evidence_legs.rs`; §8.8 is `scripts/liana-live-gate.sh` (Liana v15.0, 11 verdicts, PASS) |
-| **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
+| **3** | Go port in the fork's `md/`: `EmitTapLeavesChunks` returning a **three-state** internal-key kind (§7a.1), **the version-derived identity ruling at `md/encode.go:417`, `md/template_id.go:53`, `md/walletpolicyid.go:42` (§3e)**, §6a's `gatherIgnored` split, provenance pin bumped. **Status:** implemented on fork branch `f449-stage3` at `43294c6` (Go vectors vendored from descriptor-mnemonic `430ea478`, branch `f449-stage3-vectors`); not yet merged at the time of writing. Landed beyond the row: §2's recipe ported into `md/` (test-only at this stage), the bundle surface of §6a, the `md1_encoding_id` assertion in the keyed conformance gate, and the ADDRESS half of §7a.3. Moved: the Go composer's Liana selection and §6's kind-1 mint refusals to stage 4 (F-654). Stage 3 alone lets the device copy kind-1 cards verbatim without an address (`noAddressLines`); the engrave refusal of §7a.3 is stage 4. Also until stage 4: a kind-1 wallet on the inspect screen shows its keys but NO `Policy id:` line (its kind-0 twin shows one) and no address — measured at `43294c6` | §8 vectors in Go, **including §8.4's `ParseChunkHeader`/`Decode` leg and §8.5's Go identity leg** |
 | **4** | device: §7's `KeyPathKind`, the class-2 + unlocked-path ruling, the print-site arms including `md1Summary`, F-633 copy, **§7a.2's third address branch and §7a.3's refusal**, and **§0b's choice screen — predicate, placement, reset, default row and copy** | **§8.3's device leg**, §7's constructed shape, an address test for a kind the device cannot derive, and **§0b's firing predicate exercised on all six `tr` presets, firing on exactly `kofn-recovery` and `tiered-recovery`** |
 | **4a** | `me` (this repo): §9a's four pieces — the unpin plus its `[patch.crates-io]` override, §3f's type-change repairs to `me`'s own source, §6a's message at `sysw/record.rs:251-252`, and **§8b's fail-open fix at `bundle.rs:371`** | **§8.9's `me` rows.** NOT "me round-trips a version-8 payload": measured, that already passes on the pinned 0.42 with no change at all, because `me convert` validates only the codex32/BCH layer (`me-cli/src/lib.rs:75-83` → `validate.rs:95-100`), which is version-agnostic. A gate the status quo satisfies is not a gate |
 | **5** | rebuild `demo/sh2/` and deploy to quantoshi.xyz/SH2/ with `demo/sh2/update.sh` | site 200, `application/wasm`, and the emulator reaches §0b's screen |
