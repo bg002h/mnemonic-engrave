@@ -12,11 +12,11 @@ one:
 
 ```sh
 # md -- the descriptor tool
-curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.1/md-0.20.1-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.2/md-0.20.2-macos-amd64.tar.gz
 # ms -- the seed tool
 curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
 
-tar -xzf md-0.20.1-macos-amd64.tar.gz
+tar -xzf md-0.20.2-macos-amd64.tar.gz
 tar -xzf ms-0.19.0-macos-amd64.tar.gz
 chmod +x md ms && ./md --version && ./ms --version
 ```
