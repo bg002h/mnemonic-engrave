@@ -1072,7 +1072,7 @@ offered only when the internal key is NUMS today AND the kind-1 composition is
 inside Liana's model with class 2 skipped. The lead, then the two rows; row 0 is
 the first-entry default:
 
-> Which key path? The two are DIFFERENT WALLETS, with different addresses. It
+> Which key path? The two options below are DIFFERENT WALLETS, with different addresses. It
 > cannot be changed after engraving.
 
 > NUMS point: Bitcoin Core imports it. Liana and Nunchuk do not.
