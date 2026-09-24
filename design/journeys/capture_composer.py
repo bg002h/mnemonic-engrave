@@ -21,7 +21,11 @@ THREE COMPARISONS, and the third is the one nothing else can make:
      `md verify`, `md inspect` and `md decode` accept both identically while the
      DEVICE is chunk-form-always. No verify step can tell them apart.
 
-    python3 capture_composer.py [--arm keyed|keyless|both] [--port 8803] [--shot-port 8744]
+    python3 capture_composer.py [--arm keyed|keyless|liana|liana-same-seed|both]
+                                [--port 8803] [--shot-port 8744]
+
+`--arm both` runs every arm: keyed (forms A and B), keyless, liana, and
+liana-same-seed.
 
 Exits non-zero unless every expected shot arrived AND every comparison passed, so
 a partial or disagreeing capture cannot be mistaken for a complete one.
@@ -54,6 +58,13 @@ EXPECTED = {
     "keyless": ["c00a-boot-offer.png", "k01-door.png", "k04-census.png"],
     # F-449 stage 4: the key-path choice screen and the Liana-key census.
     "liana": ["c00a-boot-offer.png", "l01-key-path.png", "l05-census.png"],
+    # F-671/F-674: one seed seated into every slot of a Liana-key kofn-recovery.
+    # A COPY WALK, NOT AN ENGRAVE: it stops at the re-entered key-path choice,
+    # so it has no census and no engraved strings. The paged mapping review and
+    # consent contribute one shot per page; page 0 of each is fixed.
+    "liana-same-seed": ["c00a-boot-offer.png", "c01-payload-digest.png",
+                        "s01-key-path-unseated.png", "s03-mapping-p0.png",
+                        "s05-consent-p0.png", "s06-key-path-same-seed.png"],
 }
 
 
@@ -251,7 +262,8 @@ def read_liana():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arm", choices=["keyed", "keyless", "liana", "both"], default="both")
+    ap.add_argument("--arm", choices=["keyed", "keyless", "liana", "liana-same-seed", "both"],
+                    default="both")
     # THE NEGATIVE CONTROL, AS A COMMAND. A comparison nobody has made fail is
     # not evidence it can. This corrupts ONE character of ONE expected address
     # and requires the walk to notice -- exit 0 only if the capture FAILED.
@@ -346,6 +358,18 @@ def main():
         legs.append(("liana", "liana", None, li))
         print(f"host: Liana-key template id {li['templateId']} (NUMS twin {li['numsTemplateId']})")
 
+    # F-674: the F-671 same-seed arm. It loads the SAME composer payload as the
+    # keyed arm and compares only what loadComposerPayload compares -- the
+    # payload digest -- so its oracle is the keyed arm's form A (f671-impl.md,
+    # concern 1). Its own assertions are copy: §8g on the mapping review, the
+    # same-seed consent body and not the Liana claim, and the same-seed row on
+    # the re-entered key-path choice. In `both` because it is a short copy walk
+    # (no engrave) and the only walk that reaches that consent body.
+    if a.arm in ("liana-same-seed", "both"):
+        ss = read_keyed()["A"]
+        legs.append(("liana-same-seed", "liana-same-seed", "A", ss))
+        print(f"host: same-seed arm, payload digest {ss['digest']}")
+
     print(f"emulator: {EMU}")
     if not a.no_build:
         build_wasm()
@@ -419,6 +443,12 @@ def main():
             print(f"  Policy-ID       {m['policyId']}   stub {m['policyStub']}")
             for x in m["addresses"]:
                 print(f"  address         {x}")
+        elif r["arm"] == "liana-same-seed":
+            # A copy walk: nothing is engraved, so there are no strings to list.
+            print(f"  consent pages   {r['consentPages']}")
+            for x in r["needlesProven"]:
+                print(f"  proven          {x}")
+            continue
         else:
             print(f"  Template-ID     {m['templateId']}   stub {m['templateStub']}")
         print(f"  ENGRAVED, byte for byte against the host ({len(m['strings'])} string(s)):")
