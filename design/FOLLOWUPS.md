@@ -20008,7 +20008,7 @@ reproduces exactly three D3 disagreements. Rust leads; the Go port converges.
 
 ### F-669 — fork test `TestFableTwoKeylessPathsAgreeWithTheHostOracle` goes red once md 0.20.0 is on PATH (owning phase: **coordinator-compat plan 1b release (Task 9) — before md-cli 0.20.0 is installed on this box**) `#seedhammer` `#md-cli` `#test`
 
-**Status:** OPEN — owning phase: before md-cli 0.20.0 is installed on this box (plan 1b's release, Task 9)
+**Status:** CLOSED 2026-09-23 by seedhammer `eea9dea`: the test passes `--md-only` when `md compose --help` lists it, so it works with md <= 0.19.0 and with 0.20.0 (measured both ways, plus the whole gui package at 1398/1398 with md 0.20.0 on PATH).
 Filed 2026-09-23 from coordinator-compat plan 1b R0 I-2. The test
 (`gui/composer_fable_r0_funds_test.go:131-160` at fork `2c9eed3`) runs
 `md compose --wrapper wsh --experimental` on five admitted keyless rows via the

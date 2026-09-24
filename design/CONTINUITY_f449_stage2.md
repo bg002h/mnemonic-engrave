@@ -20,9 +20,8 @@
 **Next (operator):** the coordinator-compat cycle
 (`design/DESIGN_coordinator_compatibility.md`, plan 1b onward). Carry in the
 Core dev-build caveat below.
-**Still held:** the local `me` install, and the boards run firmware older
-than `d2350cb`. Flashing is operator-gated (`~/bin/sh/sh2-flash`, never
-unattended); after it, lift the hold.
+**Outstanding:** the boards run firmware older than `d2350cb`. Flashing is
+operator-gated (`~/bin/sh/sh2-flash`, never unattended).
 Open follow-ups from this cycle: F-643..F-653, F-655..F-660 (each with an
 owning phase).
 
