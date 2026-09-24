@@ -1084,6 +1084,15 @@ finder, the consent and the key-path choice alike:
 > sorted order. The same paths with the NUMS key are a different wallet with
 > different addresses.
 
+**Its Nunchuk sentence was measured for same-seed seatings (F-674).** libnunchuk
+`a7cfb49` (Nunchuk 2.1.1's pin) on eight composer-built Liana-key wallets,
+kofn-recovery and tiered-recovery, with the demo seed (`b8688df1`) in two or
+more slots of one path: the four whose leaf keys are unsorted are refused
+("Failed to verify wallet descriptor"), and the four whose leaf keys ascend are
+imported, all four slots kept as signers, with receive and change 0..2 equal to
+`md address`. The repeated seed changes nothing; key order alone decides it.
+`design/evidence/f674-nunchuk-same-seed/` (`run.sh` reproduces it).
+
 The Key path choice screen (§0b), between the path list and the stub screen,
 offered only when the internal key is NUMS today AND the kind-1 composition is
 inside Liana's model with class 2 skipped. The lead, then the two rows; row 0 is

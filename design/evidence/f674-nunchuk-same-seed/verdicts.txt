@@ -1,0 +1,9 @@
+kofn-allB              kofn-recovery    leaves=unsorted nunchuk=REFUSE addresses_vs_md=-      pr1746_control=ACCEPT rule_holds=True
+kofn-2B                kofn-recovery    leaves=unsorted nunchuk=REFUSE addresses_vs_md=-      pr1746_control=ACCEPT rule_holds=True
+tiered-2B              tiered-recovery  leaves=unsorted nunchuk=REFUSE addresses_vs_md=-      pr1746_control=ACCEPT rule_holds=True
+tiered-allB            tiered-recovery  leaves=unsorted nunchuk=REFUSE addresses_vs_md=-      pr1746_control=ACCEPT rule_holds=True
+kofn-3B-sorted         kofn-recovery    leaves=sorted   nunchuk=ACCEPT addresses_vs_md=EQUAL  pr1746_control=ACCEPT rule_holds=True
+kofn-2B-sorted         kofn-recovery    leaves=sorted   nunchuk=ACCEPT addresses_vs_md=EQUAL  pr1746_control=ACCEPT rule_holds=True
+tiered-3B-sorted       tiered-recovery  leaves=sorted   nunchuk=ACCEPT addresses_vs_md=EQUAL  pr1746_control=ACCEPT rule_holds=True
+tiered-2Bp2-sorted     tiered-recovery  leaves=sorted   nunchuk=ACCEPT addresses_vs_md=EQUAL  pr1746_control=ACCEPT rule_holds=True
+mismatches: 0
