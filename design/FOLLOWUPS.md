@@ -20058,3 +20058,18 @@ Filed 2026-09-23 from the same run (D-3). The run's evidence
 all 8 composer wallets (kofn-recovery and tiered-recovery, NUMS and Liana key),
 with addresses equal to the device's. Plan 2's committed harness should turn
 these into evidence rows.
+
+### F-674 — small residue from the F-671/F-672/F-673 reviews (owning phase: none — ownerless residue) `#seedhammer` `#descriptor-mnemonic` `#residue`
+
+**Status:** OPEN
+Filed 2026-09-23 from `design/agent-reports/f671-review.md` and
+`f672-f673-review.md`. None of these block.
+1. The same-seed consent body keeps a Nunchuk sentence that was never measured
+   for same-seed seatings. Measure it with the libnunchuk harness, or drop it.
+2. The `liana-same-seed` emulator arm is not wired into
+   `design/journeys/capture_composer.py --arm`. It needs a new choice, an
+   `EXPECTED` entry, and a leg expecting `read_keyed()["A"]`.
+3. md prints "measured 2026-09-24" for a measurement taken on 2026-09-23 local
+   time: the date comes from the engrave commit time in UTC.
+4. `md decompose`'s refusal says "testnet" when the user passed regtest or
+   signet (pre-existing).
