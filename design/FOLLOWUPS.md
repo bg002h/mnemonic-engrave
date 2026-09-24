@@ -19741,7 +19741,7 @@ one. Measure that before choosing.
 
 ### F-647 — mnemonic-toolkit's manual and its manual lint do not cover `md compose` (owning phase: **next mnemonic-toolkit release after F-642**) `#mnemonic-toolkit` `#docs` `#lint-gap`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 by mnemonic-toolkit branch `docs-green` (`7dc69c79` added `compose` to the lint and watched it fail; later commits documented md compose, shape-key and the verdicts). The lint also now checks both directions and the completeness of the subcommand list. Reviews: `design/agent-reports/toolkit-docs-green-review*.md`.
 Filed 2026-09-23 by the controller from the F-642 implementer's report
 (`design/agent-reports/f642-toolkit-pin-bump-impl.md`, concern 2).
 

@@ -239,3 +239,207 @@ Path scopes widened where the old filters were wrong:
 8. **F-647 status not edited.** I did not update
    `mnemonic-engrave/design/FOLLOWUPS.md`. The fix is in `3dade9ec`; closing
    F-647 is for the controller.
+
+---
+
+## Fix round 1: review `toolkit-docs-green-review.md` (0C/4I/2M/2N)
+
+**HEAD is now `333b6745`.** The fold adds three commits on top of `6ce7e464`.
+Nothing was pushed, merged or tagged, and branch protection was not touched.
+
+| commit | findings |
+|---|---|
+| `df2dd32f` | I-1, I-2, I-3, N-2 (guard) + `ci/doc-gate-guard.test.sh` |
+| `c4bd589a` | I-4 (reverse lint + `unreleased` marker) + `ci/doc-flag-lint.test.sh` |
+| `333b6745` | M-1, N-1 (42-md.md) |
+
+### Per finding
+
+**I-1 (fixed): the watched set is now derived mechanically.**
+`ci/doc-gate-paths.py <book>…` walks each book directory to a fixed point. It adds:
+- the resolved target of every symlink;
+- every `../` path in the book's non-Markdown files (Makefiles, scripts, Lua
+  filters, lint configs) that resolves to an existing file or directory in
+  the repo, skipping paths that resolve to an ancestor directory.
+
+Markdown is excluded: its prose links pulled LICENSE and all of `docs/manual`
+into manual-gui (measured).
+
+Derived sets today:
+
+| book | watched outside its own directory |
+|---|---|
+| technical-manual | `docs/manual/tests/verify-examples.sh`, `docs/manual/pandoc/filters/include-transcript.lua` (plus `docs/manual/FOLLOWUPS.md`, harmless) |
+| manual-gui | `docs/manual/tests/` |
+| quickstart | the manual's `transcripts/`, `pandoc/filters/`, `verify-examples.sh`, `.cspell.json`, `.markdownlint-cli2.jsonc`, `.puppeteer.json`, `Dockerfile.build` |
+
+Workflows now call `--book docs/<x> --also '<ERE>'`. The `--also` ERE keeps
+what no file spells as a relative path: `crates/`, `Cargo.*`, the mermaid tool,
+the workflow file and the guard.
+
+Test (S1): a commit touching only `docs/manual/tests/verify-examples.sh` gives
+**true for all four workflows**, both on a `ci/staging` push and on a PR. The
+control run with the pre-fix guard gives false for technical-manual and
+manual-gui.
+
+**I-2 (fixed): the guard uses `git diff --no-renames --name-only`.**
+Test (S2): `git mv docs/manual/transcripts/22-first-bundle.cmd attic/` gives
+true for manual and quickstart; the pre-fix control gives false.
+
+**I-3 (fixed): the diff base now depends on where the push goes.**
+- A push to master or main diffs against `before`, the previous protected tip.
+- A push to any other branch, and a PR, diffs against the merge-base with
+  `origin/<default|base>`, never against `before`.
+- A shallow checkout is unshallowed only when the merge-base is missing.
+
+Test (S3) reproduces the review's scenario: commit C breaks the docs and is
+left on `ci/staging`, then a README-only commit D goes on top with `before=C`.
+The guard gives true; the pre-fix control gives false.
+
+**I-4 (fixed): the lint now checks both directions.** Each first-column flag in
+a verb section's flag table must be defined by that verb's `--help` on the
+pinned binary, or be a global option. The only exemption is a row carrying the
+literal marker `(unreleased: <crate> after <X.Y.Z>)`, where X.Y.Z equals the
+pinned binary's `--version`. Each exemption is printed and counted (10 today,
+all in mk). A marker also fails when stale: wrong version, or the pinned
+binary now defines the flag.
+
+Test (`ci/doc-flag-lint.test.sh`, 7/7 pass):
+- the baseline passes;
+- **R1:** the review's `--no-such-flag` row in md compose fails;
+- **R2:** a marker naming the wrong version fails;
+- **R3:** a marker on a flag the pinned md defines (`--md-only`) fails as stale;
+- **R4:** removing a marker fails;
+- **F1, F2:** the forward direction still fails on a removed flag and a removed
+  heading.
+
+**M-1 (fixed).** The chapter now says the verdict takes **four** forms, and also
+describes the measured-refusal variant. The imports-altered example is a real
+run of pinned md 0.20.2 on the vendored evidence wallet
+`plain-2of3-wsh-UNSORTED`:
+
+`Nunchuk 2.1.1: imports the multipath form, but reads it as MINISCRIPT -- not the wallet as built (2026-09-19)`.
+
+The Liana 2-of-4 case is named in the prose.
+
+**M-2: not touched here.** It is filed as F-677. Moving `examples.yml` onto the
+guard would change a required workflow's shape; that is beyond a trivial edit.
+
+**N-1 (fixed).** The `md descriptor` example regains its stderr line, in the
+order the tool prints it.
+
+**N-2: documented, not worked around.** GitHub starts no workflow for a
+`[skip ci]` commit, so no guard can run, and `push-via-staging.sh` stops with
+"NEVER RAN". The guard header now says this: such commits cannot be pushed to
+master through staging.
+
+### Re-run evidence (pinned tier: md 0.20.2 / ms 0.19.0 / mk 0.13.0, plus mnemonic built from this tree)
+- **manual:** `make audit` OK (62 transcripts, anchor-check at baseline, "10 row
+  exemption(s)").
+- **quickstart:** lint OK, 62 transcripts pass.
+- **technical-manual:** lint OK, 18 transcripts pass.
+- **Builds:** `make pdf` and `make html` succeed for all three books.
+- **Examples golden:** no drift.
+- **actionlint:** clean on all workflows.
+- **`ci/doc-gate-guard.test.sh`:** 44 passed, 0 failed. It covers S0–S3, the
+  controls, the N1/N2 negatives and the F1–F5 fail-safes.
+- **`ci/doc-flag-lint.test.sh`:** 7 passed, 0 failed.
+
+### New caveats
+- **The manual lint now fails against the locally installed mk.** That mk is
+  built from mnemonic-key main and defines the flags the markers exempt, so the
+  markers read as stale. Run the lint against the pinned binaries, as CI does.
+  When mk-cli is released past 0.13.0 and the pin moves, the lint fails until
+  the markers are removed. That is intended.
+- **No CI job runs the two test scripts.** They are re-runnable by hand.
+  `doc-flag-lint.test.sh` needs the pinned binaries.
+- **The guard adds a merge-base fetch to technical-manual.** Its checkout is
+  depth 1, so the guard may unshallow the repository on a non-default-branch
+  push.
+- **Fix round 2 (`aafd9d27`):** `ci/doc-gate-guard.test.sh` now runs as an always-run step in the `manual` job, before the guard step. It has no `if:`, so it runs on every push, tag, PR and dispatch; under a CI-like env locally: 44 passed in 3.1 s (`act` is not installed). `ci/doc-flag-lint.test.sh` runs after the audit, behind the guard: it tests the lint, not the guard, and every input it reads (including the script itself, added to `--also`) makes the guard answer relevant.
+
+---
+
+## Fix round 3: re-review `toolkit-docs-green-review-fix1.md` (NEW-1, NEW-2)
+
+**HEAD:** `5978eaa2`. This round adds two commits: `2d71f8d4` (guard) and
+`5978eaa2` (lint).
+
+### NEW-1 (fixed in `2d71f8d4`)
+- `ci/doc-gate-paths.py` now reads git trees instead of the working directory,
+  and resolves symlink targets lexically: no existence check.
+- The guard derives the watched set from the base commit and from HEAD, and
+  unions the two.
+- **Tests:**
+  - S4 deletes the shared `verify-examples.sh`. All four books now answer
+    relevant. With the round-1 guard (`aafd9d27`), quickstart and
+    technical-manual answer false.
+  - S5 and S5b retarget a symlink.
+  - S6 deletes the symlink itself, once for each of the three books that have
+    one.
+
+### NEW-2 (fixed in `5978eaa2`)
+- The marker is now `(unreleased: <crate> after <X.Y.Z>: --flag[, --flag]…)`.
+  It exempts exactly the flags it lists; every other flag in the cell is
+  linted normally.
+- The lint fails if the marker:
+  - names no flag;
+  - names a flag the row does not document;
+  - names the wrong version;
+  - lists a flag the pinned binary already defines.
+- **Tests:**
+  - R5: a fake flag added to a marked row fails.
+  - R6: a marker naming a flag the row lacks fails.
+  - R7: the old marker form, which exempted the whole row, fails.
+
+### Self-check for a third instance of the same shape
+I checked every input the derivation reads, and every exemption the lint and
+guard grant. I found and fixed four more, one of them in `5978eaa2`'s nested-verb
+lookup:
+
+1. **Reference targets could disappear.** A `../` reference only counted if its
+   target existed. S7 deletes `docs/manual/.cspell.json`, which quickstart
+   imports; the round-1 guard answered false. The base/HEAD union closes it.
+2. **Makefile paths through the repo-root variable were never derived.**
+   manual-gui's `make lint` runs `$(TOOLKIT_ROOT)/docs/tools/render-mermaid-cache.py`,
+   and neither its old `paths:` filter nor its `--also` watched that file. S8
+   touches only that tool; the round-1 guard answered false for manual-gui.
+   `$(TOOLKIT_ROOT)/…` paths are now resolved from the repo root.
+3. **Nested verbs accepted their siblings' flags.** The reverse check matched
+   `seed-xor`, `slip39` and `ms-shares` verbs against their parent's section,
+   so each verb accepted its sibling's flags. Each verb now uses its own
+   subsection. The one section still shared (seedqr encode/decode) is printed
+   on every run.
+4. **The verb list itself was never checked.** `cli-subcommands.list` defines
+   what the lint covers, and nothing checked it; this is how `md compose` went
+   undocumented (F-647). The lint now enumerates every leaf subcommand of the
+   pinned binaries and fails in both directions. C1 drops `md compose` from the
+   list and fails; C2 adds a verb that does not exist and fails.
+
+Checked and clean:
+- a deleted book directory is still watched through its own prefix;
+- a missing guard or path-derivation script makes the step fail or answer
+  relevant;
+- sibling repositories outside this repo are outside any path filter by
+  construction;
+- the global-flag and `--help`/`--version` exemptions are narrow.
+
+Left as is:
+- flag tokens are matched lowercase only (the re-review's Nit; pre-existing,
+  and the same in both directions);
+- flags mentioned in prose rather than in table rows are not reverse-checked.
+
+### Re-run evidence
+Pinned tier: md 0.20.2, ms 0.19.0, mk 0.13.0, plus mnemonic built from this
+tree.
+
+| check | result |
+|---|---|
+| `ci/doc-gate-guard.test.sh` | 62 passed, 0 failed |
+| `ci/doc-flag-lint.test.sh` | 12 passed, 0 failed |
+| manual `make audit` | OK: 10 flag exemptions, 62 transcripts, anchor-check at baseline |
+| quickstart | lint OK, 62 transcripts pass |
+| technical-manual | lint OK, 18 transcripts pass |
+| pdf and html | built for all three books |
+| Examples golden | no drift |
+| actionlint | clean |
