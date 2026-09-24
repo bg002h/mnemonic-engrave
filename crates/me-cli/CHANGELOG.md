@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-24
+
+`me sysw pack` stops on a hashlock phrase that looks like a digest, as
+`ms hashlock` does.
+
+### Changed
+
+- **Newly stopped: a `phrase:` record whose phrase is exactly 40 or 64 hex
+  characters** (F-677). `ms hashlock` warns and stops on such a phrase (F-539),
+  and `me sysw pack --pack-preimage` packed it at exit 0. Hashing it commits the
+  wallet to the ASCII of those characters, NOT to the digest they spell. It now
+  exits 4 before the passphrase ceremony, in `ms hashlock`'s own words, naming
+  the record by index and the width, never the phrase. **Remedy:** a digest
+  you already hold goes in a `hash:` record (`me sysw pack
+  'hash:[<kind>:]<digest>'`) or `md compose --path '...,<kind>=<digest>'`. If
+  the phrase really is yours, re-run with `--phrase-looks-like-digest-ok`, the
+  same flag `ms hashlock` takes. The rule is ms-codec's
+  `hashlock::looks_like_digest`, so the two tools stop on the same phrases. A
+  record `ms hashlock --emit-record --phrase-looks-like-digest-ok` produced
+  needs the flag again here.
+
+### Breaking (library)
+
+- `sysw::SyswError` gains `PhraseLooksLikeDigest(usize, usize)` (record index,
+  width).
+- `sysw::Admission` gains `phrase_looks_like_digest_ok: bool`. A struct
+  literal without `..Default::default()` no longer compiles.
+
 ## [0.11.0] - 2026-09-23
 
 `me` reads md1 wire version 8 (F-449 kind 1, the Liana unspendable internal
