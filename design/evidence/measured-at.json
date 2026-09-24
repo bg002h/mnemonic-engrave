@@ -1,0 +1,83 @@
+{
+ "about": "The calendar date each vendored measurement was TAKEN, in the operator's local time (UTC-7, where every harness below ran). descriptor-mnemonic's scripts/vendor-coord-evidence.sh reads measured_at from here and refuses an input file with no entry. A sidecar rather than a field in each file: these files are raw harness output, byte-compared by the gates that produce them (scripts/liana-live-gate.sh diffs liana-live-gate-expected.jsonl; f449-stage4/liana-probes.sh re-runs byte-identical), so a date cannot be written into them. Not the commit time: F-674 item 3, a 20:09 local commit became 2026-09-24 in UTC. A record committed later than the rest of its file gets its own date under records, keyed by name. basis says where the date comes from.",
+ "files": {
+  "composer-fable-r0/fable-liana-parse-out.jsonl": {
+   "measured_at": "2026-09-19",
+   "basis": "Liana v8.0 harness run: /scratch/code/shibboleth/.tmp/fable-liana-parse-out.jsonl mtime 2026-09-19 23:22:54 -0700; its report, agent-reports/composer-fable-r0-liana-core.md, persisted 2026-09-20 00:00:09 -0700 (4298cae9); copied into the repo later (66589c5a, 00:06 -0700)"
+  },
+  "composer-fable-r0/fable-liana-parse-out-v15.jsonl": {
+   "measured_at": "2026-09-20",
+   "basis": "Liana v15.0 re-measure (F-633): /scratch/code/shibboleth/.tmp/fable-liana-parse-out-v15.jsonl mtime 2026-09-20 09:32:32 -0700, committed 606ab180 09:34 -0700",
+   "records": {
+    "nested-2of2-two-recoveries-tr": {
+     "measured_at": "2026-09-23",
+     "basis": "F-640 record appended by 0c51d3cc (2026-09-23 02:32 -0700), measured after the stage 2 plan went GREEN at fa8bba6f (02:02 -0700)"
+    }
+   }
+  },
+  "composer-fable-r0/fable-nunchuk-harness-out.txt": {
+   "measured_at": "2026-09-19",
+   "basis": "libnunchuk harness run: /scratch/code/shibboleth/.tmp/fable-nunchuk-harness-out.txt mtime 2026-09-19 21:27:48 -0700; its report, agent-reports/composer-fable-r0-nunchuk.md, persisted 21:35 -0700 (60e089f6); copied into the repo later (66589c5a, 2026-09-20 00:06 -0700)"
+  },
+  "coord-compat-1b/liana-r0-probes-out.jsonl": {
+   "measured_at": "2026-09-23",
+   "basis": "plan 1b R0's probes, agent-reports/coord-compat-1b-plan-r0.md persisted 2026-09-23 14:32 -0700 (0bbfc5a7)"
+  },
+  "coord-compat-1b/nunchuk-kind1-probe.out": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-1b-recon.md:3, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-24.2.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-25.0.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-25.2.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-26.0.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-26.2.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-27.2.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-28.4.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-29.4.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-30.3.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-core-boundary/core-31.1.json": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/coord-compat-core-boundary.md:5, 'Measured 2026-09-23'"
+  },
+  "coord-compat-e2e/core-composer-tr.out": {
+   "measured_at": "2026-09-23",
+   "basis": "agent-reports/e2e-live-site-wallets.md:3, 'Date 2026-09-23'; the run's core-mainnet.txt mtime 2026-09-23 19:29:20 -0700. Committed 4db2f17d at 20:09 -0700, which is 2026-09-24 in UTC"
+  },
+  "f449-stage2/liana-live-gate-expected.jsonl": {
+   "measured_at": "2026-09-23",
+   "basis": "scripts/liana-live-gate.sh run recorded by 2b153a98 (2026-09-23 02:34 -0700), after the stage 2 plan went GREEN at fa8bba6f (02:02 -0700)"
+  },
+  "f449-stage4/liana-probes-out.jsonl": {
+   "measured_at": "2026-09-23",
+   "basis": "f449-stage4/liana-probes.sh run recorded by 1ca29d16 (2026-09-23 08:10 -0700)"
+  }
+ }
+}
