@@ -20080,3 +20080,43 @@ Filed 2026-09-23 from `design/agent-reports/f671-review.md` and
    signet (pre-existing).
    **Fixed, not yet shipped:** descriptor-mnemonic `1af993cf`, same branch and
    release. The key version error had the same defect and is fixed too.
+
+### F-675 — mnemonic-toolkit `vendor-freshness` and `repro-drift` are red: md-codec's git dependency does not resolve offline (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#ci` `#reproducibility`
+
+**Status:** OPEN
+Filed 2026-09-23 from `design/agent-reports/toolkit-docs-green-impl.md`.
+- `ci/repro/vendor-freshness.sh` only redirects the miniscript git source to
+  `vendor/`. Since F-642 made md-codec a git dependency, the offline check
+  fails; locally its check 1 passes falsely, because cargo's git cache has the
+  rev. Fix: add the replacement stanza (`man-pages.yml` already has one) and a
+  provenance anchor for `vendor/md-codec`.
+- `repro-drift.yml` never passes `git_source_url`/`git_source_rev`. The runs on
+  09-07 and 09-14 failed earlier, on the miniscript source.
+- The aarch64 remap-off negative check found ZERO `/project` leakage, so on
+  that target the protection may be a no-op. That is a gate which cannot fail;
+  investigate it.
+
+### F-676 — `install.sh` installs md/ms/mk from crates.io, far behind what the manual documents (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#install` `#docs`
+
+**Status:** OPEN
+Filed 2026-09-23 from the same report. crates.io holds md-cli 0.13.0, ms-cli
+0.14.0 and mk-cli 0.12.1, while the manual documents md 0.20.2, ms 0.19.0 and
+mk 0.13.0. A user following the install instructions gets CLIs missing
+documented flags. Decide between installing from release binaries or git tags,
+and publishing to crates.io (md-codec is unpublishable while it is patched to
+miniscript master).
+
+### F-677 — CLI help texts that disagree with behaviour (owning phase: none — ownerless residue) `#mnemonic-secret` `#mnemonic-toolkit` `#mnemonic-engrave` `#descriptor-mnemonic` `#docs`
+
+**Status:** OPEN
+Filed 2026-09-23 from the same report.
+- ms: `encode --group-size` describes old behaviour.
+- ms: `repair`'s examples put the secret on argv.
+- ms: `split --out` warns about stdout while stdout is empty.
+- toolkit: the `verify-bundle --accept-search-time` help is garbled.
+- me: packs a 40- or 64-hex phrase without `ms hashlock`'s stop.
+- md: `shape-key --descriptor` refuses wallet-exported descriptors, because
+  `md descriptor` writes xpubs with a zero parent fingerprint.
+- The installed `mk` is built from mnemonic-key main but still says 0.13.0.
+- `examples` is a required check with a push-paths filter, so a docs-only
+  commit cannot earn it via `push-via-staging.sh`.
