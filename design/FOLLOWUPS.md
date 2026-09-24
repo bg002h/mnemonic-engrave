@@ -20030,7 +20030,7 @@ Documentation only: md's refusal names the flag.
 
 ### F-671 — the composer's consent screen says "Liana (v15.0) … import[s] this form" even when one seed sits in two slots of the same spending path, which Liana refuses (owning phase: **coordinator-compat plan 3 (the fork)**) `#seedhammer` `#composer` `#copy` `#liana`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 by seedhammer `bc7cbe7` (branch `f671-consent`, not pushed or merged). The consent's Liana-key body and the key-path choice's Liana row are now drawn from `composerLianaRefusesSeating`, the same finder that puts §8g on the mapping review: when one seed fills more than one slot of one path they state "SAME SEED, SAME PATH ... Liana will refuse it" instead of claiming Liana imports the wallet (spec §8y amended). No screen claims Liana imports a NUMS wallet (pinned). Gui 1403/1403; `capture_composer.py --arm both` green; a new `liana-same-seed` walk arm passes and fails with the predicate forced off. The walk arm is not yet wired into `capture_composer.py`'s `--arm` choices. Report: `design/agent-reports/f671-impl.md`.
 Filed 2026-09-23 from the live-site end-to-end run
 (`design/agent-reports/e2e-live-site-wallets.md`, D-1). Seat the one loaded
 seed into every slot of a Liana-key kofn-recovery or tiered-recovery wallet,

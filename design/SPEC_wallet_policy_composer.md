@@ -1067,6 +1067,23 @@ The key-path line a Liana-key policy shows at consent (§7's print-site arm; not
 > sorted order. The same paths with the NUMS key are a different wallet with
 > different addresses.
 
+**The Liana claim is conditional on the seating (F-671).** When one seed sits
+in more than one slot of one path -- the condition that puts §8g's "Liana will
+refuse it" on the mapping review -- Liana v15.0 refuses the wallet ("derived
+from the same origin as another key present in the same spending path";
+`design/agent-reports/e2e-live-site-wallets.md` D-1), and the consent draws
+this body instead. The rule is one function, `composerLianaRefusesSeating`
+(`composerSharedSeedInPath` found anything), called by the mapping review's
+finder, the consent and the key-path choice alike:
+
+> KEY PATH: NONE (LIANA KEY)
+> Spends use the script paths only. The key path is Liana's unspendable key,
+> computed from this wallet's own keys. SAME SEED, SAME PATH: one seed fills
+> more than one slot of one path, so Liana will refuse it. Bitcoin Core
+> imports this form. Nunchuk imports it only when the keys happen to be in
+> sorted order. The same paths with the NUMS key are a different wallet with
+> different addresses.
+
 The Key path choice screen (§0b), between the path list and the stub screen,
 offered only when the internal key is NUMS today AND the kind-1 composition is
 inside Liana's model with class 2 skipped. The lead, then the two rows; row 0 is
@@ -1078,6 +1095,17 @@ the first-entry default:
 > NUMS point: Bitcoin Core imports it. Liana and Nunchuk do not.
 
 > Liana key: Liana (v15.0) and Bitcoin Core import it. Nunchuk only by chance.
+
+On re-entry the seating is kept (Back from the stub screen, the mapping review
+and the consent all return through this screen), and when
+`composerLianaRefusesSeating` fires the second row reads instead (F-671):
+
+> Liana key: Bitcoin Core imports it. SAME SEED, SAME PATH: Liana will refuse it.
+
+No other screen claims Liana imports a wallet: the inspect screen and the
+engrave summary name the kind only ("Key path: Liana key", "Key-path: none
+(Liana key)"), and no NUMS body says Liana imports it (§8f, the NUMS row, §8x
+class 2).
 
 §0b RESET's signal, when a Liana choice is dropped because the predicate no
 longer admits it. `<cause>` is one sentence naming the fact that moved:
