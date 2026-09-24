@@ -388,7 +388,11 @@ echo "The device's key-path choice builds the LEFT one; the right one is what"
 echo "pressing through the NUMS row builds. Different Template-IDs, because the"
 echo "kind bit is part of the tree the id hashes (SPEC §3e)."
 echo
-gate "md is 0.19.0 (the first with --unspendable)" "$("$MD" --version)" "md 0.19.0"
+# AT LEAST 0.19.0, not exactly: an exact pin went red on every md release
+# after it (F-674 follow-on, 2026-09-23). sort -V picks the older of the two.
+MD_VER="$("$MD" --version | awk '{print $2}')"
+gate "md is at least 0.19.0 (the first with --unspendable)" \
+  "$(printf '%s\n' 0.19.0 "$MD_VER" | sort -V | head -1)" "0.19.0"
 LIANA_TEMPLATE="$("$MD" compose --wrapper tr --preset kofn-recovery,2of3,older=26280 --unspendable liana 2>/dev/null)"
 NUMS_TWIN="$("$MD" compose --wrapper tr --preset kofn-recovery,2of3,older=26280 2>/dev/null)"
 printf '%s\n' "$LIANA_TEMPLATE" > "$OUT/liana-kofn.template"

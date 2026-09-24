@@ -20061,7 +20061,7 @@ these into evidence rows.
 
 ### F-674 — small residue from the F-671/F-672/F-673 reviews (owning phase: none — ownerless residue) `#seedhammer` `#descriptor-mnemonic` `#residue`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23. (1) The Nunchuk sentence was measured true and kept (engrave `86d63288`, evidence `design/evidence/f674-nunchuk-same-seed/`). (2) The `liana-same-seed` arm is wired into `capture_composer.py` (`f243bce9`). (3) and (4) shipped in md-cli 0.20.2 (descriptor-mnemonic `80feff1e`, `1af993cf`). Plus the transcript gate `>= 0.19.0` (`9fd7f32c`). Review: `design/agent-reports/f674-review.md`, 0C/0I.
 Filed 2026-09-23 from `design/agent-reports/f671-review.md` and
 `f672-f673-review.md`. None of these block.
 1. The same-seed consent body keeps a Nunchuk sentence that was never measured
@@ -20071,5 +20071,12 @@ Filed 2026-09-23 from `design/agent-reports/f671-review.md` and
    `EXPECTED` entry, and a leg expecting `read_keyed()["A"]`.
 3. md prints "measured 2026-09-24" for a measurement taken on 2026-09-23 local
    time: the date comes from the engrave commit time in UTC.
+   **Fixed, not yet shipped:** dates now come from
+   `design/evidence/measured-at.json` (b729bdb1). Fixed in descriptor-mnemonic
+   `80feff1e` on branch `f674-dm`, released as md-codec 0.48.2 / md-cli 0.20.2
+   (`b662be1c`). The Liana 8.0 and Nunchuk runs were misdated too (09-20 for
+   09-19). See `design/agent-reports/f674-dm-impl.md`.
 4. `md decompose`'s refusal says "testnet" when the user passed regtest or
    signet (pre-existing).
+   **Fixed, not yet shipped:** descriptor-mnemonic `1af993cf`, same branch and
+   release. The key version error had the same defect and is fixed too.
