@@ -20044,7 +20044,7 @@ unaffected; Liana refuses loudly at import.
 
 ### F-672 — `md descriptor --network regtest` renders leaf keys as mainnet `xpub` beside a `tpub` internal key (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#md-cli` `#network`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 by descriptor-mnemonic `ffe758e0` (branch `f672-f673`), released in `f5d052c9` as md-codec 0.48.1 / md-cli 0.20.1 (not yet pushed, tagged or merged). Every key now renders under `--network`'s version bytes; D-2's exact command is pinned as a test, plus goldens for kind 0, kind 1, a real internal key and wsh derived outside md. Same pass: `md decompose --network <test> --emit commands` now prints `--network <net>` on its keyed `md encode` line, which md refused before. `md address` (addresses only) and `md compose` (no `--network`) were unaffected. Mainnet output was byte-identical over 816 corpus outputs. Report: `design/agent-reports/f672-f673-impl.md`.
 Filed 2026-09-23 from the same run (D-2). The output mixes networks, so Core
 regtest refuses the descriptor. The run worked around it by swapping in the
 tpubs, after checking that key and chain code match. Fix Rust-first, with a
@@ -20052,7 +20052,7 @@ vector: every key renders under the requested network's version bytes.
 
 ### F-673 — the coordinator registry still says "unproven" for Core 29.4–31.1 on the composer's tr shapes, which are now measured, imports included (owning phase: **coordinator-compat plan 2 (harnesses)**) `#descriptor-mnemonic` `#coordinator-compat` `#evidence`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-23 by engrave `4db2f17d` (evidence rows, `design/evidence/coord-compat-e2e/`) and descriptor-mnemonic `736d7482` (vendored, table regenerated: 16 Core cells), released in `f5d052c9`. `md descriptor` on the composer's tr shapes, multipath form, now reads Core 29.4 imports, 30.3 unproven (not measured), 31.1 imports. `md compose` is unchanged: a keyless template never claims an import (design §1 a2). Report: `design/agent-reports/f672-f673-impl.md`.
 Filed 2026-09-23 from the same run (D-3). The run's evidence
 (`design/evidence/e2e-live-site-wallets/`) shows Core 29.4 and 31.1 importing
 all 8 composer wallets (kofn-recovery and tiered-recovery, NUMS and Liana key),
