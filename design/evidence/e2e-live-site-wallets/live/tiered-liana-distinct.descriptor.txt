@@ -1,0 +1,8 @@
+note: coordinators for this descriptor, multipath form (verified versions only; newer: unmeasured):
+  Liana 8.0: unproven (not measured for this policy)
+  Liana 15.0: imports the multipath form (measured 2026-09-20)
+  Nunchuk 2.1.1: refuses (Liana's key is not the one Nunchuk derives (leaf keys not in sorted order))
+  Bitcoin Core 24.2-28.4: refuses (the <0;1> multipath spelling (use --chain 0 and --chain 1))
+  Bitcoin Core 29.4-31.1: unproven (not measured for this policy)
+tr(xpub661MyMwAqRbcEqqr69PyZ1NSe7gF3ZKA6EpnFnLbrsEu9EY9AFYXs9RSMeR1qUzXs5b9ukBASFEQ4Ga8DKoKHd9HAGmgYdSRPW1iC81UTaZ/<0;1>/*,{multi_a(2,[73c5da0a/48'/0'/0'/3']xpub6DXuQW1Q2JpZyweiMewTZuMPvjG8hKhV2qoF6wL9VFxsMBExtbfqAAoR4oMG4GyxFzVdfas1v2eAdfLxyjc4Ceo5B6w6zTpf7F2BuXCJ52i/<0;1>/*,[b8688df1/48'/0'/0'/3']xpub6DXuQW1Q2JpZzhem9yahH4CASHRvtGBvt4qzHi4Y1CziQ4pWbhKapCQNMND9csxg3rsoCxPtyXMQmvFhmwg3Kzhm6m6DQMbiFL1tnH4fhbA/<0;1>/*),and_v(v:multi_a(1,[73c5da0a/48'/0'/1'/3']xpub6DXuQW1Q2JpZzLV9igdwdnmCSoaPVd4ZNZnvfgUsGvQ8AbNAhEmfBEMCMHctwZBuxWK8HkjqUW5F72MCSJCFfisVwRY62Kb1FuDZ66nNQe1/<0;1>/*,[b8688df1/48'/0'/1'/3']xpub6DXuQW1Q2Jpa24MCYbGC2JWeaRjh5SxrpEDd8mG44CxoSVNa56XwxXREUmLQf5keJ654KrQpdoSNLvqMbyBGQvFye7GeYhaDaG5orPogipx/<0;1>/*),older(26280))})#antvp4l4
+note: stdout is watch-only — public keys only, cannot spend

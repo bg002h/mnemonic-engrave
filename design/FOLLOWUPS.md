@@ -20027,3 +20027,34 @@ Filed 2026-09-23 from coordinator-compat plan 1b R0 M-3.
 `for md compose: --path <your other paths> --path keyless,…`; under
 `--wrapper wsh` md-cli 0.20.0 also needs `--experimental --md-only`.
 Documentation only: md's refusal names the flag.
+
+### F-671 — the composer's consent screen says "Liana (v15.0) … import[s] this form" even when one seed sits in two slots of the same spending path, which Liana refuses (owning phase: **coordinator-compat plan 3 (the fork)**) `#seedhammer` `#composer` `#copy` `#liana`
+
+**Status:** OPEN
+Filed 2026-09-23 from the live-site end-to-end run
+(`design/agent-reports/e2e-live-site-wallets.md`, D-1). Seat the one loaded
+seed into every slot of a Liana-key kofn-recovery or tiered-recovery wallet,
+which is the demo's easiest path, and Liana v15.0 refuses it: "same origin … in
+the same spending path". The Key-mapping screen warns "Liana will refuse it",
+but the consent screen right after still says Liana imports this form. The
+claim on consent must be conditional on the seating, or name the exception.
+Plan 3 replaces the hand-written notices with the verdict table, which already
+carries the per-card Liana same-origin rule. Addresses and funds are
+unaffected; Liana refuses loudly at import.
+
+### F-672 — `md descriptor --network regtest` renders leaf keys as mainnet `xpub` beside a `tpub` internal key (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#md-cli` `#network`
+
+**Status:** OPEN
+Filed 2026-09-23 from the same run (D-2). The output mixes networks, so Core
+regtest refuses the descriptor. The run worked around it by swapping in the
+tpubs, after checking that key and chain code match. Fix Rust-first, with a
+vector: every key renders under the requested network's version bytes.
+
+### F-673 — the coordinator registry still says "unproven" for Core 29.4–31.1 on the composer's tr shapes, which are now measured, imports included (owning phase: **coordinator-compat plan 2 (harnesses)**) `#descriptor-mnemonic` `#coordinator-compat` `#evidence`
+
+**Status:** OPEN
+Filed 2026-09-23 from the same run (D-3). The run's evidence
+(`design/evidence/e2e-live-site-wallets/`) shows Core 29.4 and 31.1 importing
+all 8 composer wallets (kofn-recovery and tiered-recovery, NUMS and Liana key),
+with addresses equal to the device's. Plan 2's committed harness should turn
+these into evidence rows.

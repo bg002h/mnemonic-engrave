@@ -1,0 +1,13 @@
+template: tr(UNSPENDABLE(liana),{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))})
+n: 4
+wallet-policy-mode: true
+md1-encoding-id: 8d68e7670503318d1f06f6153cb72dc3
+wallet-descriptor-template-id: f99cc42e1ff68bae546c4d1070e5963f
+origins:
+  @0: [73c5da0a/48'/0'/0'/3']
+  @1: [73c5da0a/48'/0'/1'/3']
+  @2: [73c5da0a/48'/0'/2'/3']
+  @3: [73c5da0a/48'/0'/3'/3']
+wallet-policy-id: b9856021eb18d8cb1b49f584c96931e2
+wallet-policy-id-fingerprint: 0xb9856021
+note: stdout is a keyless descriptor template (no keys)

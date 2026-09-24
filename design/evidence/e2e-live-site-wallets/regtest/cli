@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /scratch/code/shibboleth/.tmp/core-releases/31.1/bitcoin-31.1/bin/bitcoin-cli -datadir=/scratch/code/shibboleth/.tmp/e2e-wallets/regtest/node31 -chain=regtest -rpcport=18921 "$@"

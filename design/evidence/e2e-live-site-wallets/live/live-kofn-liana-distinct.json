@@ -1,0 +1,74 @@
+{
+ "ok": true,
+ "r": {
+  "pathList": "Spendpathsslots:4Path1:2-of-3Path2:1key+26280blocksAddaspendpathChangethescriptDone",
+  "keyPathScreen": "KeypathWhichkeypath?ThetwooptionsbelowareDIFFERENTWALLETS,withdifferentaddresses.Itcannotbechangedafterengraving.NUMSpoint:BitcoinCoreimportsit.LianaandNunchukdonot.Lianakey:Liana(v15.0)andBitcoinCoreimportit.Nunchukonlybychance.",
+  "keyPathTargets": "[{\"y\":145,\"w\":411,\"h\":43,\"cx\":213,\"cy\":166,\"x\":8},{\"y\":192,\"w\":411,\"h\":43,\"cx\":213,\"cy\":213,\"x\":8}]",
+  "stub1": [
+   "TemplateTemplate-ID:f99cc42e1ff68bae546c4d1070e5963fmk1stub(template):f99cc42emkencode--xpub<xpub>--origin-fingerprint<fp>--origin-path<path>--policy-id-stubf99cc42e",
+   "TemplateAwalletbuilthereisitsownwallet.Thesameruleswrittenbyanothertoolgiveadifferentidanddifferentaddresses.Slot@0expectsakeyatm/48h/0h/0h/3hSlot@1expectsakeyatm/48h/0h/1h/3hSlot@2expectsakeyatm/48h/0h/2h/3hSlot@3expectsakeyatm/48h/0h/3h/3h"
+  ],
+  "seat": [
+   "SeatkeysSlot@0,Path1key1of3:chooseakeyseed1(anyslots)TypeaseedLeaveunseated",
+   "SeatkeysSlot@1,Path1key2of3:chooseakeyseed1(anyslots)TypeaseedLeaveunseated",
+   "after typing seed 2: SeatkeysSlot@1,Path1key2of3:chooseakeyseed1(anyslots)seed2(anyslots)TypeaseedLeaveunseated",
+   "SeatkeysSlot@2,Path1key3of3:chooseakeyseed1(anyslots)seed2(anyslots)TypeaseedLeaveunseated",
+   "after typing seed 3: SeatkeysSlot@2,Path1key3of3:chooseakeyseed1(anyslots)seed2(anyslots)seed3(anyslots)TypeaseedLeaveunseated",
+   "SeatkeysSlot@3,Path2key1of1:chooseakeyseed1(anyslots)seed2(anyslots)seed3(anyslots)TypeaseedLeaveunseated"
+  ],
+  "mapping": [
+   "Keymapping@0:73c5da0am/48'/0'/0'/3'@1:b8688df1m/48'/0'/0'/3'@2:28645006m/48'/0'/0'/3'@3:73c5da0am/48'/0'/1'/3'Thisdevicecannotconfirmakeywasderivedattheoriginitdeclares.",
+   "KeymappingOnepersonintwopathsneedstwokeys:asecondaccountfromthesameseed,orasecondcard."
+  ],
+  "stub2": [
+   "TemplateTemplate-ID:f99cc42e1ff68bae546c4d1070e5963fmk1stub(template):f99cc42ePolicy-ID:bd7f62a6cff6876f7755e566a1ce5a72mk1stub(policy):bd7f62a6StampBOTHstubsoneachkeycard:--policy-id-stubf99cc42e--policy-id-stubbd7f62a6",
+   "Templatemkencode--xpub<xpub>--origin-fingerprint<fp>--origin-path<path>--policy-id-stubf99cc42eAwalletbuilthereisitsownwallet.Thesameruleswrittenbyanothertoolgiveadifferentidanddifferentaddresses.Slot@0:73c5da0am/48h/0h/0h/3h",
+   "TemplateSlot@1:b8688df1m/48h/0h/0h/3hSlot@2:28645006m/48h/0h/0h/3hSlot@3:73c5da0am/48h/0h/1h/3h"
+  ],
+  "consent": [
+   "ReviewScript:Taproot(tr)Path1:2-of-3Path2:1key26280blocks(about182.5days)",
+   "ReviewKEYPATH:NONE(LIANAKEY)Spendsusethescriptpathsonly.ThekeypathisLiana'sunspendablekey,computedfromthiswallet'sownkeys.Liana(asofv15.0)andBitcoinCoreimportthisform.Nunchukimportsitonlywhenthekeyshappentobeinsortedorder.ThesamepathswiththeNUMSkeyareadifferentwalletwithdifferentaddresses.Policy-ID:bd7f62a6cff6876f7755e566a1ce5a72",
+   "Reviewmk1stub(policy):bd7f62a6Awalletbuilthereisitsownwallet.Thesameruleswrittenbyanothertoolgiveadifferentidanddifferentaddresses.Receive0:bc1pl0qghel2uqxp3q6kah6c4fga7xp6pcmtsa7w6kg32kn7q9pl95eq6sq55n",
+   "Reviewbc1pl0qghel2uqxp3q6kah6c4fga7xp6pcmtsa7w6kg32kn7q9pl95eq6sq55nReceive1:bc1p56newhfjx9s2zftqyplqvprxln7vl6053086gnlxgsd9nxgs8g4s3te62xChange0:bc1psdclg57x2f0pasj6dyjnmn9f5talky9f635fl54fefkp4ldzfeqsm5t8kzChange1:",
+   "ReviewChange1:bc1p2056u8e8hm8wf7388yat26cs66hmnuuzqqe9lg268ts53pzxdgtsgm6xv7"
+  ],
+  "holdScreen": "Nothingoutsidethisdevicehascheckedthispolicy.Beforeyoufundit,restoretheseplatesinyourcoordinatorandcompareyourownfirstreceiveaddress.Holdbuttontoconfirm.Beforeyoufundit",
+  "formPick": "Whichform?ThepolicyitselfTemplatepluskeycardsWhattoengrave",
+  "modePick": "Whattoengrave?Full(seed+keys)Watch-only(keys)EngraveMode",
+  "census": [
+   "PlatesToCutThisengraves2plates.md1policy:2plates(thewalletpolicy,withitskeys)Eachplatetakesminutestocut.Havethatmanyblanksreadybeforeyoustart:asetisonlyabackupwhenallofitexists.md1andmk1platescarryerrorcorrection.Aplaindescriptorplatecarriesonlyitschecksum,whichfindsamistakebutcannotfixone."
+  ],
+  "acts": [
+   "Chooseengraving",
+   "Holdbuttontostarttheengravingprocess",
+   "Engravingcompletedsuccessfully",
+   "Chooseengraving",
+   "Holdbuttontostarttheengravingprocess",
+   "Engravingcompletedsuccessfully",
+   "Bundleengraved",
+   "RestoreDoc"
+  ],
+  "variants": [
+   "ChooseengravingTEXTONLYCard1of1|Plate1of2",
+   "ChooseengravingTEXTONLYCard1of1|Plate2of2"
+  ],
+  "restoreDoc": "RestoreDocTheseplateswerenotfullychecked.Confirmtheyrestorethiswalletbeforerelyingonthisbackup.Walletpolicy(read-only):P2TRcomplexFirstreceive:bc1pl0qghel2uqxp3q6kah6c4fga7xp6pcmtsa7w6kg32kn7q9pl95eq6sq55nFirstchange:",
+  "door": true,
+  "strings": {
+   "strings": [
+    "md138tzwrsxq6tvyyykjmppp95kcggfd9kzz89cqps83fqygvnxjkuqqqxd2qvgs883w6pfhp5gjcc3zghwt6fe7\nmd138tzwrsgmuv2ry2qrdeutks2zeq5qnmv90d3tcduh4e8ua7f8duhh2nfa2v52y0y447v27zqml735rv8l70cg\nmd138tzwrssh7rcvclsqukx9fn0d4jnuw7trxprw9qc4yl7vvxugp0av5mc5nppyd7f7vmy9w0sn8gn970gmetzf\nmd138tzwrsuwj6ln2pdrf57wgrhef9edl65mr8r6789xwckmdh6nfn7gl5ys9nprzqr5qf62gwccp8x8ppqa0qpq\nmd138tzwr3zndaqkv6ur5lr33t45ruft9h0w3jtuyv7m25kyjqrv7wegdm9wu327ca23mqx9mesym55ruf53j2ua",
+    "md138tzwr3vq9klqm43up3wplzgkeppt20k5ppw9upf9v4aper0xz2vyyfz3mj9g97j03qcecngwrss09c4dy6jy\nmd138tzwr3h8pefra64sa94qxn6p3j3kdy33rgy2j8tg2lwweqjkrfkcvm685esw7sq0f96x2fsga6amlz4tdl8t\nmd138tzwr36gqt5w2s3aja0unepuux45pd9rt7rkwf9k8c66g2ayvhx606hynwzu2hxftuc35hcglc"
+   ],
+   "announced": 2,
+   "unattributed": 0
+  }
+ },
+ "trace": [
+  {
+   "l": "door",
+   "s": "Aseedisloaded.Itcanfillanynumberofslots.ScancardsBuildanewpolicyWalletPolicy",
+   "n": 2
+  }
+ ],
+ "pageerrors": []
+}

@@ -1,0 +1,286 @@
+{
+ "core": "/Satoshi:31.1.0/",
+ "wallets": {
+  "kofn-nums": {
+   "descriptor_public": "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{multi_a(2,[73c5da0a/48'/1'/0'/3']tpubDFH9dgzveyD94P86sEzUzWtd2wxFkUoK78rSBqSWyXNuFq46dy4HbPTEZEP4fbSY4L5Vb2LFnm23JeGQppq5SPcPDNuHZU3JQwMSFXLdudh/<0;1>/*,[b8688df1/48'/1'/0'/3']tpubDEfobrrtptRTd4Qp6K7RtkNC9GZTdyWPwrXBnPEiu9o5gbcFpscfHbhghiNuBBRuq9RfiN3nwNkLs3E2nRwnFmwKq6NPAbVa6btM8iMjsW6/<0;1>/*,[28645006/48'/1'/0'/3']tpubDEwqCvJxKwKWXeYgVhaoUCFf5QtViLFofqBLuTnjAd5CwmK8NoKbxnkYP2ba1YD9vjT8i5o1iod8RgzKtVaRjTfApksx1Cwt6FCKtTED2V8/<0;1>/*),and_v(v:pk([73c5da0a/48'/1'/1'/3']tpubDEYM1BmQ5rp2QyHNpbpDxS4FyPkU8EmSeSaTeAdZkkNVxJUjfi5AwTFkmGU85DnoH4T8Mi73XTuLSAvPyzh5oe3gBvjppL192MR69n9xrnU/<0;1>/*),older(26280))})#e0829s93",
+   "watch_warnings": [
+    "Range not given, using default keypool range"
+   ],
+   "prim_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "rec_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "fund_addrs": [
+    "bcrt1pxh6uv6szydmwyvlc2djzv6fv03jgut4pjpksvjz0rhymq2zx4zvsjyqqk2",
+    "bcrt1pd9jmrdh7qu9ytpzvd3r5kwxz4s95p75t9nhx23k27rt9elxaa8xqml3s6m"
+   ],
+   "fund_txids": [
+    "2354d5cb7e7978e64c50c0186ca14fff2fa060bd779bcbd1a24dbccf37d442ea",
+    "cbe99beba41c6c318718a3f8904da05fa4cb53bf42e9968237aca21f105f568b"
+   ],
+   "primary": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c0",
+     "leaf_script": "20fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fefac20e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bdeba20ec07c90391a37970da3f97e4781698f5866f9fc3ad3eaccde7b06591e830777aba529c",
+     "stack_items": 5,
+     "has_CSV": false,
+     "leaf_asm": "fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fef OP_CHECKSIG e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bde OP_CHECKSIGADD ec07c90391a37970da3f97e4781698f5866f9fc3ad3eaccde7b06591e830777a OP_CHECKSIGADD 2 OP_NUMEQUAL"
+    },
+    "txid": "5596756759a0d58d287ddbacd92c68fa0bba0a7ecd5382ee790989d190392a5c",
+    "confirmations": 1
+   },
+   "recovery": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c0",
+     "leaf_script": "2079dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62cad02a866b2",
+     "stack_items": 3,
+     "has_CSV": true,
+     "leaf_asm": "79dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62c OP_CHECKSIGVERIFY 26280 OP_CHECKSEQUENCEVERIFY"
+    },
+    "nSequence": 26280,
+    "tx_version": 2,
+    "attempt_immediate": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 112
+    },
+    "attempt_one_short": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 26389
+    },
+    "attempt_mature": {
+     "accepted": true,
+     "txid": "6056e294370ebcca7ad5b3ae67d6f5518a89c77aef2babe2f882e6dccef9bbb9",
+     "tip": 26390
+    },
+    "confirmations": 1
+   },
+   "private_descriptor_internal_key": [
+    "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0",
+    "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+   ]
+  },
+  "kofn-liana": {
+   "descriptor_public": "tr(tpubD6NzVbkrYhZ4Xj2FFF4p6kScAaid4Q3ohdGkAitrmrQhVqhN3U3NETELvixX9h63jqpxTLtcLE2uvrSpXXyg6J6NZVHQ44xijAp9AYkMHEb/<0;1>/*,{multi_a(2,[73c5da0a/48'/1'/0'/3']tpubDFH9dgzveyD94P86sEzUzWtd2wxFkUoK78rSBqSWyXNuFq46dy4HbPTEZEP4fbSY4L5Vb2LFnm23JeGQppq5SPcPDNuHZU3JQwMSFXLdudh/<0;1>/*,[b8688df1/48'/1'/0'/3']tpubDEfobrrtptRTd4Qp6K7RtkNC9GZTdyWPwrXBnPEiu9o5gbcFpscfHbhghiNuBBRuq9RfiN3nwNkLs3E2nRwnFmwKq6NPAbVa6btM8iMjsW6/<0;1>/*,[28645006/48'/1'/0'/3']tpubDEwqCvJxKwKWXeYgVhaoUCFf5QtViLFofqBLuTnjAd5CwmK8NoKbxnkYP2ba1YD9vjT8i5o1iod8RgzKtVaRjTfApksx1Cwt6FCKtTED2V8/<0;1>/*),and_v(v:pk([73c5da0a/48'/1'/1'/3']tpubDEYM1BmQ5rp2QyHNpbpDxS4FyPkU8EmSeSaTeAdZkkNVxJUjfi5AwTFkmGU85DnoH4T8Mi73XTuLSAvPyzh5oe3gBvjppL192MR69n9xrnU/<0;1>/*),older(26280))})#c0qjkwyv",
+   "watch_warnings": [
+    "Range not given, using default keypool range"
+   ],
+   "prim_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "rec_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "fund_addrs": [
+    "bcrt1py5vt6wzdv7murs6r589ghva6g0099vyd4g0m835jm8xq2a9g7gjqsdxk2y",
+    "bcrt1peth570tw4jfvly75cd54p3pup0vp6v87tvj6cusxzz4c8v7ndujqhpdh4c"
+   ],
+   "fund_txids": [
+    "c2078ef95c53a749ac01b9cd01090e5cf170f011fae605cf0d6f5f5780b07456",
+    "234d8faf4a391c7b6b77cff008c65da8c71d0ad52dd0074dc32ac2b84f35b17f"
+   ],
+   "primary": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c1",
+     "leaf_script": "20fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fefac20e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bdeba20ec07c90391a37970da3f97e4781698f5866f9fc3ad3eaccde7b06591e830777aba529c",
+     "stack_items": 5,
+     "has_CSV": false,
+     "leaf_asm": "fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fef OP_CHECKSIG e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bde OP_CHECKSIGADD ec07c90391a37970da3f97e4781698f5866f9fc3ad3eaccde7b06591e830777a OP_CHECKSIGADD 2 OP_NUMEQUAL"
+    },
+    "txid": "52fa88f2d9e84755493e928254387527a6c338f041b9e6a8f197c226729e164a",
+    "confirmations": 1
+   },
+   "recovery": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c0",
+     "leaf_script": "2079dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62cad02a866b2",
+     "stack_items": 3,
+     "has_CSV": true,
+     "leaf_asm": "79dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62c OP_CHECKSIGVERIFY 26280 OP_CHECKSEQUENCEVERIFY"
+    },
+    "nSequence": 26280,
+    "tx_version": 2,
+    "attempt_immediate": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 112
+    },
+    "attempt_one_short": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 26389
+    },
+    "attempt_mature": {
+     "accepted": true,
+     "txid": "f6d9c4caf94856325612ee1137b03230c6d0b1f7ebe02b12e541a04eee845659",
+     "tip": 26390
+    },
+    "confirmations": 1
+   },
+   "private_descriptor_internal_key": [
+    "tr(tpubD6NzVbkrYhZ4Xj2FFF4p6kScAaid4Q3ohdGkAitrmrQhVqhN3U3NETELvixX9h63jqpxTLtcLE2uvrSpXXyg6J6NZVHQ44xijAp9AYkMHEb/0/*",
+    "tr(tpubD6NzVbkrYhZ4Xj2FFF4p6kScAaid4Q3ohdGkAitrmrQhVqhN3U3NETELvixX9h63jqpxTLtcLE2uvrSpXXyg6J6NZVHQ44xijAp9AYkMHEb/1/*"
+   ]
+  },
+  "tiered-nums": {
+   "descriptor_public": "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{multi_a(2,[73c5da0a/48'/1'/0'/3']tpubDFH9dgzveyD94P86sEzUzWtd2wxFkUoK78rSBqSWyXNuFq46dy4HbPTEZEP4fbSY4L5Vb2LFnm23JeGQppq5SPcPDNuHZU3JQwMSFXLdudh/<0;1>/*,[b8688df1/48'/1'/0'/3']tpubDEfobrrtptRTd4Qp6K7RtkNC9GZTdyWPwrXBnPEiu9o5gbcFpscfHbhghiNuBBRuq9RfiN3nwNkLs3E2nRwnFmwKq6NPAbVa6btM8iMjsW6/<0;1>/*),and_v(v:multi_a(1,[73c5da0a/48'/1'/1'/3']tpubDEYM1BmQ5rp2QyHNpbpDxS4FyPkU8EmSeSaTeAdZkkNVxJUjfi5AwTFkmGU85DnoH4T8Mi73XTuLSAvPyzh5oe3gBvjppL192MR69n9xrnU/<0;1>/*,[b8688df1/48'/1'/1'/3']tpubDE3GtSi2ZYyZNgCxLgayWXSgHJUU1xKnQUK2z2Y6Wqc4cE1ESS6HgSSSbCrK711bikjq66kZtmszegt4W81EzDLd2Xh1vGivd1QNxVoMhMK/<0;1>/*),older(26280))})#s8x3fezj",
+   "watch_warnings": [
+    "Range not given, using default keypool range"
+   ],
+   "prim_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "rec_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "fund_addrs": [
+    "bcrt1pd6usyp84k80ufgwwkddxuj5czkg9f4fvdtdadq4e0exh2nl8nmmqpuq4pu",
+    "bcrt1prgh7tafmjn4c9ua4dr05zuer8g7paud45nnah9zkve996usjtgnq438xhr"
+   ],
+   "fund_txids": [
+    "5f23beedddf021fd0a379451f981f845b01a3ba29a517b4e57498301d0f2b2ce",
+    "81d8d7483d5cb053adfb6b464cdcc22acab0915cdc1c50ccb39920abdf6a1d18"
+   ],
+   "primary": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c0",
+     "leaf_script": "20fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fefac20e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bdeba529c",
+     "stack_items": 4,
+     "has_CSV": false,
+     "leaf_asm": "fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fef OP_CHECKSIG e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bde OP_CHECKSIGADD 2 OP_NUMEQUAL"
+    },
+    "txid": "27781e07a546b81c057947ff299d9f31a2476c0c96ed39172c46c8d662f01f0b",
+    "confirmations": 1
+   },
+   "recovery": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c0",
+     "leaf_script": "2079dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62cac2020f13a606349378b8f74386e229a836175bc9dc0e4935476f89b7cdfa082d275ba519d02a866b2",
+     "stack_items": 4,
+     "has_CSV": true,
+     "leaf_asm": "79dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62c OP_CHECKSIG 20f13a606349378b8f74386e229a836175bc9dc0e4935476f89b7cdfa082d275 OP_CHECKSIGADD 1 OP_NUMEQUALVERIFY 26280 OP_CHECKSEQUENCEVERIFY"
+    },
+    "nSequence": 26280,
+    "tx_version": 2,
+    "attempt_immediate": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 112
+    },
+    "attempt_one_short": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 26389
+    },
+    "attempt_mature": {
+     "accepted": true,
+     "txid": "150cb7aa9fae4d9f826d05065707ba74cfee7ba2ece603c675c99dcb4be1eea8",
+     "tip": 26390
+    },
+    "confirmations": 1
+   },
+   "private_descriptor_internal_key": [
+    "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0",
+    "tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+   ]
+  },
+  "tiered-liana": {
+   "descriptor_public": "tr(tpubD6NzVbkrYhZ4X4MGV9svHiz7xLKKKacpNjSH9dnBQJCzAipGkpepgUAQtgFGRBReHzfGq4yCH23y6ZM8nP25CcUxaFYdWs9fS8ukLHpB9Vp/<0;1>/*,{multi_a(2,[73c5da0a/48'/1'/0'/3']tpubDFH9dgzveyD94P86sEzUzWtd2wxFkUoK78rSBqSWyXNuFq46dy4HbPTEZEP4fbSY4L5Vb2LFnm23JeGQppq5SPcPDNuHZU3JQwMSFXLdudh/<0;1>/*,[b8688df1/48'/1'/0'/3']tpubDEfobrrtptRTd4Qp6K7RtkNC9GZTdyWPwrXBnPEiu9o5gbcFpscfHbhghiNuBBRuq9RfiN3nwNkLs3E2nRwnFmwKq6NPAbVa6btM8iMjsW6/<0;1>/*),and_v(v:multi_a(1,[73c5da0a/48'/1'/1'/3']tpubDEYM1BmQ5rp2QyHNpbpDxS4FyPkU8EmSeSaTeAdZkkNVxJUjfi5AwTFkmGU85DnoH4T8Mi73XTuLSAvPyzh5oe3gBvjppL192MR69n9xrnU/<0;1>/*,[b8688df1/48'/1'/1'/3']tpubDE3GtSi2ZYyZNgCxLgayWXSgHJUU1xKnQUK2z2Y6Wqc4cE1ESS6HgSSSbCrK711bikjq66kZtmszegt4W81EzDLd2Xh1vGivd1QNxVoMhMK/<0;1>/*),older(26280))})#783vw8ay",
+   "watch_warnings": [
+    "Range not given, using default keypool range"
+   ],
+   "prim_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "rec_warnings": [
+    "Range not given, using default keypool range",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors",
+    "Not all private keys provided. Some wallet functionality may return unexpected errors"
+   ],
+   "fund_addrs": [
+    "bcrt1puakremffass0zjexl6wfwe3vahnhd9zvusdmyng9dwq7z5m7k0vqkk09ls",
+    "bcrt1pxm7tm80vtec8mcuhyww7cca0hetpykgt33zqvwj5464q47thfynsz3pt32"
+   ],
+   "fund_txids": [
+    "83a1edc173635fd97451f01c2140ec7fcacc7e1238aa30f398dce67a94b4fe1e",
+    "7d236cfd62e3aaa94ddc0fbe33243f8a8d4ca60bab8034091b4e06d587259e72"
+   ],
+   "primary": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c1",
+     "leaf_script": "20fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fefac20e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bdeba529c",
+     "stack_items": 4,
+     "has_CSV": false,
+     "leaf_asm": "fd636a41c26ac4305eddad9f5b6ae33461daf3b8faae4ecc164b4ad74d831fef OP_CHECKSIG e6b257d1cbcad658640a16f417dab573ba27943e364c88e48227dd398ed72bde OP_CHECKSIGADD 2 OP_NUMEQUAL"
+    },
+    "txid": "eabc04f586ccfca1cce046f9fe7e64bc854b2103cb7843e30b07b63b8bba0b74",
+    "confirmations": 1
+   },
+   "recovery": {
+    "complete": true,
+    "witness": "script-path",
+    "leaf": {
+     "control_block_prefix": "c1",
+     "leaf_script": "2079dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62cac2020f13a606349378b8f74386e229a836175bc9dc0e4935476f89b7cdfa082d275ba519d02a866b2",
+     "stack_items": 4,
+     "has_CSV": true,
+     "leaf_asm": "79dbddcd3c516ee800679a710505107c86bbc3a0cc7da6d5b249737ad336b62c OP_CHECKSIG 20f13a606349378b8f74386e229a836175bc9dc0e4935476f89b7cdfa082d275 OP_CHECKSIGADD 1 OP_NUMEQUALVERIFY 26280 OP_CHECKSEQUENCEVERIFY"
+    },
+    "nSequence": 26280,
+    "tx_version": 2,
+    "attempt_immediate": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 112
+    },
+    "attempt_one_short": {
+     "accepted": false,
+     "error": "error code: -26\nerror message:\nnon-BIP68-final",
+     "tip": 26389
+    },
+    "attempt_mature": {
+     "accepted": true,
+     "txid": "8e5102e7e65acc56e26bab0e5411c7788af3f36c9dfcadc3ad6bb19ba57b3028",
+     "tip": 26390
+    },
+    "confirmations": 1
+   },
+   "private_descriptor_internal_key": [
+    "tr(tpubD6NzVbkrYhZ4X4MGV9svHiz7xLKKKacpNjSH9dnBQJCzAipGkpepgUAQtgFGRBReHzfGq4yCH23y6ZM8nP25CcUxaFYdWs9fS8ukLHpB9Vp/0/*",
+    "tr(tpubD6NzVbkrYhZ4X4MGV9svHiz7xLKKKacpNjSH9dnBQJCzAipGkpepgUAQtgFGRBReHzfGq4yCH23y6ZM8nP25CcUxaFYdWs9fS8ukLHpB9Vp/1/*"
+   ]
+  }
+ },
+ "fund_height": 111
+}

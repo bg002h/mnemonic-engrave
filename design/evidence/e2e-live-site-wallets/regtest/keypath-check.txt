@@ -1,0 +1,13 @@
+BIP341 H x-coordinate = sha256(G uncompressed) = 50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0
+kofn-nums internal key raw x-only 50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0 ==H: True privkey in any wallet? False
+   primary leaf has CHECKSIGADD: True CSV: False witness: script-path
+   recovery leaf has CHECKSIGADD: False CSV: True witness: script-path
+kofn-liana internal key is an xpub: depth 0 pubkey 0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0 x==H: True privkey in any wallet?  False
+   primary leaf has CHECKSIGADD: True CSV: False witness: script-path
+   recovery leaf has CHECKSIGADD: False CSV: True witness: script-path
+tiered-nums internal key raw x-only 50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0 ==H: True privkey in any wallet? False
+   primary leaf has CHECKSIGADD: True CSV: False witness: script-path
+   recovery leaf has CHECKSIGADD: True CSV: True witness: script-path
+tiered-liana internal key is an xpub: depth 0 pubkey 0250929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0 x==H: True privkey in any wallet?  False
+   primary leaf has CHECKSIGADD: True CSV: False witness: script-path
+   recovery leaf has CHECKSIGADD: True CSV: True witness: script-path

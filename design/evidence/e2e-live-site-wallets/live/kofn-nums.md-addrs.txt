@@ -1,0 +1,6 @@
+bc1peatq4w73xp52a7rpj958727j8flmtq2yzecglqc0y9n3l5mycc5shzqtmx
+bc1p2wt6gyetdz5rk9p2h489f5y2qye05w3q26mjypc4jlr787f7s8rqe8mdxp
+note: stdout is watch-only — public keys only, cannot spend
+bc1puz6ucwyhdln3h6s02lysd9q00jt5t25kspvq4xq5vuus59lha3uszyp9kv
+bc1p8ztlg22t66mvll7h7nsgafmfpqqcfpfgmanf3tl4uvkdyqcs80dq6c4rw6
+note: stdout is watch-only — public keys only, cannot spend

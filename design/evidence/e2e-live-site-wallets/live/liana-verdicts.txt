@@ -1,0 +1,14 @@
+probe-rule OK kofn-liana
+probe-rule OK tiered-liana
+probe-rule OK kofn-liana-distinct
+probe-rule OK tiered-liana-distinct
+CONTROL-accept-kofn-recovery-flat: ACCEPT receive=['bc1pj6davmeetfe2uutrjlgxcjytq50ggvyd82xtxx2eazm24hsdhlnqxvh4v4', 'bc1ptg5kylzsp4kxnjwl7dpg02drvhjg0egvtg9v5k6lf0p0u2zfzc6s0jtmaq'] change=['bc1pa656rnpy2dqf6gevkxw72fz7kx02zpmru507nft9cft8l0dru3vqejq0yf', 'bc1prc820f7ctrq6ad6wtfwq62dfw7jssx9cc0gy3swysw30r9077weqp2h7nq'] primary=multi recovery=[26280]
+CONTROL-stale-key-nested-B-tree-with-A-internal-key: REFUSE Descriptor is not compatible with a Liana spending policy.
+live-kofn-nums: REFUSE Descriptor is not compatible with a Liana spending policy.
+live-kofn-liana: REFUSE Key '[73c5da0a/48'/0'/1'/3']xpub6DXuQW1Q2JpZzLV9igdwdnmCSoaPVd4ZNZnvfgUsGvQ8AbNAhEmfBEMCMHctwZBuxWK8HkjqUW5F72MCSJCFfisVwRY62Kb1FuDZ66nNQe1/<0;1>/*' is derived from the same origin as another key present in the same spending path. It is not possible to use a signer more than once within a single spending path.
+live-tiered-nums: REFUSE Descriptor is not compatible with a Liana spending policy.
+live-tiered-liana: REFUSE Key '[73c5da0a/48'/0'/3'/3']xpub6DXuQW1Q2Jpa17KCHfNUuv5BiEM3eYamrmGaFCycMLvntLaosd1Jkd9XWgw7WFnhYc31z3G4aPnGT6W7tzcXfvzLKt8UWsTLq3X2XFBGeeF/<0;1>/*' is derived from the same origin as another key present in the same spending path. It is not possible to use a signer more than once within a single spending path.
+live-kofn-nums-distinct: REFUSE Descriptor is not compatible with a Liana spending policy.
+live-kofn-liana-distinct: ACCEPT receive=['bc1pl0qghel2uqxp3q6kah6c4fga7xp6pcmtsa7w6kg32kn7q9pl95eq6sq55n', 'bc1p56newhfjx9s2zftqyplqvprxln7vl6053086gnlxgsd9nxgs8g4s3te62x'] change=['bc1psdclg57x2f0pasj6dyjnmn9f5talky9f635fl54fefkp4ldzfeqsm5t8kz', 'bc1p2056u8e8hm8wf7388yat26cs66hmnuuzqqe9lg268ts53pzxdgtsgm6xv7'] primary=multi recovery=[26280]
+live-tiered-nums-distinct: REFUSE Descriptor is not compatible with a Liana spending policy.
+live-tiered-liana-distinct: ACCEPT receive=['bc1pwtcsr8l4sr9df9h96dgj6jyw9yy3dwwtjcckrn6lwcxrw7d6ua4qa05h0g', 'bc1prmvj8g0drrrak0dy692e0yc5y7hpp8vdlva6lwzjzqyuuckdq4dqrmtpwk'] change=['bc1p5n8rwy7hqu9vt3v7nz3jhgw6ae5ta5p4cy27pyncj7a382fqgddsnjmlsj', 'bc1pffdjy2an8cpt4467wukazwme0neqvm7e3w5ahudt8c9cvkeq5g8sfcjtl6'] primary=multi recovery=[26280]

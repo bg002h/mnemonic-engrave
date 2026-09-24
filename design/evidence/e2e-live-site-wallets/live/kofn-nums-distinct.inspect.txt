@@ -1,0 +1,13 @@
+template: tr(50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0,{multi_a(2,@0/<0;1>/*,@1/<0;1>/*,@2/<0;1>/*),and_v(v:pk(@3/<0;1>/*),older(26280))})
+n: 4
+wallet-policy-mode: true
+md1-encoding-id: 96a12e4aa5003d8739c71d546d0cb92b
+wallet-descriptor-template-id: 8107216456de60d05e57f7fe268824d8
+origins:
+  @0: [73c5da0a/48'/0'/0'/3']
+  @1: [b8688df1/48'/0'/0'/3']
+  @2: [28645006/48'/0'/0'/3']
+  @3: [73c5da0a/48'/0'/1'/3']
+wallet-policy-id: cdf00ab89667d1482bd8036b15862272
+wallet-policy-id-fingerprint: 0xcdf00ab8
+note: stdout is a keyless descriptor template (no keys)
