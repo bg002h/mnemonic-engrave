@@ -14,8 +14,10 @@ EMU="$FORK/cmd/emu"
 [ -d "$EMU" ] || { echo "no emulator at $EMU (set FORK=/path/to/seedhammer)" >&2; exit 1; }
 
 # emu.wasm is gitignored in the fork, so it may not exist yet. Build it unless
-# it is already newer than the Go sources.
-if [ ! -f "$EMU/emu.wasm" ] || [ -n "$(find "$EMU" -name '*.go' -newer "$EMU/emu.wasm" -print -quit)" ]; then
+# it is already newer than EVERY Go source in the fork, plus go.mod/go.sum. The
+# emulator links gui/, md/ and the rest; checking only cmd/emu once shipped a
+# stale wasm after a gui/ copy change (2026-09-23).
+if [ ! -f "$EMU/emu.wasm" ] || [ -n "$(find "$FORK" \( -name '*.go' -o -name go.mod -o -name go.sum \) -newer "$EMU/emu.wasm" -print -quit)" ]; then
   echo "== building emu.wasm"
   command -v go >/dev/null || { echo "go not on PATH; needed to build emu.wasm" >&2; exit 1; }
   (cd "$EMU" && ./build.sh)
