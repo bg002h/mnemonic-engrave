@@ -20264,3 +20264,10 @@ literally instead of as stdin, and every wrong secret produces the same
 mismatch text, so the user is told a good backup is bad. `--passphrase -` on
 verify-bundle does the same and is covered by F-687's resolver. Fix `--ms1 -`
 the same way: `-` means stdin, one stdin per invocation.
+
+### F-690 — CLI error messages echo flag-like argument values that may be secret (owning phase: none — ownerless residue) `#mnemonic-toolkit` `#mnemonic-secret` `#secret-handling`
+
+**Status:** OPEN — secret-handling class: logged, non-gating (operator ruling 2026-08-27)
+Filed 2026-09-25 from `design/agent-reports/f687-review.md` (F1). When a
+passphrase value looks like a flag, some error paths echo the value back on
+stderr. Reproduction in the review.
