@@ -20148,7 +20148,10 @@ CLIs, exercised against them, then one pin in installer and GUI manual alike.
 
 ### F-680 — md's aarch64 reproducibility gate never runs, and md 0.20.3 lacks its x86_64 musl asset (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#release` `#reproducibility`
 
-**Status:** OPEN — two operator decisions pending
+**Status:** OPEN — operator ruled 2026-09-24: **no backfill** of 0.20.3 (the next md
+release ships the x86_64 musl asset), and **turn the aarch64 reproducibility
+checks on** in all four callers (md, ms, mk, toolkit), after the toolkit's
+F-675 residue-check fix merges and the callers pin that toolkit commit.
 Filed 2026-09-24 from `design/agent-reports/f678-impl.md`.
 - `repro-aarch64-musl` is skipped on every run: the caller passes
   `run_aarch64: false`, so md's published aarch64 artifact is never checked for
