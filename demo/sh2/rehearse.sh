@@ -26,7 +26,9 @@ if ! md compose --help >/dev/null 2>&1; then
   echo "  cargo install --git https://github.com/bg002h/descriptor-mnemonic md-cli" >&2
   exit 2
 fi
-if ! ms split --help 2>&1 | grep -q -- '--in'; then
+# F-695: capture, then grep. Under pipefail `grep -q` exits at the first match
+# and the still-writing --help can die of SIGPIPE, failing a good binary.
+if ! { ms_split_help="$(ms split --help 2>&1)" && grep -q -- '--in' <<<"$ms_split_help"; }; then
   echo "This ms has no '--in' on split -- it is the crates.io build, and it" >&2
   echo "would make you put a seed on the command line." >&2
   echo "  cargo install --git https://github.com/bg002h/mnemonic-secret ms-cli" >&2

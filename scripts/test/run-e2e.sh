@@ -63,7 +63,8 @@ run_phase() { # run_phase <desc> <expect-pass|expect-fail> <input> <args...>
   fi
   [ "$codeok" -eq 1 ] || return 0
   if [ -n "$want" ]; then
-    if printf '%s' "$out" | grep -qiE "$want"; then
+    # F-695: here-string -- `printf | grep -q` can SIGPIPE under pipefail (false red).
+    if grep -qiE "$want" <<<"$out"; then
       ok "$desc [matched /$want/]"
     else
       bad "$desc — exit code right but output did NOT match /$want/"

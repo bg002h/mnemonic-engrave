@@ -177,7 +177,11 @@ otp_field() {
 $out"
   # CRIT1 is RBIT-8 and BOOT_FLAGS1 is RBIT-3; an inconsistent redundant read
   # must not be parsed as a clean value.
-  printf '%s' "$out" | grep -qi 'WARNING' \
+  # F-695: every WARNING trap is a pure-bash test, never `printf | grep -q`:
+  # under pipefail a SIGPIPE'd printf makes the pipeline false and `&& die` is
+  # SKIPPED (fail OPEN). Not a here-string either: at >=64 KiB bash backs one
+  # with a temp file, and a full /tmp would skip grep and the trap (review M1).
+  [[ ${out,,} == *warning* ]] \
     && die "picotool reported a warning reading $sel (redundant rows disagree or ECC invalid):
 $out"
   v="$(printf '%s\n' "$out" | grep -iE '^[[:space:]]*field ' | tail -1 \
@@ -205,7 +209,7 @@ read_rows() {
   local out want=$# got
   out="$(picotool otp get -n -e "$@" 2>&1)" || die "OTP read failed for: $*
 $out"
-  printf '%s' "$out" | grep -qi 'WARNING' \
+  [[ ${out,,} == *warning* ]] \
     && die "picotool reported a warning reading: $*
 $out"
   ROWVALS="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' \
@@ -370,7 +374,7 @@ $out"
   # row (picotool prints `OTP_DATA_BOOT_FLAGS1 (RBIT-3)`) while `0x04c`/`0x04d`
   # print bare, so the three reads are NOT symmetric and the A/B/C comparison
   # below cannot be the thing that catches a degraded row. This trap is.
-  printf '%s' "$out" | grep -qi 'WARNING' \
+  [[ ${out,,} == *warning* ]] \
     && die "picotool reported a warning reading row $sel (redundant rows disagree or ECC invalid):
 $out"
   v="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' | tail -1 \
@@ -1102,7 +1106,9 @@ and do not trust phase 1's seal." ;;
   [ -n "$IMGPUB" ] && [ "$IMGPUB" = "$MYPUB" ] || die "the phase-3 image is NOT signed by my-key.pem.
 A dry run of phase 3, or a rebuild, has replaced it. Re-run phase 3 --execute so
 phase 5 tests the SAME artifact phase 3 proved was rejected."
-  picotool info -a "$WORKDIR/blinky-mykey.signed.uf2" 2>/dev/null | grep -qi 'signature: *verified' \
+  # F-695: capture, then grep (see otp_field): no SIGPIPE-under-pipefail false red.
+  { IMGINFO="$(picotool info -a "$WORKDIR/blinky-mykey.signed.uf2" 2>/dev/null)" \
+      && grep -qi 'signature: *verified' <<<"$IMGINFO"; } \
     || die "the phase-3 image does not carry a verified signature -- re-run phase 3 --execute"
   ok "phase-3 image is intact and signed by your key (true A/B)"
 

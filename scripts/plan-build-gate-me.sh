@@ -58,7 +58,7 @@ for f in rust-toolchain.toml rust-toolchain clippy.toml rustfmt.toml .rustfmt.to
 # carry; the sysw plan touches me-cli only, and me-cli's deps are crates.io +
 # the in-tree mnemonic-io-lib, which `crates/` contains.
 PIN="$(grep -E '^\s*RUST_TOOLCHAIN:' "$SRC/.github/workflows/release.yml" 2>/dev/null | head -1 | sed -E "s/.*RUST_TOOLCHAIN:\s*'?([0-9.]+)'?.*/\1/")"
-if [ -n "$PIN" ] && rustup toolchain list 2>/dev/null | grep -q "^$PIN-"; then export RUSTUP_TOOLCHAIN="$PIN"; fi
+if [ -n "$PIN" ] && grep -q "^$PIN-" <<<"$(rustup toolchain list 2>/dev/null)"; then export RUSTUP_TOOLCHAIN="$PIN"; fi
 echo "   $WORK  (target: $CARGO_TARGET_DIR)"
 echo "   toolchain: $(cd "$WORK" && rustc --version 2>/dev/null)  (CI pin: ${PIN:-none found})"
 echo "== 2 -- extract the plan's Rust =="

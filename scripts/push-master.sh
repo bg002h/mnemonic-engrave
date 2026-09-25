@@ -159,7 +159,8 @@ NOW="$(git rev-parse HEAD)"
 
 # --- push for real; a bypass line is a FAILURE, not a success -------------
 OUT="$(git push origin "$BRANCH" 2>&1)"
-if printf '%s' "$OUT" | grep -qi 'bypass'; then
+# F-695: here-string -- a SIGPIPE'd printf under pipefail would hide the bypass.
+if grep -qi 'bypass' <<<"$OUT"; then
   printf '%s\n' "$OUT" >&2
   die "push printed a bypass line — the staged contexts did not apply"
 fi

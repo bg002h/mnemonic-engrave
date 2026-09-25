@@ -1,0 +1,21 @@
+push-via-staging.sh blob on f695-pipefail in 5 repos: IDENTICAL 9bb4c963981a
+
+REPS=10; cells = runs that took the TRUE branch (before -> after)
+
+site                                                             big    absent     empty  prodfail  verdict
+engrave release.yml:93 docs-only (-v)                          0->10      0->0    10->10         -  PASS
+engrave demo/sh2/rehearse.sh:29                                0->10      0->0      0->0      0->0  PASS
+engrave pico2-bootkey-rehearsal.sh:180/208/373 WARNING traps     0->10      0->0      0->0         -  PASS
+engrave pico2-bootkey-rehearsal.sh:1105 verified               0->10      0->0      0->0      0->0  PASS
+engrave push-master.sh:162 bypass                              0->10      0->0      0->0         -  PASS
+push-via-staging.sh:213 bypass (5 copies)                      0->10      0->0      0->0         -  PASS
+engrave release-workflows/emit.py:32 (emitted mk smoke)        0->10      0->0      0->0      0->0  PASS
+engrave sh2-flash:288 verified                                 0->10      0->0      0->0      0->0  PASS
+engrave sh2-flash:305 lsusb                                    0->10      0->0      0->0      0->0  PASS
+engrave sign-firmware.sh:101 HASH_ERR                          0->10      0->0      0->0         -  PASS
+engrave sign-firmware.sh:180 verified                          0->10      0->0      0->0         -  PASS
+engrave scripts/test/run-e2e.sh:66                             0->10      0->0      0->0         -  PASS
+dm scripts/gen-compose-golden.sh:34                            0->10      0->0      0->0      0->0  PASS
+seedhammer scripts/oracle-live.sh:104                          0->10      0->0      0->0         -  PASS
+
+OVERALL: PASS

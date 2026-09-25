@@ -1,0 +1,133 @@
+mnemonic-engrave/.github/workflows/release.yml:93:          if echo "$CHANGED" | grep -qvE '^(design/|[^/]+\.md$)'; then
+mnemonic-engrave/demo/sh2/check-install-links.sh:65:  latest=$(gh_api "https://api.github.com/repos/$repo/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
+mnemonic-engrave/demo/sh2/deploy.sh:51:  rrun "ls -1t ${NGINX_CONF}.bak-* 2>/dev/null | head -1"
+mnemonic-engrave/demo/sh2/deploy.sh:52:  rrun "latest=\$(ls -1t ${NGINX_CONF}.bak-* 2>/dev/null | head -1); \
+mnemonic-engrave/demo/sh2/rehearse.sh:29:if ! ms split --help 2>&1 | grep -q -- '--in'; then
+mnemonic-engrave/demo/sh2/rehearse.sh:60:[[ $(grep -o '^md1[a-z0-9]*' <<<"$out" | head -1) == "$GOOD" ]] \
+mnemonic-engrave/demo/sh2/rehearse.sh:61:  && ok "repaired string is byte-identical to the original" || bad "repair output" "$(grep -o '^md1[a-z0-9]*' <<<"$out" | head -1)"
+mnemonic-engrave/demo/sh2/rehearse.sh:150:    || bad "john->search pipeline" "$(grep -iE 'match|no match|error' <<<"$res" | head -1)"
+mnemonic-engrave/demo/sh2/update.sh:77:  prev=$("${SSH[@]}" "ls -1dt ${REMOTE_DIR}.prev-* 2>/dev/null | head -1" || true)
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:180:  printf '%s' "$out" | grep -qi 'WARNING' \
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:187:  printf '%s' "$v" | grep -qE '^[0-9a-f]+$' || die "unexpected field value '$v' for $sel"
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:208:  printf '%s' "$out" | grep -qi 'WARNING' \
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:266:  printf '%s' "$errtxt" | grep -qi 'ASN1 OID: secp256k1' \
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:267:    || openssl ec -in "$1" -noout -text 2>/dev/null | grep -qi 'ASN1 OID: secp256k1' \
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:373:  printf '%s' "$out" | grep -qi 'WARNING' \
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:1105:  picotool info -a "$WORKDIR/blinky-mykey.signed.uf2" 2>/dev/null | grep -qi 'signature: *verified' \
+mnemonic-engrave/scripts/pico2-bootkey-rehearsal.sh:1128:  FW_REAL="$(ls -1 "$SEEDHAMMER_DIR"/seedhammerii-*.uf2 2>/dev/null | grep -v '\.signed\.uf2$' | head -1 || true)"
+mnemonic-engrave/scripts/plan-build-gate-me.sh:60:PIN="$(grep -E '^\s*RUST_TOOLCHAIN:' "$SRC/.github/workflows/release.yml" 2>/dev/null | head -1 | sed -E "s/.*RUST_TOOLCHAIN:\s*'?([0-9.]+)'?.*/\1/")"
+mnemonic-engrave/scripts/plan-build-gate-me.sh:61:if [ -n "$PIN" ] && rustup toolchain list 2>/dev/null | grep -q "^$PIN-"; then export RUSTUP_TOOLCHAIN="$PIN"; fi
+mnemonic-engrave/scripts/plan-build-gate.sh:202:  | grep -E '^(warning|error)' | sort | uniq -c | sort -rn | head -10 \
+mnemonic-engrave/scripts/plan-cite-gate.sh:65:    # F-115: the search used to be `... -print | head -1`, which picks the FIRST
+mnemonic-engrave/scripts/plan-cite-gate.sh:89:      f="$(printf '%s\n' "$matches" | head -1)"
+mnemonic-engrave/scripts/plan-cite-gate.sh:122:      loc=$(grep -rnE "$top" "$GOREPO/$pkg"/*.go | head -1)
+mnemonic-engrave/scripts/plan-cite-gate.sh:125:      loc=$(grep -rnE "$grouped" "$GOREPO/$pkg"/*.go | head -1)
+mnemonic-engrave/scripts/plan-fold-sweep.sh:135:    grep -nF -- "$bare" "$doc" | head -4 | sed 's/^/                 /' | cut -c1-118
+mnemonic-engrave/scripts/push-master.sh:162:if printf '%s' "$OUT" | grep -qi 'bypass'; then
+mnemonic-engrave/scripts/push-via-staging.sh:154:if printf '%s\n' "${CR[@]}" | awk -F'\t' '$2!="completed"{f=1} END{exit !f}'; then
+mnemonic-engrave/scripts/push-via-staging.sh:213:if echo "$OUT" | grep -qi "bypassed rule violations"; then
+mnemonic-engrave/scripts/release-workflows/emit.py:32:          "$BIN" encode --help | grep -q -- '--policy-id-stub' || {
+mnemonic-engrave/scripts/sh2-flash:255:                   -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-)"
+mnemonic-engrave/scripts/sh2-flash:288:    devshell picotool info -a "$SIGNED" 2>/dev/null | grep -q 'signature:.*verified' \
+mnemonic-engrave/scripts/sh2-flash:305:if ! lsusb 2>/dev/null | grep -qi "$BOOTSEL_ID"; then
+mnemonic-engrave/scripts/sign-firmware.sh:75:openssl ec -in "$KEY" -noout -text 2>/dev/null | grep -qi 'secp256k1\|ASN1 OID: secp256k1' \
+mnemonic-engrave/scripts/sign-firmware.sh:101:elif printf '%s' "$HASH_ERR" | grep -qiE 'missing SIGNATURE section|missing HASH_DEF item'; then
+mnemonic-engrave/scripts/sign-firmware.sh:180:printf '%s' "$INFO" | grep -qi 'signature: *verified' \
+mnemonic-engrave/scripts/test/run-e2e.sh:66:    if printf '%s' "$out" | grep -qiE "$want"; then
+mnemonic-engrave/scripts/verify-releases.sh:60:      (cd "$d" && sha256sum -c "$sums" --ignore-missing 2>&1 | grep -v ': OK$' | head -4 | sed 's/^/        /')
+mnemonic-engrave/scripts/verify-releases.sh:65:  lin=$(find "$d" -name "*linux*amd64*.tar.gz" -o -name "*x86_64-linux*.tar.gz" | head -1)
+mnemonic-engrave/scripts/verify-releases.sh:71:    b=$(find "$ex" -type f -name "$bin" | head -1)
+mnemonic-engrave/scripts/verify-releases.sh:76:      v=$("$b" --version 2>&1 | head -1)
+descriptor-mnemonic/.github/workflows/bitcoind-differential.yml:94:          "./bitcoin-${BITCOIND_VERSION}/bin/bitcoind" --version | head -1
+descriptor-mnemonic/.github/workflows/man-pages.yml:338:          CROSS_IMG="$(grep -E '^image *=' Cross.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+descriptor-mnemonic/.github/workflows/release.yml:165:          POL="$("$BIN" encode --from-policy 'or(pk(@0),and(pk(@1),older(144)))' --context segwitv0 --group-size 0 | grep '^md1' | head -1)"
+descriptor-mnemonic/ci/repro/vendor-freshness.sh:45:MINISCRIPT_REV="$(grep -oE 'rust-miniscript\?rev=[0-9a-f]{40}' Cargo.lock | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+descriptor-mnemonic/scripts/gen-compose-golden.sh:34:if "$MD" compose --help 2>&1 | grep -q -- '--unspendable'; then
+descriptor-mnemonic/scripts/push-via-staging.sh:154:if printf '%s\n' "${CR[@]}" | awk -F'\t' '$2!="completed"{f=1} END{exit !f}'; then
+descriptor-mnemonic/scripts/push-via-staging.sh:213:if echo "$OUT" | grep -qi "bypassed rule violations"; then
+mnemonic-secret/.github/workflows/man-release.yml:79:          REV="$(grep -oE 'mnemonic-engrave\?rev=[0-9a-f]{40}' Cargo.lock | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+mnemonic-secret/.github/workflows/man-release.yml:267:          IO_LIB_REV="$(grep -oE 'mnemonic-engrave\?rev=[0-9a-f]{40}' Cargo.lock | head -1 | grep -oE '[0-9a-f]{40}')"
+mnemonic-secret/.github/workflows/man-release.yml:289:          CROSS_IMG="$(grep -E '^image *=' Cross.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+mnemonic-secret/.github/workflows/man-release.yml:327:          IO_LIB_REV="$(grep -oE 'mnemonic-engrave\?rev=[0-9a-f]{40}' Cargo.lock | head -1 | grep -oE '[0-9a-f]{40}')"
+mnemonic-secret/.github/workflows/rust.yml:301:          /usr/bin/bash --version | head -1
+mnemonic-secret/ci/repro/vendor-freshness.sh:40:IO_LIB_REV="$(grep -oE 'mnemonic-engrave\?rev=[0-9a-f]{40}' Cargo.lock | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+mnemonic-secret/scripts/plan-build-gate-ms.sh:124:cargo nextest run -p ms-codec --locked --no-capture -E 'test(codeword_distance)' 2>&1 | grep -E "codeword distance|PASS|FAIL" | head -3
+mnemonic-secret/scripts/plan-build-gate-ms.sh:140:echo "$OUT" | head -2; echo "exit=$RC"
+mnemonic-secret/scripts/plan-build-gate-ms.sh:141:[ "$RC" -eq 2 ] && echo "$OUT" | grep -q "reserved-prefix byte was 0x03" || { echo "DOWNGRADE ROW FAILED: expected exit 2 and the reserved-prefix text" >&2; exit 4; }
+mnemonic-secret/scripts/push-via-staging.sh:154:if printf '%s\n' "${CR[@]}" | awk -F'\t' '$2!="completed"{f=1} END{exit !f}'; then
+mnemonic-secret/scripts/push-via-staging.sh:213:if echo "$OUT" | grep -qi "bypassed rule violations"; then
+mnemonic-key/.github/workflows/musl-binaries.yml:196:          CROSS_IMG="$(grep -E '^image *=' Cross.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+mnemonic-key/ci/repro/vendor-freshness.sh:51:  | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+mnemonic-toolkit/.github/workflows/bitcoind-differential.yml:121:          "./bitcoin-${BITCOIND_VERSION}/bin/bitcoind" --version | head -1
+mnemonic-toolkit/.github/workflows/gui-pin-drift-check.yml:72:          PIN=$(grep -oE 'mnemonic-gui-v[0-9]+\.[0-9]+\.[0-9]+' scripts/install.sh | head -n1)
+mnemonic-toolkit/.github/workflows/gui-pin-drift-check.yml:104:          LOWER=$(printf '%s\n%s\n' "$PIN_V" "$LATEST_V" | sort -V | head -n1)
+mnemonic-toolkit/.github/workflows/install-pin-check.yml:48:          PIN=$(grep -oE 'mnemonic-toolkit-v[0-9]+\.[0-9]+\.[0-9]+' scripts/install.sh | head -n1)
+mnemonic-toolkit/.github/workflows/man-pages.yml:295:          CROSS_IMG="$(grep -E '^image *=' Cross.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+mnemonic-toolkit/.github/workflows/manual-gui.yml:82:                  | head -1 \
+mnemonic-toolkit/.github/workflows/manual-gui.yml:268:                  | head -1 \
+mnemonic-toolkit/ci/doc-flag-lint.test.sh:52:    grep -F '[lint] FAIL' <<<"$out" | head -5 | sed 's/^/     /'
+mnemonic-toolkit/ci/doc-flag-lint.test.sh:65:else fail=$((fail + 1)); echo "FAIL baseline: unmutated manual fails flag-coverage"; step4 "$out" | grep -F FAIL | head; fi
+mnemonic-toolkit/ci/doc-gate-guard.sh:134:# Here-strings throughout, never `printf | grep -q`: under pipefail, grep -q
+mnemonic-toolkit/ci/doc-gate-guard.test.sh:48:  grep -oE 'bash ci/doc-gate-guard\.sh .*$' <<<"$src" | head -1
+mnemonic-toolkit/ci/doc-gate-guard.test.sh:236:if git -C "$W" show 15443535:.github/workflows/examples.yml 2>/dev/null | grep -qE "^    paths:"; then
+mnemonic-toolkit/ci/repro/remap-off-negative.sh:146:  # residue_hits (residue-lib.sh), never `grep | head -1 | grep -q`: under
+mnemonic-toolkit/ci/repro/remap-off-negative.sh:180:if grep -aq "/build-a" "$WORK/out-a/$BIN" || grep -aq "/build-b" "$WORK/out-b/$BIN"; then
+mnemonic-toolkit/ci/repro/residue-lib.sh:11:#     grep -aEo "$RE" "$file" | head -1 | grep -q .
+mnemonic-toolkit/ci/repro/residue-lib.sh:48:  # residue_hits, never `grep | head -1 | grep -q`: under pipefail that shape
+mnemonic-toolkit/ci/repro/residue.test.sh:10:# than a pipe buffers, which is what made the old `grep | head -1 | grep -q`
+mnemonic-toolkit/ci/repro/residue.test.sh:66:  if ! bash -c 'set -euo pipefail; grep -aEo "/project" "$1" | head -1 | grep -q .' _ "$WORK/heavy-project.bin" 2>/dev/null; then
+mnemonic-toolkit/ci/repro/residue.test.sh:70:echo "info - OLD 'grep | head -1 | grep -q' shape reported NO residue in $old_false/20 runs on heavy residue"
+mnemonic-toolkit/scripts/install-assets.test.sh:103:        b=$(find "$x" -type f -name "$n" | head -n1)
+mnemonic-toolkit/scripts/install-assets.test.sh:106:        if readelf -d "$b" 2>/dev/null | grep -q '(NEEDED)'; then
+mnemonic-toolkit/scripts/install-msrv-guard.test.sh:74:if printf '%s' "$out_old" | grep -q 'mnemonic-gui needs rustc'; then
+mnemonic-toolkit/scripts/install-msrv-guard.test.sh:79:if printf '%s' "$out_old" | grep -q 'CARGO-INVOKED.*mnemonic-gui'; then
+mnemonic-toolkit/scripts/install-msrv-guard.test.sh:87:if printf '%s' "$out_new" | grep -q 'mnemonic-gui needs rustc'; then
+mnemonic-toolkit/scripts/install-msrv-guard.test.sh:94:if printf '%s' "$out_bin" | grep -q 'mnemonic-gui needs rustc'; then
+mnemonic-toolkit/scripts/install-msrv-guard.test.sh:96:elif printf '%s' "$out_bin" | grep -q 'CURL-INVOKED.*mnemonic-gui-v'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:88:   && printf '%s' "$out" | grep -q 'verified sha256'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:98:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q 'REFUSED .*sha256 mismatch'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:106:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q 'REFUSED .*no checksum'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:115:   && printf '%s' "$out" | grep -q 'REFUSED .*no checksum'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:123:if [ "$rc" -eq 0 ] && installed && printf '%s' "$out" | grep -q 'SHA256SUMS.portable'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:131:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q 'download failed'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:140:   && printf '%s' "$out" | grep -q 'publishes no mk binary for platform'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:148:   && ! printf '%s' "$out" | grep -q 'publishes no'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:154:if grep -v -- '--git' "$T/cargo.log" 2>/dev/null | grep -q .; then
+mnemonic-toolkit/scripts/install-verify.test.sh:170:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q "REFUSED .*did not print 'mk $MK_VER'"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:177:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q "it printed: (exit 1) mk: .*GLIBC_2.34"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:213:   && printf '%s' "$out" | grep -q 'cannot create a temporary directory'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:224:       && printf '%s' "$out" | grep -q 'cannot create a temporary directory'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:235:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q 'temporary directory .* is gone' \
+mnemonic-toolkit/scripts/install-verify.test.sh:243:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q 'cannot create a temporary directory'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:258:if printf '%s' "$n" | grep -q 'md binary needs glibc >= 2.34; this host has 2.33'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:264:if printf '%s' "$g" | grep -q 'install  md (source'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:273:if printf '%s' "$out" | grep -q -- 're-run with: --from-source --only mk'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:282:   && printf '%s' "$out" | grep -q 'which no cargo record in .* claims (--force)'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:298:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q "expected exactly one 'mk'"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:305:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q "did not print 'mk $MK_VER'"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:314:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q "cannot unpack $ASSET"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:382:if [ "$rc" -ne 0 ] && [ ! -e "$T/root/bin/mk.exe" ] && printf '%s' "$out" | grep -q "REFUSED $WZIP: 'mk.exe --version'"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:398:if [ "$rc" -ne 0 ] && ! installed && printf '%s' "$out" | grep -q 'lists it with more than one digest'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:407:if [ "$rc" -ne 0 ] && [ -z "$(ls -A "$T/root/bin/mk")" ] && printf '%s' "$out" | grep -q 'is a directory; not replacing it'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:414:if [ "$rc" -eq 2 ] && [ "$rc2" -eq 2 ] && printf '%s' "$out" | grep -q 'non-empty'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:437:if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -q 're-run with --exclude md,mnemonic-gui'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:485:   && printf '%s' "$out" | grep -q "belongs to cargo package 'fake-mk 0.1.0 (path+file:///home/user/src/fake-mk)', not mk-cli" \
+mnemonic-toolkit/scripts/install-verify.test.sh:486:   && printf '%s' "$out" | grep -q 'cargo uninstall --root .* fake-mk'; then
+mnemonic-toolkit/scripts/install-verify.test.sh:499:   && printf '%s' "$out" | grep -q "belongs to cargo package 'tools 1.0.0"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:506:   && printf '%s' "$out" | grep -q "force given: replacing .*owned by cargo package 'fake-mk"; then
+mnemonic-toolkit/scripts/install-verify.test.sh:528:       && printf '%s' "$out" | grep -q 'could not be read with certainty; not forcing'; then :
+mnemonic-toolkit/scripts/install-verify.test.sh:529:    else bad "malformed .crates.toml '$(printf '%s' "$bad_toml" | head -n1)': forced or no note: $out / $(cat "$T/cargo.log" 2>/dev/null)"; fi
+mnemonic-toolkit/scripts/install-verify.test.sh:552:   && printf '%s' "$out" | grep -q 'which no cargo record in .* claims (--force)'; then
+mnemonic-toolkit/scripts/install.sh:273:            elif ldd --version 2>&1 | grep -qi musl || ls /lib/ld-musl-* >/dev/null 2>&1; then
+mnemonic-toolkit/scripts/install.sh:474:    rustc_ver=$(rustc --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
+mnemonic-toolkit/scripts/install.sh:515:        if wget --help 2>&1 | grep -q -- '--https-only'; then
+mnemonic-toolkit/scripts/install.sh:638:            _ran=$(printf '%s\n' "$_ran" | head -n1)
+mnemonic-toolkit/scripts/install.sh:766:        if [ ! -r "$_json" ] || grep -Eq "\"$_cb(\\.exe)?\"" "$_json" 2>/dev/null; then
+mnemonic-toolkit/scripts/push-via-staging.sh:154:if printf '%s\n' "${CR[@]}" | awk -F'\t' '$2!="completed"{f=1} END{exit !f}'; then
+mnemonic-toolkit/scripts/push-via-staging.sh:213:if echo "$OUT" | grep -qi "bypassed rule violations"; then
+seedhammer/cmd/glyphtrace/variants.sh:67:    awk -v g="$glyph" '$1==g' | head -1 || true
+seedhammer/scripts/chain-mutation-check.sh:129:      detail="$(sed -n 's/.*is NOT the plate [^ ]* pins: //p' "$work/$name.m2.txt" | head -1)"
+seedhammer/scripts/chain-mutation-check.sh:142:dirty="$(git status --porcelain -- "$json" gui/testdata/ | head -20)"
+seedhammer/scripts/oracle-live.sh:104:  if ! printf '%s\n' "$mint_out" | grep -q '^=== RUN   TestAssembledMd1MatchesThePrimaryByteForByte$'; then
+seedhammer/scripts/push-via-staging.sh:154:if printf '%s\n' "${CR[@]}" | awk -F'\t' '$2!="completed"{f=1} END{exit !f}'; then
+seedhammer/scripts/push-via-staging.sh:213:if echo "$OUT" | grep -qi "bypassed rule violations"; then
