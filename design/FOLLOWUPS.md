@@ -20193,3 +20193,27 @@ PR #954 concept-NACKed 2026-05-21); the `<2e;2e+1>/*` multipath and the
 `m/87'/0'/i'` key paths must be checked against what md1 can express (md1's
 narrow paths are deliberate, F-417); and a per-epoch template means per-epoch
 md1 cards or a new way to express the epoch.
+
+### F-683 — `ms --help` still offers `hyphen` and `comma` separators, which ms refuses (owning phase: **next mnemonic-secret release**) `#mnemonic-secret` `#docs` `#help`
+
+**Status:** OPEN
+Filed 2026-09-25 from `design/agent-reports/f679-impl.md` and
+`f679-toolkit-impl.md`. ms 0.19.1 rejects `--separator hyphen|comma`, but its
+`--help` still lists them as possible values. mnemonic-gui v0.62.0 dropped them
+from its dropdown after testing the real binary. Fix the help (or the value
+enum) so what `--help` offers is what ms accepts; mk 0.13.0 still accepts both.
+
+### F-684 — the toolkit CHANGELOG at v0.104.0 leaves shipped changes under `[Unreleased]` (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#changelog`
+
+**Status:** OPEN
+Filed 2026-09-25 from `design/agent-reports/f679-impl.md`, confirmed in
+`f679-toolkit-impl.md`. The `--group-size` default of 0, `bitcoin-core-addresses`
+and the argv-secret refusal are in the 0.104.0 binary but listed under
+`[Unreleased]`. Move them under 0.104.0 at the next release.
+
+### F-685 — the mnemonic-gui CHANGELOG has no entries for 0.60.0 or 0.61.0 (owning phase: none — ownerless residue) `#mnemonic-gui` `#changelog`
+
+**Status:** OPEN
+Filed 2026-09-25 from `design/agent-reports/f679-impl.md`. Both versions were
+tagged and released without a CHANGELOG entry; reconstruct them from the tag
+messages and `git log mnemonic-gui-v0.59.0..mnemonic-gui-v0.61.0`.
