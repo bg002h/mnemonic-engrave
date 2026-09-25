@@ -20123,7 +20123,7 @@ Filed 2026-09-23 from the same report.
 
 ### F-678 — md releases since 0.12.0 ship no x86_64 musl binary: the `musl-binary (x86_64-unknown-linux-musl)` leg fails offline on the `miniscript` git source (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#release` `#reproducibility`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-24 by descriptor-mnemonic `d2c8488a` + `b686f949`, merged `141586bb` (pushed, CI green, no bypass). The musl legs now use the three-block `[source]` config built from Cargo.lock (fails closed), a dep-info check proves miniscript compiled from `vendor/`, and the legs run on `workflow_dispatch` (upload stays tag-only). Dispatch gate run 36086241898 green. Reports: `design/agent-reports/f678-impl.md`, `f678-review.md` (0C/0I). The next md tag ships the asset again; 0.20.3 itself is not backfilled, and the aarch64 repro gate is F-680.
 Filed 2026-09-24 while tagging md-cli 0.20.3 (release run 36084793496). The
 leg builds inside the repro container with `--network=none` and stops at
 `error: failed to load source for dependency \`miniscript\``; 0.20.2's run failed
@@ -20145,3 +20145,18 @@ shows any of them working with md 0.20.3 / ms 0.19.0 / mk 0.13.0: v0.61.0's own
 `pinned-upstream.toml` pins md v0.11.0, ms v0.13.0, mk v0.11.0, and its only
 recorded run was a version check. Needed: a GUI release pinned to the current
 CLIs, exercised against them, then one pin in installer and GUI manual alike.
+
+### F-680 — md's aarch64 reproducibility gate never runs, and md 0.20.3 lacks its x86_64 musl asset (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#release` `#reproducibility`
+
+**Status:** OPEN — two operator decisions pending
+Filed 2026-09-24 from `design/agent-reports/f678-impl.md`.
+- `repro-aarch64-musl` is skipped on every run: the caller passes
+  `run_aarch64: false`, so md's published aarch64 artifact is never checked for
+  reproducibility. Enabling it costs 30–60 min per run, and F-675 suggests its
+  negative check may be unable to fail; check that before relying on it. The
+  shipped aarch64 assets for 0.15.0–0.20.3 were built after cross fetched the
+  miniscript git source over the network rather than from `vendor/`.
+- Backfilling 0.20.3's x86_64 musl asset needs a build at `0e5f31d9` on a host
+  with docker and GHCR `read:packages` (the exact command is in the F-678
+  report); this box's user is not in the `docker` group. The alternative is to
+  let the next md release carry the asset.
