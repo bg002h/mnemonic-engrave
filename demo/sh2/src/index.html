@@ -51,17 +51,17 @@
   <div class="code"><pre><code><span class="c"># the descriptor tool</span>
 curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.3/md-0.20.3-macos-amd64.tar.gz
 <span class="c"># the seed tool</span>
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.0/ms-0.20.0-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.1/ms-0.20.1-macos-amd64.tar.gz
 
 tar -xzf md-0.20.3-macos-amd64.tar.gz
-tar -xzf ms-0.20.0-macos-amd64.tar.gz
+tar -xzf ms-0.20.1-macos-amd64.tar.gz
 chmod +x md ms</code></pre></div>
 
   <p>Linux x86-64, ready to paste:</p>
   <div class="code"><pre><code>curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.3/md-0.20.3-linux-amd64.tar.gz
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.0/ms-0.20.0-x86_64-linux-musl.tar.gz
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.1/ms-0.20.1-x86_64-linux-musl.tar.gz
 tar -xzf md-0.20.3-linux-amd64.tar.gz
-tar -xzf ms-0.20.0-x86_64-linux-musl.tar.gz
+tar -xzf ms-0.20.1-x86_64-linux-musl.tar.gz
 chmod +x md ms</code></pre></div>
 
   <div class="note warn">
@@ -87,12 +87,12 @@ chmod +x md ms</code></pre></div>
     the binary is <code>mnemonic</code>.
   </p>
   <div class="code"><pre><code><span class="c"># macOS Intel (swap macos-amd64 -> macos-arm64 on Apple Silicon)</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.105.0/mnemonic-0.105.0-macos-amd64.tar.gz
-tar -xzf mnemonic-0.105.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
-<span class="c"># Windows: mnemonic-0.105.0-windows-amd64.zip from the same release</span>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.105.1/mnemonic-0.105.1-macos-amd64.tar.gz
+tar -xzf mnemonic-0.105.1-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
+<span class="c"># Windows: mnemonic-0.105.1-windows-amd64.zip from the same release</span>
 <span class="c"># Linux x86-64 (static musl):</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.105.0/mnemonic-0.105.0-x86_64-linux-musl.tar.gz
-tar -xzf mnemonic-0.105.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.105.1/mnemonic-0.105.1-x86_64-linux-musl.tar.gz
+tar -xzf mnemonic-0.105.1-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
   <div class="note">
     <b>One version, every platform.</b> macOS, Windows and Linux
     <code>musl</code> all ship from <b>the same release</b> &mdash; the
