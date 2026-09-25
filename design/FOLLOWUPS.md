@@ -20163,3 +20163,15 @@ Filed 2026-09-24 from `design/agent-reports/f678-impl.md`.
   with docker and GHCR `read:packages` (the exact command is in the F-678
   report); this box's user is not in the `docker` group. The alternative is to
   let the next md release carry the asset.
+
+### F-681 — `install.sh --root DIR` leaves man pages in the XDG manpath, and `--help` doesn't say so (owning phase: none — ownerless residue) `#mnemonic-toolkit` `#install` `#docs`
+
+**Status:** OPEN
+Filed 2026-09-24. Measured: `install.sh --no-gui --root <scratch>` put the
+binaries in `<scratch>/bin` and the man pages in `~/.local/share/man/man1`.
+Deliberate and pre-existing (toolkit `15443535` already had `MAN_DIR` default
+to `${XDG_DATA_HOME:-$HOME/.local/share}/man/man1`, set by `--man-dir`, off
+with `--no-man`), but `--root`'s help line and the manual's install page
+imply `--root` contains the install. Fix: one sentence on `--root` (and the
+manual) pointing at `--man-dir`/`--no-man`. A scratch or CI install with
+`--root` otherwise overwrites the user's own man pages.
