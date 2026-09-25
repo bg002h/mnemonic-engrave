@@ -98,7 +98,7 @@ hdr "1 -- ensure the image has a SIGNATURE section"
 # key, producing a double-sealed 3-metadata-block file.
 if HASH_ERR="$(picosign hash "$IMG" 2>&1 >/dev/null)"; then
   ok "SIGNATURE section already present"
-elif printf '%s' "$HASH_ERR" | grep -qiE 'missing SIGNATURE section|missing HASH_DEF item'; then
+elif grep -qiE 'missing SIGNATURE section|missing HASH_DEF item' <<<"$HASH_ERR"; then
   info "no SIGNATURE section; sealing with a throwaway key to create the structure"
   openssl ecparam -name secp256k1 -genkey -noout -out "$WORK/seal.pem"
   picotool seal --sign --clear --quiet "$IMG" "$WORK/sealed.uf2" "$WORK/seal.pem" \
@@ -177,7 +177,8 @@ BLOCKS="$(printf '%s' "$INFO" | grep -ci 'metadata block' || true)"
   || die "expected exactly 2 metadata blocks, found $BLOCKS.
 Three means the image was sealed twice -- rebuild from source and re-sign."
 ok "exactly 2 metadata blocks"
-printf '%s' "$INFO" | grep -qi 'signature: *verified' \
+# F-695: here-strings, never `printf | grep -q`, for captured output (pipefail + SIGPIPE).
+grep -qi 'signature: *verified' <<<"$INFO" \
   || die "picotool does not report 'signature: verified' for this image -- do not flash"
 ok "picotool independently reports: signature verified"
 

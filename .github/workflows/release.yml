@@ -90,7 +90,9 @@ jobs:
           CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA") || { FULL "diff failed"; exit 0; }
           echo "changed files:"; echo "$CHANGED"
           if [ -z "$CHANGED" ]; then FULL "empty diff"; exit 0; fi
-          if echo "$CHANGED" | grep -qvE '^(design/|[^/]+\.md$)'; then
+          # F-695: a here-string, not `echo | grep -q`. No pipefail here today, but
+          # under it an early grep exit can SIGPIPE echo and flip this to docs-only.
+          if grep -qvE '^(design/|[^/]+\.md$)' <<<"$CHANGED"; then
             FULL "non-docs paths present"
           else
             echo "docs_only=true" >> "$GITHUB_OUTPUT"

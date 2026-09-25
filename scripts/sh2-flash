@@ -285,7 +285,10 @@ if [ "$DRY" = 0 ]; then
     [ -f "$SIGNED" ] || die "signing reported success but $SIGNED does not exist"
     # Asserted rather than assumed: whatever path got us here, the thing about to
     # be flashed must carry a signature picotool itself will vouch for.
-    devshell picotool info -a "$SIGNED" 2>/dev/null | grep -q 'signature:.*verified' \
+    # F-695: capture, then grep -- a pipe into grep -q can SIGPIPE picotool under
+    # pipefail. Still refuses if picotool fails or prints no verified signature.
+    { SIGINFO="$(devshell picotool info -a "$SIGNED" 2>/dev/null)" \
+          && grep -q 'signature:.*verified' <<<"$SIGINFO"; } \
         || die "$SIGNED does not carry a signature picotool will verify -- refusing to flash"
     ok "signature verified on the artifact to be flashed"
     ok "flashing $(basename "$SIGNED")"
@@ -302,7 +305,8 @@ fi
 hdr "Device"
 # Checked rather than assumed: a device that is merely plugged in looks the same
 # from here as one in BOOTSEL, and picotool's failure on the former is obscure.
-if ! lsusb 2>/dev/null | grep -qi "$BOOTSEL_ID"; then
+# F-695: capture, then grep (no SIGPIPE-under-pipefail false "not present").
+if ! { USB_LIST="$(lsusb 2>/dev/null)" && grep -qi "$BOOTSEL_ID" <<<"$USB_LIST"; }; then
     die "no RP2350 in BOOTSEL ($BOOTSEL_ID) on the USB bus.
     Hold the button on the control board while connecting USB, then re-run.
     Confirm with: lsusb | grep $BOOTSEL_ID"
