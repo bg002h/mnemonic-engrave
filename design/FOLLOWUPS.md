@@ -20255,7 +20255,7 @@ printing only a warning, unlike the rest of the 0.104.0 refusal table.
 
 ### F-689 — `verify-bundle --ms1 -` reports a false "mismatch" (exit 4) against a matching bundle (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#verify-bundle` `#wrong-result`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-25 on master (toolkit F-687b merge `30afb101`, not yet released): `verify-bundle --ms1 -` reads stdin, gives `result: ok` against a matching bundle, refuses empty (judged after the separator strip), prompts `Enter ms1:` with echo off on a terminal. Reports: `f687b-impl.md`, `f687b-review.md`, `f687b-fold1.md`, `f687b-rereview.md`.
 Filed 2026-09-25 from mnemonic-gui design fold 1 (`design/agent-reports/gui-design-fold1.md`,
 measurements on branch `gui-followups` at `2d244d2`). On mnemonic 0.104.0,
 against a bundle that verifies `result: ok` with the ms1 on argv,
@@ -20274,7 +20274,7 @@ stderr. Reproduction in the review.
 
 ### F-691 — ms and the toolkit disagree on `--passphrase "- "` under `--allow-argv-secret` (owning phase: none — ownerless residue) `#mnemonic-secret` `#mnemonic-toolkit` `#consistency`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-25 on master (ms F-687b merge `f1a1792`, not yet released): only the exact `-` means stdin in both CLIs; `--allow-argv-secret --passphrase "- "` exits 64 in ms as in the toolkit; vector row added.
 Filed 2026-09-25 from `design/agent-reports/f687-rereview.md`. With
 `--allow-argv-secret`, the toolkit's clap layer refuses a space-padded dash;
 ms's argv side-channel substitution accepts it as a literal passphrase.
