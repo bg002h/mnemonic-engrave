@@ -22,40 +22,15 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
   **Reviewer model tiering — fable is NOT the default (user constraint 2026-07-26: "fable 5 is quite expensive, I can't keep using it so freely"):** default to **sonnet** for mechanical/verification passes (does the fold match the findings, do assertions actually assert, do referenced files/flags exist, are there false-PASS paths); use **opus** for design-level adversarial review on risk-set work. **`fable` is NOT a reviewer tier at all (user directive 2026-08-16: "we will not use fable for final review"; "we will use sonnet for the next review of mechanical fold"). This CLOSES the last carve-out** — the previous rule reserved fable for a single highest-stakes gate, "realistically the final pre-execution review immediately before a first irreversible action (e.g. the first OTP write on the real SeedHammer II)". That exception no longer exists: **opus is the top of the ladder, including for the final pre-irreversible review.** Do not propose fable for a gate, a final review, or a pre-flash check. (Unaffected: routing an *operator-shaped decision* to a fable agent instead of stalling — that substitutes for the operator, not for a reviewer tier.) **Amended 2026-08-28 (operator, verbatim): "If you find opus quality sub-par, you may use fable for agent dispatch for spec, plan, or implementation writing or review."** The default is unchanged — opus tops the ladder and fable is never proposed pre-emptively — but *observed* sub-par opus output on spec/plan/implementation writing or review authorizes a fable re-dispatch of that work without asking; the trigger is observed quality on the work at hand, not anticipated difficulty, and each use is stated with its reason. Most of the round-0 findings were mechanical and within sonnet's reach; the model tier is a smaller lever than **independence + a sharp adversarial brief + a tight scope**, so spend effort on the brief before spending it on the tier.
   Non-risk-set work needs no gate: implement and verify inline. (Project standard, shared with `mnemonic-toolkit`.)
 - Design artifacts in `design/`: `RECON_*`, `SPEC_*`, `IMPLEMENTATION_PLAN_*`, `FOLLOWUPS.md`; per-phase opus reviews persist verbatim to `design/agent-reports/`.
-- **The AGENT persists its own report — the controller is never the only copy** (2026-08-09; **PROMOTED 2026-08-16 to a standing rule in `~/.claude/CLAUDE.md` (every instance) and `/scratch/code/CLAUDE.md` (constellation-wide)** at the user's direction — those are now authoritative, and this entry keeps only the repo-specific path and the original rationale). Every dispatched review/recon/audit agent MUST write its findings to `design/agent-reports/<slug>.md` **as its final action**, and return only a short summary plus that path. State the exact filename in the dispatch brief so it is predictable. Rationale, from one session: work stopped at 1% remaining usage with review output un-persisted, and separately a finished agent's output file turned out to be an 876 KB JSONL transcript that could not be read back without overflowing context — the report had to be reconstructed from the task notification. A report that exists only in the controller's context is one interruption or compaction away from being lost, after an opus round has already been paid for. It also makes "verbatim" structural rather than a promise, since the responder never gets the chance to filter it. Agents write **distinct new files**, so this composes with the parallel-isolation rule. The controller still commits the persisted report in its **own** commit before folding, and still independently machine-checks every measurable claim before acting on it.
+- **The AGENT persists its own report** — standing rule in `~/.claude/CLAUDE.md` and `/scratch/code/CLAUDE.md`. Here, reports go to `design/agent-reports/<slug>.md`, written by the agent as its final action; name the exact filename in the brief.
 - Per-phase TDD: tests before impl. Reviewer-loop to 0C/0I applies to risk-set work, with the proportional re-review rule above.
 - SeedHammer firmware work: planning docs live here; upstream PRs branch off `upstream/main`, commits signed + DCO, authored Brian Goss; keep PRs small and focused.
 - **Rust-primary rule for Go constellation ports** (2026-06-20, standing user directive; project-wide). The fork's Go reimplementations of constellation codecs (`md`, `mk`, `codex32`, `slip39`, `bip39`, `seedxor`, `bip85`) are **strictly downstream** of the primary Rust constellation repos — the Go port may NEVER lead. Any change to their **normative behavior** (wire format, identity/stub algorithms, validation, admission) MUST land **first in the primary Rust repo, with test vectors**, and only then be ported to Go. Bind **semantics**, not line-for-line code (the Go port deliberately omits `rust-miniscript` for TinyGo, so a behavior-faithful Go reimplementation is compliant). **Exempt:** (a) fixes that bring a Go port back into conformance with already-correct Rust (convergence, not leading) — BUT whenever a defect is found in a Go port we **MUST always** check whether the same defect exists in the primary Rust implementation; if it does, it is fixed in Rust **first** (with a test vector) and the Go fix becomes the convergence port; only genuinely Go-only porting errors are fixed in Go directly, and the Rust check is never skipped; (b) fork-native firmware/GUI/UX code with no Rust counterpart. Each ported Go package carries a **provenance pin** (Rust crate + version/SHA it tracks) updated on every sync, so drift is auditable.
 - Stage paths explicitly (no `git add -A`).
-- **Push `master` via the `ci/staging` ref, so the required check is SATISFIED
-  rather than bypassed** (established and verified 2026-08-08). Branch
-  protection requires the `test (rust + go)` context, and a status check binds to
-  a **commit SHA**, not a branch — so a commit pushed straight to `master` has no
-  check when the rule is evaluated, reports "expected", and is bypassed. That
-  happened five times in a row; it is a chicken-and-egg in the rule, not a lapse.
-  `strict: false` on the rule is what makes it fixable — GitHub asks only whether
-  the commit carries a passing context. So let the SHA earn it first:
-
-  ```sh
-  git push origin master:refs/heads/ci/staging   # builds this exact SHA
-  gh run watch <id>                              # wait for test (rust + go)
-  git push origin master                         # no bypass message = satisfied
-  git push origin --delete ci/staging
-  ```
-
-  **FREEZE `master` FOR THE WHOLE WINDOW — the ritual assumes the tip does not
-  move.** 2026-08-16: a push agent staged a SHA, and the controller committed
-  twice while CI ran, so the final push carried a tip two commits past the gated
-  one. `strict: false` accepted it against the older gated ancestor and printed
-  "Bypassed rule violations"; two commits reached `origin/master` with zero CI
-  signal. The agent correctly refused to call that success. **No commits to
-  `master` between the staging push and the final push** — hold the work, or
-  re-stage the new tip afterwards and verify it.
-
-  `.github/workflows/release.yml` builds `ci/**` for this reason and explains it
-  at the trigger. `assemble + sign + release` is gated on `refs/tags/v*`, so a
-  `ci/**` push cannot sign or publish — verified: it reported `skipped`. A push
-  that prints "Bypassed rule violations" means the staging step was missed.
+- **Push `master` only via `ci/staging` (`scripts/push-via-staging.sh`); a push
+  that prints "Bypassed rule violations" means the staging step was missed.**
+  **FREEZE `master` for the whole window: no commits between the staging push and
+  the final push.** Rationale and the manual ritual: the `push-master` skill.
 
 ## Toolchain on this machine (2026-09-02)
 
@@ -81,50 +56,3 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
   two are the `mt` package, which arrived after earlier records said "three".
   A gate should diff `gofmt -l` against this five-file set, not assert it
   comes back empty.
-
-## Parallel execution — this machine has 24 CPU cores
-
-**Standing directive (2026-08-19): consider parallel execution for ALL tests,
-cache generation and long calculations.** The defaults use almost none of the
-box. Measured constellation-wide the same day: **824s → 204s (~4×)**.
-
-- **Rust — `cargo nextest run --locked`**, not `cargo test`. `cargo test` runs
-  each test *binary* serially; nextest spreads them over all cores. Per-repo
-  measurements: mnemonic-toolkit 256s→49s, descriptor-mnemonic 40s→27s,
-  mnemonic-engrave 33s→16s, mnemonic-secret 2s→0.3s. `cargo-nextest` 0.9.140 is
-  installed.
-- **Go — shard the package.** `-parallel` does NOTHING unless tests call
-  `t.Parallel()`; the fork's `gui` package has 886 test funcs and zero of them.
-  `mnemonic-engrave/scripts/gui-shard-test.sh <pkg> 24` took `./gui/` from 493s
-  to 112s. It enumerates its partition from `go test -list` and **asserts the
-  union is exhaustive before running**, so it cannot silently drop a test — any
-  replacement must do the same.
-- **Long independent work** — cache/corpus generation, fixture derivation, batch
-  rendering — is a candidate too. Ask whether it is CPU-bound and independent
-  before running it in a loop.
-
-**Speed WITHOUT dropping debug_assertions.** Do NOT reach for `--release` to
-speed tests up — it drops `debug_assertions` and overflow checks, so mutation
-tests and invariant panics stop detecting things while still reporting green.
-Raise the optimisation level instead and keep them:
-
-```toml
-[profile.test]
-opt-level = 2
-
-[profile.dev]
-opt-level = 2
-```
-
-`debug-assertions` defaults to **true** on both profiles, so this is pure gain.
-Measured on descriptor-mnemonic: execution **25.4s → 0.765s**, versus 0.775s for
-`--release` — the same speed, with the checks intact. Verified empirically, not
-inferred: at `opt-level = 2` both `cfg!(debug_assertions)` and an
-`attempt to add with overflow` panic still fire. Cost is a slower first build of
-dependencies, cached thereafter.
-
-**Check what `/tmp` is before building there.** On this box it is a 32 GB tmpfs,
-and a scratch worktree's `target/` filled it and killed a running test.
-
-**Never run the same suite twice** to collect counts and failures separately.
-Capture once to a file, then grep it — otherwise every measurement costs double.
