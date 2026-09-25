@@ -20228,7 +20228,7 @@ corrected; the CLI's own help text was not.
 
 ### F-687 — `--passphrase -` and `--passphrase @env:VAR` are taken as the LITERAL passphrase, silently deriving a different wallet (owning phase: **next mnemonic-toolkit and mnemonic-secret releases**) `#mnemonic-toolkit` `#mnemonic-secret` `#funds-safety` `#passphrase`
 
-**Status:** OPEN — **RULED 2026-09-25 (operator, verbatim):** *"Don't refuse --passphrase - or env but print message to stderr how to accomplish same goal more securely. Sometimes this software will run on a secure offline computer."* So: keep the literal behaviour (exit unchanged), and print a stderr note saying the value was used as the literal passphrase and naming the private channel (`--passphrase-stdin`, and for the toolkit the flag's real `@env:` form where one exists).
+**Status:** OPEN — **RULED 2026-09-25 (operator).** First ruling: *"Don't refuse --passphrase - or env but print message to stderr how to accomplish same goal more securely. Sometimes this software will run on a secure offline computer."* Clarified the same day: *"NoBody ever wants those as passphrase."* — and confirmed ("Yes exactly") this reading: `--passphrase -` reads the passphrase from **stdin** and `--passphrase @env:VAR` from the **environment**, consistently in both CLIs on every command; nothing is refused; a passphrase given literally on argv keeps working and prints a stderr note naming the safer forms (`-` / `--passphrase-stdin`, `@env:VAR`). Changes what those two values derive, so Rust-primary with vectors.
 Filed 2026-09-25 from mnemonic-gui `design/DESIGN_secret_channels_and_new_forms.md`
 (measurement scripts in `design/measurements/secret-channels/`). Controller
 reproduced on ms 0.19.1, BIP-39 test vector "abandon ×11 about":
