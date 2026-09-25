@@ -20281,3 +20281,12 @@ ms's argv side-channel substitution accepts it as a literal passphrase.
 Pre-existing (argv-admission architecture), not introduced by F-687. Also:
 `/proc/self/fd/0` is untested by name in both repos (the inode fallback covers
 it on Linux).
+
+### F-692 — more secret inputs take `-` literally: `xpub-search --ms1`, `import-wallet --ms1`/`--slot`, `silent-payment`/`nostr --secret` (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#stdin`
+
+**Status:** OPEN
+Filed 2026-09-25 from `design/agent-reports/f687b-impl.md`. Measured on the
+F-687b branch: these take `-` literally rather than reading stdin. All fail
+with an error (none silently derives a wallet), so this is ergonomics and
+consistency, not a wrong-result defect. Same remedy as F-689: `-` means stdin,
+one stdin per invocation, through the shared resolver.
