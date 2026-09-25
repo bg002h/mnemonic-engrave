@@ -20301,3 +20301,27 @@ Filed 2026-09-25 after the ms 0.20.0 / toolkit 0.105.0 release. Toolkit CI
 Linux refuses. `path_is_stdin` compares against `metadata("/dev/stdin")`, which
 on macOS doesn't resolve to fd 0's underlying file. macOS jobs are not required
 checks, so the release shipped with it. Fix: fstat fd 0 directly.
+
+### F-694 — publish the current GUI manual (with the five new forms and secret channels) alongside the next mnemonic-gui release (owning phase: **next mnemonic-gui release**) `#mnemonic-toolkit` `#manual-gui` `#pages`
+
+**Status:** OPEN
+Filed 2026-09-25. The GUI's help icons deep-link into
+`https://bg002h.github.io/mnemonic-toolkit/manual-gui/`. GitHub Pages had failed
+every build since 2026-07-06 (legacy Jekyll; fixed today by adding `.nojekyll`
+to `gh-pages`, commit `62266e09`: build `built`, live page byte-identical to the
+branch). The live manual is `manual-gui-v1.3.1`, with a large `[Unreleased]`
+since. It has no anchors for the GUI's new forms (`md-compose`, `ms-hashlock`,
+…; measured absent). Needed: the five manual pages the GUI design assigns to a
+paired toolkit PR, a secret-channels section, then tag `manual-gui-v*` so
+`manual-gui.yml` publishes, and check the new anchors resolve on the live site.
+
+### F-695 — sweep `producer | grep -q` (and `| head`) under `pipefail` in CI and gate scripts (owning phase: none — ownerless residue) `#ci` `#scripts` `#flaky`
+
+**Status:** OPEN — sweep in progress
+Filed 2026-09-25. Third occurrence of one class (toolkit F-675 residue check,
+mk release smoke test `65a526c`): under `pipefail`, `grep -q`/`head` exits
+early, the producer dies of SIGPIPE, and the pipeline reports failure (a
+flaky red, or worse a gate that fails OPEN when the result feeds an `if`).
+About 20 instances across the repos; most are small builtin writes (harmless),
+but some are gates (push-via-staging's bypass detector; `picotool info |
+grep …verified` in sh2-flash and the OTP rehearsal).
