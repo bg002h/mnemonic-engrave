@@ -20175,3 +20175,21 @@ with `--no-man`), but `--root`'s help line and the manual's install page
 imply `--root` contains the install. Fix: one sentence on `--root` (and the
 manual) pointing at `--man-dir`/`--no-man`. A scratch or CI install with
 `--root` otherwise overwrites the user's own man pages.
+
+### F-682 — Refugium: an epoch-based deep cold storage wallet family (owning phase: none — idea, not yet brainstormed) `#idea` `#wallet-design` `#timelocks` `#inheritance`
+
+**Status:** OPEN — idea only; not specced, ruled or brainstormed
+Filed 2026-09-24 at the operator's request. The idea is recorded verbatim in
+`design/IDEA_refugium.md`. In short: one Taproot/miniscript policy template
+instantiated per "epoch" with absolute deadlines shifted by e·Δ, funds
+migrated from prior-epoch "relicts" to the current epoch to extend the
+deadlines, and ~100 epochs of descriptors precomputed so heirs can recover
+with standard tools.
+
+Known constellation constraints to check at brainstorm time (not rulings):
+the optional `musig(@0,@1,@2)` internal key is blocked upstream (see
+descriptor-mnemonic FOLLOWUPS `musig-bip390-encode-support`: rust-miniscript
+PR #954 concept-NACKed 2026-05-21); the `<2e;2e+1>/*` multipath and the
+`m/87'/0'/i'` key paths must be checked against what md1 can express (md1's
+narrow paths are deliberate, F-417); and a per-epoch template means per-epoch
+md1 cards or a new way to express the epoch.
