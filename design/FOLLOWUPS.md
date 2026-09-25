@@ -20228,7 +20228,7 @@ corrected; the CLI's own help text was not.
 
 ### F-687 — `--passphrase -` and `--passphrase @env:VAR` are taken as the LITERAL passphrase, silently deriving a different wallet (owning phase: **next mnemonic-toolkit and mnemonic-secret releases**) `#mnemonic-toolkit` `#mnemonic-secret` `#funds-safety` `#passphrase`
 
-**Status:** OPEN — needs an operator ruling on the remedy
+**Status:** OPEN — **RULED 2026-09-25 (operator, verbatim):** *"Don't refuse --passphrase - or env but print message to stderr how to accomplish same goal more securely. Sometimes this software will run on a secure offline computer."* So: keep the literal behaviour (exit unchanged), and print a stderr note saying the value was used as the literal passphrase and naming the private channel (`--passphrase-stdin`, and for the toolkit the flag's real `@env:` form where one exists).
 Filed 2026-09-25 from mnemonic-gui `design/DESIGN_secret_channels_and_new_forms.md`
 (measurement scripts in `design/measurements/secret-channels/`). Controller
 reproduced on ms 0.19.1, BIP-39 test vector "abandon ×11 about":
