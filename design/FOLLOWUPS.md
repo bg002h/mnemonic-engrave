@@ -20252,3 +20252,15 @@ Filed 2026-09-25 from the same design doc. `import-wallet --ms1`,
 `seed-xor combine --share`, `slip39 combine --share` and `ms-shares combine
 --share` run with secret material on argv without `--allow-argv-secret`,
 printing only a warning, unlike the rest of the 0.104.0 refusal table.
+
+### F-689 — `verify-bundle --ms1 -` reports a false "mismatch" (exit 4) against a matching bundle (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#verify-bundle` `#wrong-result`
+
+**Status:** OPEN
+Filed 2026-09-25 from mnemonic-gui design fold 1 (`design/agent-reports/gui-design-fold1.md`,
+measurements on branch `gui-followups` at `2d244d2`). On mnemonic 0.104.0,
+against a bundle that verifies `result: ok` with the ms1 on argv,
+`verify-bundle --ms1 -` (ms1 on stdin) exits 4 "mismatch": the `-` is taken
+literally instead of as stdin, and every wrong secret produces the same
+mismatch text, so the user is told a good backup is bad. `--passphrase -` on
+verify-bundle does the same and is covered by F-687's resolver. Fix `--ms1 -`
+the same way: `-` means stdin, one stdin per invocation.
