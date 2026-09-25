@@ -20271,3 +20271,13 @@ the same way: `-` means stdin, one stdin per invocation.
 Filed 2026-09-25 from `design/agent-reports/f687-review.md` (F1). When a
 passphrase value looks like a flag, some error paths echo the value back on
 stderr. Reproduction in the review.
+
+### F-691 — ms and the toolkit disagree on `--passphrase "- "` under `--allow-argv-secret` (owning phase: none — ownerless residue) `#mnemonic-secret` `#mnemonic-toolkit` `#consistency`
+
+**Status:** OPEN
+Filed 2026-09-25 from `design/agent-reports/f687-rereview.md`. With
+`--allow-argv-secret`, the toolkit's clap layer refuses a space-padded dash;
+ms's argv side-channel substitution accepts it as a literal passphrase.
+Pre-existing (argv-admission architecture), not introduced by F-687. Also:
+`/proc/self/fd/0` is untested by name in both repos (the inode fallback covers
+it on Linux).
