@@ -20120,3 +20120,17 @@ Filed 2026-09-23 from the same report.
 - The installed `mk` is built from mnemonic-key main but still says 0.13.0.
 - `examples` is a required check with a push-paths filter, so a docs-only
   commit cannot earn it via `push-via-staging.sh`.
+
+### F-678 — md releases since 0.12.0 ship no x86_64 musl binary: the `musl-binary (x86_64-unknown-linux-musl)` leg fails offline on the `miniscript` git source (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#release` `#reproducibility`
+
+**Status:** OPEN
+Filed 2026-09-24 while tagging md-cli 0.20.3 (release run 36084793496). The
+leg builds inside the repro container with `--network=none` and stops at
+`error: failed to load source for dependency \`miniscript\``; 0.20.2's run failed
+the same way. Measured via `gh api`: the last md release carrying
+`md-*-x86_64-linux-musl.tar.gz` / `SHA256SUMS.x86_64` is 0.12.0; 0.15.0 through
+0.20.3 have neither. `repro-aarch64-musl` was also `skipped` on 0.20.3. Same
+class as F-675 (toolkit) and the ms `mnemonic-io-lib` entry above: an offline
+build with a git dependency no replacement stanza covers. Impact is limited —
+x86_64 Linux users get `md-*-linux-amd64` (glibc) and the toolkit installer
+maps to it — but the reproducible, provenance-bearing x86_64 artifact is gone.
