@@ -14,10 +14,10 @@ one:
 # md -- the descriptor tool
 curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.3/md-0.20.3-macos-amd64.tar.gz
 # ms -- the seed tool
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/ms-0.19.0-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.1/ms-0.19.1-macos-amd64.tar.gz
 
 tar -xzf md-0.20.3-macos-amd64.tar.gz
-tar -xzf ms-0.19.0-macos-amd64.tar.gz
+tar -xzf ms-0.19.1-macos-amd64.tar.gz
 chmod +x md ms && ./md --version && ./ms --version
 ```
 
@@ -29,7 +29,7 @@ to make a binary look broken.
 Each release carries `SHA256SUMS.portable`; verify before running:
 
 ```sh
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.0/SHA256SUMS.portable
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.19.1/SHA256SUMS.portable
 shasum -a 256 -c SHA256SUMS.portable --ignore-missing
 ```
 
