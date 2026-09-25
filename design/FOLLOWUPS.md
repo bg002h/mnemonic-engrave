@@ -20137,7 +20137,7 @@ maps to it — but the reproducible, provenance-bearing x86_64 artifact is gone.
 
 ### F-679 — three different mnemonic-gui pins, none of them recorded as compatible with today's CLIs (owning phase: **next mnemonic-gui release**) `#mnemonic-gui` `#mnemonic-toolkit` `#install`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-25. One GUI version now everywhere: **mnemonic-gui v0.62.0** (tag at mnemonic-gui `9f569e1`, released), pinned to and tested against mnemonic 0.104.0, md 0.20.3, ms 0.19.1, mk 0.13.0; x86_64-linux-gnu glibc floor 2.39 -> 2.18 (measured on the published asset). Review found an ms defect first, fixed upstream as **ms-cli 0.19.1** (mnemonic-secret `91d1fd7`: an admitted argv secret is not a stdin read; verify, derive, combine). The toolkit installer and GUI manual pin v0.62.0 + ms 0.19.1 via PR #88 → `993155de`, with a new gate (manual-gui lint phase 13) against manual/installer version drift. Reports: `f679-impl.md`, `f679-review.md`, `f679-fold{1,2}.md`, `f679-rereview.md`, `f679-ms-stdin-{impl,review}.md`, `f679-toolkit-{impl,review,fold1,rereview}.md`. Residue: F-683, F-684, F-685, F-686; GUI-side follow-ups filed in mnemonic-gui (argv secrets over stdin, `restore --from` secret, unsurfaced subcommands).
 Filed 2026-09-24 from `design/agent-reports/f676-fold1.md`. The toolkit
 installer pins mnemonic-gui v0.59.0 (since toolkit `de140a08`, 2026-07-12), the
 GUI manual documents v0.57.0, and the latest release is v0.61.0. No record
@@ -20166,7 +20166,7 @@ Filed 2026-09-24 from `design/agent-reports/f678-impl.md`.
 
 ### F-681 — `install.sh --root DIR` leaves man pages in the XDG manpath, and `--help` doesn't say so (owning phase: none — ownerless residue) `#mnemonic-toolkit` `#install` `#docs`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-25. mnemonic-toolkit `65ba3c22` in PR #88 → `993155de`: `--help` and the manual say `--root` covers the binaries only; man pages go to `--man-dir` (or nowhere with `--no-man`).
 Filed 2026-09-24. Measured: `install.sh --no-gui --root <scratch>` put the
 binaries in `<scratch>/bin` and the man pages in `~/.local/share/man/man1`.
 Deliberate and pre-existing (toolkit `15443535` already had `MAN_DIR` default
