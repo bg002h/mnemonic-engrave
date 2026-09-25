@@ -20217,3 +20217,11 @@ and the argv-secret refusal are in the 0.104.0 binary but listed under
 Filed 2026-09-25 from `design/agent-reports/f679-impl.md`. Both versions were
 tagged and released without a CHANGELOG entry; reconstruct them from the tag
 messages and `git log mnemonic-gui-v0.59.0..mnemonic-gui-v0.61.0`.
+
+### F-686 — `mnemonic restore --help` still says depth-≥2 taproot trees are refused; 0.104.0 restores them (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#help`
+
+**Status:** OPEN
+Filed 2026-09-25 from `design/agent-reports/f679-toolkit-review.md` (M-1) and
+`f679-toolkit-fold1.md`. Measured: `mnemonic restore --md1` with a depth-2 tap
+tree exits 0 and its first address matches the export. The GUI manual was
+corrected; the CLI's own help text was not.
