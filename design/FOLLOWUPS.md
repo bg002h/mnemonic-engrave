@@ -20290,3 +20290,14 @@ F-687b branch: these take `-` literally rather than reading stdin. All fail
 with an error (none silently derives a wallet), so this is ergonomics and
 consistency, not a wrong-result defect. Same remedy as F-689: `-` means stdin,
 one stdin per invocation, through the shared resolver.
+
+### F-693 — macOS: a path that IS stdin by inode isn't detected, so `--secret-file f --passphrase -` with `< f` silently uses the file as the passphrase (owning phase: **patch release ms 0.20.1 / toolkit 0.105.1**) `#mnemonic-toolkit` `#mnemonic-secret` `#macos` `#wrong-result`
+
+**Status:** OPEN — fix in progress
+Filed 2026-09-25 after the ms 0.20.0 / toolkit 0.105.0 release. Toolkit CI
+`test (macos-latest)`, run 36188069667, fails
+`a_path_that_is_stdin_is_a_second_stdin_reader`
+(`tests/cli_f687_passphrase_channels.rs:867`): exit 0 and a derived wallet where
+Linux refuses. `path_is_stdin` compares against `metadata("/dev/stdin")`, which
+on macOS doesn't resolve to fd 0's underlying file. macOS jobs are not required
+checks, so the release shipped with it. Fix: fstat fd 0 directly.
