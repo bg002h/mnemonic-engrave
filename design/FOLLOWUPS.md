@@ -20293,7 +20293,7 @@ one stdin per invocation, through the shared resolver.
 
 ### F-693 — macOS: a path that IS stdin by inode isn't detected, so `--secret-file f --passphrase -` with `< f` silently uses the file as the passphrase (owning phase: **patch release ms 0.20.1 / toolkit 0.105.1**) `#mnemonic-toolkit` `#mnemonic-secret` `#macos` `#wrong-result`
 
-**Status:** OPEN — fix in progress
+**Status:** CLOSED 2026-09-25. Released as **ms-cli 0.20.1** (tag at mnemonic-secret `cfbcfdd`) and **mnemonic-toolkit 0.105.1** (tag at `1402d547`, merged via PR #90). `path_is_stdin` now fstats a duplicate of fd 0 itself and compares dev+inode; macOS `test (macos-latest)` green on the fix and both releases, and **now a REQUIRED check in both repos** (operator, 2026-09-25). Installer verified against the published assets (32/32; real install gives mnemonic 0.105.1, md 0.20.3, ms 0.20.1, mk 0.13.0). Report: `design/agent-reports/f687e-macos.md`.
 Filed 2026-09-25 after the ms 0.20.0 / toolkit 0.105.0 release. Toolkit CI
 `test (macos-latest)`, run 36188069667, fails
 `a_path_that_is_stdin_is_a_second_stdin_reader`
