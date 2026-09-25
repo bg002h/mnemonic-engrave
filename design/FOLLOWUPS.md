@@ -20148,7 +20148,7 @@ CLIs, exercised against them, then one pin in installer and GUI manual alike.
 
 ### F-680 — md's aarch64 reproducibility gate never runs, and md 0.20.3 lacks its x86_64 musl asset (owning phase: **next descriptor-mnemonic release**) `#descriptor-mnemonic` `#release` `#reproducibility`
 
-**Status:** OPEN — operator ruled 2026-09-24: **no backfill** of 0.20.3 (the next md
+**Status:** CLOSED 2026-09-24. **No backfill** (operator): md's next release ships the x86_64 musl asset. **aarch64 reproducibility gates on** in all four callers (`run_aarch64: true`; md/ms/mk repinned to toolkit `4120af85`, which carries F-675's residue-check fix): descriptor-mnemonic `4bfadd4e`, mnemonic-secret `36be26e`, mnemonic-key `ae48c81` (staging pushes, CI green, no bypass), mnemonic-toolkit via PR #87 → `77a0d172` (clippy is path-filtered on push). Dispatch gates, `repro-aarch64-musl` = success: dm 36093609331, ms 36093611840, mk 36093614333, toolkit repro-drift 36093616833; the leg takes ~4-10 min, not 30-60. The remap-off negative check found `/project` residue in every repo (99-485 matches), so it can fail. Gap: toolkit `man-pages.yml` is tag-only, so its caller first runs at the next toolkit tag. Report: `design/agent-reports/f680-impl.md`.
 release ships the x86_64 musl asset), and **turn the aarch64 reproducibility
 checks on** in all four callers (md, ms, mk, toolkit), after the toolkit's
 F-675 residue-check fix merges and the callers pin that toolkit commit.
