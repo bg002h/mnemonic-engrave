@@ -20213,7 +20213,7 @@ and the argv-secret refusal are in the 0.104.0 binary but listed under
 
 ### F-685 — the mnemonic-gui CHANGELOG has no entries for 0.60.0 or 0.61.0 (owning phase: none — ownerless residue) `#mnemonic-gui` `#changelog`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-25 by mnemonic-gui `5956da2` on branch `gui-followups` (entries rebuilt from the tag messages and `git log`; merges with that branch). Report: `design/agent-reports/gui-followups-phase1.md`.
 Filed 2026-09-25 from `design/agent-reports/f679-impl.md`. Both versions were
 tagged and released without a CHANGELOG entry; reconstruct them from the tag
 messages and `git log mnemonic-gui-v0.59.0..mnemonic-gui-v0.61.0`.
@@ -20225,3 +20225,30 @@ Filed 2026-09-25 from `design/agent-reports/f679-toolkit-review.md` (M-1) and
 `f679-toolkit-fold1.md`. Measured: `mnemonic restore --md1` with a depth-2 tap
 tree exits 0 and its first address matches the export. The GUI manual was
 corrected; the CLI's own help text was not.
+
+### F-687 — `--passphrase -` and `--passphrase @env:VAR` are taken as the LITERAL passphrase, silently deriving a different wallet (owning phase: **next mnemonic-toolkit and mnemonic-secret releases**) `#mnemonic-toolkit` `#mnemonic-secret` `#funds-safety` `#passphrase`
+
+**Status:** OPEN — needs an operator ruling on the remedy
+Filed 2026-09-25 from mnemonic-gui `design/DESIGN_secret_channels_and_new_forms.md`
+(measurement scripts in `design/measurements/secret-channels/`). Controller
+reproduced on ms 0.19.1, BIP-39 test vector "abandon ×11 about":
+`printf TREZOR | ms derive --allow-argv-secret --phrase <P> --passphrase-stdin`
+→ fingerprint `b4e3f5ed`; `… --passphrase -` → `66d564d1`, exit 0, **even with
+TREZOR on stdin**. The design reports the same on every toolkit subcommand it
+measured, and `@env:VAR` taken literally on `silent-payment` and `ms derive`.
+Help does not promise `-` = stdin for `--passphrase`, but other inputs in both
+CLIs do treat `-` (and toolkit `@env:`) as a channel, so a user who writes
+`--passphrase -` and pipes the real passphrase gets a wallet they cannot later
+restore with it. Remedy options: refuse `-` and `@env:*` as a literal
+passphrase with a pointer to `--passphrase-stdin` (plus an explicit escape if a
+literal `-` passphrase must stay expressible), or make them channels
+consistently. Rust-primary: fix in the CLIs, with vectors, before any GUI or Go
+port relies on it.
+
+### F-688 — toolkit 0.104.0 still accepts four argv secrets with only a warning (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#secret-handling`
+
+**Status:** OPEN — secret-handling class: logged, non-gating (operator ruling 2026-08-27)
+Filed 2026-09-25 from the same design doc. `import-wallet --ms1`,
+`seed-xor combine --share`, `slip39 combine --share` and `ms-shares combine
+--share` run with secret material on argv without `--allow-argv-secret`,
+printing only a warning, unlike the rest of the 0.104.0 refusal table.
