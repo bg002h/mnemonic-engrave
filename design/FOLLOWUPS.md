@@ -20134,3 +20134,14 @@ class as F-675 (toolkit) and the ms `mnemonic-io-lib` entry above: an offline
 build with a git dependency no replacement stanza covers. Impact is limited —
 x86_64 Linux users get `md-*-linux-amd64` (glibc) and the toolkit installer
 maps to it — but the reproducible, provenance-bearing x86_64 artifact is gone.
+
+### F-679 — three different mnemonic-gui pins, none of them recorded as compatible with today's CLIs (owning phase: **next mnemonic-gui release**) `#mnemonic-gui` `#mnemonic-toolkit` `#install`
+
+**Status:** OPEN
+Filed 2026-09-24 from `design/agent-reports/f676-fold1.md`. The toolkit
+installer pins mnemonic-gui v0.59.0 (since toolkit `de140a08`, 2026-07-12), the
+GUI manual documents v0.57.0, and the latest release is v0.61.0. No record
+shows any of them working with md 0.20.3 / ms 0.19.0 / mk 0.13.0: v0.61.0's own
+`pinned-upstream.toml` pins md v0.11.0, ms v0.13.0, mk v0.11.0, and its only
+recorded run was a version check. Needed: a GUI release pinned to the current
+CLIs, exercised against them, then one pin in installer and GUI manual alike.
