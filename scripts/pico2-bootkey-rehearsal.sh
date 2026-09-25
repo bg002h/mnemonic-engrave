@@ -177,10 +177,11 @@ otp_field() {
 $out"
   # CRIT1 is RBIT-8 and BOOT_FLAGS1 is RBIT-3; an inconsistent redundant read
   # must not be parsed as a clean value.
-  # F-695: here-strings for every WARNING trap, never `printf | grep -q`: under
-  # pipefail a SIGPIPE'd printf makes the pipeline false and `&& die` is SKIPPED,
-  # so the trap would fail OPEN.
-  grep -qi 'WARNING' <<<"$out" \
+  # F-695: every WARNING trap is a pure-bash test, never `printf | grep -q`:
+  # under pipefail a SIGPIPE'd printf makes the pipeline false and `&& die` is
+  # SKIPPED (fail OPEN). Not a here-string either: at >=64 KiB bash backs one
+  # with a temp file, and a full /tmp would skip grep and the trap (review M1).
+  [[ ${out,,} == *warning* ]] \
     && die "picotool reported a warning reading $sel (redundant rows disagree or ECC invalid):
 $out"
   v="$(printf '%s\n' "$out" | grep -iE '^[[:space:]]*field ' | tail -1 \
@@ -208,7 +209,7 @@ read_rows() {
   local out want=$# got
   out="$(picotool otp get -n -e "$@" 2>&1)" || die "OTP read failed for: $*
 $out"
-  grep -qi 'WARNING' <<<"$out" \
+  [[ ${out,,} == *warning* ]] \
     && die "picotool reported a warning reading: $*
 $out"
   ROWVALS="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' \
@@ -373,7 +374,7 @@ $out"
   # row (picotool prints `OTP_DATA_BOOT_FLAGS1 (RBIT-3)`) while `0x04c`/`0x04d`
   # print bare, so the three reads are NOT symmetric and the A/B/C comparison
   # below cannot be the thing that catches a degraded row. This trap is.
-  grep -qi 'WARNING' <<<"$out" \
+  [[ ${out,,} == *warning* ]] \
     && die "picotool reported a warning reading row $sel (redundant rows disagree or ECC invalid):
 $out"
   v="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' | tail -1 \
