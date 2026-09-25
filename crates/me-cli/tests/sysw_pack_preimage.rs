@@ -590,3 +590,151 @@ fn the_collision_sentence_survives_where_it_is_true_and_only_there() {
          false here: {e}"
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// F-677: a `phrase:` record that LOOKS LIKE a digest in hex stops, exactly as
+// `ms hashlock` stops (F-539): same rule (`ms_codec::hashlock::looks_like_digest`),
+// same override flag, same message vocabulary.
+// ─────────────────────────────────────────────────────────────────────────
+
+/// A sha256 digest and a hash160 digest, in hex. Neither is a phrase anyone
+/// chose; both are what an operator holding a digest would paste.
+const DIGEST64: &str = ANCHOR_HARDENED_H;
+const DIGEST40: &str = "751e76e8199196d454941c45d1b3a323f1433bd6";
+
+/// `ms hashlock`'s shipped sentences (ms-cli src/cmd/hashlock.rs), verbatim.
+const MS_WIDTH_64: &str = "that phrase is 64 hex characters, the width of a digest.";
+const MS_ASCII: &str =
+    "Hashing it commits the wallet to the ASCII of those characters, NOT to the digest they spell.";
+const MS_FINISHED: &str = "If you already hold a DIGEST, it is finished";
+const MS_OVERRIDE: &str =
+    "If you really meant this as a phrase, re-run with --phrase-looks-like-digest-ok.";
+
+/// MUTATION: drop the `looks_like_digest` rule from `admit_check` -> every
+/// row packs at exit 0 and this reds.
+#[test]
+fn a_digest_shaped_phrase_warns_and_stops() {
+    for phrase in [
+        DIGEST64.to_string(),
+        DIGEST40.to_string(),
+        DIGEST64.to_uppercase(),
+    ] {
+        for method in ["hardened", "sha256"] {
+            let o = run_with(
+                &["--no-passphrase", "--pack-preimage"],
+                &[PLATE, &phrase_record(method, &phrase)],
+            );
+            assert!(
+                !o.status.success(),
+                "a {}-hex phrase packed without confirmation ({method})",
+                phrase.len()
+            );
+            let e = stderr(&o);
+            let width = format!(
+                "that phrase is {} hex characters, the width of a digest.",
+                phrase.len()
+            );
+            for want in [
+                "record 1, as given (records count from 0)",
+                width.as_str(),
+                MS_ASCII,
+                MS_FINISHED,
+                "me sysw pack 'hash:[<kind>:]<digest>'",
+                MS_OVERRIDE,
+            ] {
+                assert!(e.contains(want), "missing {want:?}: {e}");
+            }
+            // The phrase is SECRET: the refusal names its width, never its text.
+            assert!(!e.contains(&phrase), "the refusal printed the phrase: {e}");
+        }
+    }
+}
+
+/// The override admits it, and only the flag the refusal names does.
+/// MUTATION: ignore `phrase_looks_like_digest_ok` in `admit_check` -> reds.
+#[test]
+fn the_override_admits_a_digest_shaped_phrase() {
+    for phrase in [DIGEST64, DIGEST40] {
+        let o = run_with(
+            &[
+                "--no-passphrase",
+                "--pack-preimage",
+                "--phrase-looks-like-digest-ok",
+            ],
+            &[&phrase_record("hardened", phrase)],
+        );
+        assert!(o.status.success(), "{phrase}: {}", stderr(&o));
+        assert!(!stderr(&o).contains(MS_WIDTH_64), "{}", stderr(&o));
+    }
+}
+
+/// The rule is `ms`'s and nothing wider: one character either side of each
+/// digest width, a non-hex 64, and a phrase with a space all pack untouched.
+/// MUTATION: test `len >= 40` instead of the kinds' widths -> reds.
+#[test]
+fn only_the_digest_widths_stop() {
+    let nonhex = format!("{}g", &DIGEST64[..63]);
+    let spaced = format!("{} {}", &DIGEST64[..31], &DIGEST64[32..]);
+    for phrase in [
+        &DIGEST64[..63],
+        &DIGEST40[..39],
+        &format!("{DIGEST40}a")[..],
+        &format!("{DIGEST64}a")[..],
+        nonhex.as_str(),
+        spaced.as_str(),
+        ANCHOR,
+    ] {
+        let o = run_with(
+            &["--no-passphrase", "--pack-preimage"],
+            &[&phrase_record("hardened", phrase)],
+        );
+        assert!(o.status.success(), "{} chars: {}", phrase.len(), stderr(&o));
+    }
+}
+
+/// F-246's order: the stop comes BEFORE the passphrase ceremony, so nobody is
+/// told to write down twelve words for a payload that is not built.
+#[test]
+fn the_stop_precedes_the_passphrase_ceremony() {
+    let o = run_with(
+        &["--pack-preimage"],
+        &[&phrase_record("hardened", DIGEST64)],
+    );
+    assert!(!o.status.success());
+    let e = stderr(&o);
+    assert!(e.contains(MS_WIDTH_64), "{e}");
+    assert!(!e.to_lowercase().contains("write this down"), "{e}");
+    // Not vacuous: the SAME invocation, confirmed, does reach the ceremony.
+    let o = run_with(
+        &["--pack-preimage", "--phrase-looks-like-digest-ok"],
+        &[&phrase_record("hardened", DIGEST64)],
+    );
+    assert!(o.status.success(), "{}", stderr(&o));
+    assert!(stderr(&o).to_lowercase().contains("write this down"));
+}
+
+/// The library rule, directly: the override is an `Admission` field and the
+/// refusal is a distinct error carrying index and width.
+#[test]
+fn admit_check_names_the_record_and_the_width() {
+    use mnemonic_engrave::sysw::{admit_check, Admission, SyswError};
+    let recs = vec![PLATE.to_string(), phrase_record("sha256", DIGEST40)];
+    let adm = Admission {
+        pack_preimage: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        admit_check(&recs, adm),
+        Err(SyswError::PhraseLooksLikeDigest(1, 40))
+    );
+    assert_eq!(
+        admit_check(
+            &recs,
+            Admission {
+                phrase_looks_like_digest_ok: true,
+                ..adm
+            }
+        ),
+        Ok(())
+    );
+}

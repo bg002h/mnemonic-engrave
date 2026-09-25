@@ -100,6 +100,11 @@ pub enum SyswError {
     /// NOT an `Unclassifiable`: the record is perfectly well understood. The
     /// class rides along so the message can name which carrier it was.
     PreimageNotAdmitted(usize, record::Class),
+    /// A `phrase:` record, at this index, whose phrase is this many hex
+    /// characters, the width of a digest, in a payload that did not pass
+    /// `--phrase-looks-like-digest-ok` (F-677; `ms hashlock`'s F-539 stop).
+    /// Carries the width, never the phrase: the phrase is SECRET.
+    PhraseLooksLikeDigest(usize, usize),
 }
 
 /// The 4-character id of a kind-`0x03` record, as far as admission cares.
@@ -287,6 +292,16 @@ pub struct Admission {
     /// makes encrypting seed material explicit. It is NOT `--seal-secret` and
     /// the two do not substitute.
     pub pack_preimage: bool,
+    /// Admit a `phrase:` record whose phrase LOOKS LIKE a digest in hex
+    /// (F-677): exactly 40 or 64 hex characters, `ms hashlock`'s F-539 rule
+    /// ([`ms_codec::hashlock::looks_like_digest`]) and its override's name.
+    ///
+    /// Without it such a record stops at admission. Hashing it commits the
+    /// wallet to the ASCII of those characters, not to the digest they spell,
+    /// so an operator who pasted a digest would hold a preimage they do not
+    /// know they hold. It is a confirmation, not a wall (operator ruling
+    /// 2026-09-16): an all-hex phrase someone really chose still packs.
+    pub phrase_looks_like_digest_ok: bool,
 }
 
 /// Which section a record belongs in.
@@ -541,6 +556,21 @@ pub fn admit_check(records: &[String], adm: Admission) -> Result<(), SyswError> 
         // refusal message lie about what `me` found.
         if !adm.pack_preimage && matches!(class, record::Class::Preimage | record::Class::Phrase) {
             return Err(SyswError::PreimageNotAdmitted(i, class));
+        }
+        // F-677: `ms hashlock`'s F-539 stop, on the one other surface that
+        // hashes a phrase. The SAME predicate, called on the phrase as the
+        // record carries it (everything after the first comma, no trim, no
+        // case fold), so the two tools cannot disagree about which phrase
+        // stops. Admission, not classification: the record is still a
+        // `Phrase`, and `--expect`/sealing see it as one.
+        if matches!(class, record::Class::Phrase) && !adm.phrase_looks_like_digest_ok {
+            if let Some(Ok(composer_records::ComposerRecord::Phrase(p))) =
+                composer_records::parse(r)
+            {
+                if let Some(chars) = ms_codec::hashlock::looks_like_digest(p.phrase.as_bytes()) {
+                    return Err(SyswError::PhraseLooksLikeDigest(i, chars));
+                }
+            }
         }
     }
     Ok(())

@@ -300,6 +300,20 @@ enum SyswCmd {
         /// row.
         #[arg(long)]
         pack_preimage: bool,
+        /// Confirm a `phrase:` record whose phrase LOOKS LIKE a digest in hex
+        /// (F-677, the same flag as `ms hashlock`'s F-539).
+        ///
+        /// A phrase of exactly 40 or 64 hex characters is very likely a digest
+        /// someone means to commit to, not a phrase they mean to hash -- and
+        /// hashing it commits the wallet to the ASCII of the digest instead, a
+        /// preimage they do not hold. Without this flag that case WARNS AND
+        /// STOPS; with it, it proceeds.
+        ///
+        /// It is not a refusal: an operator who really chose an all-hex phrase
+        /// can still use it (operator ruling 2026-09-16). What they cannot do is
+        /// walk into it silently.
+        #[arg(long)]
+        phrase_looks_like_digest_ok: bool,
         /// Append the pack time as a trailing `now:` record to THIS payload even
         /// though it holds no `key:`/`hash:` record. By default `pack` appends
         /// `now:<hex of unix seconds>` as the LAST record only when the records
@@ -1485,6 +1499,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             region,
             r#as,
             pack_preimage,
+            phrase_looks_like_digest_ok,
         } => {
             if *allow_weak {
                 eprintln!(
@@ -1543,6 +1558,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             let admission = mnemonic_engrave::sysw::Admission {
                 allow_unsigned_inputs: *allow_unsigned_inputs,
                 pack_preimage: *pack_preimage,
+                phrase_looks_like_digest_ok: *phrase_looks_like_digest_ok,
             };
             if *allow_unsigned_inputs {
                 report_unsigned_overrides(&recs);
@@ -3322,6 +3338,25 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                  entropy. Re-run with --pack-preimage if that is what you intend."
             )
         }
+        // F-677: `ms hashlock`'s F-539 stop, in `ms hashlock`'s own sentences
+        // (ms-cli src/cmd/hashlock.rs) -- one vocabulary across both tools, so
+        // an operator who has read one has read the other. Only the `--hex`
+        // parenthetical is dropped: `me` has no `--hex`. The width is printed,
+        // the phrase never is.
+        E::PhraseLooksLikeDigest(i, chars) => format!(
+            "record {i}, as given (records count from 0) is a hashlock PHRASE record (phrase:), \
+             and that phrase is {chars} hex characters, the width of a digest. \
+             Hashing it commits the wallet to the ASCII of those characters, \
+             NOT to the digest they spell.\n\
+             \n\
+             If you already hold a DIGEST, it is finished -- do not pack it as a \
+             phrase. Use it directly:\n\
+             \x20 md compose --path '...,<kind>=<digest>'\n\
+             \x20 me sysw pack 'hash:[<kind>:]<digest>'\n\
+             \n\
+             If you really meant this as a phrase, re-run with \
+             --phrase-looks-like-digest-ok."
+        ),
         // Neither branch prints the record — a `pass:` body is a passphrase.
         E::Unclassifiable(i, why) => {
             use mnemonic_engrave::sysw::UnknownReason as U;
