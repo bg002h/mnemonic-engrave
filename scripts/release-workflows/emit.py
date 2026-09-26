@@ -101,6 +101,11 @@ MD_SMOKE = '''          # A REAL acceptance pass, on this platform, using the co
           ZEN="$("$BIN" compose --wrapper tr --path '1of1,older=32768' 2>/dev/null)"
           case "$ZEN" in *'older(32768)'*) ;; *) echo "::error::compose failed: $ZEN"; exit 1 ;; esac
 
+          # --from-policy needs the cli-compiler feature; the manual documents it,
+          # so a release binary without it is a regression (F-676).
+          POL="$("$BIN" encode --from-policy 'or(pk(@0),and(pk(@1),older(144)))' --context segwitv0 --group-size 0 | grep '^md1' | head -1)"
+          [ "$POL" = "md1ypqqnq5fnf2uqqqqpyq8y3frmejdncm8" ] || { echo "::error::--from-policy failed: $POL"; exit 1; }
+
           # BCH repair: four damaged characters, named and corrected
           BADMD1=md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
           GOODMD1=md1yqfdsssjuqqcr5e55uqqqgqqq6qqvf4d7h59r2
@@ -141,11 +146,11 @@ TEST_SETUP = {
 TEST_OS = {"md": "[ubuntu-latest, macos-latest]", "mk": "[ubuntu-latest, macos-latest]"}
 
 REPOS = {
- "descriptor-mnemonic":  dict(bin_="md", pkg="md-cli", branch="main",   names=ALL5),
- "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=PORTABLE3),
- "mnemonic-key":         dict(bin_="mk", pkg="mk-cli", branch="main",   names=PORTABLE3),
- "mnemonic-transaction": dict(bin_="mt", pkg="mt-cli", branch="main",   names=ALL5),
- "mnemonic-toolkit":     dict(bin_="mnemonic", pkg="mnemonic-toolkit", branch="master", names=PORTABLE3),
+ "descriptor-mnemonic":  dict(bin_="md", pkg="md-cli", branch="main",   names=ALL5, features=" --features cli-compiler", tag_prefix="descriptor-mnemonic-md-cli-v"),
+ "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=PORTABLE3, tag_prefix="ms-cli-v"),
+ "mnemonic-key":         dict(bin_="mk", pkg="mk-cli", branch="main",   names=PORTABLE3, tag_prefix="mk-cli-v"),
+ "mnemonic-transaction": dict(bin_="mt", pkg="mt-cli", branch="main",   names=ALL5, tag_prefix="mt-cli-v"),
+ "mnemonic-toolkit":     dict(bin_="mnemonic", pkg="mnemonic-toolkit", branch="master", names=PORTABLE3, tag_prefix="mnemonic-toolkit-v"),
 }
 
 for repo, kw in REPOS.items():
