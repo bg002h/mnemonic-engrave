@@ -20304,7 +20304,7 @@ checks, so the release shipped with it. Fix: fstat fd 0 directly.
 
 ### F-694 — publish the current GUI manual (with the five new forms and secret channels) alongside the next mnemonic-gui release (owning phase: **next mnemonic-gui release**) `#mnemonic-toolkit` `#manual-gui` `#pages`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-09-25. mnemonic-gui **v0.63.0** released (tag at `d82c889`; pinned to mnemonic 0.105.1, md 0.20.3, ms 0.20.1, mk 0.13.0, via the design's re-measure path). Toolkit PR #92 (`2bf27636`): installer pins mnemonic-gui-v0.63.0; **manual-gui v1.4.0** (five form chapters, secret channels, 66 renders) tagged at `cfa293a3` and published by `manual-gui.yml` run 36211422584; Pages build `built`; live site shows v1.4.0 and **20/20** new help-icon anchors resolve. Reports: `f694-gui-repin{,2,3}.md`, `f694-manual.md`, `f694-manual-pin.md`.
 Filed 2026-09-25. The GUI's help icons deep-link into
 `https://bg002h.github.io/mnemonic-toolkit/manual-gui/`. GitHub Pages had failed
 every build since 2026-07-06 (legacy Jekyll; fixed today by adding `.nojekyll`
