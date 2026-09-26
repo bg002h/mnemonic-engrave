@@ -159,9 +159,24 @@ jobs:
           /usr/bin/zsh --version
           /usr/bin/fish --version
 
+      # F-696: cargo nextest runs the test binaries CONCURRENTLY; `cargo test`
+      # runs them one at a time. Pinned by commit SHA; install-action checks the
+      # downloaded archive against the sha256 in its own manifest, and
+      # `fallback: none` refuses the unverified cargo-binstall path.
+      - name: Install cargo-nextest (pinned, checksum-verified)
+        if: steps.detect.outputs.docs_only != 'true'
+        uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        with:
+          tool: cargo-nextest@0.9.146
+          fallback: none
       - name: Rust test suite (locked; Go on PATH + ME_REQUIRE_GO=1 → oracles run)
         if: steps.detect.outputs.docs_only != 'true'
-        run: cargo test --locked
+        run: cargo nextest run --locked --no-fail-fast
+
+      # nextest does not run doc-tests; this step keeps them.
+      - name: Rust doc-tests
+        if: steps.detect.outputs.docs_only != 'true'
+        run: cargo test --locked --doc
 
       - name: Go tests (me-preview sidecar)
         if: steps.detect.outputs.docs_only != 'true'
