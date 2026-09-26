@@ -34,6 +34,11 @@ on:
       - master
       - 'ci/**'
   pull_request:
+  # A NON-PUBLISHING release rehearsal: the full matrix builds, `assemble`
+  # packs, writes SHA256SUMS, minisign-signs it and VERIFIES the signature,
+  # and the attest + publish steps (tag-only) are skipped. It proves the
+  # signing secret works without cutting a release.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -343,7 +348,7 @@ jobs:
   assemble:
     name: assemble + sign + release
     needs: [test, go-build, rust-build]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (with submodules)
@@ -488,17 +493,34 @@ jobs:
           sha256sum mnemonic-engrave-* > SHA256SUMS
           cat SHA256SUMS
 
+      # Signing policy (operator, 2026-09-25: "sign every release"):
+      #   `v*` tag  : MINISIGN_SECRET_KEY missing, or sign/verify failing ->
+      #               the job FAILS before attest/publish; nothing ships
+      #   dispatch  : secret present -> sign + verify, publish nothing
+      #               secret missing -> warning, unsigned, publish nothing
       - name: Write minisign secret key to a temp file
         id: minisign_key
         env:
           MINISIGN_SECRET_KEY: ${{ secrets.MINISIGN_SECRET_KEY }}
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
           set -euo pipefail
+          if [ -z "$MINISIGN_SECRET_KEY" ]; then
+            if [ "$IS_RELEASE" = "true" ]; then
+              echo "::error::MINISIGN_SECRET_KEY is not set, and this is a release tag. Refusing to publish SHA256SUMS unsigned."
+              exit 1
+            fi
+            echo "::warning::MINISIGN_SECRET_KEY is not set -- SHA256SUMS stays UNSIGNED (not a release; nothing is published)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
           KEYFILE="$(mktemp)"
           printf '%s\n' "$MINISIGN_SECRET_KEY" > "$KEYFILE"
           echo "keyfile=$KEYFILE" >> "$GITHUB_OUTPUT"
 
       - name: Sign SHA256SUMS with minisign
+        if: steps.minisign_key.outputs.enabled == 'true'
         working-directory: release
         env:
           MINISIGN_PASSWORD: ${{ secrets.MINISIGN_SECRET_KEY_PASSWORD }}
@@ -509,7 +531,14 @@ jobs:
           printf '%s\n' "$MINISIGN_PASSWORD" | \
             minisign -S -s "$KEYFILE" -m SHA256SUMS \
               -t "mnemonic-engrave ${TAG} SHA256SUMS"
+
+      - name: Verify SHA256SUMS.minisig against the pinned public key
+        if: steps.minisign_key.outputs.enabled == 'true'
+        working-directory: release
+        run: |
+          set -euo pipefail
           minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+          echo "signature verified against the pinned key"
 
       - name: Remove minisign secret key
         if: always()
@@ -517,12 +546,20 @@ jobs:
           KEYFILE: ${{ steps.minisign_key.outputs.keyfile }}
         run: rm -f "$KEYFILE"
 
+      - name: Dispatch rehearsal -- nothing published
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          ls -l release
+          echo "dispatch rehearsal: signed=${{ steps.minisign_key.outputs.enabled }}; no attestation, no release."
+
       - name: Attest build provenance
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/attest-build-provenance@v1
         with:
           subject-path: 'release/mnemonic-engrave-*'
 
       - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
