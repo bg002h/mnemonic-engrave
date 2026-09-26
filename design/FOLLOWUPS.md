@@ -20317,7 +20317,7 @@ paired toolkit PR, a secret-channels section, then tag `manual-gui-v*` so
 
 ### F-695 — sweep `producer | grep -q` (and `| head`) under `pipefail` in CI and gate scripts (owning phase: none — ownerless residue) `#ci` `#scripts` `#flaky`
 
-**Status:** OPEN — sweep in progress
+**Status:** CLOSED 2026-09-25. 133 instances, 20 fixed (1 MiB producer: 0/10 -> 10/10), 113 judged safe; review 0C/0I (`f695-review.md`), folds M1 (pure-bash OTP WARNING traps), M3 (dm decompose generator), M4 (plan-build-gate-me). Merged: engrave `11c03b87`, dm `f7135a62`, ms `7c97953`, seedhammer `be00ef8`, toolkit via PR #91.
 Filed 2026-09-25. Third occurrence of one class (toolkit F-675 residue check,
 mk release smoke test `65a526c`): under `pipefail`, `grep -q`/`head` exits
 early, the producer dies of SIGPIPE, and the pipeline reports failure (a
