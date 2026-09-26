@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-install-links.sh -- the SH2 demo page's install block, verified against
 # reality: every advertised URL must RESOLVE, and every advertised version must
-# be the LATEST release of its repo.
+# be the NEWEST release of its kind (same tag prefix) in its repo.
 #
 # WHY THIS EXISTS (F-623). Twice on 2026-09-18 the page was wrong about a
 # version and a human found it, not a gate:
@@ -54,21 +54,37 @@ while read -r u; do
   if [ "$code" = "200" ]; then note "$code" "${u##*/}"; else note "$code" "${u##*/}   <-- BROKEN"; fail=1; fi
 done <<< "$urls"
 
-# ── 2. every advertised release must BE the latest one ──────────────────────
+# ── 2. every advertised release must BE the newest of its kind ─────────────
 # This is the check that would have caught md 0.15.0. A URL that resolves is
 # not the same as a URL that is current: 0.15.0's assets still exist.
+#
+# "Newest of its kind", NOT GitHub's `releases/latest`: a repo publishes more
+# than one kind of release (mnemonic-toolkit also tags manual-gui-v*, manual-v*,
+# tech-manual-v*, ...), and GitHub marks whichever was created last as Latest.
+# On 2026-09-25 tagging manual-gui-v1.4.0 made this check call the toolkit
+# CLI "STALE" against a MANUAL release. So compare within the tag's own prefix
+# (everything before the version: `mnemonic-toolkit-v`, `ms-cli-v`,
+# `descriptor-mnemonic-md-cli-v`), over published, non-prerelease releases.
 echo
-echo "advertised tag vs latest release:"
+echo "advertised tag vs newest release of the same kind:"
 tags=$(printf '%s\n' "$urls" | sed -E 's#https://github\.com/([^/]+/[^/]+)/releases/download/([^/]+)/.*#\1 \2#' | sort -u)
 while read -r repo tag; do
   [ -n "$repo" ] || continue
-  latest=$(gh_api "https://api.github.com/repos/$repo/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)
-  if [ -z "$latest" ]; then
-    note "??" "$repo — could not read latest release"; fail=1
-  elif [ "$latest" = "$tag" ]; then
+  prefix=$(printf '%s' "$tag" | sed -E 's/[0-9]+(\.[0-9]+)*$//')
+  if [ -z "$prefix" ] || [ "$prefix" = "$tag" ]; then
+    note "??" "$repo — cannot split '$tag' into prefix + version"; fail=1; continue
+  fi
+  # Capture, then filter: no early-exiting reader under pipefail (F-695).
+  rel_json=$(gh_api "https://api.github.com/repos/$repo/releases?per_page=100") || rel_json=""
+  newest=$(jq -r --arg p "$prefix" \
+             '.[] | select(.draft|not) | select(.prerelease|not) | .tag_name | select(startswith($p))' \
+             <<<"$rel_json" 2>/dev/null | sort -V | tail -n 1)
+  if [ -z "$newest" ]; then
+    note "??" "$repo — no published '${prefix}*' release found"; fail=1
+  elif [ "$newest" = "$tag" ]; then
     note "ok" "$repo $tag"
   else
-    note "STALE" "$repo advertises $tag, latest is $latest"; fail=1
+    note "STALE" "$repo advertises $tag, newest ${prefix}* is $newest"; fail=1
   fi
 done <<< "$tags"
 
@@ -84,4 +100,4 @@ FAIL: the install block is out of date or broken.
 EOF
   exit 1
 fi
-echo "OK: every advertised URL resolves and names its repo's latest release."
+echo "OK: every advertised URL resolves and names the newest release of its kind."
