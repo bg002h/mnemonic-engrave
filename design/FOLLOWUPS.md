@@ -20337,3 +20337,11 @@ Do it in every constellation repo's CI (toolkit, ms, md, mk, engrave, gui), keep
 the ignored/`--include-ignored` mlock legs and doc-tests (nextest skips doc-tests:
 run `cargo test --doc` separately), and keep the required-check context names
 unchanged so branch protection still matches. Measure before and after per repo.
+
+### F-697 — `install.sh` `fetch_sig` classifies a `.minisig` URL that redirects to a different 200 page as "ok" (owning phase: none — ownerless residue) `#mnemonic-toolkit` `#install` `#signing`
+
+**Status:** OPEN
+Filed 2026-09-26 from `design/agent-reports/sign-all-releases-rereview.md`. The
+install still refuses, because the downstream minisign verification fails, but
+`fetch_sig` should itself report a redirect to non-signature content as an error.
+No exploit follows (nothing can forge bytes that verify against the pinned key).
