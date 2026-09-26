@@ -20325,3 +20325,15 @@ flaky red, or worse a gate that fails OPEN when the result feeds an `if`).
 About 20 instances across the repos; most are small builtin writes (harmless),
 but some are gates (push-via-staging's bypass detector; `picotool info |
 grep …verified` in sh2-flash and the OTP rehearsal).
+
+### F-696 — CI runs `cargo test` serially: switch the Rust test jobs to `cargo nextest` (owning phase: **right after the sign-all-releases cycle**, operator 2026-09-26) `#ci` `#speed`
+
+**Status:** OPEN — scheduled next
+Filed 2026-09-26. mnemonic-toolkit `rust.yml` runs `cargo test --workspace` (one
+test binary at a time); a green master run took 21 min, and `test (macos-latest)`
+is now a required check on toolkit and ms. Locally nextest took the toolkit suite
+256 s → 49 s; on 4-vCPU hosted runners (3 on macOS) expect less, still minutes.
+Do it in every constellation repo's CI (toolkit, ms, md, mk, engrave, gui), keep
+the ignored/`--include-ignored` mlock legs and doc-tests (nextest skips doc-tests:
+run `cargo test --doc` separately), and keep the required-check context names
+unchanged so branch protection still matches. Measure before and after per repo.
