@@ -20328,7 +20328,7 @@ grep …verified` in sh2-flash and the OTP rehearsal).
 
 ### F-696 — CI runs `cargo test` serially: switch the Rust test jobs to `cargo nextest` (owning phase: **right after the sign-all-releases cycle**, operator 2026-09-26) `#ci` `#speed`
 
-**Status:** OPEN — scheduled next
+**Status:** CLOSED 2026-09-26. All six repos' Rust test jobs run on cargo nextest (37/37 jobs, identical executed counts; doc-tests via `cargo test --doc`; ignored/env-gated legs unchanged; no job renamed). aarch64-musl legs moved to native `ubuntu-24.04-arm` (cross can't drive nextest): toolkit 1403s -> 290s. Report: `design/agent-reports/f696-impl.md`.
 Filed 2026-09-26. mnemonic-toolkit `rust.yml` runs `cargo test --workspace` (one
 test binary at a time); a green master run took 21 min, and `test (macos-latest)`
 is now a required check on toolkit and ms. Locally nextest took the toolkit suite
@@ -20345,3 +20345,13 @@ Filed 2026-09-26 from `design/agent-reports/sign-all-releases-rereview.md`. The
 install still refuses, because the downstream minisign verification fails, but
 `fetch_sig` should itself report a redirect to non-signature content as an error.
 No exploit follows (nothing can forge bytes that verify against the pinned key).
+
+### F-698 — cache Rust builds in CI; stop re-running the toolkit suite in release.yml (owning phase: none — ownerless residue) `#ci` `#speed`
+
+**Status:** OPEN
+Filed 2026-09-26 from `design/agent-reports/f696-impl.md`. Native test jobs are
+compile-bound (toolkit `test (ubuntu-latest)`: ~402 s build, ~32 s tests); the
+toolkit and ms `test` jobs have no rust-cache, and the toolkit's `release.yml`
+re-runs the same 4085-test suite `rust.yml` already runs on every push. Also
+recorded: no CI job now runs the main suites with tests sharing one process
+(nextest isolation), so shared-state bugs surface only locally under `cargo test`.
