@@ -30,11 +30,21 @@ rest attach their own assets. The checksum file is named **`SHA256SUMS.portable`
 so it cannot race the per-arch `SHA256SUMS.<arch>` the musl workflow uploads to
 the same tag.
 
-## Unsigned, for now
+## Signed, and a tag cannot ship unsigned
 
-Only `mnemonic-engrave` holds `MINISIGN_SECRET_KEY`. These ship `SHA256SUMS.portable`
-with a `VERIFY.txt` that says plainly a checksum proves **integrity, not origin**.
-Add the secret to a repo and re-generate with signing to change that.
+Every generated workflow minisign-signs `SHA256SUMS.portable` with the
+constellation key (`MINISIGN_PUBKEY`, pinned once in the workflow's `env:`) and
+verifies the signature against it in the same job. A publishing run (a tag
+push, or a backfill dispatch with `tag`) FAILS if `MINISIGN_SECRET_KEY` is
+missing or signing / verifying fails, before anything uploads. A
+`sign_dry_run` dispatch signs and verifies and uploads nothing: that is how to
+prove a repo's secrets work without cutting a release.
+
+`emit.py` output matches the committed `release.yml` byte-for-byte in
+mnemonic-toolkit, mnemonic-secret, descriptor-mnemonic and mnemonic-key (md's
+`--features cli-compiler` and `--from-policy` smoke are now generator inputs).
+mnemonic-transaction's committed file predates signing and has no signing
+secret; regenerating it there makes its next tag require one.
 
 ## Backfilling an existing release
 
