@@ -83,6 +83,12 @@ jobs:
       # to the green parent and the expensive steps are gated off with an
       # explicit verdict in the log. Every fallback is FULL TESTS: new refs,
       # unknown before-SHA, empty diff, anything not provably docs-only.
+      # Every hard-coded copy of the signing key (release.yml, README, the
+      # workflow generator) must equal minisign.pub, the key file shipped in
+      # every archive; a rotation that misses one fails here.
+      - name: signing key copies agree with minisign.pub
+        run: sh scripts/check-minisign-pin.sh
+
       - name: docs-only detection
         id: detect
         run: |
@@ -551,6 +557,18 @@ jobs:
         run: |
           ls -l release
           echo "dispatch rehearsal: signed=${{ steps.minisign_key.outputs.enabled }}; no attestation, no release."
+
+      # A dispatch publishes nothing, but keeps the signed SHA256SUMS +
+      # .minisig as a workflow artifact so a reviewer can verify a real
+      # signature offline. (A tag runs the workflow AT THE TAGGED COMMIT: tag
+      # only commits containing this signing policy.)
+      - name: Dispatch rehearsal -- keep the signed checksums as a workflow artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') && steps.minisign_key.outputs.enabled == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-sums-dry-run
+          path: release/SHA256SUMS*
+          if-no-files-found: error
 
       - name: Attest build provenance
         if: startsWith(github.ref, 'refs/tags/v')

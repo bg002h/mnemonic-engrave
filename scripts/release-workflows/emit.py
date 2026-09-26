@@ -146,11 +146,11 @@ TEST_SETUP = {
 TEST_OS = {"md": "[ubuntu-latest, macos-latest]", "mk": "[ubuntu-latest, macos-latest]"}
 
 REPOS = {
- "descriptor-mnemonic":  dict(bin_="md", pkg="md-cli", branch="main",   names=ALL5, features=" --features cli-compiler"),
- "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=PORTABLE3),
- "mnemonic-key":         dict(bin_="mk", pkg="mk-cli", branch="main",   names=PORTABLE3),
- "mnemonic-transaction": dict(bin_="mt", pkg="mt-cli", branch="main",   names=ALL5),
- "mnemonic-toolkit":     dict(bin_="mnemonic", pkg="mnemonic-toolkit", branch="master", names=PORTABLE3),
+ "descriptor-mnemonic":  dict(bin_="md", pkg="md-cli", branch="main",   names=ALL5, features=" --features cli-compiler", tag_prefix="descriptor-mnemonic-md-cli-v"),
+ "mnemonic-secret":      dict(bin_="ms", pkg="ms-cli", branch="master", names=PORTABLE3, tag_prefix="ms-cli-v"),
+ "mnemonic-key":         dict(bin_="mk", pkg="mk-cli", branch="main",   names=PORTABLE3, tag_prefix="mk-cli-v"),
+ "mnemonic-transaction": dict(bin_="mt", pkg="mt-cli", branch="main",   names=ALL5, tag_prefix="mt-cli-v"),
+ "mnemonic-toolkit":     dict(bin_="mnemonic", pkg="mnemonic-toolkit", branch="master", names=PORTABLE3, tag_prefix="mnemonic-toolkit-v"),
 }
 
 for repo, kw in REPOS.items():
