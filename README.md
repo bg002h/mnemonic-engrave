@@ -160,19 +160,22 @@ The signing public key is pinned here (and shipped in every archive as
 `minisign.pub`):
 
 ```
-untrusted comment: minisign public key CA39ECB257009A0F
-RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+untrusted comment: minisign public key EF2B8D34D8409754
+RWRUl0DYNI0r72HYC0ou+T/7pHEf0km3a8RWHwqGwZmIEMWtiSd4k0B5
 ```
 
 To verify a download:
 
 ```sh
 # 1. Verify the checksum file's signature against the pinned public key:
-minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+minisign -Vm SHA256SUMS -P RWRUl0DYNI0r72HYC0ou+T/7pHEf0km3a8RWHwqGwZmIEMWtiSd4k0B5
 
 # 2. Verify the binaries against the now-trusted checksums:
 sha256sum -c SHA256SUMS --ignore-missing
 ```
+
+Releases up to and including **v0.12.0** were signed with the retired key `CA39ECB257009A0F` (rotated 2026-09-26); verify those with
+`-P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW`.
 
 (Step 1 is equivalent to `minisign -Vm SHA256SUMS -p minisign.pub` using the
 bundled key file.) Key rotation is an explicit, auditable change to this section.

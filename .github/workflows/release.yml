@@ -440,7 +440,7 @@ jobs:
           1. Verify the checksum file's minisign signature against the pinned
              public key (also in the project README):
 
-               minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+               minisign -Vm SHA256SUMS -P RWRUl0DYNI0r72HYC0ou+T/7pHEf0km3a8RWHwqGwZmIEMWtiSd4k0B5
 
              (or, equivalently, `minisign -Vm SHA256SUMS -p minisign.pub`)
 
@@ -537,7 +537,7 @@ jobs:
         working-directory: release
         run: |
           set -euo pipefail
-          minisign -Vm SHA256SUMS -P RWQPmgBXsuw5yi8W0SfDr8KF+IqY/Z5U2p724emSODS1UPfJBP3agbKW
+          minisign -Vm SHA256SUMS -P RWRUl0DYNI0r72HYC0ou+T/7pHEf0km3a8RWHwqGwZmIEMWtiSd4k0B5
           echo "signature verified against the pinned key"
 
       - name: Remove minisign secret key
