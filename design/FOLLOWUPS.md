@@ -20328,7 +20328,7 @@ grep …verified` in sh2-flash and the OTP rehearsal).
 
 ### F-696 — CI runs `cargo test` serially: switch the Rust test jobs to `cargo nextest` (owning phase: **right after the sign-all-releases cycle**, operator 2026-09-26) `#ci` `#speed`
 
-**Status:** CLOSED 2026-09-26. All six repos' Rust test jobs run on cargo nextest (37/37 jobs, identical executed counts; doc-tests via `cargo test --doc`; ignored/env-gated legs unchanged; no job renamed). aarch64-musl legs moved to native `ubuntu-24.04-arm` (cross can't drive nextest): toolkit 1403s -> 290s. Report: `design/agent-reports/f696-impl.md`.
+**Status:** CLOSED 2026-09-26 — mnemonic-engrave `d49941d1`; mnemonic-toolkit `0324cdcb`, mnemonic-secret `e3b34a30`, descriptor-mnemonic `31c74785`, mnemonic-key `5cd4d283`, mnemonic-gui `e9b65a63`. All six repos' Rust test jobs run on cargo nextest (37/37 jobs, identical executed counts; doc-tests via `cargo test --doc`; ignored/env-gated legs unchanged; no job renamed). aarch64-musl legs moved to native `ubuntu-24.04-arm` (cross can't drive nextest): toolkit 1403s -> 290s. Report: `design/agent-reports/f696-impl.md`.
 Filed 2026-09-26. mnemonic-toolkit `rust.yml` runs `cargo test --workspace` (one
 test binary at a time); a green master run took 21 min, and `test (macos-latest)`
 is now a required check on toolkit and ms. Locally nextest took the toolkit suite
