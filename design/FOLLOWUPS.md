@@ -20176,9 +20176,9 @@ imply `--root` contains the install. Fix: one sentence on `--root` (and the
 manual) pointing at `--man-dir`/`--no-man`. A scratch or CI install with
 `--root` otherwise overwrites the user's own man pages.
 
-### F-682 — Refugium: an epoch-based deep cold storage wallet family (owning phase: none — idea, not yet brainstormed) `#idea` `#wallet-design` `#timelocks` `#inheritance`
+### F-682 — Refugium: an epoch-based deep cold storage wallet family (owning phase: none — moved to its own project) `#idea` `#wallet-design` `#timelocks` `#inheritance`
 
-**Status:** OPEN — idea only; not specced, ruled or brainstormed
+**Status:** SUPERSEDED — its own project, `bg002h/mnemonic-refugium` (`/scratch/code/shibboleth/mnemonic-refugium`, `8859307`); track it there
 Filed 2026-09-24 at the operator's request. The idea is recorded verbatim in
 `design/IDEA_refugium.md`. In short: one Taproot/miniscript policy template
 instantiated per "epoch" with absolute deadlines shifted by e·Δ, funds
