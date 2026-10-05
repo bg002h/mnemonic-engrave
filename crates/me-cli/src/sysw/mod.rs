@@ -672,6 +672,28 @@ fn bound(blob: Vec<u8>) -> Result<Vec<u8>, SyswError> {
     Ok(blob)
 }
 
+/// A packed container padded out to a full [`wire::REGION_LEN`] image, ready to
+/// write at [`wire::REGION_ADDR`] (`me sysw pack --region`; F-700, so the
+/// Refugium app pads through the same code as the CLI).
+///
+/// The tail is `0xFF`, the ERASED state of NOR flash, so the image is
+/// byte-for-byte what the region reads back with only the container written.
+/// Padding moves neither the identity nor the digest: both bound themselves by
+/// the header's declared total.
+///
+/// Refuses what [`bound`] refuses: a blob larger than the region, and one the
+/// reader would not parse. A caller holding something that is not a container
+/// gets an error here, not a region image of it.
+pub fn region_image(blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, SyswError> {
+    if blob.len() > wire::REGION_LEN {
+        return Err(SyswError::TooLarge(blob.len()));
+    }
+    wire::Header::parse(blob).map_err(SyswError::Wire)?;
+    let mut img = Zeroizing::new(vec![0xFFu8; wire::REGION_LEN]);
+    img[..blob.len()].copy_from_slice(blob);
+    Ok(img)
+}
+
 /// Parse and, if sealed, decrypt.
 pub fn open(blob: &[u8], passphrase: Option<&str>) -> Result<Payload, SyswError> {
     let h = wire::Header::parse(blob).map_err(SyswError::Wire)?;
@@ -866,6 +888,32 @@ mod tests {
             bound(pad_to(wire::REGION_LEN + 1)).unwrap_err(),
             SyswError::TooLarge(wire::REGION_LEN + 1)
         );
+    }
+
+    /// F-700: `region_image` is the library form of `--region`. The image is
+    /// the container then `0xFF` to exactly the region, and it refuses what
+    /// `bound` refuses.
+    #[test]
+    fn region_image_pads_with_erased_flash_and_refuses_what_bound_refuses() {
+        let real = pack(vec!["text:6869".into()], None, wire::MIN_ITERATIONS).unwrap();
+        let img = region_image(&real).unwrap();
+        assert_eq!(img.len(), wire::REGION_LEN);
+        assert_eq!(&img[..real.len()], &real[..]);
+        assert!(img[real.len()..].iter().all(|&b| b == 0xFF));
+
+        let mut full = real.clone();
+        full.resize(wire::REGION_LEN, 0xFF);
+        assert_eq!(&region_image(&full).unwrap()[..], &full[..]);
+
+        full.push(0xFF);
+        assert_eq!(
+            region_image(&full).unwrap_err(),
+            SyswError::TooLarge(wire::REGION_LEN + 1)
+        );
+        assert!(matches!(
+            region_image(&[0u8; 64]).unwrap_err(),
+            SyswError::Wire(_)
+        ));
     }
 
     /// C1, as a property rather than two cases: whatever `pack` emits, the

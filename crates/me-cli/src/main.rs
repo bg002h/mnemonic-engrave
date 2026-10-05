@@ -1925,17 +1925,22 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // moved.
             if *region {
                 let n = sysw::wire::REGION_LEN;
-                if blob.len() > n {
-                    eprintln!(
-                        "me: container is {} bytes, larger than the {n}-byte region — \
-                         it cannot be written to 0x{:08X}",
-                        blob.len(),
-                        sysw::wire::REGION_ADDR
-                    );
-                    return EXIT_INVALID;
-                }
-                let mut img = Zeroizing::new(vec![0xFFu8; n]);
-                img[..blob.len()].copy_from_slice(&blob);
+                let img = match sysw::region_image(&blob) {
+                    Ok(img) => img,
+                    Err(sysw::SyswError::TooLarge(_)) => {
+                        eprintln!(
+                            "me: container is {} bytes, larger than the {n}-byte region — \
+                             it cannot be written to 0x{:08X}",
+                            blob.len(),
+                            sysw::wire::REGION_ADDR
+                        );
+                        return EXIT_INVALID;
+                    }
+                    Err(e) => {
+                        eprintln!("me: {}", sysw_error(&e));
+                        return EXIT_INVALID;
+                    }
+                };
                 eprintln!(
                     "me: region image — {} bytes of container, padded with 0xFF to {n}; \
                      write it at 0x{:08X}",
