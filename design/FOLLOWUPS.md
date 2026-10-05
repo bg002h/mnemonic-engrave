@@ -20523,6 +20523,11 @@ builds in F9a (rehearsal images) pass the reproducibility gate on G-13 alone (on
 builder plus the framework addendum's G-13 check), like the Sitting's S1. Only the
 release-signed fork image needs two independent builders producing the same hash
 (addendum G-13a); that second builder is open item O-10, waiting on Brian.
+Offline source archive (owner ruling 2026-10-05 09:50Z, refugium-wallet framework
+addendum P-23, refugium-wallet PR 4): every F9b fork release ships its own offline source
+archive so anyone can rebuild it later. It holds the pinned toolchain, the dependencies
+and the source, and is built and checked the same way as the addendum's G-10a archive.
+The release trailer and manifest are documented alongside it.
 
 ### F-704 — `bip39.Mnemonic.Valid` accepts word indices aliased past the wordlist (owning phase: none — ownerless residue) `#seedhammer` `#bip39` `#seedqr`
 
