@@ -1,11 +1,13 @@
 # IMPLEMENTATION PLAN — E3a: OTP tooling for Refugium, the rehearsal profile, and one picotool (F-701)
 
-*Draft 2, 2026-10-05. Author: thread "mnemonic-engrave for Refugium". Baseline: mnemonic-engrave
+*Draft 3, 2026-10-05. Author: thread "mnemonic-engrave for Refugium". Baseline: mnemonic-engrave
 `fde7841` (master after PR 6). Risk set (a) irreversible OTP writes and (b) keys: R0 to 0 C / 0 I
 before code, a single implementer, then a mandatory adversarial review of the whole diff.*
 
-Draft 2 folds R0 round 1: `design/agent-reports/e3a-plan-r0-a.md` (lens A, facts: 2 C / 5 I / 10 M /
-3 N) and `e3a-plan-r0-b.md` (lens B, failure states: 1 C / 7 I / 10 M / 2 N). The fold table is §10.
+Draft 2 folded R0 round 1: `design/agent-reports/e3a-plan-r0-a.md` (lens A, facts: 2 C / 5 I / 10 M /
+3 N) and `e3a-plan-r0-b.md` (lens B, failure states: 1 C / 7 I / 10 M / 2 N). Draft 3 folds round 2:
+`e3a-plan-r1-a.md` (0 C / 1 I / 8 M / 1 N) and `e3a-plan-r1-b.md` (0 C / 2 I / 10 M / 2 N). Fold
+tables: §10.
 
 Source of the ask: `bg002h/refugium-wallet` `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` at `f929084`,
 phase E3a (and E3b, which this plan prepares but does not run); UI spec
@@ -60,14 +62,16 @@ provisioning flow (lane S); the retail values themselves (H0 measures them with 
 | F13 | `erase` (default `-a`) and `save -a` guess the flash size and refuse erased flash; plain `save` defaults to `-p`; `-r <from> <to>` uses the range (rounded to 4 KiB); `save` writes raw only to a `.bin` name | PT D15-D17; lens A A-N2, A-M8 |
 | F14 | picotool's `cli.h` matches option groups **in declaration order**. `otp get` must be spelled `otp get [-c N] [-r] [-e] [-n] [--ser S] <selector…>`; `otp set` as `otp set [-c N] [-r] [-e] [-s] <selector> <value> [--ser S]`. A misplaced option silently becomes a selector that matches no row, and the call then runs on whatever device is attached. (This is also what F-619 measured: `-n -c 1` added CHIPID1 as a selector.) | lens A A-C1, measured on the 2.3.1 binary |
 | F15 | `--ser` must be CHIPID3..0 in uppercase (e.g. `09F50BF63E8D6F46`); picotool `strcmp`s it; a miss exits 249 with "…found with serial number X." (2.3.1). The USB serial is the CHIPID unless white-label entry 6 is valid | HARDWARE_INVENTORY; lens A G4, A-N3 |
-| F16 | `0x049`, `0x04a`, `0x04c`, `0x04d` name no register, so `otp set -s 0x04a <v>` writes that one row; `0x048`, `0x04b`, `0x040` resolve to the named register and write all copies unless `-c 1` comes first. Without `-s`, a value lacking existing bits fails ("Cannot clear bits") | lens A A-M7, PT `main.cpp:9715, 9726-9728` |
+| F16 | `0x049`, `0x04a`, `0x04c`, `0x04d` name no register, so `otp set -s 0x04a <v>` writes that one row; `0x048`, `0x04b`, `0x040` resolve to the named register and write all copies unless `-c 1` comes first. Without `-s`, a value lacking existing bits fails ("Cannot clear bits"). An unnamed row is written raw (no ECC) unless `-e` is given (`bEcc = ecc && !raw`) | lens A A-M7, A2-N1; PT `main.cpp:8990-8992, 9715-9732` |
 | F17 | `picotool version -s` prints the bare version (`2.3.1`) | lens A A-N1 |
+| F18 | When stdout is not a terminal, picotool word-wraps output at 80 columns, so a long message or a CRIT1 `RAW_VALUE=` list with 8 copies spans lines | lens A A2-M1, PT `main.cpp:10178-10186` |
+| F19 | `otp set -s` writes `(value << shift & mask) \| (old & ~mask) \| old`, with `old` = copy 0's raw row: **every bit copy 0 holds is written to every copy**, including bits inside the target field that the target value lacks | lens B B2-I1, PT `main.cpp:9693-9712` |
 
 Still to establish from 2.3.1 source before writing the fake, with `main.cpp:<line>` cited at each
 parser and fake arm: **G1** the exact text of every `otp get` line parsed (ROW, VALUE, RAW_VALUE,
 field, WARNING, the `(flipping raw value to …)` note) for ECC, RBIT-3, RBIT-8 and raw rows, with and
-without `-r`, `-e`, `-c 1`; **G2** whether `otp set` takes `-r` and what it changes for an unnamed
-raw row (F16 says the row is written raw; confirm no ECC is added); **G3** the exit status of an
+without `-r`, `-e`, `-c 1`, including F18's wrapping (parsers join wrapped lines before matching);
+(G2 is answered: F16.) **G3** the exit status of an
 `erase -r`/`save -r` the boot ROM refuses (the tool keys on a non-zero exit, not on text); **G5**
 the `info` text listing more than one device.
 
@@ -102,24 +106,29 @@ and that stays true. Shared code moves to `scripts/lib/otp-read.sh`, sourced by 
   R uses the builder too, with an empty serial (unchanged behaviour: no `--ser`).
 - **Non-dying readers.** Each helper (`otp_field`, `read_rows`, `read_row_raw24`, `read_slot`,
   `chipid`, `check_page_locks`) becomes `try_<name>`: returns 0/1, sets its globals, and on failure
-  sets `ERR` to the message. R keeps its names as thin wrappers (`otp_field() { try_otp_field "$@" ||
-  die "$ERR"; }`), so R's behaviour and messages are unchanged. Nothing is called inside `$(...)`.
+  sets `ERR` to the message. R keeps its names as thin wrappers that die on failure and otherwise
+  print what R's call sites capture (`otp_field() { try_otp_field "$@" || die "$ERR"; printf '%s'
+  "$OTP_FIELD_VAL"; }`), so R's call sites (`KV="$(otp_field …)"`, R:348, 704, 791) and messages are
+  unchanged; R's old e2e checks it. `refugium-otp.sh` never calls a reader inside `$(...)`.
 - `refugium-otp.sh` uses only the `try_` forms. `check` records each row as PASS or FAIL in arrays in
   the main shell (`ROW_NAMES`, `ROW_RESULTS`), never in a subshell. RESULT is PASS only if FAIL count
-  is 0 **and** the number of rows compared equals the number the expected-state table requires for
-  the profile; a row never compared is a FAIL.
+  is 0 **and** the set of row names compared equals the required set, which is derived from the
+  profile and the matched retail entry, never from what the board reports; a required row never
+  compared is a FAIL, and a row compared twice is a tool error.
 - Exit codes: 0 pass; 1 usage or environment (bad flags, wrong picotool, no device); 2 state refused
   (any FAIL, any unreadable row); 3 a write was issued and anything after it failed: a non-zero exit
-  of the write itself, any read failure, WARNING or mismatch in the post-write check. Exit 3 always
-  prints: "The write may be partial. Re-run this same command: it only adds bits and heals a missing
-  copy. If the re-run refuses, do not use this board for seeds."
+  of the write itself, any read failure, WARNING or mismatch in the post-write check. Exit 3 is used
+  only when `otp set` was actually invoked; a branch that wrote nothing exits 2. Exit 3 prints: "The
+  write may be partial. Re-run this same command once: it only adds bits and heals a missing copy. If
+  the re-run exits non-zero for any reason, stop and do not use this board for seeds."
+  (`inject-copy` has its own exit-3 text, §3.6.)
 - `--log <file>`: the tool writes its own full transcript, so the operator need not pipe into `tee`
   (which would hide the exit status).
 
 ### 3.1 Command line
 
 ```
-refugium-otp.sh check   --profile P --ser S [--rehearsal-key K]
+refugium-otp.sh check   --profile P --ser S [--rehearsal-key K --rehearsal-slot1-key K1]
                         --slot1 empty|key|valid --disable-otp-boot 0|1 --key-invalid 0|c
 refugium-otp.sh capture --ser S --out <file>
 refugium-otp.sh disable-otp-boot      --profile P --ser S [--rehearsal-key K] [--execute]
@@ -131,11 +140,16 @@ refugium-otp.sh inject-copy --profile rehearsal --ser S --rehearsal-key K --case
 
 - `--ser` is required everywhere, must be 16 hex characters and is uppercased; it must equal the
   CHIPID read from the board (CHIPID3..0, F15). Exactly one RP2350 in BOOTSEL (G5).
-- `--rehearsal-key` is required under `rehearsal` (no default) and refused under `retail`.
+- Under `rehearsal`, `--rehearsal-key` (slot 0's key: R's `rehearsal-work/factory-key.pem`) is
+  required on every device command, and `--rehearsal-slot1-key` (R's `my-key.pem`) on every command
+  that judges slot 1 (all but `capture`, `save-range` and `inject-copy`); no defaults; the hashes used
+  are printed. Both are refused under `retail`. (The other synopsis lines take the same pair; omitted
+  above for width.)
 - **Profile identity gate**, run before anything else touches the device, for every command except
   `capture`: under `retail`, slot 0 = `SH_SIGNKEY_HASH`; under `rehearsal`, slot 0 = the hash of
   `--rehearsal-key`, slot 0 ≠ `SH_SIGNKEY_HASH`, and the CHIPID is not one of the SeedHammer CHIPIDs
-  listed in `otp-read.sh` (from HARDWARE_INVENTORY). A failure exits 2 before any write or erase.
+  listed in `otp-read.sh` (from HARDWARE_INVENTORY), stored in `--ser` form and compared after the
+  same conversion as `--ser`. A failure exits 2 before any write or erase.
 - Write commands are dry-run unless `--execute`; then a typed confirmation `BURN <step> <CHIPID>`.
 
 ### 3.2 `check` — the expected state
@@ -155,29 +169,35 @@ Slot 1 and KEY_VALID are judged together:
 | row(s) | read | retail | rehearsal |
 |---|---|---|---|
 | CHIPID0-3 | `read_rows` | = `--ser` | same |
-| CRIT0, CRIT1 ×8 | raw, each copy; `-c 1` named read of 0x040 | copies equal; values equal the recorded retail entry (SECURE_BOOT_ENABLE 1, DEBUG_DISABLE clear) | CRIT1 = 0x000001 in all 8, CRIT0 = 0 |
+| CRIT0 ×8, CRIT1 ×8 | copy rule; `-c 1` named reads of 0x038 and 0x040 | equal the recorded entry (SECURE_BOOT_ENABLE 1, DEBUG_DISABLE clear) | CRIT1 = 0x000001 in all 8, CRIT0 = 0 in all 8 |
 | slot 0 | `read_slot` | identity gate | identity gate |
 | slot 1 + KEY_VALID | above | joint table | joint table |
 | slots 2, 3 | `read_slot` | all zero | all zero |
-| BOOT_FLAGS1 ×3 | copy rule | KEY_INVALID = `--key-invalid`; bits 16-19 equal the recorded entry | KEY_INVALID = `--key-invalid`; other bits 0 |
+| BOOT_FLAGS1 ×3 | copy rule | KEY_INVALID = `--key-invalid`; every bit outside KEY_VALID and KEY_INVALID equals the recorded entry | KEY_INVALID = `--key-invalid`; every bit outside KEY_VALID and KEY_INVALID is 0 |
 | BOOT_FLAGS0 ×3 | copy rule | ENABLE_OTP_BOOT 0; DISABLE_OTP_BOOT = flag; bit 11 (ROLLBACK_REQUIRED) either value; every other bit equals the recorded entry | ENABLE_OTP_BOOT 0; DISABLE_OTP_BOOT = flag; bit 11 either; other bits 0 |
 | FLASH_DEVINFO | raw 24-bit | equals the recorded entry; if ENABLE is set, CS0_SIZE = 0xc | FLASH_DEVINFO_ENABLE 0 |
 | USB_BOOT_FLAGS ×3 | copy rule | equals the recorded entry | copies equal; value not compared (CANNOT PROVE) |
 | USB_WHITE_LABEL_ADDR, its 16-row table, every valid STRDEF's string rows | raw 24-bit | equal the recorded entry | not compared (CANNOT PROVE) |
 | PAGE1/2_LOCK0/1 | raw | LOCK1 0x040404, LOCK0 0 exactly | same |
 
-**Copy rule** (BOOT_FLAGS0/1, USB_BOOT_FLAGS ×3; CRIT1 ×8): (a) the raw reads of the unnamed copies
-and the `-c 1` read of the first row are all equal; (b) the named read printed no WARNING; (c) the
-named vote equals the expected value. (a) is what catches the first copy being the odd one, the case
-F-619 called blind. ECC rows are always read raw (24-bit) so a corrected single-bit change is
-visible.
+**Copy rule** (BOOT_FLAGS0/1, USB_BOOT_FLAGS ×3; CRIT0, CRIT1 ×8): (a) the raw reads of the unnamed
+copies and the `-c 1` read of the first row are all equal; (b) the named read printed no WARNING; (c)
+the named vote equals the expected value; (d) if the named read printed `RAW_VALUE=`, its copies must
+equal the bare and `-c 1` reads copy for copy, or the row is refused (this keeps the rule honest if
+F10 were false on silicon). (a) is what catches the first copy being the odd one, the case F-619
+called blind. ECC rows are always read raw (24-bit) so a corrected single-bit change is visible.
 
-**Retail values** live in `design/hardware/retail-otp.json`: a list of entries, each with every row
-above, the capture file it came from (committed under `design/hardware/captures/`), that file's
-sha256, the date and the unit's history (e.g. "has run fork firmware"). A unit passes only if it
-equals one entry in every recorded row. Each entry is schema-checked before use (every row present,
+**Retail values** live in `design/hardware/retail-otp.json`: a list of entries, each holding the
+cells the table marks "recorded entry" (CRIT0, CRIT1, BOOT_FLAGS0 bits outside DISABLE_OTP_BOOT,
+ENABLE_OTP_BOOT and bit 11, BOOT_FLAGS1 bits outside KEY_VALID and KEY_INVALID, FLASH_DEVINFO,
+USB_BOOT_FLAGS, the white-label address, table and strings), the capture file it came from (committed
+under `design/hardware/captures/`), that file's sha256, the date and the unit's history (e.g. "has run
+fork firmware"). CHIPID, slots, KEY_VALID, KEY_INVALID and DISABLE_OTP_BOOT are never taken from an
+entry. A unit passes only if **the same** entry matches every recorded cell. Each entry is schema-checked before use (every row present,
 hex shape, capture file present with matching sha256); a malformed file is exit 1. The path can be
-overridden only by `REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY`, which prints a warning line in the output.
+overridden only by `REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY`: with it set, every write command and
+`--execute` are refused, and `check`'s RESULT reads `RESULT: TEST ENTRY — not a retail check`, never
+PASS.
 With no entries, a retail `check` refuses: "no recorded retail values; run `capture` on a retail
 unit (H0)". Test fixtures live under `scripts/test/fixtures/`, never in `design/hardware/`.
 
@@ -191,22 +211,33 @@ not a retail check`.
 Each write command reads the board, works out its own pre-state and post-state, and never needs the
 operator to state them.
 
-- **`disable-otp-boot`.** Pre-state: the identity gate; `--slot1 valid`; KEY_INVALID either 0 or 0xC
-  with equal copies (whichever is found is kept in the post-state); DISABLE_OTP_BOOT 0, **or** the heal
-  rule below holds for it, **or** it is already 1 in all three copies (then no write, straight to the
-  post-check). Write: `otp set -s BOOT_FLAGS0.DISABLE_OTP_BOOT 0x1 --ser S` (F14 order). Post: the same
-  state with `--disable-otp-boot 1`.
-- **`invalidate-spare-keys`.** Pre-state: the identity gate; `--slot1 valid`; slots 2 and 3 zero;
-  KEY_VALID bits 2-3 clear; DISABLE_OTP_BOOT either value with equal copies (kept); KEY_INVALID 0 or
-  heal rule or already 0xC. Write: `otp set -s BOOT_FLAGS1.KEY_INVALID 0xc --ser S`. Post: same state
-  with `--key-invalid c`. The confirmation adds: "Slots 2 and 3 can never hold a key after this."
-- **Heal rule** (the exact F11 safety condition, and the admission rule for a re-run after exit 3):
-  a row whose copies are unequal is admitted for this write only if (1) every copy, including copy 0
-  read with `-c 1`, holds no bit outside the value the write will produce (copy 0 | target bits);
-  (2) the copies differ only inside the target field's bits; (3) every bit outside the target field
-  equals the expected value. The tool prints the copies and the words "healing an unequal copy". Any
-  other unequal state is refused with exit 2 and no write. The read-only `check` never heals: it
-  refuses any unequal copy.
+- **Pre-state is the full §3.2 check**, with the flags derived from the board (DISABLE_OTP_BOOT and
+  KEY_INVALID take whatever equal value they hold; slot 1 must be `valid`), except that the write's
+  target row is judged by the heal rule below instead of the copy rule. A retail unit whose CRIT1, page
+  locks or white-label rows mismatch is refused before any write.
+- **Branches, in this order** (E = the row value the write produces, T = the target bits it sets):
+  1. every copy already equals E → no write; run the post-check; a failure there is exit 2 (no write
+     was issued), never exit 3;
+  2. every copy has T clear and equals E & ~T, or the heal rule admits the row → write;
+  3. anything else → exit 2, no write.
+  Exit 3 is used only when `otp set` was invoked.
+- **`disable-otp-boot`.** T = bit 13 of BOOT_FLAGS0. Write: `otp set -s BOOT_FLAGS0.DISABLE_OTP_BOOT
+  0x1 --ser S` (F14 order). Post: the full check with `--disable-otp-boot 1`.
+- **`invalidate-spare-keys`.** T = bits 10-11 of BOOT_FLAGS1 (KEY_INVALID 0xC). Extra pre-state: slots
+  2 and 3 zero; KEY_VALID bits 2-3 clear. Write: `otp set -s BOOT_FLAGS1.KEY_INVALID 0xc --ser S`.
+  Post: the full check with `--key-invalid c`. The confirmation adds: "Slots 2 and 3 can never hold a
+  key after this."
+- **Heal rule** (the exact F11/F19 safety condition, and the admission rule for a re-run after exit 3).
+  A row whose copies are unequal is admitted for this write only if all of these hold:
+  1. every copy, copy 0 included, is a subset of E (no bit outside E, so no stray bit inside the
+     target field either: a KEY_INVALID bit 8 or 9 is refused);
+  2. every copy & ~T equals E & ~T (the copies differ only in target bits);
+  3. copy 0 | T equals E (picotool computes the write from copy 0, F19, so this is what lands in every
+     copy);
+  4. copy 0 is read with `-c 1` **and** equals RAW_VALUE[0] of the named read (F9); a disagreement means
+     F10 does not hold on this board, and the row is refused (exit 2).
+  The tool prints the copies and the words "healing an unequal copy". The read-only `check` never heals:
+  it refuses any unequal copy.
 - The two writes are order-independent; UI spec §4.4's order (precheck, erase, key, image, re-check,
   DISABLE_OTP_BOOT, optional KEY_INVALID, check) is the Sitting image's job (lane S).
 
@@ -218,8 +249,12 @@ operator to state them.
 - `erase-range`: identity gate; `picotool erase -r <from> <to> --ser S`; then `save -r <from> <to>
   <tmp>.bin --ser S`; require the file size equals the range and every byte is 0xFF (counted with `tr
   -d '\377'` into a file and `stat`, no pipe into `grep -q`, F-695). Under `retail`, an **alias probe**
-  first: write a 4 KiB marker at `0x10000000`, read 4 KiB at `+4 MiB`, `+8 MiB`, `+12 MiB`; any copy of
-  the marker means the flash is smaller than 16 MB (refuse, condemned); then erase as above. A non-zero
+  runs first, and only after `--execute` and the typed confirmation (it writes flash): a 4 KiB marker of
+  random bytes, generated per run and printed by sha256, written with `load -v <marker>.bin -o
+  0x10000000 --ser S`; then 4 KiB read at `+4 MiB`, `+8 MiB`, `+12 MiB`; any copy of the marker means the
+  flash is smaller than 16 MB (refuse, condemned); then erase as above. A non-zero exit from the `load`
+  is condemned too. `erase-range --probe-only` runs just the probe (any profile, same gating), for the
+  bench (§7 R4). A dry run records no `load` argv (case 8). A non-zero
   exit from `erase` or `save` is "the boot ROM refused this range: treat the engraver as an unknown
   image (condemned)", exit 2.
 - `save-range`: identity gate; the same read into `--out` (must end `.bin`); prints its sha256.
@@ -237,8 +272,9 @@ Exactly two cases, no free `--bits`: `bf0-copy3` writes DISABLE_OTP_BOOT into ro
 (`otp set -s 0x04a 0x002000 --ser S`, F16); `bf1-copy0` writes KEY_INVALID slot 3 into the first
 BOOT_FLAGS1 copy only (`otp set -c 1 -s 0x04b <copy0|0x000800> --ser S`, F14, F16). Pre: identity gate
 (rehearsal), the target copies equal and the bit clear. After the write it reads every copy of the row
-(unnamed rows bare, the first row with `-c 1`) and requires: the target copy = old | bit, every other
-copy unchanged. Anything else is exit 3 and the rehearsal stops.
+(unnamed rows bare, the first row with `-c 1`, cross-checked with RAW_VALUE[0]) and requires: the target
+copy = old | bit, every other copy unchanged. Anything else is exit 3 with inject-copy's own text: "stop
+the rehearsal; do not re-run".
 
 ## 4. R changes
 
@@ -255,7 +291,9 @@ copy unchanged. Anything else is exit 3 and the rehearsal stops.
   (E3b)": `check --profile retail --slot1 valid --disable-otp-boot 0 --key-invalid 0`,
   `disable-otp-boot`, the optional `invalidate-spare-keys` (only if plan §9 item 14 allows it on a
   test board), the final `check`; each IRREVERSIBLE step needs Brian's typed go-ahead naming the
-  CHIPID and the step; exit 3 means re-run the same command; no SeedHammer write before E4.
+  CHIPID and the step; exit 3 means re-run the same command once, and that one re-run is
+  pre-authorised by the step's go-ahead; a second re-run needs a new go-ahead, and a re-run that exits
+  non-zero for any reason means stop and do not use the board for seeds; no SeedHammer write before E4.
 - HARDWARE_INVENTORY: a "Retail OTP rows" section pointing at `design/hardware/retail-otp.json`.
 - FOLLOWUPS: F-619's correction (the `-c 1` measurement was an argument-order artefact, F14); F-701
   progress. The F10 hardware reading (§7 R9) is written to the result file and to F-619.
@@ -266,7 +304,8 @@ copy unchanged. Anything else is exit 3 and the rehearsal stops.
 
 Row-level RP2350 simulator. State: a JSON file of raw rows (ECC rows as 24-bit raw), a flash image of
 a configured physical size, a device list. Implements, with G1's exact text and F14-F17: `version
-[-s]`, `info` (one or more devices, G5), `otp list` (the fingerprint names), `otp get` (named
+[-s]`, `info` (one or more devices, G5), `otp list` (the fingerprint names), every output
+line word-wrapped at 80 columns as picotool does when stdout is not a tty (F18), `otp get` (named
 registers with vote, RAW_VALUE, WARNING, the flipping note; numeric rows resolving to named registers
 for 0x040/0x048/0x04b/0x059; `-c`, `-r`, `-e`), `otp set` (all copies row by row with F11's failure
 after earlier rows; `-c 1`; unnamed raw rows; "Cannot clear bits"), `otp load`, `erase -r`/`save -r`
@@ -279,7 +318,10 @@ subcommand or flag exits 99. OTP bits only set.
 
 Fault modes (env): `SUPPRESS_WARNING=1` (unequal copies print no WARNING, a picotool output
 regression); `COPIES_IGNORED=1` (`-c 1` returns the vote, F-619's old reading); `FAIL_SET_AFTER=N`
-(`otp set` burns N rows, then exits non-zero); `FAIL_READ_AFTER_WRITE=1`; `DEVICES=2`.
+(`otp set` burns N rows, then exits non-zero); `FAIL_READ_AFTER_WRITE=1`; `DEVICES=2`;
+`FAKE_REQUIRE_SER=1` (any device-touching call without `--ser` exits 99; `run-e2e-otp.sh` always sets
+it). The fake appends every argv to an argv log the cases can assert on. R's old fake stub is updated
+to answer `version -s` with `2.3.1`.
 
 ### 6.2 `scripts/test/run-e2e-otp.sh` cases (each asserts exit code, a message regex, and for refusals
 that the state file is byte-identical afterwards)
@@ -288,49 +330,65 @@ that the state file is byte-identical afterwards)
 2. Each §3.2 row wrong, one at a time → exit 2 naming the row; two rows wrong → both named. The two
    bad slot-1/KEY_VALID combinations (empty slot 1 with 0x3; fork key with 0x1 under `--slot1 valid`).
 3. Unequal copies: each of the 3 copies of BOOT_FLAGS0, BOOT_FLAGS1, USB_BOOT_FLAGS, and copies 0 and
-   7 of CRIT1, odd one at a time → `check` exit 2. The same with `SUPPRESS_WARNING=1` → still exit 2.
+   7 of CRIT1, odd one at a time → `check` exit 2. The same with `SUPPRESS_WARNING=1` → still exit 2. CRIT0 copy 0
+   odd → exit 2.
+   3c. Copy 0 odd with `COPIES_IGNORED=1` (only the WARNING can refuse) → exit 2.
 4. Writes: dry-run leaves state identical; `--execute` with the right confirmation writes and passes;
    wrong confirmation, `--ser` mismatch (exit 1 before any write), `DEVICES=2`, retail with no entries →
    refused, state identical. Both orders of the two writes pass.
 5. Heal: each single-copy subset partial (for both rows) + the write → heal message, post PASS; a copy
-   holding a bit outside the target → exit 2, state identical.
+   holding a bit outside the target → exit 2, state identical. A stray KEY_INVALID bit 8, and
+   separately bit 9, in copy 0 only → `invalidate-spare-keys` exit 2, state identical. Heal under
+   `COPIES_IGNORED=1` → refused (RAW_VALUE cross-check), state identical. A no-write branch whose
+   post-check fails → exit 2, not 3.
 6. Interrupted write: `FAIL_SET_AFTER=1` and `=2` → exit 3 with the re-run text; re-run → heal → PASS.
    `FAIL_READ_AFTER_WRITE=1` → exit 3.
 7. Identity gate: `erase-range --profile rehearsal` and `inject-copy` on a retail-shaped state → exit 2
-   before any erase/set argv is recorded; rehearsal on a CHIPID in the SeedHammer list → exit 2.
+   before any erase/set argv is recorded; rehearsal on a CHIPID in the SeedHammer list → exit 2 (7b: also with `--rehearsal-slot1-key`
+   given).
 8. Flash: argv carries `-r` and `--ser`; FLASH_DEVINFO CS0 8 MB under retail → condemned exit 2; a byte
-   left non-0xFF → exit 2; physical flash 4 MB under retail → alias probe refuses.
+   left non-0xFF → exit 2; physical flash 4 MB under retail → alias probe refuses; a dry run records no `load` argv; the
+   probe's `load` failing → condemned.
 9. picotool 2.2.0-a4, or 2.3.1 with the wrong `otp list` fingerprint → exit 1 before device access.
 10. `inject-copy`: both cases produce exactly the intended copy; with the builder mutated to drop `-c 1`
     (all copies written) → post-injection check exit 3.
 11. CHIPID test vector: rows of `0x09f50bf63e8d6f46` → `--ser 09F50BF63E8D6F46`; lowercase `--ser`
     accepted and uppercased.
 12. Replay: the real 2.3.1 transcripts committed in `scripts/test/fixtures/transcripts/` (from §7 R1)
-    are fed through the parsers and must parse to the recorded values.
+    are fed through the parsers and must parse to the recorded values. Until the bench PR the directory
+    is empty and the case passes vacuously; once `scripts/test/fixtures/transcripts/BENCH_RUN` exists,
+    an empty or partial directory (R1 captures, R5 and R7 refusals) fails.
+13. Argv log: in every case, every device-touching argv the fake recorded carries `--ser <S>`.
 
-### 6.3 Mutations (run once by the implementer; the report maps each to the case that kills it)
+### 6.3 Mutations (run once by the implementer; the report shows each mutation's red run: case id and
+failing assertion)
 
 | mutation | killed by |
 |---|---|
 | drop copy rule (a) | case 3, copy 2 odd, with `SUPPRESS_WARNING=1` |
 | drop the `-c 1` read from (a) | case 3, copy 0 odd, with `SUPPRESS_WARNING=1` |
-| drop the WARNING trap (b) | a case with equal printed values but WARNING (fault in the fake text) |
-| drop `--ser` from the builder | case 4 `--ser` mismatch (the fake runs on the attached device otherwise; with `DEVICES=2` it refuses) |
+| drop the WARNING trap (b) | case 3c |
+| drop `--ser` from the builder | `FAKE_REQUIRE_SER=1` (exit 99) and case 13 |
 | builder emits `-n` before `-c` | fake exit 99 (argv order) |
 | drop the post-write check | case 6 `FAIL_READ_AFTER_WRITE` |
 | heal rule accepts a superset copy | case 5 superset |
+| heal judged by field, or bounded by copy0 \| T instead of E | case 5 stray KEY_INVALID bit 8 / 9 |
+| drop the RAW_VALUE cross-check | case 5 heal under `COPIES_IGNORED=1` |
 | identity gate skipped for erase | case 7 |
 
 ### 6.4 CI
 
-- Job `otp tooling e2e` (ubuntu, bash, python3, jq, openssl, xxd): `run-e2e-otp.sh`;
-  `shellcheck -x -S warning` on `refugium-otp.sh`, `lib/otp-read.sh` and R.
-- Job `picotool argv probe`: installs nix (an install action pinned by commit SHA), `nix build
-  .#picotool`, then for each argv shape the builder emits, runs it with `--ser ZZPROBE00000000` and no
-  device attached, and requires the 249 exit and "with serial number ZZPROBE00000000" (proving `--ser`
-  was parsed, F14/F15); plus `version -s` = 2.3.1 and the `otp list` fingerprint.
-- R's existing e2e (`run-e2e.sh`, old fake with its version line updated to 2.3.1) is not in CI (it
-  needs TinyGo and the fork); it runs in `.#otp` at §8 step 1 and at the bench (R0).
+- `run-e2e-otp.sh` and `shellcheck -x -S warning` (on `refugium-otp.sh`, `lib/otp-read.sh` and R) run
+  as steps inside the existing required job `test (rust + go)`, so they gate merges.
+- Job `picotool argv probe`, with job-level `permissions: contents: read`: installs nix (an install
+  action pinned by commit SHA), `nix build .#picotool`, then runs every argv shape the builder emits
+  (generated by the builder's print mode, not written by hand) with `--ser ZZPROBE00000000` and no
+  device attached, and requires the 249 exit and, after joining wrapped lines, "with serial number
+  ZZPROBE00000000." (proving `--ser` was parsed, F14/F15/F18); plus `version -s` = 2.3.1 and the `otp
+  list` fingerprint. The e2e asserts that every argv shape in the fake's argv log is in the probed
+  set. The thread asks Brian, through the Merging PRs thread, to add this job as a required check.
+- R's existing e2e (`run-e2e.sh`, old fake answering `version -s` with 2.3.1) is not in CI (it needs
+  TinyGo and the fork); it runs in `.#otp` at §8 step 1 and at the bench (R0).
 
 ## 7. Bench rehearsal (plain Pico 2, 4 MB, consumable; Brian at 13764k)
 
@@ -338,14 +396,18 @@ No per-board go-ahead (plan §9 item 5); every write is still bound to the CHIPI
 every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RESULT_<date>_e3a.md`.
 
 - R0. `nix develop .#otp` with `SEEDHAMMER_DIR` set; `picotool version -s` = 2.3.1. Run R's old e2e.
-  Then, with no board attached: run `sign-firmware.sh` on the blinky and require `picotool info -a` →
+  Then, with no board attached: build the blinky to a scratch path with R's own tinygo command
+  (`build_blinky`), run `sign-firmware.sh` on it and require `picotool info -a` →
   `signature: verified` (picosign on 2.3.1's `seal` output, F12). Any failure stops here.
 - R1. Board in BOOTSEL: `capture` (read-only) before any write; commit its `otp get` transcripts as the
-  replay fixtures (§6.2 case 12) and diff the line formats against the fake. Any difference stops the
-  rehearsal and returns to the implementer.
+  replay fixtures (§6.2 case 12) and diff the line formats against the fake. Check the stock values
+  the rehearsal profile assumes (CRIT0, CRIT1 0; BOOT_FLAGS0 0 outside bit 11; BOOT_FLAGS1 bits 16-23
+  0; USB_BOOT_FLAGS copies equal) from the capture before R2. Any difference stops the rehearsal and
+  returns to the implementer.
 - R2. R's phases 0, 1, 2, 3 (`--execute`), 4 — the A/B proof needs phase 3 (R:1099).
-- R3. `check --profile rehearsal --slot1 valid --disable-otp-boot 0 --key-invalid 0`: PASS.
-- R4. `erase-range`, then R's phase 5 with `ACCEPT_BLINKY_ONLY=1` (positive control: blinky boots).
+- R3. `check --profile rehearsal --rehearsal-slot1-key rehearsal-work/<CHIPID>/my-key.pem --slot1 valid --disable-otp-boot 0 --key-invalid 0`: PASS.
+- R4. `erase-range --probe-only` (4 MB board: aliasing expected, recorded as the probe's positive
+  control), then `erase-range`, then R's phase 5 with `ACCEPT_BLINKY_ONLY=1` (positive control: blinky boots).
   Re-enter BOOTSEL by hand after every phase 5.
 - R5. `inject-copy --case bf0-copy3`. `check` (same flags as R3) must refuse naming BOOT_FLAGS0 copies.
 - R6. `disable-otp-boot --execute`: heal message, post PASS. Phase 5 again: still boots (F5).
@@ -364,14 +426,16 @@ every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RES
 
 ## 8. Order of work
 
-1. Pre-dispatch (author): establish G1, G2, G3, G5 from 2.3.1 source; `nix build .#picotool` here;
+1. Pre-dispatch (author): establish G1, G3, G5 from 2.3.1 source; `nix build .#picotool` here;
    run R's old e2e in `.#otp` if the fork is reachable (else at R0); run the e2e skeleton once.
 2. Implementer (one agent, worktree, TDD): fake and cases first (red); `otp-read.sh` extraction with
    R's old e2e still green; `refugium-otp.sh`; R changes; flake; docs; CI jobs; mutations.
 3. Adversarial review of the whole diff (opus); fold; repeat to 0 C / 0 I.
 4. PR; merge through the Merging PRs thread on Brian's per-PR go-ahead.
-5. Bench rehearsal §7 with Brian; result file; F-701's E3a part closes on R10's PASS.
-6. E3b separately, after E4 and H0's `capture`, on Brian's typed go-ahead naming SeedHammer #1's CHIPID
+5. Bench rehearsal §7 with Brian; result file.
+6. Bench-result PR: the result file, the R1 transcripts, the R5 and R7 refusal transcripts, and the
+   `BENCH_RUN` marker (case 12 activates); F-701's E3a part closes when it merges.
+7. E3b separately, after E4 and H0's `capture`, on Brian's typed go-ahead naming SeedHammer #1's CHIPID
    and each step.
 
 ## 9. Done when
@@ -421,3 +485,31 @@ every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RES
 | B-M10 tee, shellcheck, SDK, small flash | `--log`; `shellcheck -x -S warning` and R's two warnings fixed; `otp list` fingerprint; alias probe |
 | B-N1 where R6's result goes | R9 writes it to the result file and F-619 |
 | B-N2 `--board-rev` | dropped: a unit must equal one recorded entry |
+
+## 11. Fold table (R0 round 2: A 0C/1I, B 0C/2I; reports e3a-plan-r1-a.md, e3a-plan-r1-b.md)
+
+| finding | fold |
+|---|---|
+| A2-I1 / B2-I1 heal admits stray target-field bits | heal rule bounds every copy by E, differs only in T, copy0 \| T = E §3.3; case 5 stray bit 8/9; mutation row |
+| B2-I2 two mutations survive | case 3c (`COPIES_IGNORED`); `FAKE_REQUIRE_SER` + case 13 argv log; red runs in the report §6.3 |
+| A2-M1 80-column wrap | F18; fake wraps §6.1; probe joins lines §6.4 |
+| A2-M2 CRIT0 is a CRIT register | §3.2 copy rule with `-c 1` of 0x038; case 3 CRIT0 |
+| A2-M3 stock values assumed | R1 checks them before R2 §7 |
+| A2-M4 rehearsal slot-1 key flag | `--rehearsal-slot1-key` §3.1; R3 names it |
+| A2-M5 / B2-I2.2 `--ser` killer | as B2-I2 |
+| A2-M6 BOOT_FLAGS1 other bits | bits outside KV/KI equal the entry (retail) or 0 (rehearsal) §3.2 |
+| A2-M7 alias probe detail | random marker, `load -v`, gating, `--probe-only` §3.4; R4; case 8 |
+| A2-M8 no blinky at R0 | R0 builds it §7 |
+| A2-N1 G2 answered | F16 absorbs G2 |
+| B2-M1 F10 before R8 | RAW_VALUE[0] cross-check in heal and inject-copy; inject-copy's own exit-3 text; case 5 |
+| B2-M2 pre-state scope, branches | full check pre-state; ordered branches; exit 3 only after `otp set` §3.3 |
+| B2-M3 probe writes flash | probe only after `--execute` + confirmation §3.4 |
+| B2-M4 compared-row count | compared-row set §3.0 |
+| B2-M5 retail entry vs table | entry cells listed, same-entry rule §3.2 |
+| B2-M6 deny-list spelling | `--ser` form §3.1 |
+| B2-M7 case 12 vacuous | `BENCH_RUN` marker; bench-result PR §8 with R5/R7 transcripts |
+| B2-M8 CI not gating | steps in `test (rust + go)`; probe `contents: read`, builder-generated argv, ⊆ check, required-check request §6.4 |
+| B2-M9 `_TEST_ONLY` on writes | refused with `--execute`; RESULT "TEST ENTRY" §3.2 |
+| B2-M10 exit-3 guidance | "non-zero for any reason, stop" §3.0; one pre-authorised re-run §5 |
+| B2-N1 wrapper prints | `printf` form §3.0 |
+| B2-N2 old fake `version -s` | old fake stub answers 2.3.1 §6.1, §6.4 |
