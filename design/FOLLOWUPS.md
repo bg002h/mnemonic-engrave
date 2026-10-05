@@ -18857,6 +18857,24 @@ Journey review I-6, and the sharpest finding of the two reviews. `--sh2-verify-v
 
 **This did not gate the board-2 burn, and here is why it did not need to.** The primary detection is independent and was verified in-session: `otp_field` (`scripts/pico2-bootkey-rehearsal.sh:180`) and `read_rows` (`:208`) both die on *any* picotool `WARNING`, and picotool emits `(WARNING - REDUNDANT ROWS AREN'T EQUAL)` whenever redundant rows disagree — `:771` documents `--sh2-verify-valid` depending on that. So a partial `otp set` fails closed through the warning path regardless. The three-copy compare is a second layer, and it is the second layer that is weak.
 
+**Correction (2026-10-05, plan E3a F14).** The "`-c 1` does nothing" measurement was an
+argument-order artefact, not a property of `-c`. picotool's parser (`cli.h`, 2.3.1) matches option
+groups in **declaration order**: `otp get [-c N] [-r] [-e] [-n] [--ser S] <selector…>`. Written
+after `-n`, `-c 1` was not read as the copies option; its `1` became a selector naming row 1,
+`CHIPID1` (F14). picotool 2.2.0-a4 prints nothing for a lone `CHIPID1` read (plan F12), so the
+output was the plain named read, byte for byte. The `-c 3` result is the same mechanism: `3` named
+row 3, `OTP_DATA_CHIPID3`. The 2.3.1 binary confirms the order rule: `otp get -n -c 1 --ser S
+0x04b` also loses `--ser`, and the CI probe (`scripts/test/picotool-argv-probe.sh`) keeps that argv
+as its negative control. In its declared place, `otp get -c 1 -n --ser S 0x04b`
+reads copy 0's raw row with no RAW_VALUE line (G-facts G1, compiled from 2.3.1 source).
+`scripts/refugium-otp.sh` uses it that way, and every argv now comes from one builder in
+`scripts/lib/otp-read.sh`.
+
+The silicon reading is still owed: bench step R8 (plan §7) compares `-c 1` against the named read's
+RAW_VALUE[0] after an injected copy-0 change, and that result is written here. This entry stays
+CLOSED because R's WARNING trap fix stands. The correction is to the claim about `-c 1`, which F14
+and refugium-otp.sh's copy rule now rely on.
+
 ### F-620 — the OTP json is named after a board it is not bound to
 
 **Status:** CLOSED 2026-09-17. The runbook now generates `~/.sh2/otp-bootkey-<fp8>-slot<N>.json` — named after what the content actually is — and states that only `--ser` binds a write to a board. Canonical file generated and verified byte-identical to both board-named predecessors (all three sha256 `b474f23a...92cc9`), which is the demonstration that the name never carried a binding. **Owning phase:** SH2 board 3 bring-up.
@@ -20412,3 +20430,37 @@ E3b: the same steps on SeedHammer #1 (`DISABLE_OTP_BOOT`; `KEY_INVALID` only if
 plan §9 item 14 allows). **Irreversible: Brian's typed go-ahead naming the
 board's CHIPID and each step.** Depends on E3a, the fork key decision (E4) and
 H0's button and white-label rows.
+
+**Progress 2026-10-05: E3a implemented** (plan `design/IMPLEMENTATION_PLAN_e3a_refugium_otp.md`
+§8 step 2; report `design/agent-reports/e3a-impl-report.md`). Not yet reviewed (§8 step 3), merged
+or run at the bench.
+
+Built:
+
+- The picotool decision: **2.3.1** from nixpkgs-unstable `a7868a72` with no overlay, through
+  `flake.nix` (`packages.picotool`, `devShells.otp`); see `design/PICOTOOL_PIN.md`.
+- `scripts/refugium-otp.sh`: `check`, `capture`, `disable-otp-boot`, `invalidate-spare-keys`,
+  `erase-range`, `save-range` and `inject-copy`, with the retail and rehearsal profiles.
+- `scripts/lib/otp-read.sh`: the argv builder and readers, shared with R.
+- R accepts `KEY_INVALID` 0xC with `--expect-key-invalid c`.
+- `design/hardware/retail-otp.json`, with the schema and no entries.
+- A row-level picotool fake and `scripts/test/run-e2e-otp.sh`, both in CI.
+- The CI job `picotool argv probe`.
+
+Open for E3a:
+
+- the adversarial review;
+- adding the probe as a required check;
+- the bench rehearsal on a 4 MB Pico 2 (§7 R0-R10), and the bench-result PR with the R1, R5 and
+  R7 transcripts.
+
+**Blocker found for bench step R0.** On picotool 2.3.1, `sign-firmware.sh`'s throwaway seal
+(`picotool seal --sign --clear`, `sign-firmware.sh:104`) exits 248 with `ERROR: unknown sram end`
+on the TinyGo blinky.
+
+- Measured here, with no board: R's old e2e fails phases 3, 5 and 6.
+- The pre-E3a tree fails the same three phases on 2.3.1, so E3a did not cause it.
+- `seal --sign` without `--clear` works and verifies.
+- R0 cannot pass until `sign-firmware.sh` (or the blinky's link layout) is fixed for 2.3.1.
+
+E3a does not change either. The fix needs its own decision.
