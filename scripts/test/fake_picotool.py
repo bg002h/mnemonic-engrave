@@ -500,7 +500,11 @@ def cmd_otp_get(st, args, regs):
         row, mask, reg, field = matches[key]
         do_ecc = ecc_flag
         redundancy = copies_opt
+        # COPIES_IGNORED: the vote, in the equal-copies shape (F20: no RAW_VALUE
+        # and no WARNING under -c), i.e. what -c 1 would print if it read the vote.
+        quiet_vote = False
         if reg is not None and os.environ.get('COPIES_IGNORED') == '1':
+            quiet_vote = copies_opt >= 0
             redundancy = -1
         corrected = 0
         if row != last_row:
@@ -557,7 +561,7 @@ def cmd_otp_get(st, args, regs):
                         corrected |= (1 << b)
                     if sets[b] and clears[b]:
                         diff = True
-                if diff and os.environ.get('SUPPRESS_WARNING') != '1':
+                if diff and not quiet_vote and os.environ.get('SUPPRESS_WARNING') != '1':
                     if os.environ.get('SUPPRESS_RAW_VALUE') == '1':
                         fos.write("(WARNING - REDUNDANT ROWS AREN'T EQUAL)")
                     else:
