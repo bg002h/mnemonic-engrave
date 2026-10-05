@@ -20492,3 +20492,31 @@ the engrave step, in both the default and Refugium builds. The keyboard types AS
 so only a payload reaches it; the code is the same at fork `be00ef8`, so it predates
 F-702. Fix: refuse a rune the plate font lacks at admission or at the fit step, with a
 message naming its position.
+
+### F-707 — v1 fork images carry no OTP rollback version and no TBYB (owning phase: **refugium-wallet build plan F9a/F9b**) `#seedhammer` `#refugium` `#release` `#otp` `#cross-repo`
+
+**Status:** OPEN — tier cross-repo (`bg002h/refugium-wallet`)
+Companion: refugium-wallet `design/FOLLOWUPS.md` `mr-gui-f9-no-otp-rollback` (05cc6f4, branch
+`claude/project-thread-rcj081`). Filed 2026-10-05 at the UI brainstorm thread's request.
+No v1 fork image (refugium-wallet plan F9a and F9b) carries an OTP rollback version or a
+TBYB flag; never use `picotool seal --rollback`. Under secure boot, the first boot of a
+signed image carrying a rollback version burns a thermometer bit in
+DEFAULT_BOOT_VERSION0/1 (OTP rows 0x04e-0x053) and sets BOOT_FLAGS0.ROLLBACK_REQUIRED
+(pico-bootrom-rp2350 `varm_launch_image.c`; pico-sdk `otp_data.h`, as cited by the UI
+thread; re-verify against those sources before F9). That would condemn every honestly
+provisioned board at its closing image check. The release check enforces it with the
+pinned picotool's `info`. Anti-rollback is deferred until after v1, beside key rotation
+(UI brainstorm ruling 2026-10-05 07:40Z). Touches F-703.
+
+### F-708 — `picobin.Image.HashData` hashes entry 0's size word for every clear LOAD_MAP entry (owning phase: none — ownerless residue) `#seedhammer` `#picobin` `#signing`
+
+**Status:** OPEN — owning phase: none (fix before F-703 if a v1 image uses `--pin-xip-sram`)
+Found by thread "mnemonic-engrave for Refugium" during the E3 seal investigation
+(`design/agent-reports/e3a-seal-clear-investigation.md`); filed 2026-10-05. In fork
+`picobin/picobin.go` `HashData` (fork main c0f9379, lines 324-330), a LOAD_MAP entry with
+`storageStart == 0` hashes its size word with `hashData(r, hasher, buf, eidx+8, 4)`,
+which reads entry 0's size word regardless of `i`; it should read `eidx+i*12+8`. Today's
+images have only entry 0 as a clear entry, so the hash is right; an image sealed with
+`--clear --pin-xip-sram` has a second clear entry and would hash wrongly, so
+`picosign` would compute a signature the boot ROM rejects. Fork-native code (no Rust
+primary). Fix with a test image that has two clear entries.
