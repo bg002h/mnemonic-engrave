@@ -697,7 +697,7 @@ cmd_write() {
     say "already written: every copy equals E; no write."
     cmd_postcheck 0
   elif copies_equal "$tgt" && [ "$c0" -eq $(( E & ~T )) ]; then
-    say "copies equal E & ~T: writing T."
+    if [ "$EXECUTE" = 1 ]; then say "copies equal E & ~T: writing T."; else say "copies equal E & ~T: would write T (dry run)."; fi
   elif ! copies_equal "$tgt"; then
     # The heal rule (plan 3.3), conditions 1-3 on the per-copy reads.
     for k in "${cs[@]}"; do
@@ -708,7 +708,7 @@ cmd_write() {
     # 4: RAW_VALUE present and equal to the per-copy reads, copy for copy.
     [ -n "${G_RAW[$tgt]}" ] || die2 "heal refused: the named read printed no RAW_VALUE for unequal copies"
     raw_matches "$tgt" || die2 "heal refused: RAW_VALUE=${G_RAW[$tgt]// /;} disagrees with the per-copy reads $(copies_hex "${G_COPIES[$tgt]}") (-c 1 is not reading copy 0 on this board)"
-    say "healing an unequal copy: copies $(copies_hex "${G_COPIES[$tgt]}") -> $(hx "$E") in every copy"
+    say "healing an unequal copy: copies $(copies_hex "${G_COPIES[$tgt]}") -> $(hx "$E") in every copy$([ "$EXECUTE" = 1 ] || printf ' (dry run: nothing written)')"
   else
     die2 "$tgt copies are equal at $(hx "$c0"), which is neither E $(hx "$E") nor E & ~T $(hx $(( E & ~T )))"
   fi
@@ -767,7 +767,7 @@ alias_probe() {
     pt_exec
     if [ "$PT_RC" -ne 0 ]; then rm -f "$got"; condemned "reading +$off MiB exited $PT_RC"; fi
     [ -f "$got" ] && [ "$(stat -c%s "$got")" -eq 4096 ] \
-      || die2 "the read-back at +$off MiB is missing or not 4096 bytes: the probe proved nothing (refused)"
+      || die2 "the read-back at +$off MiB is missing or not 4096 bytes: the probe proved nothing (refused; the 4 KiB marker is already written at 0x10000000: treat the engraver as an unknown image, condemned)"
     if [ "$(sha256sum < "$m")" = "$(sha256sum < "$got")" ]; then
       die2 "the marker reappears at +$off MiB: this flash is smaller than 16 MB (condemned)"
     fi

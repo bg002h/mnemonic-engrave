@@ -579,6 +579,9 @@ also asks for `BURN <step> <CHIPID>` to be typed at its prompt.
 | 2 | state refused | stop; nothing was written by OTP |
 | 3 | an `otp set` was issued and something after it failed | see below |
 
+**Exit 4** comes only from `check` with `REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY` set: it matched a
+test entry and is never a pass. Unset the variable; it must never be set at a sitting.
+
 **On exit 3**, re-run **the same command once**. It only adds bits, and it heals a copy the
 interrupted write missed.
 
