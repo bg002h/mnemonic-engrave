@@ -64,6 +64,8 @@ Fault modes (environment)
                            nothing.
   FAIL_LOAD_VERIFY=1       `load -v` reports a verify failure (exit 245)
   ERASE_SKIP_BYTE=<off>    `erase` leaves the byte at flash offset <off> as it was
+  FAIL_GET_AFTER=N         the first N `otp get` calls succeed, every later one
+                           fails (exit 247); the count lives in <state>.getcount
 """
 import json
 import os

@@ -174,53 +174,53 @@ grep -q "RESULT: PASS" <<<"$OUT" && bad 1 "_TEST_ONLY never prints RESULT: PASS"
 
 ########################################################################
 hdr "2. each expected-state row wrong, one at a time"
-rehrow() { # rehrow <desc> <row-name-regex> <state-edit...>
+rehrow() { # rehrow <desc> <row-name-regex> <state-edit...>  (@S in the edit = this case's state)
   local desc="$1" re="$2"; shift 2
-  fresh "$BASE_REH"; "$@"; SNAP0="$(snap)"; chk_reh valid 0 0
-  expect 2 "rehearsal: $desc" "FAIL +$re" same
+  fresh "$BASE_REH"; "${@//@S/$S}"; SNAP0="$(snap)"; chk_reh valid 0 0
+  expect 2 "rehearsal: $desc" 2 "FAIL +$re" same
 }
-rehrow "CRIT0 not 0" CRIT0 st set-copies "$S" 038 8 000001
-rehrow "CRIT1 not 0x000001" CRIT1 st set-copies "$S" 040 8 000005
-rehrow "slot 2 not empty" SLOT2 st set-slot "$S" 2 "$THIRD"
-rehrow "slot 3 not empty" SLOT3 st set-slot "$S" 3 "$THIRD"
-rehrow "KEY_INVALID not as stated" BOOT_FLAGS1 st set-copies "$S" 04b 3 000c03
-rehrow "BOOT_FLAGS1 other bit (DOUBLE_TAP)" BOOT_FLAGS1 st set-copies "$S" 04b 3 080003
-rehrow "ENABLE_OTP_BOOT set" BOOT_FLAGS0 st set-copies "$S" 048 3 004000
-rehrow "DISABLE_OTP_BOOT not as stated" BOOT_FLAGS0 st set-copies "$S" 048 3 002000
-rehrow "BOOT_FLAGS0 other bit" BOOT_FLAGS0 st set-copies "$S" 048 3 000002
-rehrow "FLASH_DEVINFO_ENABLE set" FLASH_DEVINFO st set-copies "$S" 048 3 000020
-rehrow "PAGE1_LOCK1 not 0x040404" PAGE1_LOCK1 st set-row "$S" f83 000000
-rehrow "PAGE2_LOCK0 not 0" PAGE2_LOCK0 st set-row "$S" f84 000001
-rehrow "slot 1 is not the rehearsal slot-1 key" SLOT1 st set-slot "$S" 1 "$THIRD"
+rehrow "CRIT0 not 0" CRIT0 st set-copies @S 038 8 000001
+rehrow "CRIT1 not 0x000001" CRIT1 st set-copies @S 040 8 000005
+rehrow "slot 2 not empty" SLOT2 st set-slot @S 2 "$THIRD"
+rehrow "slot 3 not empty" SLOT3 st set-slot @S 3 "$THIRD"
+rehrow "KEY_INVALID not as stated" BOOT_FLAGS1 st set-copies @S 04b 3 000c03
+rehrow "BOOT_FLAGS1 other bit (DOUBLE_TAP)" BOOT_FLAGS1 st set-copies @S 04b 3 080003
+rehrow "ENABLE_OTP_BOOT set" BOOT_FLAGS0 st set-copies @S 048 3 004000
+rehrow "DISABLE_OTP_BOOT not as stated" BOOT_FLAGS0 st set-copies @S 048 3 002000
+rehrow "BOOT_FLAGS0 other bit" BOOT_FLAGS0 st set-copies @S 048 3 000002
+rehrow "FLASH_DEVINFO_ENABLE set" FLASH_DEVINFO st set-copies @S 048 3 000020
+rehrow "PAGE1_LOCK1 not 0x040404" PAGE1_LOCK1 st set-row @S f83 000000
+rehrow "PAGE2_LOCK0 not 0" PAGE2_LOCK0 st set-row @S f84 000001
+rehrow "slot 1 is not the rehearsal slot-1 key" SLOT1 st set-slot @S 1 "$THIRD"
 fresh "$BASE_REH"; st set-copies "$S" 038 8 000001; st set-row "$S" f83 000000; SNAP0="$(snap)"
 chk_reh valid 0 0
-expect 2 "two rows wrong: CRIT0 named" "FAIL +CRIT0" same
-expect 2 "two rows wrong: PAGE1_LOCK1 named" "FAIL +PAGE1_LOCK1" same
+expect 2 "two rows wrong: CRIT0 named" 2 "FAIL +CRIT0" same
+expect 2 "two rows wrong: PAGE1_LOCK1 named" 2 "FAIL +PAGE1_LOCK1" same
 # The joint slot-1 / KEY_VALID table.
 fresh "$BASE_REH"; st set-slot "$S" 1 "$(printf '0%.0s' $(seq 1 64))"; SNAP0="$(snap)"
 chk_reh empty 0 0
-expect 2 "--slot1 empty with KEY_VALID 0x3 refused" "FAIL +SLOT1" same
+expect 2 "--slot1 empty with KEY_VALID 0x3 refused" 2 "FAIL +SLOT1" same
 fresh "$BASE_REH"; st set-copies "$S" 04b 3 000001; SNAP0="$(snap)"
 chk_reh valid 0 0
-expect 2 "--slot1 valid with the key but KEY_VALID 0x1 refused" "FAIL +SLOT1" same
+expect 2 "--slot1 valid with the key but KEY_VALID 0x1 refused" 2 "FAIL +SLOT1" same
 chk_reh key 0 0
 expect 2 "--slot1 key with KEY_VALID 0x1 passes" 0 "RESULT: REHEARSAL PROFILE PASS" same
 # Retail cells against the recorded entry.
-retrow() { # retrow <desc> <row-name-regex> <state-edit...>
+retrow() { # retrow <desc> <row-name-regex> <state-edit...>  (@S in the edit = this case's state)
   local desc="$1" re="$2"; shift 2
-  fresh "$BASE_RET"; "$@"; SNAP0="$(snap)"
+  fresh "$BASE_RET"; "${@//@S/$S}"; SNAP0="$(snap)"
   run "" "$TTOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
-  expect 2 "retail: $desc" "FAIL +$re" same
+  expect 2 "retail: $desc" 2 "FAIL +$re" same
 }
-retrow "FLASH_DEVINFO differs from the entry" FLASH_DEVINFO st set-ecc "$S" 054 0b00
-retrow "USB_BOOT_FLAGS differs from the entry" USB_BOOT_FLAGS st set-copies "$S" 059 3 400233
-retrow "a white-label string row differs" WHITE_LABEL st set-ecc "$S" 110 4854
-retrow "CRIT1 differs (DEBUG_DISABLE)" CRIT1 st set-copies "$S" 040 8 000005
-retrow "BOOT_FLAGS1 DOUBLE_TAP differs" BOOT_FLAGS1 st set-copies "$S" 04b 3 000003
-retrow "slot 1 is not the fork key" SLOT1 st set-slot "$S" 1 "$THIRD"
+retrow "FLASH_DEVINFO differs from the entry" FLASH_DEVINFO st set-ecc @S 054 0b00
+retrow "USB_BOOT_FLAGS differs from the entry" USB_BOOT_FLAGS st set-copies @S 059 3 400233
+retrow "a white-label string row differs" WHITE_LABEL st set-ecc @S 110 4854
+retrow "CRIT1 differs (DEBUG_DISABLE)" CRIT1 st set-copies @S 040 8 000005
+retrow "BOOT_FLAGS1 DOUBLE_TAP differs" BOOT_FLAGS1 st set-copies @S 04b 3 000003
+retrow "slot 1 is not the fork key" SLOT1 st set-slot @S 1 "$THIRD"
 fresh "$BASE_RET"; st set-slot "$S" 0 "$THIRD"; SNAP0="$(snap)"
 run "" "$TTOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
-expect 2 "retail: slot 0 is not SeedHammer's key (identity gate)" "identity" same
+expect 2 "retail: slot 0 is not SeedHammer's key (identity gate)" 2 "identity" same
 
 ########################################################################
 hdr "3. unequal copies are refused by check"

@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2034  # this file sets globals that its callers read
 #
 # otp-read.sh -- shared picotool plumbing for scripts/pico2-bootkey-rehearsal.sh
 # ("R") and scripts/refugium-otp.sh. Sourced, never executed.
