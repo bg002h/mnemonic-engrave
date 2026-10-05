@@ -562,7 +562,8 @@ also asks for `BURN <step> <CHIPID>` to be typed at its prompt.
    the full check itself (`post-write check: PASS`).
 3. **Optional:
    `refugium-otp.sh invalidate-spare-keys --profile retail --ser S --execute`** (IRREVERSIBLE).
-   - Run it only if plan §9 item 14 allows it on a test board.
+   - Run it only if `refugium-wallet`'s `IMPLEMENTATION_PLAN_mr_gui_v1.md` §9 item 14 allows it on
+     a test board.
    - It sets KEY_INVALID 0xC. **Slots 2 and 3 can never hold a key after this.**
    - After it, R's `--sh2-precheck` and `--sh2-verify-valid` need `--expect-key-invalid c`.
 4. **Final check (read only).** Run

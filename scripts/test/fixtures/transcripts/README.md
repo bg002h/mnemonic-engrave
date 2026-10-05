@@ -11,6 +11,13 @@ That PR adds:
   `<capture>.transcripts/` directory that `refugium-otp.sh capture` writes at R1;
 - `r1-capture.json`, the R1 capture itself;
 - `r5-check-refusal.log` and `r7-check-refusal.log`, the `--log` transcripts of
-  the two `check` refusals after `inject-copy` (R5, R7);
+  the two `check` refusals after `inject-copy` (R5, R7). Case 12 requires
+  `FAIL BOOT_FLAGS0 copies differ` and `FAIL BOOT_FLAGS1 copies differ` in them,
+  so a refusal for a parse failure (`unreadable: …`) does not count;
+- `r5-capture.json` and `r7-capture.json` with their `.transcripts/`
+  directories: the captures taken right after those refusals. R1's board is
+  stock, so only these hold silicon's RAW_VALUE and WARNING lines. Case 12
+  replays both and requires RAW_VALUE in `0x048_named.txt` (R5) and
+  `0x04b_named.txt` (R7);
 - `BENCH_RUN`, an empty marker. Once it exists, an empty or partial directory
   fails case 12.
