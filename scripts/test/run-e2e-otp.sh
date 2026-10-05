@@ -50,7 +50,8 @@ export FAKE_PT_ARGV_LOG="$TMP/argv.log"
 : > "$FAKE_PT_ARGV_LOG"
 # A case must never inherit a fault mode from the shell that launched it.
 unset SUPPRESS_WARNING SUPPRESS_RAW_VALUE COPIES_IGNORED FAIL_SET_AFTER FAIL_READ_AFTER_WRITE \
-      DEVICES FAIL_LOAD_VERIFY ERASE_SKIP_BYTE FAIL_GET_AFTER REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY
+      DEVICES FAIL_LOAD_VERIFY ERASE_SKIP_BYTE FAIL_GET_AFTER REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY \
+      NOISY_COPY_READS NOISY_BARE_READS SAVE_SHORT SAVE_NO_FILE REFUGIUM_OTP_LOGGING
 
 # --- keys ---------------------------------------------------------------------
 KEYS="$TMP/keys"; mkdir -p "$KEYS"
@@ -160,11 +161,17 @@ hdr "1. a board in the expected state passes"
 fresh "$BASE_RET"; SNAP0="$(snap)"
 run "" "$TTOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
 expect 1 "retail-shaped state with a recorded entry: check PASS" 0 "RESULT: PASS" same
+grep -qE "PASS +SLOT1 +fork key, KEY_VALID 0x3" <<<"$OUT" && ok 1 "retail SLOT1 PASS names the fork key" \
+  || bad 1 "retail SLOT1 PASS names the fork key" "no 'PASS SLOT1 fork key'"
 fresh "$BASE_REH"; SNAP0="$(snap)"
 chk_reh valid 0 0
 expect 1 "rehearsal-shaped state: check PASS" 0 "RESULT: REHEARSAL PROFILE PASS — not a retail check" same
 grep -q "CANNOT PROVE" <<<"$OUT" && ok 1 "rehearsal RESULT carries the CANNOT PROVE list" \
   || bad 1 "rehearsal RESULT carries the CANNOT PROVE list" "no CANNOT PROVE"
+grep -qE "PASS +SLOT1 +rehearsal slot-1 key, KEY_VALID 0x3" <<<"$OUT" && ok 1 "rehearsal SLOT1 PASS names the rehearsal slot-1 key" \
+  || bad 1 "rehearsal SLOT1 PASS names the rehearsal slot-1 key" "no 'PASS SLOT1 rehearsal slot-1 key'"
+grep -qE "PASS +SLOT1 +fork key" <<<"$OUT" && bad 1 "rehearsal SLOT1 never says fork key" "it did" \
+  || ok 1 "rehearsal SLOT1 never says fork key"
 fresh "$BASE_RET"; SNAP0="$(snap)"
 REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY="$TREE/design/hardware/retail-otp.json" \
   run "" "$TOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
@@ -221,6 +228,16 @@ retrow "slot 1 is not the fork key" SLOT1 st set-slot @S 1 "$THIRD"
 fresh "$BASE_RET"; st set-slot "$S" 0 "$THIRD"; SNAP0="$(snap)"
 run "" "$TTOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
 expect 2 "retail: slot 0 is not SeedHammer's key (identity gate)" 2 "identity" same
+# An entry that itself records FLASH_DEVINFO_ENABLE with CS0_SIZE 0xb (8 MiB):
+# the board equals its entry, and FLASH_DEVINFO must still FAIL (CS0 must be 0xc).
+CS8="$TMP/base-retail-cs8-entry"; mk_retail "$CS8"; st set-ecc "$CS8/state.json" 054 0b00
+fresh "$CS8"; SNAP0="$(snap)"
+run "" "$TOOL" capture --ser "$TSER" --out "$TMP/cap-cs8.json"
+expect 2 "capture of a retail-shaped board with CS0_SIZE 0xb" 0 "wrote" same
+mk_tree "$TMP/tree-cs8" "$TMP/cap-cs8.json"
+run "" "$TMP/tree-cs8/scripts/refugium-otp.sh" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
+expect 2 "retail: entry with FLASH_DEVINFO_ENABLE and CS0_SIZE 0xb still FAILs" 2 \
+  "FAIL +FLASH_DEVINFO +raw 0x[0-9a-f]+, entry .*CS0_SIZE must be 0xc" same
 
 ########################################################################
 hdr "3. unequal copies are refused by check"
@@ -250,6 +267,19 @@ done
 odd 3 CRIT0 038 8 0 000001
 odd 3 CRIT0 038 8 0 000001 SUPPRESS_WARNING=1
 odd 3c BOOT_FLAGS1 04b 3 0 000100 COPIES_IGNORED=1 SUPPRESS_RAW_VALUE=1
+# A one-copy read (-c 1, or a bare read of a copy row) that prints RAW_VALUE or
+# a WARNING was not a one-copy read (F20): unreadable, even with every copy equal.
+noisy() { # noisy <desc> <regex> [env...]
+  local desc="$1" re="$2"; shift 2
+  fresh "$BASE_REH"; SNAP0="$(snap)"
+  env "$@" "$TOOL" check "${REH1[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0 > "$TMP/out" 2>&1
+  RC=$?; OUT="$(cat "$TMP/out")"
+  expect 3 "$desc ($*)" 2 "$re" same
+}
+noisy "a noisy -c 1 read is unreadable" \
+  "FAIL +BOOT_FLAGS0 +unreadable: the -c 1 read of 0x048 printed a WARNING or RAW_VALUE" NOISY_COPY_READS=1
+noisy "a noisy bare copy read is unreadable" \
+  "FAIL +BOOT_FLAGS0 +unreadable: the bare read of 0x049 printed a WARNING or RAW_VALUE" NOISY_BARE_READS=1
 
 ########################################################################
 hdr "4. writes"
@@ -270,8 +300,20 @@ expect 4 "--ser that matches no board: exit 1 before any write" 1 "no board" sam
 no_argv 4 "--ser mismatch issues no otp set" $'^otp\tset'
 DEVICES=2 run "BURN disable-otp-boot $RSER"$'\n' "$TOOL" disable-otp-boot "${REH1[@]}" --execute
 expect 4 "two boards in BOOTSEL refused" 1 "more than one" same
+# The board answering to --ser reports a different CHIPID (F15: a white-label
+# serial). The state's USB serial is $RSER, its CHIPID rows another value.
+CXB="$TMP/base-chipid-mismatch"; mk_rehearsal "$CXB" 1111222233334444 "$RSER"
+fresh "$CXB"; SNAP0="$(snap)"
+run "BURN disable-otp-boot $RSER"$'\n' "$TOOL" disable-otp-boot "${REH1[@]}" --execute
+expect 4 "the board answering to --ser reports another CHIPID: exit 1" 1 "reports CHIPID 1111222233334444" same
+no_argv 4 "CHIPID mismatch issues no otp set" $'^otp\tset'
+# A generated tree whose retail-otp.json has no entries, so this case does not
+# depend on the repo's live file (which gains entries at H0).
+ETREE="$TMP/tree-empty"; rm -rf "$ETREE"; mkdir -p "$ETREE/scripts/lib" "$ETREE/design/hardware"
+cp "$TOOL" "$ETREE/scripts/"; cp "$LIB" "$ETREE/scripts/lib/"
+jq -n '{schema: "refugium-retail-otp/1", entries: []}' > "$ETREE/design/hardware/retail-otp.json"
 fresh "$BASE_RET"; SNAP0="$(snap)"
-run "BURN disable-otp-boot $TSER"$'\n' "$TOOL" disable-otp-boot "${RET[@]}" --execute
+run "BURN disable-otp-boot $TSER"$'\n' "$ETREE/scripts/refugium-otp.sh" disable-otp-boot "${RET[@]}" --execute
 expect 4 "retail with no recorded entries refused" 2 "no recorded retail values" same
 REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY="$TREE/design/hardware/retail-otp.json" \
   run "BURN disable-otp-boot $TSER"$'\n' "$TOOL" disable-otp-boot "${RET[@]}" --execute
@@ -311,16 +353,16 @@ heal_ok() { # heal_ok <desc> <cmd> <row0> <v0> <v1> <v2> <want>
   grep -q "post-write check: PASS" <<<"$OUT" && ok 5 "$desc: post PASS" || bad 5 "$desc: post PASS" "no PASS"
   eqv 5 "$desc: every copy $want" "$(row "$r0") $(row "$(printf '%03x' $((16#$r0+1)))") $(row "$(printf '%03x' $((16#$r0+2)))")" "$want $want $want"
 }
-heal_no() { # heal_no <case> <desc> <cmd> <row0> <v0> <v1> <v2> [env...]
-  local c="$1" desc="$2" cmd="$3" r0="$4"
+heal_no() { # heal_no <case> <desc> <regex> <cmd> <row0> <v0> <v1> <v2> [env...]
+  local c="$1" desc="$2" re="$3" cmd="$4" r0="$5"
   fresh "$BASE_REH"
-  st set-row "$S" "$r0" "$5"; st set-row "$S" "$(printf '%03x' $((16#$r0+1)))" "$6"
-  st set-row "$S" "$(printf '%03x' $((16#$r0+2)))" "$7"
-  shift 7
+  st set-row "$S" "$r0" "$6"; st set-row "$S" "$(printf '%03x' $((16#$r0+1)))" "$7"
+  st set-row "$S" "$(printf '%03x' $((16#$r0+2)))" "$8"
+  shift 8
   SNAP0="$(snap)"
   printf 'BURN %s %s\n' "$cmd" "$RSER" | env "$@" "$TOOL" "$cmd" "${REH1[@]}" --execute > "$TMP/out" 2>&1
   RC=$?; OUT="$(cat "$TMP/out")"
-  expect "$c" "$desc" 2 "" same
+  expect "$c" "$desc" 2 "$re" same
 }
 for k in 0 1 2; do
   v=(002000 002000 002000); v[k]=000000
@@ -332,15 +374,15 @@ for k in 0 1 2; do
   v=(000003 000003 000003); v[k]=000403
   heal_ok "BOOT_FLAGS1 copy $k holds half of KEY_INVALID" invalidate-spare-keys 04b "${v[@]}" 0x000c03
 done
-heal_no 5 "a copy holding a bit outside the target refused" disable-otp-boot 048 002000 002002 000000
-heal_no 5 "stray KEY_INVALID bit 8 in copy 0 only refused" invalidate-spare-keys 04b 000103 000003 000003
-heal_no 5 "stray KEY_INVALID bit 9 in copy 0 only refused" invalidate-spare-keys 04b 000203 000003 000003
-heal_no 5 "0x103/0x003/0x003 under COPIES_IGNORED refused" invalidate-spare-keys 04b 000103 000003 000003 COPIES_IGNORED=1
-heal_no 5 "0x803/0x003/0x003 under COPIES_IGNORED refused" invalidate-spare-keys 04b 000803 000003 000003 COPIES_IGNORED=1
-heal_no 5d "0x903/0x103/0x103 refused" invalidate-spare-keys 04b 000903 000103 000103
-heal_no 5e "KEY_INVALID 0x1 in all copies: disable-otp-boot refused" disable-otp-boot 04b 000103 000103 000103
-heal_no 5e "DISABLE_OTP_BOOT copies disagreeing: invalidate-spare-keys refused" invalidate-spare-keys 048 002000 000000 000000
-heal_no 5e "0x803/0x003/0x003 under COPIES_IGNORED refused" invalidate-spare-keys 04b 000803 000003 000003 COPIES_IGNORED=1
+heal_no 5 "a copy holding a bit outside the target refused" "heal refused: copy 0x002002 holds a bit outside E 0x002000" disable-otp-boot 048 002000 002002 000000
+heal_no 5 "stray KEY_INVALID bit 8 in copy 0 only refused" "heal refused: copy 0x000103 holds a bit outside E 0x000c03" invalidate-spare-keys 04b 000103 000003 000003
+heal_no 5 "stray KEY_INVALID bit 9 in copy 0 only refused" "heal refused: copy 0x000203 holds a bit outside E 0x000c03" invalidate-spare-keys 04b 000203 000003 000003
+heal_no 5 "0x103/0x003/0x003 under COPIES_IGNORED refused" "heal refused: RAW_VALUE=0x000103;0x000003;0x000003 disagrees with the per-copy reads" invalidate-spare-keys 04b 000103 000003 000003 COPIES_IGNORED=1
+heal_no 5 "0x803/0x003/0x003 under COPIES_IGNORED refused" "heal refused: RAW_VALUE=0x000803;0x000003;0x000003 disagrees with the per-copy reads" invalidate-spare-keys 04b 000803 000003 000003 COPIES_IGNORED=1
+heal_no 5d "0x903/0x103/0x103 refused" "heal refused: copy 0x000903 holds a bit outside E 0x000c03" invalidate-spare-keys 04b 000903 000103 000103
+heal_no 5e "KEY_INVALID 0x1 in all copies: disable-otp-boot refused" "pre-state: KEY_INVALID is 0x1 in every copy" disable-otp-boot 04b 000103 000103 000103
+heal_no 5e "DISABLE_OTP_BOOT copies disagreeing: invalidate-spare-keys refused" "pre-state: BOOT_FLAGS0 copies differ" invalidate-spare-keys 048 002000 000000 000000
+heal_no 5e "0x803/0x003/0x003 under COPIES_IGNORED refused" "heal refused: RAW_VALUE=0x000803;0x000003;0x000003 disagrees with the per-copy reads" invalidate-spare-keys 04b 000803 000003 000003 COPIES_IGNORED=1
 # 5f: ROLLBACK_REQUIRED (bit 11), which the boot ROM sets itself.
 fresh "$BASE_REH"; st set-copies "$S" 048 3 000800
 run "BURN disable-otp-boot $RSER"$'\n' "$TOOL" disable-otp-boot "${REH1[@]}" --execute
@@ -353,7 +395,7 @@ expect 5f "bit 11 in all copies, then bf0-copy3 injected" 0 "injected"
 run "BURN disable-otp-boot $RSER"$'\n' "$TOOL" disable-otp-boot "${REH1[@]}" --execute
 expect 5f "after bf0-copy3: heal" 0 "healing an unequal copy"
 eqv 5f "after bf0-copy3: every copy 0x002800" "$(row 048) $(row 049) $(row 04a)" "0x002800 0x002800 0x002800"
-heal_no 5f "bit 11 in one copy only: disable-otp-boot refused" disable-otp-boot 048 000800 000000 000000
+heal_no 5f "bit 11 in one copy only: disable-otp-boot refused" "BOOT_FLAGS0 copies disagree on bit 11" disable-otp-boot 048 000800 000000 000000
 fresh "$BASE_REH"; st set-copies "$S" 048 3 000800
 run "BURN invalidate-spare-keys $RSER"$'\n' "$TOOL" invalidate-spare-keys "${REH1[@]}" --execute
 expect 5f "bit 11 in all copies: invalidate-spare-keys writes" 0 "post-write check: PASS"
@@ -366,7 +408,7 @@ run "" "$TOOL" disable-otp-boot "${REH1[@]}" --execute
 NGET="$(grep -c $'^otp\tget' <<<"$RUNLOG")"
 SNAP0="$(snap)"; rm -f "$S.getcount"
 FAIL_GET_AFTER=$((NGET/2)) run "" "$TOOL" disable-otp-boot "${REH1[@]}" --execute
-expect 5 "no write issued, post-check fails: exit 2 not 3" 2 "" same
+expect 5 "no write issued, post-check fails: exit 2 not 3" 2 "REFUSED: post-check read" same
 no_argv 5 "no write issued in that branch" $'^otp\tset'
 
 ########################################################################
@@ -388,6 +430,7 @@ done
 fresh "$BASE_REH"
 FAIL_READ_AFTER_WRITE=1 run "BURN disable-otp-boot $RSER"$'\n' "$TOOL" disable-otp-boot "${REH1[@]}" --execute
 expect 6 "FAIL_READ_AFTER_WRITE: exit 3" 3 "Re-run this same command once"
+expect 6 "FAIL_READ_AFTER_WRITE: the failure is the post-write read" 3 "WRITE ISSUED, THEN: post-write read"
 
 ########################################################################
 hdr "7. profile identity gate"
@@ -448,7 +491,6 @@ FAIL_LOAD_VERIFY=1 run "BURN erase-range $TSER"$'\n' "$TTOOL" erase-range "${RET
 expect 8 "the probe's load failing is condemned" 2 "condemned"
 # FLASH_DEVINFO with CS0 = 8 MiB: the boot ROM refuses the probe's load (G3).
 R8="$TMP/base-retail-cs8"; mk_retail "$R8"; st set-ecc "$R8/state.json" 054 0b00
-mk_tree "$TMP/tree8" "$TMP/cap-retail.json"
 fresh "$R8"
 run "BURN erase-range $TSER"$'\n' "$TTOOL" erase-range "${RET[@]}" --execute
 expect 8 "FLASH_DEVINFO CS0 8 MB under retail: condemned" 2 "condemned"
@@ -458,6 +500,29 @@ expect 8 "save-range" 0 "sha256" same
 eqv 8 "save-range wrote the whole range" "$(stat -c%s "$TMP/save8.bin")" "$((4*1024*1024))"
 run "" "$TOOL" save-range "${REH[@]}" --out "$TMP/save8.txt"
 expect 8 "save-range refuses a non-.bin name" 1 "\\.bin"
+# Read-backs that are short or missing, and a local count that fails, never verify.
+fresh "$BASE_REH"
+SAVE_SHORT=1 run "BURN erase-range $RSER"$'\n' "$TOOL" erase-range "${REH[@]}" --execute
+expect 8 "a short erase read-back is condemned" 2 "the read-back is 4194303 bytes, the range is 4194304"
+fresh "$BASE_RET"
+SAVE_SHORT=1 run "BURN erase-range $TSER"$'\n' "$TTOOL" erase-range "${RET[@]}" --execute
+expect 8 "a short alias-probe read-back is refused" 2 "read-back at \\+4 MiB is missing or not 4096 bytes"
+no_argv 8 "a short probe read-back issues no erase" $'^erase\t'
+fresh "$BASE_RET"
+SAVE_NO_FILE=1 run "BURN erase-range $TSER"$'\n' "$TTOOL" erase-range "${RET[@]}" --execute
+expect 8 "a missing alias-probe read-back is refused" 2 "read-back at \\+4 MiB is missing or not 4096 bytes"
+no_argv 8 "a missing probe read-back issues no erase" $'^erase\t'
+# `tr` failing while it counts the non-0xFF bytes (a full tmpfs, say).
+TRF="$TMP/trfail"; mkdir -p "$TRF"; REALTR="$(command -v tr)"
+cat > "$TRF/tr" <<EOF
+#!/usr/bin/env bash
+if [ "\${1:-}" = -d ] && [ "\${2:-}" = '\\377' ]; then exit 1; fi
+exec "$REALTR" "\$@"
+EOF
+chmod +x "$TRF/tr"
+fresh "$BASE_REH"
+PATH="$TRF:$PATH" run "BURN erase-range $RSER"$'\n' "$TOOL" erase-range "${REH[@]}" --execute
+expect 8 "a failed local count of the read-back is refused" 2 "could not count the read-back's non-0xFF bytes"
 
 ########################################################################
 hdr "9. picotool version and build fingerprint"
@@ -478,14 +543,14 @@ run "BURN inject-copy $RSER"$'\n' "$TOOL" inject-copy --profile rehearsal --ser 
 expect 10 "bf0-copy3" 0 "injected"
 eqv 10 "bf0-copy3 wrote row 0x04a only" "$(row 048) $(row 049) $(row 04a)" "0x000000 0x000000 0x002000"
 chk_reh valid 0 0
-expect 10 "check refuses BOOT_FLAGS0 after bf0-copy3 (bench R5)" 2 "FAIL +BOOT_FLAGS0"
+expect 10 "check refuses BOOT_FLAGS0 after bf0-copy3 (bench R5)" 2 "FAIL +BOOT_FLAGS0 +copies differ"
 fresh "$BASE_REH"
 run "BURN inject-copy $RSER"$'\n' "$TOOL" inject-copy --profile rehearsal --ser "$RSER" --rehearsal-key "$K0" \
   --case bf1-copy0 --execute
 expect 10 "bf1-copy0" 0 "injected"
 eqv 10 "bf1-copy0 wrote row 0x04b only" "$(row 04b) $(row 04c) $(row 04d)" "0x000803 0x000003 0x000003"
 chk_reh valid 0 0
-expect 10 "check refuses BOOT_FLAGS1 after bf1-copy0 (bench R7)" 2 "FAIL +BOOT_FLAGS1"
+expect 10 "check refuses BOOT_FLAGS1 after bf1-copy0 (bench R7)" 2 "FAIL +BOOT_FLAGS1 +copies differ"
 fresh "$BASE_REH"; SNAP0="$(snap)"
 run "" "$TOOL" inject-copy --profile rehearsal --ser "$RSER" --rehearsal-key "$K0" --case bf1-copy0
 expect 10 "inject-copy dry run" 0 "dry-run" same
@@ -529,13 +594,25 @@ replay() { # replay <dir> -> runs the lib's replay check
 if [ -e "$TR/BENCH_RUN" ]; then
   OUT="$(replay "$TR" 2>&1)"; RC=$?
   expect 12 "bench transcripts parse to the recorded values" 0 "REPLAY PASS"
-  for f in r1-capture.json r5-check-refusal.log r7-check-refusal.log; do
+  for f in r1-capture.json r5-check-refusal.log r7-check-refusal.log r5-capture.json r7-capture.json; do
     [ -s "$TR/$f" ] && ok 12 "bench fixture $f present" || { OUT=""; bad 12 "bench fixture $f present" "missing or empty"; }
   done
-  grep -q "FAIL +BOOT_FLAGS0" "$TR/r5-check-refusal.log" 2>/dev/null && ok 12 "R5 refusal names BOOT_FLAGS0" \
-    || { OUT=""; bad 12 "R5 refusal names BOOT_FLAGS0" "not found"; }
-  grep -q "FAIL +BOOT_FLAGS1" "$TR/r7-check-refusal.log" 2>/dev/null && ok 12 "R7 refusal names BOOT_FLAGS1" \
-    || { OUT=""; bad 12 "R7 refusal names BOOT_FLAGS1" "not found"; }
+  # The copy rule, not a parse failure ("unreadable: ..."), must be what refused.
+  grep -qE "FAIL +BOOT_FLAGS0 +copies differ" "$TR/r5-check-refusal.log" 2>/dev/null \
+    && ok 12 "R5 refusal: BOOT_FLAGS0 copies differ" \
+    || { OUT=""; bad 12 "R5 refusal: BOOT_FLAGS0 copies differ" "not found"; }
+  grep -qE "FAIL +BOOT_FLAGS1 +copies differ" "$TR/r7-check-refusal.log" 2>/dev/null \
+    && ok 12 "R7 refusal: BOOT_FLAGS1 copies differ" \
+    || { OUT=""; bad 12 "R7 refusal: BOOT_FLAGS1 copies differ" "not found"; }
+  # The captures after R5 and R7 hold silicon's RAW_VALUE and WARNING lines,
+  # and the parsers must read them to the recorded values.
+  for p in r5:0x048 r7:0x04b; do
+    d="$TR/${p%%:*}-capture.json.transcripts"
+    OUT="$(replay "$d" 2>&1)"; RC=$?
+    expect 12 "${p%%:*} capture transcripts parse to the recorded values" 0 "REPLAY PASS"
+    grep -q "RAW_VALUE=" "$d/${p#*:}_named.txt" 2>/dev/null && ok 12 "${p%%:*}: the named read of ${p#*:} holds RAW_VALUE" \
+      || { OUT=""; bad 12 "${p%%:*}: the named read of ${p#*:} holds RAW_VALUE" "no RAW_VALUE line"; }
+  done
 else
   ok 12 "no BENCH_RUN marker yet: vacuous until the bench-result PR"
 fi
@@ -548,6 +625,14 @@ expect 12 "replay of capture transcripts parses to the captured values" 0 "REPLA
 sed -i 's/VALUE 0x000003/VALUE 0x000007/' "$TMP/cap-reh.json.transcripts/0x04b_named.txt"
 OUT="$(replay "$TMP/cap-reh.json.transcripts" 2>&1)"; RC=$?
 expect 12 "replay catches a transcript that does not match its capture" 1 "MISMATCH"
+# The -c 1 row's expected value comes from the named read (its vote when it is
+# clean, RAW_VALUE[0] when it is not), never from a -c 1 read. Under
+# COPIES_IGNORED the -c 1 read returns the vote: the replay must catch it.
+fresh "$BASE_REH"; st set-row "$S" 04b 000803
+COPIES_IGNORED=1 run "" "$TOOL" capture --ser "$RSER" --out "$TMP/cap-ci.json"
+expect 12 "capture under COPIES_IGNORED writes transcripts" 0 "transcripts"
+OUT="$(replay "$TMP/cap-ci.json.transcripts" 2>&1)"; RC=$?
+expect 12 "replay catches a -c 1 read that is not copy 0" 1 "MISMATCH.*0x04b_c1"
 
 ########################################################################
 hdr "13. argv log: --ser on every device call, every shape probed"
@@ -589,6 +674,12 @@ jq '.entries[0].capture_sha256 = "00"' "$TREE/design/hardware/retail-otp.json" >
 REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY="$BADJ" \
   run "" "$TOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
 expect 14 "a retail entry whose capture sha256 does not match is exit 1" 1 "sha256" same
+for c1 in 0x000000 0x000005; do
+  jq --arg v "$c1" '.entries[0].crit1 = $v' "$TREE/design/hardware/retail-otp.json" > "$BADJ"
+  REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY="$BADJ" \
+    run "" "$TOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
+  expect 14 "a retail entry with crit1 $c1 is exit 1" 1 "crit1 $c1 must have SECURE_BOOT_ENABLE set and DEBUG_DISABLE clear" same
+done
 run "" "$TOOL" check "${RET[@]}" --rehearsal-key "$K0" --slot1 valid --disable-otp-boot 0 --key-invalid 0
 expect 14 "--rehearsal-key refused under retail" 1 "rehearsal" same
 run "" "$TOOL" check --profile rehearsal --ser "$RSER" --rehearsal-key "$K0" --slot1 valid --disable-otp-boot 0 --key-invalid 0
@@ -600,6 +691,27 @@ run "" "$TOOL" check "${REH1[@]}" --slot1 valid --disable-otp-boot 0 --key-inval
 expect 14 "--log keeps the exit status" 0 "RESULT: REHEARSAL PROFILE PASS" same
 grep -q "RESULT: REHEARSAL PROFILE PASS" "$TMP/check.log" && ok 14 "--log wrote the transcript" \
   || bad 14 "--log wrote the transcript" "no RESULT line in the log"
+eqv 14 "--log: the transcript holds one run, not two" "$(grep -c "RESULT:" "$TMP/check.log")" 1
+# A failing run keeps its exit code through the tee.
+fresh "$BASE_REH"; st set-copies "$S" 038 8 000001; SNAP0="$(snap)"
+run "" timeout 120 "$TOOL" check "${REH1[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0 --log "$TMP/fail.log"
+expect 14 "--log keeps a refusal's exit 2" 2 "RESULT: FAIL" same
+grep -q "RESULT: FAIL" "$TMP/fail.log" && ok 14 "--log wrote the refusal's transcript" \
+  || bad 14 "--log wrote the refusal's transcript" "no RESULT: FAIL in the log"
+# REFUGIUM_OTP_LOGGING inherited from the operator's environment must not
+# switch --log off (it is the re-run's marker, and it carries the parent's PID).
+fresh "$BASE_REH"; SNAP0="$(snap)"
+REFUGIUM_OTP_LOGGING=1 run "" timeout 120 "$TOOL" check "${REH1[@]}" --slot1 valid --disable-otp-boot 0 \
+  --key-invalid 0 --log "$TMP/inherit.log"
+expect 14 "--log with REFUGIUM_OTP_LOGGING=1 inherited keeps the exit status" 0 "RESULT: REHEARSAL PROFILE PASS" same
+eqv 14 "--log with REFUGIUM_OTP_LOGGING=1 inherited still writes one transcript" \
+  "$(grep -c "RESULT: REHEARSAL PROFILE PASS" "$TMP/inherit.log" 2>/dev/null || echo 0)" 1
+fresh "$BASE_REH"; st set-copies "$S" 038 8 000001; SNAP0="$(snap)"
+REFUGIUM_OTP_LOGGING=1 run "" timeout 120 "$TOOL" check "${REH1[@]}" --slot1 valid --disable-otp-boot 0 \
+  --key-invalid 0 --log "$TMP/inherit-fail.log"
+expect 14 "--log with REFUGIUM_OTP_LOGGING=1 inherited keeps a refusal's exit 2" 2 "RESULT: FAIL" same
+grep -q "RESULT: FAIL" "$TMP/inherit-fail.log" 2>/dev/null && ok 14 "--log with the marker inherited wrote the refusal" \
+  || bad 14 "--log with the marker inherited wrote the refusal" "no RESULT: FAIL in the log"
 
 ########################################################################
 hdr "RESULT"

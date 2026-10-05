@@ -25,6 +25,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source-path=SCRIPTDIR
 # shellcheck source=../lib/otp-read.sh
 . "$HERE/../lib/otp-read.sh"
 
