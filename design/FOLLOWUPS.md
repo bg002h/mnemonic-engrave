@@ -20518,6 +20518,11 @@ A signed UF2 under the key model Brian picks (E4; see `firmware-dual-distributio
 its reproducible unsigned build, and a fork `copy-signature` (today's flake hard-codes
 upstream's key). Depends on F-702 (F1 to F7) and E4. **Irreversible:** signing under the
 fork key needs Brian's typed go-ahead naming the unsigned image hash. Not started.
+Reproducibility (UI brainstorm ruling 2026-10-05 09:30Z item 3): pre-release fork
+builds in F9a (rehearsal images) pass the reproducibility gate on G-13 alone (one
+builder plus the framework addendum's G-13 check), like the Sitting's S1. Only the
+release-signed fork image needs two independent builders producing the same hash
+(addendum G-13a); that second builder is open item O-10, waiting on Brian.
 
 ### F-704 — `bip39.Mnemonic.Valid` accepts word indices aliased past the wordlist (owning phase: none — ownerless residue) `#seedhammer` `#bip39` `#seedqr`
 
