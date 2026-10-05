@@ -1,6 +1,8 @@
 # IMPLEMENTATION PLAN — SeedHammer fork, Refugium F5 and F7
 
-> **Status: DRAFT 3 (2026-10-05).** Draft 1 (972665e): R0 round 1, opus 0C/8I/10M/3N
+> **Status: GREEN, draft 4 (2026-10-05).** Round 3 on draft 3 (fc73529): opus 0C/0I/7M/3N
+> (`refugium-F5-F7-plan-R0-round3.md`), which closes the R0 gate; draft 4 folds its
+> Minors and Nits (§7). Earlier: **draft 3**. Draft 1 (972665e): R0 round 1, opus 0C/8I/10M/3N
 > (`design/agent-reports/refugium-F5-F7-plan-R0.md`). Draft 2 (bdc87b3): round 2, opus
 > 0C/3I/8M/3N (`refugium-F5-F7-plan-R0-round2.md`). Draft 3 folds round 2 (fold table
 > §7), and the device ELF gate has now been run once (§4.5). Biggest change: in the Refugium build NFC is off for
@@ -149,8 +151,10 @@ and `bip39` without a cycle (R0 checked).
   `const proofTriggersEnabled` pair gates each comparison, and the trigger constants
   move to `!refugium` files. A trigger is never disabled by setting it to `""`, which
   would fire on an empty passphrase or text (round 2 M-1). The `qaProgram` enum
-  value stays (guard at `gui.go:268`); whether `qaEngraveFlow` code still links is
-  measured by §4.5 and reported.
+  value stays (guard at `gui.go:268`); the `gui.go:2148` dispatch arm is gated under the
+  profile so `qaEngraveFlow` does not link, as §4.5 requires (round 3 N-3). The
+  `preview.go:100-107` entries that use the trigger constants move with them (round 3
+  M-3).
 - `cmd/controller/platform_sh2.go`'s `LockBoot` and `writeOTPValues` (`:553`, `:724`)
   move to a `!refugium` file; the `refugium` twin's `LockBoot` returns an error and
   links no OTP writer. `signKeyHash` stays in the shared file, since
@@ -169,9 +173,12 @@ Enforced twice, so neither layer alone carries it (round 2 I-3):
   `(*st25r3916.Device).Close()` once, which writes `regOpCtrl` (0x02) = 0, clearing
   `en`, `rx_en`, `tx_en` and `wu` (`driver/st25r3916/st25r3916.go:297-301,791`); a warm
   reboot does not reset the chip, so the write is needed. It is the firmware's only
-  contact with the chip in this build. If it fails, the platform records an NFC fault;
-  `gui.Run` checks the platform's fault before anything else and shows one non-secret
-  screen, "NFC could not be turned off. Power off.", that takes no input (round 2 M-7).
+  contact with the chip in this build. If it fails, the platform records an NFC fault,
+  exposed through an optional interface (`interface{ NFCFault() error }`) so the other
+  two `Platform` implementations are untouched; the top of `uiFlow` type-asserts it
+  before anything else and shows one non-secret screen, "NFC could not be turned off.
+  Power off.", that takes no input. A gui test with a faulting fake platform checks the
+  screen and that no input leaves it (round 2 M-7, round 3 M-7).
 - **gui.** Under the profile `startScanner` treats every reader as nil, and one helper
   `ctx.nfcAvailable()` (false under the profile, else `Features().Has(FeatureNFC)`)
   replaces every `FeatureNFC` read and keys every scan offer. A source-parse test
@@ -199,7 +206,11 @@ Enforced twice, so neither layer alone carries it (round 2 I-3):
   `FeatureNFC` (today always reported, `platform.go:350`), nil reader. The walk: power
   on, start the single-sig engrave flow, type a seed, engrave its cards, and end on that
   flow's final done screen (gui has no power-off prompt; the end of the flow is the end
-  of the session), presenting a tag at every screen. Refugium build: `presented() > 0`
+  of the session), presenting at every screen a record that triggers nothing on its own
+  (not a valid md1/mk1 record, which would navigate the start screen). The walk's payload
+  carries no `pass:` record (the emulator's default `records` payload has one, which the
+  Refugium build refuses at the boot prompt). A second Refugium walk keeps the emulator
+  platform's reader attached, so the gui gate itself is exercised (round 3 M-6). Refugium build: `presented() > 0`
   and `delivered() == 0` at the end. Default build: `delivered() > 0`. It runs headless
   through Playwright on the preinstalled Chromium (`/opt/pw-browsers`); the implementer
   runs the default-build walk **first**, before any profile code, and a failing control
@@ -225,7 +236,9 @@ Under the profile (R0 I-7):
   "yes, the shares have a passphrase" ends in a stop: "This build cannot take a SLIP-39
   passphrase. Recover these shares on another build." Only "no passphrase" continues.
 - The passphrase engrave program is hidden from the menu, and a payload holding a
-  `pass:` record is refused whole at load, with a message naming the record (dropping
+  `pass:` record is refused whole at load, after `sysw.Open` and before
+  `ctx.sysw.load`, with a message naming the record by position and class, never by
+  its contents (round 3 N-1) (dropping
   one record silently would change what the payload's digest covers; round 2 nit). The
   default build is unchanged.
 - Tests per site under the tag.
@@ -240,9 +253,11 @@ bundle ms1 cards' "TEXT + QR" and "QR ONLY" choices, reached through
 `multisig_engrave.go:36` and the composer (`composer_flow.go:584-647`), and the Engrave
 Text program, which today only warns on ms1-shaped text (`freetext_flow.go:1068`,
 `sysw_session.go:308-317`) and still offers "Add QR" (`freetext_flow.go:538`) (round 2
-M-4). `validateMdmkStrings` takes no card kind, so the gate tests each string's HRP
-(`ms`, case-insensitive, the same predicate as the free-text warning) rather than
-threading a kind through. Each producer offers text only under the profile, or, where
+M-4). `validateMdmkStrings` takes no card kind, so the gate tests each string with one
+predicate: the string's HRP is `ms` (case-insensitive) after separators are stripped,
+with no minimum length (stricter than `hashlock.IsMS1Shaped`'s 48 characters); the
+free-text gate uses the same predicate. The QR exists only in the single-string branch
+(`gui.go:2675`), which is where the gate sits (round 3 M-5). Each producer offers text only under the profile, or, where
 the plate function needs a QR, the implementer adds a text-only variant to that path
 with a golden; ms1-shaped free text gets "No QR" forced. A tagged test walks each
 producer and asserts no QR whose content is an ms1 string is emitted. F3/F4 later add
@@ -252,12 +267,15 @@ the SeedQR plate (F5) to the seed sitting.
 
 R0 I-1 showed byte scans of switch literals fail: gc compiles short `case` strings to
 integer compares. So:
-- **Source level, every `go test`:** the Refugium file sets are
+- **Source level, every `go test`:** the Refugium file sets are the union of
   `go list -tags refugium -f '{{.GoFiles}}' ./gui` and
+  `go list -e -tags tinygo,rp,refugium -f '{{.GoFiles}}' ./gui` (the device set adds
+  the `*_tinygo.go` hook files; round 3 M-4), and
   `go list -e -tags tinygo,rp,refugium -f '{{.GoFiles}}' ./cmd/controller` (round 2
   M-2; verified to run on host). A test parses those files with `go/parser` and
   asserts no **string literal** (`*ast.BasicLit`) equals or contains `FOREVERLAURA!`,
-  `lock-boot`, `PASSPROOF!`, `TEXTPROOF!`, `CONSTPROOF!` or
+  `lock-boot`, `PASSPROOF!`, `TEXTPROOF!`, `CONSTPROOF!`, `BOTHPROOF!`,
+  `SIZEPROOF!FRONT`, `SIZEPROOF!BACK` (round 3 M-3) or
   `https://seedhammer.com/doc/?d=SHII`, and no **call** names `writeOTPValues`,
   `AddBootKey`, `EnableSecureBoot` or a white-label writer (comments are ignored, round
   2 M-1). Positive control: the default sets (`-tags ''` and `-tags tinygo,rp`) contain
@@ -267,14 +285,21 @@ integer compares. So:
   precise -opt 2 -scheduler tasks`, ELF output): `writeOTPValues`, `AddBootKey` and
   `EnableSecureBoot` have **no symbols** (inlined into `LockBoot`'s caller), and
   `FOREVERLAURA!` occurs 0 times. What is present in the default ELF and so usable as
-  markers: data literals `lock-boot`, `seedhammer.com/doc/?d=SHII` (the OTP redirect URL
-  `writeOTPValues` writes), `PASSPROOF`, `TEXTPROOF`, `CONSTPROOF`; symbols
-  `(*seedhammer.com/nfc/poller.Poller).Read` and `seedhammer.com/gui.qaEngraveFlow`.
+  markers: data literals `lock-boot: %v` (the log format string beside the switch case;
+  the case itself has no binary form), `seedhammer.com/doc/?d=SHII` (the OTP redirect
+  URL `writeOTPValues` writes), the `ppPassProofKeep*` help strings that carry
+  `PASSPROOF` (`passphrase_passproof.go:127,130`; they move to `!refugium` files with the
+  trigger), `TEXTPROOF`, `CONSTPROOF`, `BOTHPROOF`, `SIZEPROOF`; symbols
+  `(*seedhammer.com/nfc/poller.Poller).Read`, `seedhammer.com/gui.qaEngraveFlow`, and the
+  OTP write primitives `otp.writeECC` and `otp.writeOrRow`, which only write paths reach
+  (round 3 M-1, M-2). Scans cover allocated sections only, since the ELF carries DWARF
+  (round 3 N-2).
   The check: in the Refugium ELF every marker is absent; in the default ELF every
   marker is present (positive control, measured above). The OTP writer's absence rests
-  on the redirect literal plus the source-level call check, since it has no symbol of
-  its own. The implementer re-measures on the PR's base, records the marker list and
-  any `st25r3916` symbol (`Detect`, `reset`) that disappears with the reader, and runs
+  on `otp.writeECC`/`otp.writeOrRow`, the redirect literal and the source-level call
+  check. The implementer re-measures on the PR's base, records the marker list and
+  the measured `st25r3916` symbols that disappear with the reader (`Detect` and `reset`
+  have none even in the default ELF), and runs
   both builds locally before review. In CI, `test.yml`'s TinyGo job builds to `-o
   /dev/null` today (`test.yml:139`); it gains two ELF builds and the marker check.
 - **Tagged tests in CI:** `GOFLAGS=-tags=refugium` with the shard script (it does not
@@ -355,3 +380,16 @@ No OTP, signing or hardware step is in this plan.
 | M-7 field-off call and fault screen | §4.2 `Close()`, fault flag, `gui.Run` screen |
 | M-8 tagged emulator CI | §4.5 |
 | Nits (untyped nil, emu twin, `pass:` whole-payload refusal) | §4.2, §4.3 |
+
+### R0 round 3 (0C/0I: gate closed; Minors and Nits folded, no re-review needed)
+
+| Finding | Fold |
+|---|---|
+| M-1 mislabelled markers | §4.5 `lock-boot: %v`, `ppPassProofKeep*` strings |
+| M-2 OTP write symbols exist | §4.5 `otp.writeECC`, `otp.writeOrRow` |
+| M-3 missing triggers; `preview.go` | §4.5 list; §4.1 |
+| M-4 device file set | §4.5 union |
+| M-5 ms1 predicate | §4.4 one predicate |
+| M-6 walk hazards | §4.2 inert record, no `pass:`, second walk |
+| M-7 fault screen mechanism | §4.2 optional interface, `uiFlow`, test |
+| N-1 to N-3 | §4.3, §4.5, §4.1 |
