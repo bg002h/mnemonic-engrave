@@ -363,13 +363,15 @@ that the state file is byte-identical afterwards)
    identical; DISABLE_OTP_BOOT copies disagreeing → `invalidate-spare-keys` exit 2. With `COPIES_IGNORED=1`,
    copies 0x803/0x003/0x003 → `invalidate-spare-keys` exit 2, state identical. 5f. BOOT_FLAGS0 bit 11
    (ROLLBACK_REQUIRED) set in all three copies → `disable-otp-boot --execute` writes, post PASS, bit 11
-   still set in every copy; the same with copy 3 lacking bit 13 after `bf0-copy3` → heal, post PASS. A no-write branch whose
+   still set in every copy; the same after `bf0-copy3` (bit 13 in copy 3 only) → heal, post PASS. Bit 11 in one copy only →
+   `disable-otp-boot` exit 2, state identical. Bit 11 set in all three copies →
+   `invalidate-spare-keys --execute` writes, post PASS. A no-write branch whose
    post-check fails → exit 2, not 3.
 6. Interrupted write: `FAIL_SET_AFTER=1` and `=2` → exit 3 with the re-run text; re-run → heal → PASS.
    `FAIL_READ_AFTER_WRITE=1` → exit 3.
 7. Identity gate: `erase-range --profile rehearsal` and `inject-copy` on a retail-shaped state → exit 2
    before any erase/set argv is recorded; rehearsal on a CHIPID in the SeedHammer list → exit 2 (7b: also with `--rehearsal-slot1-key`
-   given).
+   given, on `check` and the two write commands).
 8. Flash: argv carries `-r` and `--ser`; FLASH_DEVINFO CS0 8 MB under retail → condemned exit 2; a byte
    left non-0xFF → exit 2; physical flash 4 MB under retail → alias probe refuses; a dry run records no `load` argv; the
    probe's `load` failing → condemned.
@@ -391,7 +393,6 @@ failing assertion)
 |---|---|
 | drop copy rule (a) | case 3, copy 2 odd, with `SUPPRESS_WARNING=1` |
 | drop the `-c 1` read from (a) | case 3, copy 0 odd, with `SUPPRESS_WARNING=1` |
-
 | drop the WARNING trap (b) | case 3c (`SUPPRESS_RAW_VALUE` leaves only (b)) |
 | drop `--ser` from the builder | `FAKE_REQUIRE_SER=1` (exit 99) and case 13 |
 | builder emits `-n` before `-c` | fake exit 99 (argv order) |
@@ -581,3 +582,7 @@ every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RES
 | R4A-M3 slot-1 key on other commands | R3 says which steps pass it §7 |
 | R4A-N1 table broken by the note | note moved below the table §6.3 |
 | R4A-N2 runbook and R7 flags | `--ser S` in the runbook line; R7 spelled out §5, §7 |
+
+Round 5 (`e3a-plan-r4-a.md`, Sonnet fold check): 0 C / 0 I / 2 M / 1 N, which closes the R0 gate.
+R5-M1 (blank line splitting the §6.3 table) removed; R5-M2 case 5f wording fixed and its two missing
+cases added; R5-N1 case 7b scoped to the commands that take the flag.
