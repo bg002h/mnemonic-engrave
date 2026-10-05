@@ -166,6 +166,28 @@ run_phase "--sh2-verify-valid passes once KEY_VALID is 0x3" expect-pass "" \
   --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
 state_is KV 3
 
+# KEY_INVALID (plan E3a section 4): 0xC (slots 2 and 3 revoked by
+# refugium-otp.sh invalidate-spare-keys) only when asked for; bits 0-1 must be
+# clear either way.
+printf 'KI=c\n' >> "$OTPSTATE"
+EXPECT_OUT="REVOKED"
+run_phase "--sh2-verify-valid refuses KEY_INVALID 0xc by default" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem"
+EXPECT_OUT="KEY_INVALID 0xc"
+run_phase "--sh2-verify-valid --expect-key-invalid c accepts 0xc" expect-pass "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem" --expect-key-invalid c
+printf 'KI=d\n' >> "$OTPSTATE"
+EXPECT_OUT="slot 0 or slot 1"
+run_phase "--expect-key-invalid c still refuses KEY_INVALID bit 0" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem" --expect-key-invalid c
+printf 'KI=0\n' >> "$OTPSTATE"
+EXPECT_OUT="expected 0xc"
+run_phase "--expect-key-invalid c refuses KEY_INVALID 0" expect-fail "" \
+  --sh2-verify-valid 1 --key "$TMP/sh2-boot-key.pem" --expect-key-invalid c
+EXPECT_OUT="taken only by"
+run_phase "--expect-key-invalid is refused outside --sh2-precheck/--sh2-verify-valid" expect-fail "" \
+  --sh2-verify-slot 1 --key "$TMP/sh2-boot-key.pem" --expect-key-invalid c
+
 # The 3-copy comparison must DISCRIMINATE, not pass vacuously (the stub used to
 # return 0x000000 for every copy row). Run it here, while KEY_VALID is still
 # exactly 0x3 -- after the extra-bit case below it would die on that instead.

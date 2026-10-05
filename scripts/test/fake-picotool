@@ -19,7 +19,9 @@ set_() { grep -v "^$1=" "$S" > "$S.t"; echo "$1=$2" >> "$S.t"; mv "$S.t" "$S"; }
 emit_row() { printf 'ROW 0x%04x: OTP_DATA_%s (ECC)\nVALUE 0x%06x\n' 0 "$2" "$1"; }
 
 case "$1" in
-  version) echo "picotool v2.2.0-a4 (stub)"; exit 0 ;;
+  # `version -s` answers the pinned 2.3.1 (design/PICOTOOL_PIN.md), which R
+  # accepts alongside 2.2.0-a4.
+  version) if [ "${2:-}" = "-s" ]; then echo "2.3.1"; else echo "picotool v2.3.1 (stub)"; fi; exit 0 ;;
   seal)    exec "$REAL" "$@" ;;
   info)
     # file inspection -> real picotool; device query -> simulated
@@ -62,7 +64,7 @@ sel="$1"
 case "$sel" in
   CRIT1.SECURE_BOOT_ENABLE) printf 'ROW 0x0040: OTP_DATA_CRIT1 (CRIT)\nVALUE 0x%06x\n  field SECURE_BOOT_ENABLE (bit 0) = %s\n' "$(get SB)" "$(get SB)"; exit 0 ;;
   BOOT_FLAGS1.KEY_VALID)   printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x%06x\n  field KEY_VALID (bits 0-3) = %s\n' "0x$(get KV)" "$(get KV)"; exit 0 ;;
-  BOOT_FLAGS1.KEY_INVALID) printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x000000\n  field KEY_INVALID (bits 8-11) = 0\n'; exit 0 ;;
+  BOOT_FLAGS1.KEY_INVALID) printf 'ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)\nVALUE 0x000000\n  field KEY_INVALID (bits 8-11) = %s\n' "$(get KI)"; exit 0 ;;
   CHIPID*) i="${sel#CHIPID}"; emit_row $(( 0xC0DE + i )) "$sel"; exit 0 ;;
   # BOOT_FLAGS1 redundant copies (rows 0x04b/0x04c/0x04d) and CRIT1 copies
   # (0x040-0x047). Served from state so the 3-way / 8-way comparisons are real.

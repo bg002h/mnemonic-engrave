@@ -49,6 +49,9 @@
 #   ./pico2-bootkey-rehearsal.sh --sh2-precheck
 #   ./pico2-bootkey-rehearsal.sh --sh2-verify-slot 1 --key /abs/sh2-boot-key.pem
 #   ./pico2-bootkey-rehearsal.sh --sh2-verify-valid 1 --key /abs/sh2-boot-key.pem
+#   (--sh2-precheck and --sh2-verify-valid take --expect-key-invalid 0|c, default
+#    0: c accepts KEY_INVALID 0xC, slots 2 and 3 revoked by refugium-otp.sh's
+#    invalidate-spare-keys; bits 0-1 must be 0 either way)
 #   ./pico2-bootkey-rehearsal.sh --make-otp-json --key K --slot 1 --out F   (no device)
 #
 # These exist because the phases above deliberately REFUSE the SeedHammer II
@@ -111,7 +114,7 @@ confirm() {
   [ "$reply" = "$word" ] || die "aborted at operator confirmation"
 }
 
-MODE=""; SH2_SLOT=""; SH2_KEY=""; JSON_OUT=""
+MODE=""; SH2_SLOT=""; SH2_KEY=""; JSON_OUT=""; EXPECT_KI=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --phase)          PHASE="${2:-}"; shift 2 ;;
@@ -123,6 +126,7 @@ while [ $# -gt 0 ]; do
     --key)            SH2_KEY="${2:-}"; shift 2 ;;
     --slot)           SH2_SLOT="${2:-}"; shift 2 ;;
     --out)            JSON_OUT="${2:-}"; shift 2 ;;
+    --expect-key-invalid) EXPECT_KI="${2:-}"; shift 2 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -130,11 +134,34 @@ done
   --sh2-precheck                       read-only survey of the SeedHammer II (runbook step 1)
   --sh2-verify-slot N --key <key.pem>  read-only slot readback (gates runbook step 3)
   --sh2-verify-valid N --key <key.pem> read-only post-write check (closes step 3)
+  (both take --expect-key-invalid 0|c; default 0)
   --make-otp-json --key <key.pem> --slot N --out <file>   no device access at all"
+
+case "$EXPECT_KI" in
+  "") EXPECT_KI=0 ;;
+  0) ;;
+  c|C) EXPECT_KI=c ;;
+  *) die "--expect-key-invalid must be 0 or c (got '$EXPECT_KI')" ;;
+esac
+if [ "$EXPECT_KI" != 0 ]; then
+  case "$MODE" in
+    sh2-precheck|sh2-verify-valid) ;;
+    *) die "--expect-key-invalid is taken only by --sh2-precheck and --sh2-verify-valid" ;;
+  esac
+fi
 
 for t in picotool openssl sha256sum; do
   command -v "$t" >/dev/null || die "$t not found -- run inside 'nix develop' in the seedhammer fork"
 done
+# picotool: 2.2.0-a4 (the fork's shell until it moves to this repo's flake) or
+# 2.3.1 (design/PICOTOOL_PIN.md). The readers mask ECC values to 16 bits, so
+# both print formats parse the same.
+pt_build_version
+PTV="$(picotool "${PT_ARGV[@]}" 2>/dev/null | tr -d '[:space:]')" || PTV=""
+case "$PTV" in
+  2.2.0-a4|2.3.1) info "picotool $PTV" ;;
+  *) die "picotool version '$PTV' -- this script supports 2.2.0-a4 or 2.3.1 (design/PICOTOOL_PIN.md)" ;;
+esac
 # tinygo/go are only needed where images are built or signed.
 case "$PHASE" in
   0|3|4|5|6)
@@ -170,9 +197,11 @@ fi
 # stock board, so the parser is validated before phase 4 depends on it.
 # --------------------------------------------------------------------------
 
-# Output format is taken from picotool 2.2.0 main.cpp otp_get_command::execute:
+# Output format, picotool main.cpp otp_get_command::execute, 2.2.0-a4 and 2.3.1:
 #   "ROW 0x%04x" [": " reg->name] [" (ECC)"/" (CRIT)"/" (RBIT-n)"] ["(Part i/n)"]
-#   "\nVALUE 0x%06x\n"                     <- the WHOLE 24-bit row
+#   "\nVALUE 0x%06x\n"                     <- the WHOLE 24-bit row (non-ECC rows)
+#   ECC rows: 2.2.0-a4 prints the 24-bit re-encoding, 2.3.1 the 16-bit data
+#   ("VALUE 0x%04x"); the readers mask ECC values to 16 bits, so both parse.
 #   "field <NAME> (bit n|bits n-m) = %x"   <- the field, BARE hex, no 0x prefix
 # So a field must be read from the `field ... = ` line, never from VALUE (which
 # includes unrelated bits of the same row, e.g. KEY_INVALID alongside KEY_VALID).
@@ -192,12 +221,10 @@ otp_field() { try_otp_field "$1" || die "$ERR"; printf '%s' "$OTP_FIELD_VAL"; }
 # Sets a global instead of printing: `die` inside $(...) exits only the
 # subshell, so a fail-closed guard called via command substitution was not
 # actually closed.
-ROWVALS=""
 read_rows() { try_read_rows "$@" || die "$ERR"; }
 
 # read_slot <n> -> sets SLOT_HEX to 64 hex chars (the 32-byte key hash).
 # Each row holds two bytes, LOW BYTE FIRST, so each row is byte-swapped.
-SLOT_HEX=""
 read_slot() { try_read_slot "$1" || die "$ERR"; }
 
 # key_hash <key.pem> -> sha256 of the UNCOMPRESSED 64-byte X||Y pubkey.
@@ -217,7 +244,6 @@ rule is numbered BELOW 73 (see the runbook prerequisites)."
   ok "RP2350 in BOOTSEL, CHIPID $CHIPID_HEX"
 }
 
-CHIPID_HEX=""
 chipid() { try_chipid || die "$ERR"; }
 
 # require_board: refuse to act on any board other than the one phase 0 saw.
@@ -420,6 +446,23 @@ sign_image() {
 # irreversible writes stay in the operator's hands, in the runbook.
 # --------------------------------------------------------------------------
 
+# check_key_invalid <bare-hex>: KEY_INVALID must equal --expect-key-invalid
+# (0 by default; c after refugium-otp.sh invalidate-spare-keys). Bits 0-1
+# (slots 0 and 1) must be clear either way.
+check_key_invalid() {
+  local ki=$((16#$1))
+  [ $(( ki & 0x3 )) -eq 0 ] || die "KEY_INVALID is 0x$1 -- slot 0 or slot 1 has been REVOKED on this device. STOP."
+  if [ "$EXPECT_KI" = c ]; then
+    [ "$ki" -eq 12 ] || die "KEY_INVALID is 0x$1, expected 0xc (--expect-key-invalid c: slots 2 and 3 revoked). STOP."
+    ok "KEY_INVALID 0xc: slots 2 and 3 revoked, as expected"
+  else
+    [ "$ki" -eq 0 ] || die "KEY_INVALID is 0x$1 -- a boot key has been REVOKED on this device. STOP.
+(If slots 2 and 3 were revoked on purpose by refugium-otp.sh invalidate-spare-keys,
+re-run with --expect-key-invalid c.)"
+    ok "no boot key revoked"
+  fi
+}
+
 require_spare_slot() {
   case "${1:-}" in
     1|2|3) ;;
@@ -549,8 +592,7 @@ STOP and find out why."
     ok "exactly one valid boot key (slot 0)"
 
     KI="$(otp_field BOOT_FLAGS1.KEY_INVALID)"
-    [ $((16#$KI)) -eq 0 ] || die "KEY_INVALID is 0x$KI -- a boot key has been REVOKED on this device. STOP."
-    ok "no boot key revoked"
+    check_key_invalid "$KI"
 
     for s in 1 2 3; do
       read_slot "$s"; v="$SLOT_HEX"
@@ -572,11 +614,13 @@ Otherwise this device has been modified by someone else. STOP."
     # BOOT_FLAGS1 3-way redundant. Read the raw copies individually so a partial
     # write is visible; read_row_raw24 dies on any unreadable row.
     hdr "Redundant-row raw readback (CRIT1 x8, BOOT_FLAGS1 x3)"
-    # Compared here, not eyeballed. Raw row-number reads resolve without a
-    # register match, so picotool takes the no-redundancy path and can NEVER
-    # print a disagreement warning -- an earlier version told the operator it
-    # would, which was assurance the tool cannot give. Plain assignments (not
-    # printf arguments) so a failed read's `die` actually halts.
+    # Compared here, not eyeballed. `0x040` resolves to the NAMED register
+    # CRIT1 (a vote over all 8 copies, plan E3a F16) while 0x041-0x047 read
+    # bare, so this comparison is blind to copy 0 being the odd one; the
+    # WARNING trap in read_row_raw24 is what catches that (picotool warns on
+    # the named read when the copies differ). refugium-otp.sh check reads copy
+    # 0 with `-c 1`. Plain assignments (not printf arguments) so a failed
+    # read's `die` actually halts.
     FIRST=""; MISMATCH=0
     for r in 0x040 0x041 0x042 0x043 0x044 0x045 0x046 0x047; do
       V="$(read_row_raw24 "$r")"
@@ -585,7 +629,8 @@ Otherwise this device has been modified by someone else. STOP."
       [ "$V" = "$FIRST" ] || MISMATCH=1
     done
     [ "$MISMATCH" -eq 0 ] || die "CRIT1's 8 redundant copies DISAGREE (see above).
-The hardware majority-votes these, so the device may still behave correctly, but
+The boot ROM reads SECURE_BOOT_ENABLE as set when any 3 of the 8 copies hold it,
+so the device may still behave correctly, but
 a critical boot flag with degraded redundancy on a machine you are about to
 modify is not something to proceed past. STOP."
     ok "all 8 CRIT1 copies agree (0x$FIRST)"
@@ -661,8 +706,7 @@ do NOT start re-signing -- your key hash is already proven correct above."
     ok "KEY_VALID is 0x$KV (slot 0 + slot $SH2_SLOT)"
 
     KI="$(otp_field BOOT_FLAGS1.KEY_INVALID)"
-    [ $((16#$KI)) -eq 0 ] || die "KEY_INVALID is 0x$KI -- a key has been revoked. STOP."
-    ok "no key revoked"
+    check_key_invalid "$KI"
 
     # All three BOOT_FLAGS1 copies must agree.
     #
@@ -676,14 +720,17 @@ do NOT start re-signing -- your key hash is already proven correct above."
     # otp_field, read_rows AND read_row_raw24: picotool emits
     # `(WARNING - REDUNDANT ROWS AREN'T EQUAL)` whenever the copies of a
     # redundant row disagree, and every reader here dies on it. `-c 1` was
-    # PRESCRIBED as the fix for this and was measured to be a no-op -- byte
-    # identical output -- so it is deliberately not used.
+    # prescribed as the fix for this and measured as a no-op, but that
+    # measurement wrote `-n -c 1`: picotool matches options in declaration
+    # order, so `-c 1` became a selector (plan E3a F14, F-619's correction).
+    # In its declared place (`otp get -c 1 -n 0x04b`) it reads copy 0, and
+    # refugium-otp.sh check uses it that way; this mode keeps the trap.
     A="$(read_row_raw24 0x04b)"; B="$(read_row_raw24 0x04c)"; C="$(read_row_raw24 0x04d)"
     if [ "$A" != "$B" ] || [ "$B" != "$C" ]; then
       die "BOOT_FLAGS1 redundant copies DISAGREE: 0x$A / 0x$B / 0x$C.
 picotool's majority vote may still report the right value, but the redundancy
 protecting the bit that says 'trust your key' is degraded. Re-run the identical
-`otp set -s` (set-bits only, safe to repeat) and re-check."
+\`otp set -s\` (set-bits only, safe to repeat) and re-check."
     fi
     ok "all three BOOT_FLAGS1 copies agree (0x$A)"
 
@@ -973,7 +1020,12 @@ re-sign once to get a fresh nonce before concluding the chain is broken." ;;
   # too. It cannot run on a Pico (no SeedHammer peripherals), so the acceptance
   # signal is negative: a REJECTED secure-boot image returns to BOOTSEL, an
   # accepted one does not.
-  FW_REAL="$(ls -1 "$SEEDHAMMER_DIR"/seedhammerii-*.uf2 2>/dev/null | grep -v '\.signed\.uf2$' | head -1 || true)"
+  FW_REAL=""
+  for f in "$SEEDHAMMER_DIR"/seedhammerii-*.uf2; do
+    [ -f "$f" ] || continue
+    case "$f" in *.signed.uf2) continue ;; esac
+    FW_REAL="$f"; break
+  done
   if [ -z "$FW_REAL" ] && [ "${ACCEPT_BLINKY_ONLY:-0}" = "1" ]; then
     warn "ACCEPT_BLINKY_ONLY=1 -- skipping 5b by request."
     warn "Acceptance is proven for the 33KB blinky ONLY, not the real firmware."
