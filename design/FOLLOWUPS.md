@@ -20424,7 +20424,7 @@ reviews live here in `design/`, as for every fork feature.
 The phases (plan §5, lane F; Rust first, then a Go port with a provenance pin, tested
 in `cmd/emu`; risk set throughout):
 
-- **F1** mr1 string layer, payload reading and the card's QR. Waits on E1 (`mr-gui-e1-mr1-class`,
+- **F1** mr1 string layer, payload reading and the card's QR. Waits on F-699 (E1, `mr-gui-e1-mr1-class`,
   `Class::Mr` in me) and mr-codec's vectors.
 - **F2** plan entry (plan id as 4 words, session number, seed count, letters in use),
   CHIPID read from OTP in picotool's spelling, the image-check code; holder entry.
