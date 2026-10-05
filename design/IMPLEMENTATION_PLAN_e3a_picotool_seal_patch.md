@@ -60,8 +60,9 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
   verifies (P4 regression guard). With `--expect-fail` (the unpatched build) require exit 248 and
   "unknown sram end" on the `--clear` seal, proving the test can tell patched from unpatched. The
   fixture's sha256 is checked first. Greps are anchored to whole lines, and `signature:` must appear
-  only as `verified` (the line prints twice in `info -a`; N1). **Tamper control (SP-M3):** flip one
-  payload byte of the sealed `out.uf2` (in a UF2 data block, inside the hashed range) and require
+  only as `verified` (the line prints twice in `info -a`; N1). **Tamper control (SP-M3):** XOR 0x01 into
+  byte 32 of the sealed `out.uf2` (block 0's first payload byte, target `0x10000000`, inside the hashed
+  range; skipped under `--expect-fail`; SP2-N1) and require
   `info -a` to print `signature:           incorrect`, so the check can tell a correct signature from
   a wrong one. Hunk B is otherwise proven only by the one-time mutation run (§3).
 - **CI.** In the `picotool argv probe` job (already builds `.#picotool` with nix, `contents: read`):
@@ -78,17 +79,23 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
 - **Docs, with the hardware hold written in (SP-I2).** Patched and stock both print `2.3.1`, so no
   tool can enforce the hold; the words must. `design/PICOTOOL_PIN.md`, the RUNBOOK prerequisites note
   (`RUNBOOK_custom_boot_key.md:85-88`) and F-701 each say, in these words: "The `seal --clear` fix is
-  in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, sign
-  real SeedHammer firmware only from the fork's shell (picotool 2.2.0-a4), and the fork does not move
-  to this picotool." PICOTOOL_PIN.md also gains: the patch, why, the two upstream bugs, how to drop
+  in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not
+  let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE
+  section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to
+  this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works
+  from either shell." The RUNBOOK's "the SH2 steps below work from either shell" sentence is amended
+  to match (SP2-M1). PICOTOOL_PIN.md also gains: the patch, why, the two upstream bugs, how to drop
   the patch once upstream fixes both, the patched store path as built in CI and on Brian's box
   (SP-M5), and the seal section corrected (the cause is picotool, not the image). Every reference to
   `design/patches/` (FOLLOWUPS F-701, PICOTOOL_PIN.md) is updated to `nix/patches/` (SP-M6).
 - **`sign-firmware.sh` checks the Clear entry (SP-M1).** After the final signature check it also
-  requires `load map entry 0:    Clear 0x20000000->0x20082000` in `picotool info -a` of the output,
-  else it refuses (an image sealed elsewhere without `--clear`, or one whose existing load map made
+  requires a line matching `^[[:space:]]*load map entry 0:[[:space:]]+Clear 0x20000000->0x20082000$`
+  in the captured `picotool info -a` output (matched with a here-string, not a pipe, F-695), else it
+  refuses (an image sealed elsewhere without `--clear`, or one whose existing load map made
   picotool ignore `--clear`, would otherwise pass as verified with no SRAM wipe). R's old e2e must
-  still pass with this check.
+  still pass with this check, and `seal-clear-test.sh` exercises the refusal: it seals the fixture
+  without `--clear`, runs `sign-firmware.sh`'s check on it (or the script with a stub picosign), and
+  requires the refusal (SP2-M2).
 - **Upstream issue draft** `design/agent-reports/picotool-upstream-issue-draft.md`: title, repro
   (any TinyGo or SDK UF2 with an IMAGE_DEF, `seal --sign --clear`), both bugs with line numbers at
   `2.3.1` **and** at `develop@ba3df40` (`main.cpp:5807`, `bintool.cpp:886`), every affected path
@@ -135,3 +142,7 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
 | N2 what R4 proves | §3 |
 | N3 fixture provenance | §2 |
 | N4 shellcheck list | §3 |
+
+Round 2 (`e3a-seal-patch-plan-r1.md`, Sonnet fold check): 0 C / 0 I / 2 M / 1 N, which closes the R0
+gate. SP2-M1 hold scoped to images `sign-firmware.sh` seals itself, RUNBOOK sentence amended; SP2-M2
+whitespace-tolerant here-string match and a tested refusal; SP2-N1 tamper recipe fixed.
