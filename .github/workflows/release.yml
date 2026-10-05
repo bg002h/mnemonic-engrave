@@ -67,6 +67,12 @@ jobs:
   test:
     name: test (rust + go)
     runs-on: ubuntu-latest
+    # Nothing in this job writes: checkout, the before-SHA fetch, cargo, go,
+    # the OTP e2e and shellcheck, and the demo link check's API reads. A
+    # read-only token and no OIDC (the workflow-level grants are for
+    # assemble's release and attestation).
+    permissions:
+      contents: read
     env:
       ME_REQUIRE_GO: '1'
     steps:
@@ -103,7 +109,12 @@ jobs:
           if [ -z "$CHANGED" ]; then FULL "empty diff"; exit 0; fi
           # F-695: a here-string, not `echo | grep -q`. No pipefail here today, but
           # under it an early grep exit can SIGPIPE echo and flip this to docs-only.
-          if grep -qvE '^(design/|[^/]+\.md$)' <<<"$CHANGED"; then
+          # design/hardware/ is NOT docs: retail-otp.json and its captures are
+          # the values scripts/refugium-otp.sh gates on, so a change there runs
+          # the OTP e2e like any code change.
+          if grep -qE '^design/hardware/' <<<"$CHANGED"; then
+            FULL "design/hardware/ changed (retail OTP values)"
+          elif grep -qvE '^(design/|[^/]+\.md$)' <<<"$CHANGED"; then
             FULL "non-docs paths present"
           else
             echo "docs_only=true" >> "$GITHUB_OUTPUT"
@@ -210,8 +221,11 @@ jobs:
         if: steps.detect.outputs.docs_only != 'true'
         run: |
           shellcheck --version
+          # `source-path=SCRIPTDIR` in each script makes -x follow the shared
+          # lib from any cwd, so the cross-file analysis actually runs.
           shellcheck -x -S warning scripts/refugium-otp.sh scripts/lib/otp-read.sh \
-            scripts/pico2-bootkey-rehearsal.sh
+            scripts/pico2-bootkey-rehearsal.sh scripts/test/picotool-argv-probe.sh \
+            scripts/test/run-e2e-otp.sh
 
       # F-623. The SH2 demo page hands visitors `curl` lines with a VERSION in
       # them, and twice on 2026-09-18 that version was wrong -- once a full day

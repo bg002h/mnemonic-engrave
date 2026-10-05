@@ -36,6 +36,7 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/otp-read.sh
 . "$HERE/lib/otp-read.sh"
 
@@ -352,7 +353,7 @@ read_group() {
   G_COPIES[$nm]="$copies"; G_OK[$nm]=1
 }
 
-copies_hex() { local v o=""; for v in $1; do o+="$(hx "$v")/"; done; printf '%s' "${o%/}"; }
+copies_hex() { local v acc=""; for v in $1; do acc+="$(hx "$v")/"; done; printf '%s' "${acc%/}"; }
 all_equal() { local first="" v; for v in $1; do [ -n "$first" ] || first="$v"; [ "$v" = "$first" ] || return 1; done; return 0; }
 raw_matches() { # raw_matches <NAME>: RAW_VALUE's list equals the per-copy reads, copy for copy
   local -a rv cv; local i
@@ -493,7 +494,9 @@ judge() {
   fi
 
   # Slot 1 and KEY_VALID, judged together.
-  if [ "$PROFILE" = retail ]; then want_slot="$SH2_BOOTKEY_FP"; else want_slot="$RKEY1_HASH"; fi
+  local slot_what
+  if [ "$PROFILE" = retail ]; then want_slot="$SH2_BOOTKEY_FP"; slot_what="fork key"
+  else want_slot="$RKEY1_HASH"; slot_what="rehearsal slot-1 key"; fi
   case "$s1" in empty) want_kv=1 ;; key) want_kv=1 ;; valid) want_kv=3 ;; esac
   # KEY_VALID comes from BOOT_FLAGS1's vote once its copy rule holds. When
   # BOOT_FLAGS1 is the target of invalidate-spare-keys (ki "-"), its copies are
@@ -510,7 +513,7 @@ judge() {
         || rowres SLOT1 FAIL "--slot1 empty wants slot 1 all zero and KEY_VALID 0x1; slot 1 ${SLOTV[1]}, KEY_VALID 0x$(printf '%x' "$kv")"
     else
       [ "${SLOTV[1]}" = "$want_slot" ] && [ "$kv" -eq "$want_kv" ] \
-        && rowres SLOT1 PASS "fork key, KEY_VALID 0x$kv" \
+        && rowres SLOT1 PASS "$slot_what, KEY_VALID 0x$kv" \
         || rowres SLOT1 FAIL "--slot1 $s1 wants slot 1 $want_slot and KEY_VALID 0x$want_kv; slot 1 ${SLOTV[1]}, KEY_VALID 0x$(printf '%x' "$kv")"
     fi
   fi
@@ -929,7 +932,11 @@ cmd_capture() {
 
   # Transcripts for the replay check (plan 6.2 case 12): `otp get -n` of 0x040,
   # 0x048, 0x04b and 0x054, plain, with -r and with -c 1, and the values each
-  # must parse to, computed from the per-copy reads.
+  # must parse to, computed from the per-copy reads. The -c 1 row of a copied
+  # register is the exception: its value is copy 0 as the named read reports it
+  # (the vote when it printed no WARNING and no RAW_VALUE, so every copy is
+  # equal; else RAW_VALUE[0]), so that row tests -c 1 against an independent
+  # reading rather than against itself.
   local fl suffix name width val warn raw cps crit nn
   for r in 0x040 0x048 0x04b 0x054; do
     case "$r" in 0x040) nn=CRIT1; crit=1; c=8 ;; 0x048) nn=BOOT_FLAGS0; crit=0; c=3 ;; 0x04b) nn=BOOT_FLAGS1; crit=0; c=3 ;; 0x054) nn=FLASH_DEVINFO; crit=0; c=1 ;; esac
@@ -945,8 +952,13 @@ cmd_capture() {
       if [ "$nn" = FLASH_DEVINFO ] && [ "$suffix" != r ]; then
         width=4; val=$(( cps[0] & 0xffff ))
         if [ "$(ecc16 "$val")" -ne "${cps[0]}" ]; then warn=1; raw="$(hx "${cps[0]}")"; fi
-      elif [ "$suffix" = c1 ] || [ "$nn" = FLASH_DEVINFO ]; then
+      elif [ "$nn" = FLASH_DEVINFO ]; then
         width=6; val="${cps[0]}"
+      elif [ "$suffix" = c1 ]; then
+        width=6
+        if [ "${G_WARN[$nn]}" = 0 ] && [ -z "${G_RAW[$nn]}" ]; then val="${G_VOTE[$nn]}"
+        elif [ -n "${G_RAW[$nn]}" ]; then val=$(( ${G_RAW[$nn]%% *} ))
+        else capfail "$nn: the named read printed a WARNING without RAW_VALUE, so copy 0 has no independent reading"; fi
       else
         width=6; val="$(vote "$crit" "${cps[@]}")"
         if ! all_equal "${cps[*]}"; then warn=1; raw=""; for v in "${cps[@]}"; do raw+="$(hx "$v") "; done; raw="${raw% }"; fi

@@ -87,6 +87,7 @@ PHASE=""
 # (cmd/controller/platform_sh2.go:70) -- is defined there. Used here as a
 # tripwire: if a board presents it in slot 0, it is a real SeedHammer II and
 # this script must never write to it.
+# shellcheck source-path=SCRIPTDIR
 # shellcheck source=lib/otp-read.sh
 . "$REPO_ROOT/scripts/lib/otp-read.sh"
 

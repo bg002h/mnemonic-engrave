@@ -140,3 +140,124 @@ prerequisites and F-701's progress note. Before R0 on the bench there are two ch
   - M11 is a two-line faithful mutant (the derived flag carries the raw value through to the
     post-check).
 - emit.py does not generate this repo's `release.yml`, so the workflow was edited directly.
+
+## 8. Review r1 fold
+
+Review: `design/agent-reports/e3a-exec-review-r1.md` (0C / 1I / 9M / 6N). The controller folded I1,
+M1, M2, M3, N1 and N4 in `6c23046`. On top of that, this session made three commits: `bc9cee1`
+(scripts and tests), `974bd6d` (CI) and `b659f88` (docs).
+
+**Checks on the controller's fold.**
+
+- **The `--log` marker carrying the parent's PID works through the `| tee` pipeline.** Bash forks the
+  pipeline element and execs the re-run in that fork, so the re-run's `$PPID` is the first run's `$$`.
+- New case 14 checks cover it:
+  - `--log` keeps exit 0 and exit 2;
+  - each transcript holds exactly one run;
+  - with `REFUGIUM_OTP_LOGGING=1` inherited from the environment, both exit codes are kept and the
+    transcript is still written.
+- Mutant M21 restores the old presence-only marker. It goes red on exactly the two inherited-marker
+  checks.
+- **The other three behaviour changes had no tests, so I added them** (the M1 I/O checks are under M4
+  below):
+  - the TEST_ONLY exit 4 is guarded by M22;
+  - the CRIT1 schema rule is checked against crit1 `0x000000` and `0x000005` (M20);
+  - the probe's no-board gate was run in both directions. Against a stub that reports a board, it
+    aborts with exit 2 after a single bare `info`. Against the real 2.3.1 binary with no board, bare
+    `info` exits 249 and the probe passes, with every `otp set` payload `0x000000`.
+
+**Folded here.**
+
+- **M4: every gate now has a case that kills it.**
+  1. CHIPID ≠ `--ser`: a state whose CHIPID rows say `1111222233334444` while `--ser` matches the board
+     gives exit 1, "reports CHIPID", and no `otp set`.
+  2. New fake modes `NOISY_COPY_READS` and `NOISY_BARE_READS` print F-619's noisy shape on the
+     one-copy reads, with every copy equal. Each gives exit 2 with "the -c 1 read of 0x048 printed…"
+     or "the bare read of 0x049 printed…".
+  3. New fake modes `SAVE_SHORT` and `SAVE_NO_FILE` cover a short erase read-back (condemned), and a
+     short or missing alias-probe read-back (refused, no erase). A `tr` shim on PATH covers a failed
+     local count (exit 2).
+  4. An entry captured from a board with FLASH_DEVINFO_ENABLE and CS0_SIZE 0xb gives
+     `FAIL FLASH_DEVINFO … CS0_SIZE must be 0xc`.
+- **M5:** every `heal_no` and the no-write post-check case now assert their exact message. One side
+  effect: a dropped heal condition 1 used to be an equivalent mutant, and the message now tells it
+  apart (M25).
+- **M6:**
+  - case 4's "no recorded retail values" runs on a generated tree with `entries: []`;
+  - in `release.yml`, `design/hardware/` changes force full tests.
+- **M7:**
+  - `# shellcheck source-path=SCRIPTDIR` is added in the tool, R and the probe;
+  - `copies_hex`'s local is renamed;
+  - CI shellcheck now also covers the probe and the e2e script.
+  - At `-S info`, run from the repo root and from `/`, there is no SC1091, SC2178 or SC2179, so the
+    lib is followed.
+- **M8:** the `test` job has `permissions: contents: read`. I checked first, and nothing in the job
+  writes; the demo link check only reads the API.
+- **M9:**
+  - plan §7 R5 and R7 now take a `capture` right after the refusal, and the fixtures README lists
+    both captures;
+  - case 12's bench branch requires `copies differ` in the R5/R7 logs, and replays both captures with
+    RAW_VALUE present in the named reads;
+  - case 10, the fake-side analogue of R5/R7, also requires `copies differ`.
+- **N2:** the RUNBOOK names `refugium-wallet` `IMPLEMENTATION_PLAN_mr_gui_v1.md` §9 item 14.
+- **N3:** SLOT1's PASS text under rehearsal says "rehearsal slot-1 key" (M24).
+- **N5:** the capture manifest's `-c 1` row now takes copy 0 from the named read: its vote when the
+  read is clean, otherwise RAW_VALUE[0], and the capture fails if there is a WARNING with no
+  RAW_VALUE. A capture under `COPIES_IGNORED` with 0x803/0x003/0x003 now replays to
+  `MISMATCH: 0x04b_c1…` (M23).
+- **N6:** the unused `tree8` is removed.
+
+**Gates re-run at `b659f88`.**
+
+- **`run-e2e-otp.sh`:** 235 passed, 0 failed.
+
+  | case | 1 | 2 | 3 | 3c | 4 | 5 | 5d | 5e | 5f | 6 | 7 | 7b | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | ok | 10 | 27 | 26 | 1 | 24 | 43 | 1 | 3 | 7 | 12 | 4 | 4 | 27 | 4 | 9 | 6 | 6 | 4 | 17 |
+
+- **Probe** against the real picotool 2.3.1 with no board attached: 58 ok, `PROBE PASS`.
+- **shellcheck `-x -S warning`:** clean on the tool, lib, R, probe and e2e.
+- **Mutations:** all 25 are red. The original 12 are each still killed by their named case. M13-M25
+  target the gates and folds listed above:
+
+| # | mutation | red run (case: failing assertion) |
+|---|---|---|
+| M01 | drop copy rule (a) | `[3] BOOT_FLAGS0 copy 0 odd (SUPPRESS_WARNING=1) -- exit 0, want 2` (15 failed, cases 3, 5e, 10) |
+| M02 | drop `-c 1` from (a) | `[3] BOOT_FLAGS0 copy 0 odd (SUPPRESS_WARNING=1) -- exit 0, want 2` (7 failed) |
+| M03 | drop WARNING trap (b) | `[3c] BOOT_FLAGS1 copy 0 odd (COPIES_IGNORED=1 SUPPRESS_RAW_VALUE=1) -- exit 0, want 2` |
+| M04 | drop `--ser` | 197 failed, cases 1-14 incl. 13 |
+| M05 | `-n` before `-c` | 196 failed (fake exit 99) |
+| M06 | drop post-write check | `[6] FAIL_READ_AFTER_WRITE: exit 3 -- exit 0, want 3` |
+| M07 | E = copy 0 \| T in conds 1-3 | `[5d] 0x903/0x103/0x103 refused -- exit 3, want 2` |
+| M08 | drop condition 4 | `[5] 0x803/0x003/0x003 under COPIES_IGNORED refused -- exit 0, want 2` |
+| M09 | E bit 11 fixed 0 | `[5f] bit 11 in all copies: disable-otp-boot writes -- exit 2, want 0` |
+| M10 | drop RAW cross-check | `[5] 0x103/0x003/0x003 under COPIES_IGNORED refused -- exit 3, want 2` |
+| M11 | derived flag any value | `[5e] KEY_INVALID 0x1 in all copies: disable-otp-boot refused -- exit 0, want 2` |
+| M12 | identity gate skipped for erase | `[7] erase-range --profile rehearsal on a retail-shaped board -- exit 0, want 2` |
+| M13 | CHIPID = `--ser` gate dropped | `[4] the board answering to --ser reports another CHIPID: exit 1 -- exit 0, want 1` |
+| M14 | `-c 1` noise trap dropped | `[3] a noisy -c 1 read is unreadable (NOISY_COPY_READS=1) -- exit 0, want 2` |
+| M15 | bare-read noise trap dropped | `[3] a noisy bare copy read is unreadable (NOISY_BARE_READS=1) -- exit 0, want 2` |
+| M16 | erase read-back size check dropped | `[8] a short erase read-back is condemned -- exit 0, want 2` |
+| M17 | probe read-back size check dropped | `[8] a short probe read-back issues no erase -- argv matching /^erase\t/ was issued` |
+| M18 | `tr` exit unchecked | `[8] a failed local count of the read-back is refused -- exit 0, want 2` |
+| M19 | ENABLE ⇒ CS0 0xc rule dropped | `[2] retail: entry with FLASH_DEVINFO_ENABLE and CS0_SIZE 0xb still FAILs -- exit 0, want 2` |
+| M20 | CRIT1 schema rule dropped | `[14] a retail entry with crit1 0x000000 is exit 1 -- output did not match /crit1 0x000000 must have…/` |
+| M21 | `--log` marker presence-only | `[14] --log with REFUGIUM_OTP_LOGGING=1 inherited still writes one transcript -- got 0, want 1` |
+| M22 | TEST_ONLY exits 0 | `[1] _TEST_ONLY override: RESULT is TEST ENTRY, never PASS, exit 4 -- exit 0, want 4` |
+| M23 | `-c 1` manifest row circular | `[12] replay catches a -c 1 read that is not copy 0 -- output did not match /MISMATCH.*0x04b_c1/` |
+| M24 | SLOT1 text "fork key" under rehearsal | `[1] rehearsal SLOT1 PASS names the rehearsal slot-1 key` |
+| M25 | heal condition 1 dropped | `[5] a copy holding a bit outside the target refused -- output did not match /…holds a bit outside E 0x002000/` |
+
+**Harness note.** The first 25-way parallel run filled the disk: each e2e run peaks at about a GB of
+fake flash images. Those results were discarded, not reported. The rerun used 6 jobs at a time, and
+the harness now marks any run whose log contains "No space left on device" as invalid; none was.
+
+**Not changed.**
+
+- R's old e2e was not re-run, because R changed only by a shellcheck comment.
+- The `sign-firmware.sh` `--clear` blocker (§4) still stands.
+- The review's M2 white-label consistency clause was not folded. The controller's M2 fold covered
+  CRIT1 only; it is noted here for the controller.
+- I considered making capture refuse when RAW_VALUE disagrees with the per-copy reads, and did not
+  add it: capture is read-only, the replay now catches that state (N5), and a retail `check` refuses
+  unequal copies anyway.

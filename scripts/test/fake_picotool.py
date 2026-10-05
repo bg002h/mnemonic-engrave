@@ -66,6 +66,13 @@ Fault modes (environment)
   ERASE_SKIP_BYTE=<off>    `erase` leaves the byte at flash offset <off> as it was
   FAIL_GET_AFTER=N         the first N `otp get` calls succeed, every later one
                            fails (exit 247); the count lives in <state>.getcount
+  NOISY_COPY_READS=1       `-c N` on a named register prints a RAW_VALUE list and
+                           the WARNING (F-619's noisy shape), whatever the copies
+                           hold; the VALUE is still the one-copy read
+  NOISY_BARE_READS=1       a bare read of an unnamed copy row (0x049, 0x04a, ...)
+                           prints a RAW_VALUE and the WARNING the same way
+  SAVE_SHORT=1             `save` exits 0 but leaves the file one byte short
+  SAVE_NO_FILE=1           `save` exits 0 but leaves no file (a local I/O loss)
 """
 import json
 import os
@@ -506,6 +513,15 @@ def cmd_otp_get(st, args, regs):
         if reg is not None and os.environ.get('COPIES_IGNORED') == '1':
             quiet_vote = copies_opt >= 0
             redundancy = -1
+        # NOISY_COPY_READS / NOISY_BARE_READS: the one-copy reads the tool makes
+        # (`-c N` on a named register; a bare read of an unnamed copy row) print
+        # a RAW_VALUE list and the WARNING, whatever the copies hold.
+        noisy_rows = 0
+        if reg is not None and copies_opt >= 0 and os.environ.get('NOISY_COPY_READS') == '1':
+            noisy_rows = max(reg.redundancy, 1)
+        if reg is None and os.environ.get('NOISY_BARE_READS') == '1' and any(
+                r.redundancy > 1 and r.row < row < r.row + r.redundancy for r in regs.values()):
+            noisy_rows = 1
         corrected = 0
         if row != last_row:
             last_row = row
@@ -538,6 +554,10 @@ def cmd_otp_get(st, args, regs):
                 if 3 == (raw >> 22):
                     raw ^= 0xffffff
                     fos.write('(flipping raw value to 0x%08x)' % raw)
+            if noisy_rows:
+                fos.write('RAW_VALUE=' + ';'.join('0x%06x' % row_get(dev, row + i)
+                                                  for i in range(noisy_rows)))
+                fos.write(" (WARNING - REDUNDANT ROWS AREN'T EQUAL)")
             if do_ecc:
                 corrected = otp_calculate_ecc(raw & 0xffff)
                 fos.write('\nVALUE 0x%04x\n' % (corrected & 0xffff))
@@ -561,7 +581,7 @@ def cmd_otp_get(st, args, regs):
                         corrected |= (1 << b)
                     if sets[b] and clears[b]:
                         diff = True
-                if diff and not quiet_vote and os.environ.get('SUPPRESS_WARNING') != '1':
+                if diff and not quiet_vote and not noisy_rows and os.environ.get('SUPPRESS_WARNING') != '1':
                     if os.environ.get('SUPPRESS_RAW_VALUE') == '1':
                         fos.write("(WARNING - REDUNDANT ROWS AREN'T EQUAL)")
                     else:
@@ -864,6 +884,11 @@ def cmd_save(st, args):
             f.seek(phys)
             out.write(f.read(n))
             a += n
+    if os.environ.get('SAVE_SHORT') == '1':
+        with open(fname, 'r+b') as out:
+            out.truncate(max(to - frm - 1, 0))
+    if os.environ.get('SAVE_NO_FILE') == '1':
+        os.remove(fname)
     sys.stdout.write('Saving file: [==============================]  100%%\nWrote %d bytes to %s\n'
                      % (to - frm, fname))
     return 0

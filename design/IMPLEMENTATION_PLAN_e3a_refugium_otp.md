@@ -455,10 +455,14 @@ every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RES
   with exit 2; that refusal is the probe's positive control, and any other result stops the
   rehearsal), then `erase-range`, then R's phase 5 with `ACCEPT_BLINKY_ONLY=1` (positive control: blinky boots).
   Re-enter BOOTSEL by hand after every phase 5.
-- R5. `inject-copy --case bf0-copy3`. `check` (same flags as R3) must refuse naming BOOT_FLAGS0 copies.
+- R5. `inject-copy --case bf0-copy3`. `check` (same flags as R3) must refuse naming BOOT_FLAGS0 copies
+  (`FAIL BOOT_FLAGS0 copies differ`, not `unreadable`). Then `capture --out …/r5-capture.json`: its
+  transcripts are the silicon RAW_VALUE/WARNING lines the replay fixtures need (case 12). *(Added by
+  the execution review r1 fold, M9.)*
 - R6. `disable-otp-boot --execute`: heal message, post PASS. Phase 5 again: still boots (F5).
 - R7. `inject-copy --case bf1-copy0`. `check` (R3's flags with `--disable-otp-boot 1 --key-invalid 0`)
-  must refuse naming BOOT_FLAGS1 copies.
+  must refuse naming BOOT_FLAGS1 copies (`FAIL BOOT_FLAGS1 copies differ`). Then `capture --out
+  …/r7-capture.json` as in R5. *(Added by the execution review r1 fold, M9.)*
 - R8. F10 on silicon: `otp get -c 1 -n --ser S 0x04b` must show `0x000803` while the named vote shows
   `0x000003`, and the named read's RAW_VALUE[0] must equal it. F10 false on silicon shows up first in
   R7: `inject-copy`'s verification exits 3 because `-c 1` disagrees with RAW_VALUE[0]. In that case run
