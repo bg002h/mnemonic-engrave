@@ -52,6 +52,9 @@ cp "$IMG_IN" "$OUT"
 IMG="$OUT"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=lib/seal-check.sh
+. "$REPO_ROOT/scripts/lib/seal-check.sh"
 SEEDHAMMER_DIR="${SEEDHAMMER_DIR:-$(cd "$REPO_ROOT/../seedhammer" 2>/dev/null && pwd || true)}"
 [ -n "$SEEDHAMMER_DIR" ] && [ -d "$SEEDHAMMER_DIR" ] \
   || die "set SEEDHAMMER_DIR to the seedhammer fork (needs cmd/picosign)"
@@ -181,6 +184,19 @@ ok "exactly 2 metadata blocks"
 grep -qi 'signature: *verified' <<<"$INFO" \
   || die "picotool does not report 'signature: verified' for this image -- do not flash"
 ok "picotool independently reports: signature verified"
+# F-701 (SP-M1): a verified signature is not enough. The point of `--clear` is
+# signed load-map entry 0, which makes the bootrom zero all of main SRAM before
+# this image runs. An image sealed elsewhere without --clear -- or resealed from
+# an input that already had a load map, where picotool silently ignores --clear
+# -- verifies just as well and wipes nothing. Step 1 skips sealing for any image
+# that already has a SIGNATURE section, so this is the only place that catches
+# it. The check is shared with scripts/test/seal-clear-test.sh, which proves it
+# refuses such an image.
+seal_has_clear_entry "$INFO" \
+  || die "picotool does not report 'load map entry 0: Clear 0x20000000->0x20082000' for this
+image: it is signed, but its load map does not make the bootrom wipe main SRAM
+before it runs. Rebuild and seal it with 'picotool seal --clear' -- do not flash"
+ok "load map entry 0 is Clear 0x20000000->0x20082000 (bootrom wipes main SRAM)"
 
 hdr "RESULT"
 ok "$IMG is signed by $KEY and the signature is proven valid offline."

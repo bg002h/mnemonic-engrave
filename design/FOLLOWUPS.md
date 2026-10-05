@@ -20464,9 +20464,34 @@ on the TinyGo blinky.
   two picotool bugs from upstream `3c743bd`, unfixed on `develop` — `main.cpp:5646` passes
   `in.get_model()` (an unknown model) and `bintool.cpp:886` hashes the image before the clear-size
   word. The fork's own firmware seal (its `flake.nix:121`) fails the same way on 2.3.1.
-- Candidate two-line fix: `design/patches/picotool-2.3.1-seal-clear-fix.patch` (not applied);
-  patch vs. keeping 2.2.0-a4 for sealing is Brian's decision. The `picobin` defect found
-  alongside is F-708.
+- Candidate two-line fix, first drafted at `design/patches/` and since moved to
+  `nix/patches/picotool-2.3.1-seal-clear-fix.patch` (the investigation report keeps the old path
+  verbatim). The `picobin` defect found alongside is F-708.
+
+**Progress 2026-10-05: seal patch implemented** (Brian chose "Patch and report"; plan
+`design/IMPLEMENTATION_PLAN_e3a_picotool_seal_patch.md`, GREEN at round 2; report
+`design/agent-reports/e3a-seal-patch-impl-report.md`). Execution review 0C/0I
+(`design/agent-reports/e3a-seal-patch-exec-review-r1.md`, minors folded); not yet merged or run at the bench.
+
+- `flake.nix`: `packages.picotool`, `default` and `devShells.otp` are nixpkgs' 2.3.1 plus
+  `nix/patches/picotool-2.3.1-seal-clear-fix.patch` (`version -s` still 2.3.1; patched x86_64-linux
+  store path in `design/PICOTOOL_PIN.md`); `packages.picotool-unpatched` is the stock control.
+- `scripts/test/seal-clear-test.sh` runs in the `picotool argv probe` job on both builds;
+  `picotool-probe` is now in `assemble.needs`. Still open: making that job a required check
+  (Brian, through Merging PRs); until then the PR records the green probe run on its final head.
+- `sign-firmware.sh` step 7 refuses an image without `load map entry 0: Clear 0x20000000->0x20082000`.
+- Upstream issue drafted for Brian to post: `design/agent-reports/picotool-upstream-issue-draft.md`.
+- **picotool's own `seal --sign` signature is wrong about 1 time in 256** (`der_to_raw`,
+  `bintool/mbedtls_wrapper.c:169/179`, in 2.2.0-a4 and 2.3.1; not in our patch). We are immune only
+  because `picosign` is the final signer (`picosign sign -clear` replaces picotool's signature). Never
+  use picotool's signature as final. Open until the upstream report (in the issue draft) is filed and fixed.
+- **Open follow-up (SPX-M3):** `scripts/sh2-flash:270-293` flashes an existing `*.signed.uf2` as-is and
+  only checks `signature:.*verified`; it should also source `scripts/lib/seal-check.sh` and require
+  `seal_has_clear_entry "$SIGINFO"`. Low risk today (the fork's build seals with `--clear`); do it with
+  a bench flash to confirm current dev images pass.
+- **Hold:** The `seal --clear` fix is in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works from either shell.
+  **Bench R4 (E3a plan §7) is the gate that lifts it**, in this entry, `design/PICOTOOL_PIN.md` and
+  `design/RUNBOOK_custom_boot_key.md` together.
 
 ### F-702 — SeedHammer fork: Refugium features F1 to F7 (owning phase: **refugium-wallet build plan lane F**) `#seedhammer` `#refugium` `#mr1` `#funds-safety`
 

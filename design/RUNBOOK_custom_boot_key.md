@@ -78,14 +78,16 @@ Do not skip it.
 - **The OTP shell, for `refugium-otp.sh` and the Refugium steps (E3a, 2026-10-05).**
   Run them in **this repo's** shell, not the fork's:
   `SEEDHAMMER_DIR=/path/to/seedhammer nix develop .#otp`. It provides picotool
-  **2.3.1** (pinned in `flake.lock`; see `design/PICOTOOL_PIN.md`), plus openssl,
-  jq, python3, xxd, tinygo and go. `scripts/refugium-otp.sh` refuses any other
-  picotool. `scripts/pico2-bootkey-rehearsal.sh` accepts 2.2.0-a4 or 2.3.1, so
-  the SH2 steps below work from either shell. `SEEDHAMMER_DIR` points at the fork
-  checkout, which provides `cmd/picosign`. Known issue: on 2.3.1,
-  `sign-firmware.sh`'s throwaway seal (`seal --sign --clear`) fails with
-  `unknown sram end`. Sign from the fork's shell until that is fixed
-  (PICOTOOL_PIN.md, F-701).
+  **2.3.1** (pinned in `flake.lock`, with this repo's `seal --clear` fix applied;
+  see `design/PICOTOOL_PIN.md`), plus openssl, jq, python3, xxd, tinygo and go.
+  `scripts/refugium-otp.sh` refuses any other picotool.
+  `scripts/pico2-bootkey-rehearsal.sh` accepts 2.2.0-a4 or 2.3.1, so the SH2
+  steps below that sign an image the fork's build already sealed work from
+  either shell; sealing real SeedHammer firmware is held as follows.
+  `SEEDHAMMER_DIR` points at the fork checkout, which provides `cmd/picosign`.
+  **Hold (F-701):** The `seal --clear` fix is in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works from either shell.
+  Whichever shell signs, `sign-firmware.sh` refuses an image whose load map
+  lacks the `Clear 0x20000000->0x20082000` entry.
 - **A rehearsal board.** A plain **Pico 2** (~$5) — *not* a Pico 2 W as the
   primary: on the W the LED sits behind the CYW43 chip, so the rehearsal blinky
   gives no visible pass signal. Package (RP2350A vs B) is irrelevant here; the
