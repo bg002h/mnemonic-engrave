@@ -36,8 +36,14 @@
 # build); hunk B's red run is the one-time mutation run recorded in
 # design/agent-reports/e3a-seal-patch-impl-report.md.
 #
-# No device is touched: `info -a` always gets a file argument. The key is a
-# throwaway generated per run.
+# A third picotool bug, unrelated to the patch and present in 2.2.0-a4 too
+# (der_to_raw, below), makes a fraction of a percent of picotool's own
+# signatures wrong at random. A seal is retried with a new key, at most twice,
+# only when its signature carries that bug's exact fingerprint; anything else is
+# judged on the first attempt.
+#
+# No device is touched: `info -a` always gets a file argument. Each seal uses a
+# throwaway key generated for it.
 #
 set -uo pipefail
 
@@ -72,8 +78,6 @@ ok "fixture sha256 $FIXTURE_SHA256"
 
 DIR="$(mktemp -d "${TMPDIR:-/tmp}/seal-clear.XXXXXX")"
 trap 'rm -rf "$DIR"' EXIT
-openssl ecparam -name secp256k1 -genkey -noout -out "$DIR/key.pem" 2>/dev/null \
-  || { echo "seal-clear-test: openssl could not generate a secp256k1 key"; exit 2; }
 
 # sig_verdict <info -a output> -> prints "verified", "incorrect", "none" or
 # "mixed". The `signature:` line prints twice in `info -a` (Program Information
@@ -91,11 +95,61 @@ sig_verdict() {
   else echo mixed; fi
 }
 
+# der_to_raw_defect <info -a output>: true when the printed signature value
+# carries the fingerprint of a THIRD picotool bug, independent of the patch and
+# present in 2.2.0-a4 and 2.3.1 alike: bintool/mbedtls_wrapper.c der_to_raw
+# (2.3.1 :169 for r, :179 for s) copies a DER integer shorter than 32 bytes
+# with `memcpy(r + (32 - b2), der + 4, (32 - b2))` -- length 32-b2 instead of
+# b2 -- so a half whose value is below 2^247 (a 31-byte DER integer) is stored as k zero bytes, the
+# first k bytes of the integer, then zeros (k = 32 - b2). picotool's own
+# signature is then wrong (measured 2026-10-05: 7 failing runs in 500 on the
+# patched build, 3 in 200 on 2.2.0-a4, 3 bad signatures in 1500 seals). The
+# pattern is matched exactly for k = 1..4; a hunk-B defect gives a
+# random-looking signature, which matches with probability ~2^-240, so it is
+# never retried.
+der_to_raw_defect() {
+  local line hex half k
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*signature\ value:[[:space:]]+([0-9A-Fa-f]{128})$ ]] || continue
+    hex="${BASH_REMATCH[1]^^}"
+    for half in "${hex:0:64}" "${hex:64:64}"; do
+      for k in 1 2 3 4; do
+        if [[ "$half" =~ ^(00){$k}[0-9A-F]{$((2 * k))}(00){$((32 - 2 * k))}$ ]]; then return 0; fi
+      done
+    done
+  done <<<"$1"
+  return 1
+}
+
+# seal_attempts <out.uf2> [seal options...]: seal the fixture with a fresh
+# throwaway key and run `info -a` on the result; sets RC, OUT, INFO and V.
+# Retries with a new key, at most twice, ONLY when the verdict is `incorrect`
+# AND der_to_raw_defect matches -- the signer bug above, which no fix here
+# touches. Every other result, including a deterministic `incorrect` and any
+# non-zero exit, is final on the first attempt. Each retry is printed.
+seal_attempts() {
+  local out="$1" attempt; shift
+  for attempt in 1 2 3; do
+    openssl ecparam -name secp256k1 -genkey -noout -out "$DIR/key.pem" 2>/dev/null \
+      || { echo "seal-clear-test: openssl could not generate a secp256k1 key"; exit 2; }
+    rm -f "$out"
+    RC=0; INFO=""; V=""
+    OUT="$("$PT" seal --sign "$@" --quiet "$FIXTURE" "$out" "$DIR/key.pem" 2>&1)" || RC=$?
+    [ "$RC" -eq 0 ] && [ -s "$out" ] || return 0
+    INFO="$("$PT" info -a "$out" 2>&1)"
+    V="$(sig_verdict "$INFO")"
+    if [ "$V" = "incorrect" ] && der_to_raw_defect "$INFO" && [ "$attempt" -lt 3 ]; then
+      printf '  note seal %s attempt %d: picotool der_to_raw short-integer signature; resealing with a new key\n' "${*:-(no options)}" "$attempt"
+      continue
+    fi
+    return 0
+  done
+}
+
 # ---------------------------------------------------------------------------
 # 1-3. seal --sign --clear
 # ---------------------------------------------------------------------------
-RC=0
-OUT="$("$PT" seal --sign --clear --quiet "$FIXTURE" "$DIR/clear.uf2" "$DIR/key.pem" 2>&1)" || RC=$?
+seal_attempts "$DIR/clear.uf2" --clear
 
 if [ "$MODE" = "--expect-fail" ]; then
   if [ "$RC" -eq 248 ] && [[ "$OUT" == *"unknown sram end"* ]]; then
@@ -106,8 +160,7 @@ if [ "$MODE" = "--expect-fail" ]; then
 else
   if [ "$RC" -eq 0 ] && [ -s "$DIR/clear.uf2" ]; then
     ok "seal --sign --clear exits 0"
-    INFO_C="$("$PT" info -a "$DIR/clear.uf2" 2>&1)"
-    V="$(sig_verdict "$INFO_C")"
+    INFO_C="$INFO"
     if [ "$V" = "verified" ]; then ok "--clear output: every signature line is 'verified'"
     else bad "--clear output: signature verdict '$V', want verified"; fi
     # 2.3.1 main.cpp:3824 prints the entry (text built at :3809-3810).
@@ -145,12 +198,10 @@ fi
 # ---------------------------------------------------------------------------
 # 4-5. seal --sign without --clear (both modes), and the refusal
 # ---------------------------------------------------------------------------
-RC=0
-OUT="$("$PT" seal --sign --quiet "$FIXTURE" "$DIR/noclear.uf2" "$DIR/key.pem" 2>&1)" || RC=$?
+seal_attempts "$DIR/noclear.uf2"
 if [ "$RC" -eq 0 ] && [ -s "$DIR/noclear.uf2" ]; then
   ok "seal --sign (no --clear) exits 0"
-  INFO_N="$("$PT" info -a "$DIR/noclear.uf2" 2>&1)"
-  V="$(sig_verdict "$INFO_N")"
+  INFO_N="$INFO"
   if [ "$V" = "verified" ]; then ok "no --clear output: every signature line is 'verified'"
   else bad "no --clear output: signature verdict '$V', want verified"; fi
   if grep -qE '^[[:space:]]*load map entry [0-9]+:[[:space:]]+Clear ' <<<"$INFO_N"; then
