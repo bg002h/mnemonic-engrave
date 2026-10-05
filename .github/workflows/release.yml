@@ -231,7 +231,7 @@ jobs:
           # lib from any cwd, so the cross-file analysis actually runs.
           shellcheck -x -S warning scripts/refugium-otp.sh scripts/lib/otp-read.sh \
             scripts/pico2-bootkey-rehearsal.sh scripts/test/picotool-argv-probe.sh \
-            scripts/test/run-e2e-otp.sh
+            scripts/test/run-e2e-otp.sh scripts/test/seal-clear-test.sh
 
       # F-623. The SH2 demo page hands visitors `curl` lines with a VERSION in
       # them, and twice on 2026-09-18 that version was wrong -- once a full day
@@ -265,7 +265,9 @@ jobs:
   # 249 with "...with serial number ZZPROBE00000000.", which proves --ser was
   # parsed in that position (picotool silently turns a misplaced option into a
   # selector, fact F14). Plus `version -s` = 2.3.1, the otp list fingerprint
-  # and a misordered negative control. Read-only token.
+  # and a misordered negative control. Then scripts/test/seal-clear-test.sh on
+  # the patched build and, with --expect-fail, on stock 2.3.1 (F-701).
+  # `assemble` needs this job. Read-only token.
   # ---------------------------------------------------------------------------
   picotool-probe:
     name: picotool argv probe
@@ -279,11 +281,32 @@ jobs:
       - name: Install Nix (pinned by commit SHA)
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
 
-      - name: Build the pinned picotool (flake.lock)
-        run: nix build .#picotool --print-build-logs
+      # F-701: `.#picotool` is nixpkgs' 2.3.1 plus
+      # nix/patches/picotool-2.3.1-seal-clear-fix.patch; `.#picotool-unpatched`
+      # is stock 2.3.1, the seal test's negative control. Both print
+      # `version -s` = 2.3.1, so only the store path tells them apart: explicit
+      # out-links (a second default `result` would silently retarget the probe)
+      # and a check that the two paths differ.
+      - name: Build the pinned picotool (patched) and the stock control
+        run: |
+          nix build .#picotool -o pt-patched --print-build-logs
+          nix build .#picotool-unpatched -o pt-stock --print-build-logs
+          patched="$(readlink -f pt-patched)"
+          stock="$(readlink -f pt-stock)"
+          echo "patched picotool: $patched"
+          echo "stock picotool:   $stock"
+          [ "$patched" != "$stock" ] \
+            || { echo "::error::.#picotool and .#picotool-unpatched are the same store path -- the patch is not applied"; exit 1; }
 
       - name: Probe every builder argv shape against the real binary
-        run: bash scripts/test/picotool-argv-probe.sh "$PWD/result/bin/picotool"
+        run: bash scripts/test/picotool-argv-probe.sh "$PWD/pt-patched/bin/picotool"
+
+      # A file argument only: no device is touched. Throwaway key per run.
+      - name: seal --sign --clear works and verifies (patched)
+        run: bash scripts/test/seal-clear-test.sh "$PWD/pt-patched/bin/picotool"
+
+      - name: seal --sign --clear fails 248 on stock 2.3.1 (negative control)
+        run: bash scripts/test/seal-clear-test.sh "$PWD/pt-stock/bin/picotool" --expect-fail
 
   go-build:
     name: build me-preview (all targets)
@@ -439,7 +462,9 @@ jobs:
   # ---------------------------------------------------------------------------
   assemble:
     name: assemble + sign + release
-    needs: [test, go-build, rust-build]
+    # picotool-probe (F-701): a red seal test on the signing toolchain must
+    # never reach a release.
+    needs: [test, go-build, rust-build, picotool-probe]
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
