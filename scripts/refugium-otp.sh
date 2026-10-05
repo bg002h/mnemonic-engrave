@@ -30,6 +30,8 @@
 #      wrong confirmation)
 #   2  state refused (any FAIL, any unreadable row); nothing was written by OTP
 #   3  an `otp set` was issued and something after it failed
+#   4  `check` under REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY matched a TEST entry: never
+#      a pass, so nothing keyed on exit 0 can mistake it for a retail check
 #
 set -uo pipefail
 
@@ -86,8 +88,10 @@ done
 
 # --log: re-run this same command with stdout and stderr through tee, and keep
 # its exit code (an operator piping into tee would lose it).
-if [ -n "$LOG" ] && [ -z "${REFUGIUM_OTP_LOGGING:-}" ]; then
-  REFUGIUM_OTP_LOGGING=1 "$0" "${ORIG_ARGS[@]}" 2>&1 | tee -a "$LOG"
+# REFUGIUM_OTP_LOGGING is this script's own marker for the re-run; one inherited
+# from the environment would silently drop --log, so it must carry our PID.
+if [ -n "$LOG" ] && [ "${REFUGIUM_OTP_LOGGING:-}" != "$PPID" ]; then
+  REFUGIUM_OTP_LOGGING=$$ "$0" "${ORIG_ARGS[@]}" 2>&1 | tee -a "$LOG"
   exit "${PIPESTATUS[0]}"
 fi
 
@@ -227,6 +231,10 @@ load_retail() {
     # Cells that are never taken from an entry must be clear in it.
     (( (16#${EF[boot_flags0]#0x} & 0x6800) == 0 )) \
       || die1 "schema: entry $i boot_flags0 carries DISABLE_OTP_BOOT, ENABLE_OTP_BOOT or bit 11 (never taken from an entry)"
+    # A retail SeedHammer is secure-boot locked and debuggable only through the
+    # secure-debug path: SECURE_BOOT_ENABLE (bit 0) set, DEBUG_DISABLE (bit 2) clear.
+    (( (16#${EF[crit1]#0x} & 0x1) == 1 && (16#${EF[crit1]#0x} & 0x4) == 0 )) \
+      || die1 "schema: entry $i crit1 ${EF[crit1]} must have SECURE_BOOT_ENABLE set and DEBUG_DISABLE clear"
     (( (16#${EF[boot_flags1]#0x} & 0x0f0f) == 0 )) \
       || die1 "schema: entry $i boot_flags1 carries KEY_VALID or KEY_INVALID (never taken from an entry)"
     rows="$(jq -r --argjson i "$i" '.entries[$i].white_label_rows | if type == "object" then (to_entries[] | "\(.key)=\(.value)") else "<bad>" end' "$f")"
@@ -631,7 +639,7 @@ cmd_check() {
   read_board
   judge "$SLOT1" "$DOB" "$KI"
   cannot_prove
-  if [ "$RESULT_OK" = 1 ]; then result_line; exit 0; fi
+  if [ "$RESULT_OK" = 1 ]; then result_line; [ "$TEST_ONLY" = 1 ] && exit 4; exit 0; fi
   say "RESULT: FAIL ($NFAIL row(s))"
   exit 2
 }
@@ -719,7 +727,7 @@ cmd_write() {
 # cmd_postcheck <written 0|1>: the full check with the step's flag set.
 cmd_postcheck() {
   local written="$1"
-  say ""; say "post-write check:"
+  say ""; if [ "$written" = 1 ]; then say "post-write check:"; else say "check (no write was issued):"; fi
   if ! try_gate; then [ "$written" = 1 ] && die3 "post-write read: $ERR"; die2 "post-check read: $ERR"; fi
   read_board
   if [ "$CMD" = disable-otp-boot ]; then
@@ -755,6 +763,8 @@ alias_probe() {
       "$(printf '0x%08x' $(( FLASH_FROM + off * 1048576 + 4096 )))" "$got"
     pt_exec
     if [ "$PT_RC" -ne 0 ]; then rm -f "$got"; condemned "reading +$off MiB exited $PT_RC"; fi
+    [ -f "$got" ] && [ "$(stat -c%s "$got")" -eq 4096 ] \
+      || die2 "the read-back at +$off MiB is missing or not 4096 bytes: the probe proved nothing (refused)"
     if [ "$(sha256sum < "$m")" = "$(sha256sum < "$got")" ]; then
       die2 "the marker reappears at +$off MiB: this flash is smaller than 16 MB (condemned)"
     fi
@@ -788,7 +798,7 @@ cmd_erase() {
   if [ "$PT_RC" -ne 0 ]; then rm -f "$f"; condemned "the read-back exited $PT_RC"; fi
   [ "$(stat -c%s "$f")" -eq $(( to - FLASH_FROM )) ] || condemned "the read-back is $(stat -c%s "$f") bytes, the range is $(( to - FLASH_FROM ))"
   # Count non-0xFF bytes into a file and stat it: no pipe into grep -q (F-695).
-  tr -d '\377' < "$f" > "$TMPD/left.bin"
+  tr -d '\377' < "$f" > "$TMPD/left.bin" || die2 "could not count the read-back's non-0xFF bytes (local I/O error): erase not verified"
   left="$(stat -c%s "$TMPD/left.bin")"
   [ "$left" -eq 0 ] || die2 "flash not erased: $left byte(s) in the range are not 0xFF (condemned)"
   say "flash $(printf '0x%08x' "$FLASH_FROM")-$(printf '0x%08x' "$to") erased and verified (every byte 0xFF)"

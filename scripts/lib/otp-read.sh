@@ -179,7 +179,10 @@ pt_print_argvs() {
       pt_build_otp_get "$ser" "${o[@]}" -- $sels; printf '%s\n' "${PT_ARGV[*]}"
     done
     o=(); [ "$c" = 1 ] && o+=(-c 1); [ "$r" = 1 ] && o+=(-r); [ "$e" = 1 ] && o+=(-e); [ "$x" = 1 ] && o+=(-s)
-    pt_build_otp_set "$ser" "${o[@]}" -- 0x04b 0x000803; printf '%s\n' "${PT_ARGV[*]}"
+    # Value 0: with -s it ORs nothing in, without -s picotool refuses any row
+    # holding bits ("Cannot clear bits"), so a board that somehow answers
+    # the probe gets no new OTP bit from it.
+    pt_build_otp_set "$ser" "${o[@]}" -- 0x04b 0x000000; printf '%s\n' "${PT_ARGV[*]}"
   done; done; done; done
   pt_build_otp_load "$ser" "$dir/probe.json"; printf '%s\n' "${PT_ARGV[*]}"
   pt_build_erase "$ser" 0x10000000 0x10001000; printf '%s\n' "${PT_ARGV[*]}"

@@ -4,6 +4,9 @@
 # scripts/lib/otp-read.sh can emit against the REAL picotool, with no board
 # attached (plan E3a section 6.4; CI job `picotool argv probe`).
 #
+# UNPLUG EVERY BOARD FIRST. The script refuses to start, and aborts mid-run,
+# if picotool can see any board.
+#
 # picotool's parser matches option groups in declaration order, and an option
 # out of place silently becomes a selector (fact F14): the call then runs on
 # whatever board is attached. With no board attached, a call whose --ser was
@@ -50,6 +53,20 @@ probe() { # probe <argv...> -> OUT (wrapped lines joined), RC
 
 echo "picotool: $PT"
 
+# NO BOARD MAY BE ATTACHED. The shapes below include `otp set`, `erase` and
+# `load`; only --ser keeps them off a board, and a regression in --ser parsing
+# is exactly what this probe exists to catch. So before every device argv,
+# require that picotool sees no RP-series board at all, and abort otherwise.
+require_no_board() {
+  local rc=0 out
+  out="$("$PT" info 2>&1)" || rc=$?
+  if [ "$rc" -ne 249 ] || [[ "$out" != *"No accessible"* ]]; then
+    echo "picotool-argv-probe: ABORT -- a board may be attached (info exit $rc). Unplug every RP2040/RP2350 board and re-run."
+    exit 2
+  fi
+}
+require_no_board
+
 probe version -s
 if [ "$RC" -eq 0 ] && [ "${OUT% }" = "$PICOTOOL_PIN" ]; then ok "version -s = $PICOTOOL_PIN"
 else bad "version -s printed '$OUT' (exit $RC), want $PICOTOOL_PIN"; fi
@@ -75,6 +92,7 @@ while IFS= read -r line; do
       continue ;;
   esac
   N=$((N + 1))
+  require_no_board
   probe "${argv[@]}"
   if [ "$RC" -eq 249 ] && [[ "$OUT" == *"$WANT"* ]]; then ok "$line"
   else bad "$line -> exit $RC: $OUT"; fi
@@ -82,6 +100,7 @@ done < <(pt_print_argvs "$SER" "$DIR")
 [ "$N" -gt 0 ] || bad "the builder's print mode produced no device argvs"
 
 # Negative control: F-619's argument order. --ser is not parsed, so no serial.
+require_no_board
 probe otp get -n -c 1 --ser "$SER" 0x04b
 if [ "$RC" -eq 249 ] && [[ "$OUT" != *"$WANT"* ]]; then
   ok "negative control: misordered 'otp get -n -c 1 --ser S 0x04b' loses --ser (the check discriminates)"

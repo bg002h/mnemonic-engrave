@@ -79,7 +79,7 @@ bench uses `.#otp` here, with `SEEDHAMMER_DIR` pointing at a fork checkout.
 2. Bump `PICOTOOL_PIN` in `scripts/lib/otp-read.sh`.
 3. Re-check the `otp list` fingerprint and the G1 output layout (`design/agent-reports/e3a-g-facts.md`)
    against the new source.
-4. Re-run the argv probe, `run-e2e-otp.sh`, R's old e2e and the bench transcript replay
+4. Re-run the argv probe (with every board unplugged; it aborts if it sees one), `run-e2e-otp.sh`, R's old e2e and the bench transcript replay
    (`scripts/test/fixtures/transcripts/`).
 
 A pin moved without these steps is a picotool nobody has checked.

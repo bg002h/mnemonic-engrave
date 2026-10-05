@@ -168,7 +168,7 @@ grep -q "CANNOT PROVE" <<<"$OUT" && ok 1 "rehearsal RESULT carries the CANNOT PR
 fresh "$BASE_RET"; SNAP0="$(snap)"
 REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY="$TREE/design/hardware/retail-otp.json" \
   run "" "$TOOL" check "${RET[@]}" --slot1 valid --disable-otp-boot 0 --key-invalid 0
-expect 1 "_TEST_ONLY override: RESULT is TEST ENTRY, never PASS" 0 "RESULT: TEST ENTRY — not a retail check" same
+expect 1 "_TEST_ONLY override: RESULT is TEST ENTRY, never PASS, exit 4" 4 "RESULT: TEST ENTRY — not a retail check" same
 grep -q "RESULT: PASS" <<<"$OUT" && bad 1 "_TEST_ONLY never prints RESULT: PASS" "it did" \
   || ok 1 "_TEST_ONLY never prints RESULT: PASS"
 
