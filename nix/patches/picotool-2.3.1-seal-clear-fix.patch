@@ -1,0 +1,55 @@
+picotool 2.3.1: make `seal --sign --clear` work on UF2/BIN input (mnemonic-engrave F-701)
+
+Applied by flake.nix to nixpkgs' picotool 2.3.1 (`patches` is empty upstream at
+nixpkgs a7868a72; `patch -p1`). Everything above the first `diff --git` line is
+commentary and is ignored by patch(1).
+
+Both bugs come from upstream raspberrypi/picotool commit 3c743bd ("Add support
+for pinning XIP SRAM (#298)"), first released in 2.3.0, still present on
+`develop` at ba3df40. Evidence: design/agent-reports/e3a-seal-clear-investigation.md.
+
+Hunk A (main.cpp, sign_guts_bin): pass the `model` parameter, which seal_command
+computed from the image's own IMAGE_DEF, instead of `in.get_model()`. `in` is a
+file_memory_access whose model was never set (models::unknown), so with --clear
+get_lm_hash_data calls model_unknown::sram_end() and exits 248 "unknown sram end"
+(2.3.1 main.cpp:5646, bintool.cpp:863, model/model.h:124). The ELF path already
+passes `model` (main.cpp:5574).
+
+Hunk B (bintool/bintool.cpp, get_lm_hash_data, no-load-map branch): append the
+image AFTER the Clear/pin size words instead of inserting it before them, so the
+digest is `clear_size || pin_size || bin` -- the load-map entry order the RP2350
+bootrom hashes (bootrom varm_blocks.c:973-997). Without it picotool's own
+`--clear` signature is `incorrect`. A no-op when neither --clear nor
+--pin-xip-sram is given (to_hash is empty before the insert).
+
+Drop this patch when upstream picotool ships both fixes: then delete this file
+and the `overrideAttrs` in flake.nix, and keep scripts/test/seal-clear-test.sh
+(it must still pass on the unpatched upstream build; its --expect-fail
+negative control then goes, together with packages.picotool-unpatched).
+
+diff --git a/bintool/bintool.cpp b/bintool/bintool.cpp
+index 43a23a0..483108f 100644
+--- a/bintool/bintool.cpp
++++ b/bintool/bintool.cpp
+@@ -883,7 +883,7 @@ std::vector<uint8_t> get_lm_hash_data(std::vector<uint8_t> bin, uint32_t storage
+             std::copy(xip_pin_size_data.begin(), xip_pin_size_data.end(), std::back_inserter(to_hash));
+             DEBUG_LOG("PIN XIP SRAM %08x + %08x\n", (int)model->xip_sram_start(), (int)xip_pin_size_vec[0]);
+         }
+-        to_hash.insert(to_hash.begin(), bin.begin(), bin.end());
++        to_hash.insert(to_hash.end(), bin.begin(), bin.end());
+         DEBUG_LOG("HASH %08x + %08x\n", (int)storage_addr, (int)bin.size());
+         entries.push_back(
+             {
+diff --git a/main.cpp b/main.cpp
+index 534b794..b9698af 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -5643,7 +5643,7 @@ vector<uint8_t> sign_guts_bin(iostream_memory_access in, private_t private_key,
+     auto sig_data = hash_andor_sign(
+         bin, bin_start, bin_start,
+         &new_block, public_key, private_key,
+-        in.get_model(),
++        model,
+         settings.seal.hash, settings.seal.sign,
+         settings.seal.clear_sram, settings.seal.pin_xip_sram
+     );
