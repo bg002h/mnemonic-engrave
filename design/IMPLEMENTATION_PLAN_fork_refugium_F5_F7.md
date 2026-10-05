@@ -1,6 +1,6 @@
 # IMPLEMENTATION PLAN — SeedHammer fork, Refugium F5 and F7
 
-> **Status: GREEN, draft 4 (2026-10-05).** Round 3 on draft 3 (fc73529): opus 0C/0I/7M/3N
+> **Status: GREEN, draft 4 (2026-10-05); F5 merged (seedhammer d156a3e), F7 in seedhammer PR 3, deviations in §8.** Round 3 on draft 3 (fc73529): opus 0C/0I/7M/3N
 > (`refugium-F5-F7-plan-R0-round3.md`), which closes the R0 gate; draft 4 folds its
 > Minors and Nits (§7). Earlier: **draft 3**. Draft 1 (972665e): R0 round 1, opus 0C/8I/10M/3N
 > (`design/agent-reports/refugium-F5-F7-plan-R0.md`). Draft 2 (bdc87b3): round 2, opus
@@ -393,3 +393,21 @@ No OTP, signing or hardware step is in this plan.
 | M-6 walk hazards | §4.2 inert record, no `pass:`, second walk |
 | M-7 fault screen mechanism | §4.2 optional interface, `uiFlow`, test |
 | N-1 to N-3 | §4.3, §4.5, §4.1 |
+
+## 8. Deviations in the F7 build (seedhammer PR 3)
+
+Recorded at merge so the next reader does not undo them (F7 fold re-check 2, n-3).
+
+- **§4.4 Engrave Text has no QR at all under the profile.** The plan said the free-text
+  gate uses the ms1 predicate and forces "No QR" on ms1-shaped text. The build is
+  stricter: `noFreeTextQR()` returns `refugiumProfile`, so Engrave Text offers no QR for
+  any text, and the free-text predicate was deleted. Reason: the folded review found
+  ms1 strings written with mixed separators and grouping that the free-text predicate missed (`refugium-F7-fold-recheck.md`).
+  Do not re-add a predicate. Bundle and codex32 producers still use the ms1 predicate.
+- **§4.2 scan offers key on `scanOffered()`, not `nfcAvailable()`.** Sites that never
+  checked for a reader now check `scanOffered()`, which is false under the profile and
+  a constant true otherwise, so the default build is unchanged on reader-less
+  platforms (F7 execution review, design check 1).
+
+Reports: `design/agent-reports/refugium-F7-impl.md`, `refugium-F7-exec-review.md`,
+`refugium-F7-fold-recheck.md`, `refugium-F7-fold-recheck2.md`.
