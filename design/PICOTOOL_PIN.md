@@ -59,8 +59,11 @@ SEEDHAMMER_DIR=/path/to/seedhammer nix develop .#otp
   - The baseline tree (`1982788`, before E3a) fails the same three phases on 2.3.1, so E3a did not
     introduce it.
   - Until it is resolved, R0 cannot pass, and the fork should not move to this pin for signing.
-  - The fix belongs to `sign-firmware.sh` or the blinky's link layout, and E3a does not change
-    either. It is recorded in F-701.
+  - The cause is two picotool bugs, not the image (`design/agent-reports/e3a-seal-clear-investigation.md`):
+    `main.cpp:5646` passes `in.get_model()` (an unknown model) and `bintool.cpp:886` hashes the
+    image before the clear-size word. The fork's own firmware seal fails the same way on 2.3.1.
+    A two-line fix is in `design/patches/picotool-2.3.1-seal-clear-fix.patch`, not applied;
+    patching vs. keeping 2.2.0-a4 for sealing is Brian's decision. Recorded in F-701.
 
 ## How the fork and the Sitting image consume it
 

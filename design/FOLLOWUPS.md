@@ -20432,8 +20432,8 @@ board's CHIPID and each step.** Depends on E3a, the fork key decision (E4) and
 H0's button and white-label rows.
 
 **Progress 2026-10-05: E3a implemented** (plan `design/IMPLEMENTATION_PLAN_e3a_refugium_otp.md`
-§8 step 2; report `design/agent-reports/e3a-impl-report.md`). Not yet reviewed (§8 step 3), merged
-or run at the bench.
+§8 step 2; report `design/agent-reports/e3a-impl-report.md`). The adversarial execution review closed at
+0 C / 0 I in round 2 (`e3a-exec-review-r1.md`, `-r2.md`); PR 11. Not yet merged or run at the bench.
 
 Built:
 
@@ -20449,7 +20449,6 @@ Built:
 
 Open for E3a:
 
-- the adversarial review;
 - adding the probe as a required check;
 - the bench rehearsal on a 4 MB Pico 2 (§7 R0-R10), and the bench-result PR with the R1, R5 and
   R7 transcripts.
@@ -20461,6 +20460,134 @@ on the TinyGo blinky.
 - Measured here, with no board: R's old e2e fails phases 3, 5 and 6.
 - The pre-E3a tree fails the same three phases on 2.3.1, so E3a did not cause it.
 - `seal --sign` without `--clear` works and verifies.
-- R0 cannot pass until `sign-firmware.sh` (or the blinky's link layout) is fixed for 2.3.1.
+- R0 cannot pass until this is fixed. Cause (`design/agent-reports/e3a-seal-clear-investigation.md`):
+  two picotool bugs from upstream `3c743bd`, unfixed on `develop` — `main.cpp:5646` passes
+  `in.get_model()` (an unknown model) and `bintool.cpp:886` hashes the image before the clear-size
+  word. The fork's own firmware seal (its `flake.nix:121`) fails the same way on 2.3.1.
+- Candidate two-line fix: `design/patches/picotool-2.3.1-seal-clear-fix.patch` (not applied);
+  patch vs. keeping 2.2.0-a4 for sealing is Brian's decision. The `picobin` defect found
+  alongside is F-708.
 
-E3a does not change either. The fix needs its own decision.
+### F-702 — SeedHammer fork: Refugium features F1 to F7 (owning phase: **refugium-wallet build plan lane F**) `#seedhammer` `#refugium` `#mr1` `#funds-safety`
+
+**Status:** OPEN — owning phase: refugium-wallet `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` lane F (f929084)
+Filed 2026-10-05 by thread "SeedHammer fork for Refugium". Primary entry for the
+cross-repo ask `mr-gui-f-refugium-features`; companion in `bg002h/refugium-wallet`
+`design/FOLLOWUPS.md` (same id). Fork work lands in `bg002h/seedhammer`; its plan and
+reviews live here in `design/`, as for every fork feature.
+
+The phases (plan §5, lane F; Rust first, then a Go port with a provenance pin, tested
+in `cmd/emu`; risk set throughout):
+
+- **F1** mr1 string layer, payload reading and the card's QR. Waits on F-699 (E1, `mr-gui-e1-mr1-class`,
+  `Class::Mr` in me) and mr-codec's vectors.
+- **F2** plan entry (plan id as 4 words, session number, seed count, letters in use),
+  CHIPID read from OTP in picotool's spelling, the image-check code; holder entry.
+  Waits on `refugium-codes` (plan A7).
+- **F3** letter per seed and the set check (count, distinct letters, letters in use;
+  24 words unless the plan allows 12; non-English refused); words held until every
+  plate is checked. Waits on A7.
+- **F4** per-plate typed read-back against the held seed, plate result codes, summary
+  screen before power-off. Waits on A7.
+- **F5** ms1 plus Standard SeedQR plate layout from the held words (today's ms1 plate
+  carries a QR of the ms1 string, `backup/backup.go`); a 96-digit SeedQR must fit the
+  QR size cap. No upstream dependency: starts now.
+- **F6** public plates in numbered, countable groups (A7's grouping function), chunked
+  cards and mk1 plates included. Waits on A7.
+- **F7** Refugium build profile: NFC off while a secret is held (single-sig verify's
+  NFC gatherer included), the NFC `lock-boot` OTP writer and the `FOREVERLAURA!` QA
+  command removed, BIP-39 passphrase entry off in the seed sitting. A build test
+  asserts both commands are absent from the binary. No upstream dependency: starts now.
+
+F8 (seed from plate, `seat_records`, closing runs on the SeedHammer) is after v1.
+F9 is F-703. Done when: each phase's Done-when in the plan holds and both entries
+close in lockstep.
+
+### F-703 — SeedHammer fork: Refugium release F9 (owning phase: **refugium-wallet build plan lane F, after E4**) `#seedhammer` `#refugium` `#release` `#signing`
+
+**Status:** OPEN — owning phase: refugium-wallet `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` F9; waits on F1 to F7 and on the new offline v1 key
+E4 decided by Brian 2026-10-05 03:40Z: "Keep 846aa289 but we will plan to move to a new
+key before v1 release". Development and rehearsal builds sign with `846aa289…`; the v1
+fork release is signed under a new key made offline. Board model (03:51Z, "New
+SeedHammers"): boards #1 to #3 stay development boards on `846aa289…` and never run a v1
+release; v1 is provisioned onto new sealed units (SeedHammer #4, more only if needed);
+each Sitting release pins exactly one fork key hash.
+Filed 2026-10-05 by thread "SeedHammer fork for Refugium". Primary entry for
+`mr-gui-f9-fork-release`; companion in `bg002h/refugium-wallet` `design/FOLLOWUPS.md`.
+A signed UF2 under the key model Brian picks (E4; see `firmware-dual-distribution`),
+its reproducible unsigned build, and a fork `copy-signature` (today's flake hard-codes
+upstream's key). Depends on F-702 (F1 to F7) and E4. **Irreversible:** signing under the
+fork key needs Brian's typed go-ahead naming the unsigned image hash. Not started.
+
+### F-704 — `bip39.Mnemonic.Valid` accepts word indices aliased past the wordlist (owning phase: none — ownerless residue) `#seedhammer` `#bip39` `#seedqr`
+
+**Status:** OPEN — owning phase: none
+Filed 2026-10-05 from `design/agent-reports/refugium-F5-exec-review.md` I-1. The fork's
+`bip39.Mnemonic.Valid` builds entropy as `ent*2048|w` without range-checking each word,
+so adding 2048 to a word whose predecessor is odd leaves entropy and checksum unchanged
+and `Valid` passes. `seedqr.QR` and `CompactQR` would then encode the out-of-range index.
+`backup.EngraveSeedStringSeedQR` (F-702 F5) range-checks itself and is pinned by a test;
+the fix belongs in `Valid`. Go-only: rust-bip39 holds words, not raw indices, so there is
+no Rust primary to fix first (checked by the reviewer; re-check when fixing).
+
+### F-705 — `codex32.EncodeMS1Preimage` leaves its payload buffer unwiped (owning phase: none — ownerless residue) `#seedhammer` `#codex32` `#secret-handling`
+
+**Status:** OPEN — owning phase: none
+Filed 2026-10-05 from `design/agent-reports/refugium-F5-exec-review.md` M-3. F-702 F5
+made `EncodeMS1` wipe its payload; `EncodeMS1Preimage` (`codex32/msencode.go:61`) builds
+the same kind of buffer from a hashlock preimage and does not.
+
+### F-706 — a `text:` payload record with a non-ASCII rune panics Engrave Text at the engrave step (owning phase: none — ownerless residue) `#seedhammer` `#freetext` `#payload` `#crash`
+
+**Status:** OPEN — owning phase: none
+Filed 2026-10-05 from the F7 fold re-check (`design/agent-reports/refugium-F7-fold-recheck.md`).
+A systemwide payload `text:` record containing NBSP, U+200B or `é` passes the text,
+title, footer and Confirm screens, then `ftBuildPlate` panics with "unsupported rune" at
+the engrave step, in both the default and Refugium builds. The keyboard types ASCII only,
+so only a payload reaches it; the code is the same at fork `be00ef8`, so it predates
+F-702. Fix: refuse a rune the plate font lacks at admission or at the fit step, with a
+message naming its position.
+
+### F-707 — v1 fork images carry no OTP rollback version and no TBYB (owning phase: **refugium-wallet build plan F9a/F9b**) `#seedhammer` `#refugium` `#release` `#otp` `#cross-repo`
+
+**Status:** OPEN — tier cross-repo (`bg002h/refugium-wallet`)
+Companion: refugium-wallet `design/FOLLOWUPS.md` `mr-gui-f9-no-otp-rollback` (05cc6f4, branch
+`claude/project-thread-rcj081`). Filed 2026-10-05 at the UI brainstorm thread's request.
+No v1 fork image (refugium-wallet plan F9a and F9b) carries an OTP rollback version or a
+TBYB flag; never use `picotool seal --rollback`. Under secure boot, the first boot of a
+signed image carrying a rollback version burns a thermometer bit in
+DEFAULT_BOOT_VERSION0/1 (OTP rows 0x04e-0x053) and sets BOOT_FLAGS0.ROLLBACK_REQUIRED
+(pico-bootrom-rp2350 `varm_launch_image.c`; pico-sdk `otp_data.h`, as cited by the UI
+thread; re-verify against those sources before F9). That would condemn every honestly
+provisioned board at its closing image check. The release check enforces it with the
+pinned picotool's `info`. Anti-rollback is deferred until after v1, beside key rotation
+(UI brainstorm ruling 2026-10-05 07:40Z). Touches F-703.
+
+Extended 2026-10-05 (UI brainstorm ruling 08:10Z item 4, relayed by the UI Minors thread):
+the v1 fork image also carries **no partition table**, and Refugium's step 4 boots it by a
+normal power-on, never a flash-update boot. On a flash-update boot of an image with a
+partition table, the boot ROM's implicit buy can erase a flash sector
+(pico-bootrom-rp2350 `varm_launch_image.c` L206-212 and L434-460, `varm_flash_boot.c`
+L236-327, as cited by the UI thread); picotool 2.3.1 `load -x` reboots with
+REBOOT2_FLAG_REBOOT_TYPE_FLASH_UPDATE (`main.cpp` L5385-5389). Any flash write outside the
+image would fail Refugium's before-and-after check. The F9a/F9b release check refuses an
+image in which `picotool info -a` shows a partition table.
+Measured 2026-10-05 at fork main c0f9379 (TinyGo 0.41.1, the flake's flags, ELF output,
+both the default and `-tags refugium` builds): the unsealed image has exactly one picobin
+block, at 0x100000f8, holding IMAGE_DEF and LAST only, so no PARTITION_TABLE item
+(0x0a). It comes from TinyGo's `targets/rp2350_embedded_block.s`. Not measured: the
+image after `picotool seal --sign --clear` (no picotool here). The flake's seal call
+passes no partition table, but the release check above is what proves the sealed image.
+
+### F-708 — `picobin.Image.HashData` hashes entry 0's size word for every clear LOAD_MAP entry (owning phase: none — ownerless residue) `#seedhammer` `#picobin` `#signing`
+
+**Status:** OPEN — owning phase: none (fix before F-703 if a v1 image uses `--pin-xip-sram`)
+Found by thread "mnemonic-engrave for Refugium" during the E3 seal investigation
+(`design/agent-reports/e3a-seal-clear-investigation.md`); filed 2026-10-05. In fork
+`picobin/picobin.go` `HashData` (fork main c0f9379, lines 324-330), a LOAD_MAP entry with
+`storageStart == 0` hashes its size word with `hashData(r, hasher, buf, eidx+8, 4)`,
+which reads entry 0's size word regardless of `i`; it should read `eidx+i*12+8`. Today's
+images have only entry 0 as a clear entry, so the hash is right; an image sealed with
+`--clear --pin-xip-sram` has a second clear entry and would hash wrongly, so
+`picosign` would compute a signature the boot ROM rejects. Fork-native code (no Rust
+primary). Fix with a test image that has two clear entries.
