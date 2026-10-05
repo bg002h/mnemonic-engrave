@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`sysw::region_image`**, the library form of `me sysw pack --region`
+  (F-700). It pads a packed container with `0xFF` to the full 64 KiB region
+  and refuses a blob larger than the region or one the reader would not
+  parse. The CLI now pads through it; its output and messages are unchanged.
+- **A `cli` feature, on by default** (F-700). clap and rpassword, used only by
+  the `me` binary, sit behind it. A library user depends with
+  `default-features = false` and links no CLI crate; CI builds that form.
+
+### Changed
+
+- **md-codec moves from 0.47.0 to 0.48.4** (F-700), the same rev
+  mnemonic-refugium pins, so a program linking both holds one md-codec. 0.48.x
+  adds API and changes no wire format.
+
 ## [0.12.0] - 2026-09-24
 
 `me sysw pack` stops on a hashlock phrase that looks like a digest, as

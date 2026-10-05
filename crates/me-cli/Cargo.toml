@@ -13,6 +13,9 @@ categories = ["command-line-utilities", "cryptography::cryptocurrencies"]
 [[bin]]
 name = "me"
 path = "src/main.rs"
+# The `me` binary needs the CLI's own crates (F-700). A library user turns
+# `cli` off and gets neither the binary nor its dependencies.
+required-features = ["cli"]
 
 [lib]
 name = "mnemonic_engrave"
@@ -27,12 +30,18 @@ mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 # SPEC_liana_unspendable_internal_key §9a). md-codec is unpublishable while it
 # depends on the rust-miniscript git patch below, so crates.io stopped at 0.42
 # -- which reads no wire version but 4, and fails every version-8 plate.
-# cf35d61a is `descriptor-mnemonic-md-cli-v0.19.0` (md-codec 0.47.0). A rev,
-# not the tag: a tag can be moved, a rev cannot. Same shape as mnemonic-toolkit.
+# 6cf6599a is tag `md-codec-v0.48.4`. A rev, not the tag: a tag can be moved, a
+# rev cannot. Same shape as mnemonic-toolkit.
 #
-# NEEDS the root `[patch.crates-io]` miniscript override: md-codec 0.47 calls
+# F-700 (Refugium plan phase E2): this rev EQUALS mnemonic-refugium's workspace
+# pin, so the Refugium app, which links both, holds ONE md-codec. md-codec moves
+# by tagged release; when mnemonic-refugium re-pins it, this pin follows in the
+# same week. (It was cf35d61a, md-codec 0.47.0; 0.48.x adds API and changes no
+# wire format.)
+#
+# NEEDS the root `[patch.crates-io]` miniscript override: md-codec 0.47+ calls
 # APIs that exist only at that rev (`derive_at_index`, `Terminal::SortedMultiA`).
-md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "cf35d61af0f058029df841f4882945e53f86cd4b" }
+md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "6cf6599ab71eb37adef836641095fb3c8756784f" }
 # §5.4's `address 0:` line -- the executable check the operator makes before
 # anything is engraved. `md_codec::Descriptor::derive_address` is the derivation
 # (md-codec's `derive` feature is default-on and already in this tree), and its
@@ -46,7 +55,7 @@ md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "cf35d
 # md-codec's own dependency, so the lock gains only this package's edge to it.
 bitcoin = "0.32"
 mk-codec = "0.5"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive"], optional = true }
 zeroize = "1.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -93,7 +102,18 @@ ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "e5dff6f9c
 # six unpushed commits touch `mt-cli` and the spec only, and `me` depends on
 # `mt-codec`. So this needs no push -- an outward-facing act -- to build.
 mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "72b79b8762ec208b6143afade8c4b66a551bd29d" }
-rpassword = "7.5.4"
+rpassword = { version = "7.5.4", optional = true }
+
+# F-700 (Refugium plan phase E2): the library carries no CLI crate. clap and
+# rpassword are used only by `src/main.rs`, so they sit behind `cli`, which is
+# on by default so `cargo build`, `cargo install` and the release builds are
+# unchanged. A library user (the Refugium desktop app) depends with
+# `default-features = false` and gets the lean library; CI builds that form
+# (`cargo build --lib --no-default-features`) so a CLI crate reaching the
+# library fails there.
+[features]
+default = ["cli"]
+cli = ["dep:clap", "dep:rpassword"]
 
 [dev-dependencies]
 assert_cmd = "2"
