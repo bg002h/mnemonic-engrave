@@ -60,21 +60,24 @@ provisioning flow (lane S); the retail values themselves (H0 measures them with 
 | F10 | `-c 1` makes a named read return the first row's own raw content — **only when `-c` is in its declared position** (F14) | lens A A-C1 |
 | F11 | `otp set` computes the new value from copy 0 and writes it to all copies, row by row; a copy holding a bit outside the new value fails that row after earlier rows are burned; a copy that is a subset is healed | OF P3; BR `varm_otp.c:402-407` |
 | F12 | 2.3.1 vs 2.2.0-a4: names unchanged; ECC `VALUE` prints 16-bit; lone CHIPID1 read works; `seal --sign` adds EXTRA_SECURITY and a VECTOR_TABLE item | PT |
-| F13 | `erase` (default `-a`) and `save -a` guess the flash size and refuse erased flash; plain `save` defaults to `-p`; `-r <from> <to>` uses the range (rounded to 4 KiB); `save` writes raw only to a `.bin` name | PT D15-D17; lens A A-N2, A-M8 |
+| F13 | `erase` (default `-a`) and `save -a` guess the flash size and refuse erased flash; plain `save` defaults to `-p`; `erase -r <from> <to>` rounds the range to 4 KiB, `save -r` to a `.bin` uses the exact range; `save` writes raw only to a `.bin` name and creates/truncates it before reading (a refused read leaves a partial file) | PT D15-D17; lens A A-N2, A-M8; G-facts G3 |
 | F14 | picotool's `cli.h` matches option groups **in declaration order**. `otp get` must be spelled `otp get [-c N] [-r] [-e] [-n] [--ser S] <selector…>`; `otp set` as `otp set [-c N] [-r] [-e] [-s] <selector> <value> [--ser S]`. A misplaced option silently becomes a selector that matches no row, and the call then runs on whatever device is attached. (This is also what F-619 measured: `-n -c 1` added CHIPID1 as a selector.) | lens A A-C1, measured on the 2.3.1 binary |
 | F15 | `--ser` must be CHIPID3..0 in uppercase (e.g. `09F50BF63E8D6F46`); picotool `strcmp`s it; a miss exits 249 with "…found with serial number X." (2.3.1). The USB serial is the CHIPID unless white-label entry 6 is valid | HARDWARE_INVENTORY; lens A G4, A-N3 |
 | F16 | `0x049`, `0x04a`, `0x04c`, `0x04d` name no register, so `otp set -s 0x04a <v>` writes that one row; `0x048`, `0x04b`, `0x040` resolve to the named register and write all copies unless `-c 1` comes first. Without `-s`, a value lacking existing bits fails ("Cannot clear bits"). An unnamed row is written raw (no ECC) unless `-e` is given (`bEcc = ecc && !raw`) | lens A A-M7, A2-N1; PT `main.cpp:8990-8992, 9715-9732` |
 | F17 | `picotool version -s` prints the bare version (`2.3.1`) | lens A A-N1 |
-| F18 | When stdout is not a terminal, picotool word-wraps output at 80 columns, so a long message or a CRIT1 `RAW_VALUE=` list with 8 copies spans lines | lens A A2-M1, PT `main.cpp:10178-10186` |
+| F18 | When stdout is not a terminal, picotool word-wraps **stdout** at 80 columns (terminal width otherwise); `ERROR:` lines and progress bars are never wrapped. A token with no spaces is never broken: CRIT0/CRIT1's 8-copy `RAW_VALUE=` list is one 124-character line, often run together with its warning (`…;0x000001(WARNING - REDUNDANT ROWS AREN'T EQUAL)`). What does wrap: descriptions, the `--ser` miss message (it breaks before the serial), and a 3-copy `RAW_VALUE` line carrying the `(flipping raw value to 0x%08x)` note, whose warning moves to a continuation line indented 14 spaces. Parsers join continuation lines and match the warning with or without a preceding space | lens A A2-M1; G-facts G1, PT `main.cpp:10178-10186` |
+| F20 | **G1, `otp get` layout** (literal blocks in `e3a-g-facts.md`): `RAW_VALUE=` prints only when copies differ or an ECC row fails its check (`(WARNING - ECC IS INVALID)`), never under `-c 1`; with no RAW_VALUE line an empty line precedes `VALUE`; ECC `VALUE` is 4 hex digits, 6 under `-r`; field values are bare lowercase hex (`= a`); rows print in row order with duplicates merged; a selector matching nothing prints nothing and exits 0 (so the `otp list` fingerprint and every read test the output, never the exit code alone) | G-facts G1, compiled from 2.3.1 source; `otp list -n` matched the binary line for line |
+| F21 | **`otp set` exits**: success prints `ROW 0x%04x  OLD_VALUE=0x%06x` (copy 0), the description and a `field` line; "Cannot clear bits in OTP row(s): current value %06x, new value %06x" exits 248; a write failing part-way prints `ERROR: Attempted to clear bits in OTP row(s)` and exits 248 with earlier rows written; any other boot-ROM refusal exits 157 | G-facts G1 |
+| F22 | **G3, flash refusals**: a range beyond CS0 prints `ERROR: The RP2350 device returned an error: permission failure` and exits 157; `erase` goes sector by sector, so sectors below CS0 are already erased when it fails; `load -v` failing verify prints `  FAILED` and `ERROR: The device contents did not match the file`, exit 245; every flash `load`, `erase -a` and `save -a` first probes flash at +8 MiB, so with FLASH_DEVINFO enabled, CS0 ≤ 8 MiB and unerased flash they exit 157 before writing. The tool treats any non-zero exit as a refusal (more conservative than keying on 157) | G-facts G3, boot ROM A4 source |
+| F23 | **G5, several boards**: `info` never refuses and exits 0; with two or more boards it prints `Multiple RP-series devices in BOOTSEL mode found:` and a header and dashed line per device; `--ser` matching exactly one board gives normal output. `otp get/set`, `erase`, `save`, `load` with two or more boards print `ERROR: Command requires a single RP-series device to be targeted.` and exit 248 | G-facts G5 |
 | F19 | `otp set -s` writes `(value << shift & mask) \| (old & ~mask) \| old`, with `old` = copy 0's raw row: **every bit copy 0 holds is written to every copy**, including bits inside the target field that the target value lacks | lens B B2-I1, PT `main.cpp:9693-9712` |
 
-Still to establish from 2.3.1 source before writing the fake, with `main.cpp:<line>` cited at each
-parser and fake arm: **G1** the exact text of every `otp get` line parsed (ROW, VALUE, RAW_VALUE,
-field, WARNING, the `(flipping raw value to …)` note) for ECC, RBIT-3, RBIT-8 and raw rows, with and
-without `-r`, `-e`, `-c 1`, including F18's wrapping (parsers join wrapped lines before matching);
-(G2 is answered: F16.) **G3** the exit status of an
-`erase -r`/`save -r` the boot ROM refuses (the tool keys on a non-zero exit, not on text); **G5**
-the `info` text listing more than one device.
+G1, G3 and G5 are answered (F20-F23) from 2.3.1 source compiled with fake OTP contents and the boot
+ROM A4 source: `design/agent-reports/e3a-g-facts.md`, which cites `main.cpp:<line>` for each line the
+parsers and the fake must match. Still unverified on silicon: the G1 blocks (compared at R1, which
+captures `otp get -n` of 0x040, 0x048, 0x04b, 0x054 with and without `-r` and `-c 1`); the G3 refusal
+(needs a board with FLASH_DEVINFO set; not reproduced on the rehearsal Pico); G5's per-device `info`
+body (needs two boards); the boot ROM revision of the real boards.
 
 ## 2. The picotool pin
 
@@ -140,7 +143,9 @@ refugium-otp.sh inject-copy --profile rehearsal --ser S --rehearsal-key K --case
 ```
 
 - `--ser` is required everywhere, must be 16 hex characters and is uppercased; it must equal the
-  CHIPID read from the board (CHIPID3..0, F15). Exactly one RP2350 in BOOTSEL (G5).
+  CHIPID read from the board (CHIPID3..0, F15). Exactly one RP2350 in BOOTSEL: `info` is run without `--ser`, its output
+  must not contain `Multiple RP-series devices in BOOTSEL mode found:` and must show one device (F23:
+  the exit code cannot tell one board from two).
 - Under `rehearsal`, `--rehearsal-key` (slot 0's key: R's `rehearsal-work/factory-key.pem`) is
   required on every device command, and `--rehearsal-slot1-key` (R's `my-key.pem`) on every command
   that judges slot 1 (`check`, `disable-otp-boot`, `invalidate-spare-keys`); no defaults; the hashes used
@@ -272,6 +277,7 @@ operator to state them.
   bench (§7 R4). A dry run records no `load` argv (case 8). A non-zero
   exit from `erase` or `save` is "the boot ROM refused this range: treat the engraver as an unknown
   image (condemned)", exit 2.
+- A `save` that exits non-zero leaves a partial file (F13): the tool deletes it and never reads it.
 - `save-range`: identity gate; the same read into `--out` (must end `.bin`); prints its sha256.
 
 ### 3.5 `capture`
@@ -334,7 +340,7 @@ subcommand or flag exits 99. OTP bits only set.
 Fault modes (env): `SUPPRESS_WARNING=1` (the named read prints only the vote: no WARNING and no
 `RAW_VALUE=`, a picotool output regression); `SUPPRESS_RAW_VALUE=1` (WARNING printed, no
 `RAW_VALUE=`); `COPIES_IGNORED=1` (`-c 1` returns the vote, F-619's old reading); `FAIL_SET_AFTER=N`
-(`otp set` burns N rows, then exits non-zero); `FAIL_READ_AFTER_WRITE=1`; `DEVICES=2`;
+(`otp set` burns N rows, then exits 248 with F21's text); `FAIL_READ_AFTER_WRITE=1`; `DEVICES=2` (F23 output and exits);
 `FAKE_REQUIRE_SER=1` (any device-touching call without `--ser` exits 99; `run-e2e-otp.sh` always sets
 it). The fake appends every argv to an argv log the cases can assert on. R's old fake stub is updated
 to answer `version -s` with `2.3.1`.
@@ -469,7 +475,7 @@ every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RES
 
 ## 8. Order of work
 
-1. Pre-dispatch (author): establish G1, G3, G5 from 2.3.1 source; `nix build .#picotool` here;
+1. Pre-dispatch (author): G1, G3, G5 established (F20-F23, `e3a-g-facts.md`); `nix build .#picotool` here;
    run R's old e2e in `.#otp` if the fork is reachable (else at R0); run the e2e skeleton once.
 2. Implementer (one agent, worktree, TDD): fake and cases first (red); `otp-read.sh` extraction with
    R's old e2e still green; `refugium-otp.sh`; R changes; flake; docs; CI jobs; mutations.
