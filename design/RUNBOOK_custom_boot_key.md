@@ -75,6 +75,17 @@ Do not skip it.
   `cachyos-extra-v3/nix` build segfaults on every invocation (libstdc++ static
   init → glibc `__newlocale` → `operator delete[]` into `libmimalloc.so.3`).
   Same version 2.35.1 from upstream works fine.
+- **The OTP shell, for `refugium-otp.sh` and the Refugium steps (E3a, 2026-10-05).**
+  Run them in **this repo's** shell, not the fork's:
+  `SEEDHAMMER_DIR=/path/to/seedhammer nix develop .#otp`. It provides picotool
+  **2.3.1** (pinned in `flake.lock`; see `design/PICOTOOL_PIN.md`), plus openssl,
+  jq, python3, xxd, tinygo and go. `scripts/refugium-otp.sh` refuses any other
+  picotool. `scripts/pico2-bootkey-rehearsal.sh` accepts 2.2.0-a4 or 2.3.1, so
+  the SH2 steps below work from either shell. `SEEDHAMMER_DIR` points at the fork
+  checkout, which provides `cmd/picosign`. Known issue: on 2.3.1,
+  `sign-firmware.sh`'s throwaway seal (`seal --sign --clear`) fails with
+  `unknown sram end`. Sign from the fork's shell until that is fixed
+  (PICOTOOL_PIN.md, F-701).
 - **A rehearsal board.** A plain **Pico 2** (~$5) — *not* a Pico 2 W as the
   primary: on the W the LED sits behind the CYW43 chip, so the rehearsal blinky
   gives no visible pass signal. Package (RP2350A vs B) is irrelevant here; the
@@ -520,6 +531,67 @@ is no reason for it to sit in your paste buffer. Leaving slot 0 valid keeps
 official SeedHammer releases bootable, which is your only recovery path if a fork
 build ever fails to start.
 Revoking is permanent and removes that path.
+
+---
+
+## Refugium steps (E3b)
+
+*Prepared by plan E3a (`design/IMPLEMENTATION_PLAN_e3a_refugium_otp.md`). Not run yet: E3b runs
+after E4 (the key model) and after H0 has recorded SeedHammer #1's retail values. **No write to a
+SeedHammer happens before E4.***
+
+These steps put a SeedHammer II into the Refugium expected OTP state (UI spec §4.4) with
+`scripts/refugium-otp.sh`, in `nix develop .#otp`. Every command is bound to one board by
+`--ser`: its CHIPID, CHIPID3..0, 16 uppercase hex characters. Exactly one RP2350 may be in BOOTSEL.
+Pass `--log <file>` on every step and keep the files.
+
+**Go-ahead.** Each IRREVERSIBLE step needs Brian's typed go-ahead, and it must name the CHIPID and
+the step, e.g. *"go: disable-otp-boot on 09F50BF63E8D6F46"*. A go-ahead for one step or one board
+does not carry over to another. Each write is a dry run until `--execute`. With `--execute` the tool
+also asks for `BURN <step> <CHIPID>` to be typed at its prompt.
+
+0. **Record the unit (H0, read only).** Run `refugium-otp.sh capture --ser S --out <file>.json`. A
+   reviewed PR then commits the capture under `design/hardware/captures/` and adds its entry to
+   `design/hardware/retail-otp.json`. Until then every retail `check` refuses with "no recorded
+   retail values".
+1. **Pre-check (read only).** Run
+   `refugium-otp.sh check --profile retail --ser S --slot1 valid --disable-otp-boot 0 --key-invalid 0`.
+   It must end `RESULT: PASS`. Anything else: stop.
+2. **`refugium-otp.sh disable-otp-boot --profile retail --ser S --execute`** (IRREVERSIBLE; go-ahead
+   names this step and S). It sets BOOT_FLAGS0.DISABLE_OTP_BOOT in all three copies and then runs
+   the full check itself (`post-write check: PASS`).
+3. **Optional:
+   `refugium-otp.sh invalidate-spare-keys --profile retail --ser S --execute`** (IRREVERSIBLE).
+   - Run it only if `refugium-wallet`'s `IMPLEMENTATION_PLAN_mr_gui_v1.md` §9 item 14 allows it on
+     a test board.
+   - It sets KEY_INVALID 0xC. **Slots 2 and 3 can never hold a key after this.**
+   - After it, R's `--sh2-precheck` and `--sh2-verify-valid` need `--expect-key-invalid c`.
+4. **Final check (read only).** Run
+   `refugium-otp.sh check --profile retail --ser S --slot1 valid --disable-otp-boot 1 --key-invalid 0`.
+   Use `--key-invalid c` if step 3 ran. It must end `RESULT: PASS`.
+
+**Exit codes.**
+
+| exit | meaning | what to do |
+|---|---|---|
+| 0 | pass | continue |
+| 1 | usage or environment (wrong picotool, no board, two boards, wrong `--ser`, wrong confirmation) | fix and re-run; nothing was written |
+| 2 | state refused | stop; nothing was written by OTP |
+| 3 | an `otp set` was issued and something after it failed | see below |
+
+**Exit 4** comes only from `check` with `REFUGIUM_OTP_RETAIL_JSON_TEST_ONLY` set: it matched a
+test entry and is never a pass. Unset the variable; it must never be set at a sitting.
+
+**On exit 3**, re-run **the same command once**. It only adds bits, and it heals a copy the
+interrupted write missed.
+
+- That one re-run is pre-authorised by the step's go-ahead.
+- A second re-run needs a new go-ahead.
+- If the re-run exits non-zero for **any** reason, stop. Do not use this board for seeds.
+
+`erase-range` (16 MB, alias probe first) and `save-range` are part of lane S's provisioning
+sitting, not of these steps. An `erase-range` refusal means the engraver is an unknown image
+(condemned).
 
 ---
 

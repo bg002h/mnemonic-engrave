@@ -1,0 +1,5 @@
+{
+ "schema": "refugium-retail-otp/1",
+ "doc": "Recorded OTP values of retail SeedHammer II units, one entry per measured unit (plan E3a section 3.2; design/HARDWARE_INVENTORY.md 'Retail OTP rows'). Each entry holds: id; capture (captures/<file>.json, the `refugium-otp.sh capture` output it came from, committed beside this file); capture_sha256; date; history (e.g. 'has run fork firmware'); and the cells refugium-otp.sh compares: crit0, crit1, boot_flags0 (DISABLE_OTP_BOOT, ENABLE_OTP_BOOT and bit 11 clear), boot_flags1 (KEY_VALID and KEY_INVALID clear), flash_devinfo (raw 24-bit), usb_boot_flags, usb_white_label_addr (raw 24-bit), white_label_rows {\"0xRRR\": \"0xVVVVVV\"} (raw 24-bit: the table and every valid string's rows). Values are 0x plus 6 lowercase hex digits. CHIPID, slots, KEY_VALID, KEY_INVALID and DISABLE_OTP_BOOT are never taken from an entry. Entries are added by a reviewed PR after H0 runs `capture` on a retail unit; test fixtures never go here.",
+ "entries": []
+}

@@ -1,0 +1,26 @@
+diff --git a/bintool/bintool.cpp b/bintool/bintool.cpp
+index 43a23a0..483108f 100644
+--- a/bintool/bintool.cpp
++++ b/bintool/bintool.cpp
+@@ -883,7 +883,7 @@ std::vector<uint8_t> get_lm_hash_data(std::vector<uint8_t> bin, uint32_t storage
+             std::copy(xip_pin_size_data.begin(), xip_pin_size_data.end(), std::back_inserter(to_hash));
+             DEBUG_LOG("PIN XIP SRAM %08x + %08x\n", (int)model->xip_sram_start(), (int)xip_pin_size_vec[0]);
+         }
+-        to_hash.insert(to_hash.begin(), bin.begin(), bin.end());
++        to_hash.insert(to_hash.end(), bin.begin(), bin.end());
+         DEBUG_LOG("HASH %08x + %08x\n", (int)storage_addr, (int)bin.size());
+         entries.push_back(
+             {
+diff --git a/main.cpp b/main.cpp
+index 534b794..b9698af 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -5643,7 +5643,7 @@ vector<uint8_t> sign_guts_bin(iostream_memory_access in, private_t private_key,
+     auto sig_data = hash_andor_sign(
+         bin, bin_start, bin_start,
+         &new_block, public_key, private_key,
+-        in.get_model(),
++        model,
+         settings.seal.hash, settings.seal.sign,
+         settings.seal.clear_sram, settings.seal.pin_xip_sram
+     );

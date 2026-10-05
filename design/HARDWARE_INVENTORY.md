@@ -149,6 +149,35 @@ Plus 2 (`__flash_size=16M`, which is why the fork's build target is
 
 ---
 
+## Retail OTP rows
+
+The OTP values of retail SeedHammer II units live in **`design/hardware/retail-otp.json`**, one
+entry per measured unit. `scripts/refugium-otp.sh check --profile retail` compares a board against
+them (plan E3a §3.2).
+
+- Each entry comes from a read-only `refugium-otp.sh capture --ser <CHIPID> --out <file>`. The
+  capture file is committed under `design/hardware/captures/`, and the entry records its sha256,
+  the date and the unit's history (e.g. "has run fork firmware").
+- **Recorded in an entry:** CRIT0 and CRIT1; BOOT_FLAGS0 outside DISABLE_OTP_BOOT, ENABLE_OTP_BOOT
+  and bit 11 (ROLLBACK_REQUIRED, which the boot ROM sets itself); BOOT_FLAGS1 outside KEY_VALID and
+  KEY_INVALID; FLASH_DEVINFO; USB_BOOT_FLAGS; the white-label address, its 16-row table and every
+  valid string's rows.
+- **Never taken from an entry:** CHIPID, the boot-key slots, KEY_VALID, KEY_INVALID and
+  DISABLE_OTP_BOOT.
+- A unit passes only if **one** entry matches every recorded cell.
+- **Status (2026-10-05): no entries.** H0 runs `capture` on SeedHammer #1 (`0x77c483b745abf55c`,
+  `--ser 77C483B745ABF55C`); a reviewed PR then adds the first entry. Until then every retail
+  `check` refuses: "no recorded retail values".
+- `--ser` spells the CHIPID as picotool's serial: CHIPID3..0, uppercase, no `0x`. That is the
+  `0x…` value in the table above, uppercased. R prints the word-reversed form, e.g.
+  `bf2ff20ad60f66d3` for the rehearsal Pico 2.
+- The SeedHammer CHIPIDs in the table above are also listed in `scripts/lib/otp-read.sh`
+  (`SEEDHAMMER_SERS`). The rehearsal profile refuses them. **Add a new SeedHammer there when it
+  joins this table.**
+- Test fixtures never go in `design/hardware/`; they live under `scripts/test/`.
+
+---
+
 ## Flashing
 
 Always `~/bin/sh/sh2-flash` (→ `scripts/sh2-flash`), never `picotool` by hand:
