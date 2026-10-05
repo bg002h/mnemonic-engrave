@@ -133,6 +133,28 @@ empty before the insert).
 - Reverting either change alone: without the `main.cpp` change, exit 248; without the
   `bintool.cpp` change, `signature: incorrect`.
 
+### A separate bug found while testing: `der_to_raw` truncates short integers
+
+*(Brian: this one may deserve its own issue. It is not in the patch above, and our toolchain does
+not depend on it — `sign-firmware.sh` takes the final signature from `picosign`, which pads r and s —
+but anyone using `picotool seal --sign` as the final signer is affected.)*
+
+`bintool/mbedtls_wrapper.c` `der_to_raw` (2.3.1 lines 162-180; also in 2.2.0) handles a DER integer
+shorter than 32 bytes with
+
+```c
+memset(r, 0, sizeof(r));
+memcpy(r + (32 - b2), sig->der + 4, (32 - b2));   // length should be b2
+```
+
+(and the same for `s` with `b3`). With `b2 = 31` this stores `00 XX 00 … 00` — the integer's first
+byte and 30 zero bytes — instead of `00` followed by the 31 bytes. Whenever r or s is below 2^247
+(roughly 1 signature in 256), `seal --sign` writes a signature that `picotool info -a` reports as
+`incorrect` and the boot ROM would reject. Measured on 2.3.1 and 2.2.0-a4: 3 such signatures in
+1500 seals, each of the form `00XX` + 60 zeros in one half, e.g.
+`0024000000000000000000000000000000000000000000000000000000000000A3878DCF…`. The fix is to copy
+`b2` (resp. `b3`) bytes.
+
 ### Side notes (not part of the fix)
 
 - `bin2uf2` on the seal path is also passed `access.get_model()` (2.3.1 `main.cpp:6233`,
