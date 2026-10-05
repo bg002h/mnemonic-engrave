@@ -75,10 +75,17 @@ SEEDHAMMER_DIR="${SEEDHAMMER_DIR:-$(cd "$REPO_ROOT/../seedhammer" 2>/dev/null &&
 EXECUTE=0
 PHASE=""
 
-# SeedHammer's production signing-key hash (cmd/controller/platform_sh2.go:70).
-# Used as a tripwire: if a board presents this in slot 0, it is a real
-# SeedHammer II and this script must never write to it.
-SH_SIGNKEY_HASH="c8314536d6af61ac2e62e5991e3e4711629c54696ba8c4af08965a1d319a473b"
+# Shared with scripts/refugium-otp.sh: the argv builder (every OTP picotool call
+# below goes through it, in picotool's declared option order, plan E3a F14) and
+# the readers, as non-dying try_<name> forms. The wrappers below keep this
+# script's names, messages and exits unchanged.
+#
+# SH_SIGNKEY_HASH -- SeedHammer's production signing-key hash
+# (cmd/controller/platform_sh2.go:70) -- is defined there. Used here as a
+# tripwire: if a board presents it in slot 0, it is a real SeedHammer II and
+# this script must never write to it.
+# shellcheck source=lib/otp-read.sh
+. "$REPO_ROOT/scripts/lib/otp-read.sh"
 
 die()  { printf '\n\033[31mFAIL:\033[0m %s\n' "$*" >&2; exit 1; }
 ok()   { printf '\033[32m  PASS:\033[0m %s\n' "$*"; }
@@ -171,26 +178,7 @@ fi
 # includes unrelated bits of the same row, e.g. KEY_INVALID alongside KEY_VALID).
 
 # otp_field <selector> -> field value as bare lowercase hex
-otp_field() {
-  local sel="$1" out v
-  out="$(picotool otp get -n "$sel" 2>&1)" || die "OTP read failed for $sel:
-$out"
-  # CRIT1 is RBIT-8 and BOOT_FLAGS1 is RBIT-3; an inconsistent redundant read
-  # must not be parsed as a clean value.
-  # F-695: every WARNING trap is a pure-bash test, never `printf | grep -q`:
-  # under pipefail a SIGPIPE'd printf makes the pipeline false and `&& die` is
-  # SKIPPED (fail OPEN). Not a here-string either: at >=64 KiB bash backs one
-  # with a temp file, and a full /tmp would skip grep and the trap (review M1).
-  [[ ${out,,} == *warning* ]] \
-    && die "picotool reported a warning reading $sel (redundant rows disagree or ECC invalid):
-$out"
-  v="$(printf '%s\n' "$out" | grep -iE '^[[:space:]]*field ' | tail -1 \
-       | sed -E 's/.*=[[:space:]]*//' | tr -d '[:space:]' | tr 'A-F' 'a-f')"
-  [ -n "$v" ] || die "could not parse a field value for $sel from picotool output:
-$out"
-  printf '%s' "$v" | grep -qE '^[0-9a-f]+$' || die "unexpected field value '$v' for $sel"
-  printf '%s' "$v"
-}
+otp_field() { try_otp_field "$1" || die "$ERR"; printf '%s' "$OTP_FIELD_VAL"; }
 
 
 # read_rows <selector...> -> sets ROWVALS to space-separated 4-hex-digit values,
@@ -205,93 +193,17 @@ $out"
 # subshell, so a fail-closed guard called via command substitution was not
 # actually closed.
 ROWVALS=""
-read_rows() {
-  local out want=$# got
-  out="$(picotool otp get -n -e "$@" 2>&1)" || die "OTP read failed for: $*
-$out"
-  [[ ${out,,} == *warning* ]] \
-    && die "picotool reported a warning reading: $*
-$out"
-  ROWVALS="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' \
-             | grep -oiE '0x[0-9a-f]+' | sed 's/^0[xX]//' | tr 'A-F' 'a-f' \
-             | while read -r v; do printf '%04x ' $(( 16#$v & 0xffff )); done)"
-  got="$(printf '%s' "$ROWVALS" | wc -w)"
-  [ "$got" -eq "$want" ] || die "expected $want row values for '$*', parsed $got.
-picotool output was:
-$out"
-  # picotool returns rows ASCENDING-SORTED with silent dedup (its filter_otp
-  # builds a std::map keyed by row) -- NOT in request order. Positional mapping
-  # is therefore only valid for distinct ascending selectors. Verify the row
-  # names it echoed match what we asked for, in order, rather than assume it.
-  local names
-  names="$(printf '%s\n' "$out" | grep -oiE '^ROW 0x[0-9a-f]+: OTP_DATA_[A-Z0-9_]+' \
-           | sed -E 's/.*OTP_DATA_//')"
-  [ "$(printf '%s\n' "$names" | wc -l)" -eq "$want" ] \
-    || die "parsed $(printf '%s\n' "$names" | wc -l) ROW names for '$*', expected $want"
-  local k=1 sel
-  for sel in "$@"; do
-    [ "$(printf '%s\n' "$names" | sed -n "${k}p")" = "$sel" ] \
-      || die "picotool returned rows in an unexpected order.
-  requested position $k: $sel
-  received:            $(printf '%s\n' "$names" | sed -n "${k}p")
-Positional mapping is unsafe here; refusing to guess which value is which."
-    k=$((k+1))
-  done
-}
+read_rows() { try_read_rows "$@" || die "$ERR"; }
 
 # read_slot <n> -> sets SLOT_HEX to 64 hex chars (the 32-byte key hash).
 # Each row holds two bytes, LOW BYTE FIRST, so each row is byte-swapped.
 SLOT_HEX=""
-read_slot() {
-  local n="$1" i sels="" v
-  for i in $(seq 0 15); do sels="$sels BOOTKEY${n}_${i}"; done
-  # shellcheck disable=SC2086
-  read_rows $sels
-  SLOT_HEX=""
-  for v in $ROWVALS; do SLOT_HEX="${SLOT_HEX}${v:2:2}${v:0:2}"; done
-  [ ${#SLOT_HEX} -eq 64 ] || die "slot $n reassembled to ${#SLOT_HEX} hex chars, expected 64"
-}
+read_slot() { try_read_slot "$1" || die "$ERR"; }
 
 # key_hash <key.pem> -> sha256 of the UNCOMPRESSED 64-byte X||Y pubkey.
 # This is what the RP2350 stores in a boot-key slot. Computed independently of
 # picotool so the two can be cross-checked.
-key_hash() {
-  local f full h errtxt
-  [ -f "$1" ] || die "key_hash: no such key file: $1"
-  [ -r "$1" ] || die "key_hash: $1 exists but is not readable by you.
-(Owned by another user? A root-owned file left by running something under sudo?)"
-  # Discriminate 'openssl cannot read this at all' from 'wrong curve'. Collapsing
-  # both into 'not secp256k1' sends the operator off regenerating a perfectly
-  # good key when the real fault is permissions, a passphrase, or a bad format.
-  errtxt="$(openssl ec -in "$1" -noout -text 2>&1 >/dev/null)" || die "key_hash: openssl cannot read $1 as an EC private key.
-This is NOT a curve problem -- do not regenerate yet. openssl said:
-$errtxt
-(Passphrase-protected? Wrong file? A public key rather than a private one?)"
-  printf '%s' "$errtxt" | grep -qi 'ASN1 OID: secp256k1' \
-    || openssl ec -in "$1" -noout -text 2>/dev/null | grep -qi 'ASN1 OID: secp256k1' \
-    || die "key_hash: $1 is NOT a secp256k1 key.
-RP2350 secure boot requires secp256k1. EVERY EC curve yields a 64-byte slice
-that looks superficially valid, so without this check a P-256 or P-384 key would
-pass --make-otp-json AND --sh2-verify-slot, get burned into OTP, and never match
-any signature you could produce -- permanently spending a slot."
-
-  # Capture the point ONCE and hash exactly the bytes that were validated, so
-  # what is asserted is what is burned.
-  f="$(mktemp)"
-  openssl ec -in "$1" -pubout -conv_form uncompressed -outform DER 2>/dev/null \
-    | tail -c 65 > "$f" || { rm -f "$f"; die "key_hash: openssl failed on $1"; }
-  # secp256k1 uncompressed point: exactly 65 bytes, 0x04 || X(32) || Y(32).
-  [ "$(stat -c%s "$f")" -eq 65 ] \
-    || { rm -f "$f"; die "key_hash: expected a 65-byte uncompressed point from $1, got $(stat -c%s "$f") bytes"; }
-  full="$(od -An -v -tx1 -N1 "$f" | tr -d ' \n')"
-  [ "$full" = "04" ] \
-    || { rm -f "$f"; die "key_hash: public key is not uncompressed (leading byte 0x$full, expected 0x04)"; }
-  # The OTP value is sha256 over X||Y -- the 64 bytes AFTER the 0x04 prefix.
-  h="$(tail -c 64 "$f" | sha256sum | cut -d' ' -f1)" || { rm -f "$f"; die "key_hash: hashing failed for $1"; }
-  rm -f "$f"
-  [ ${#h} -eq 64 ] || die "key_hash: sha256 produced ${#h} chars for $1"
-  printf '%s' "$h"
-}
+key_hash() { try_key_hash "$1" || die "$ERR"; printf '%s' "$KEY_HASH"; }
 
 # require_rp2350_bootsel: liveness + identity probe.
 # Deliberately NOT `picotool info | grep RP2350`: on a board with empty flash
@@ -306,22 +218,7 @@ rule is numbered BELOW 73 (see the runbook prerequisites)."
 }
 
 CHIPID_HEX=""
-chipid() {
-  local out=""
-  read_rows CHIPID0 CHIPID1 CHIPID2 CHIPID3
-  for v in $ROWVALS; do out="${out}${v}"; done
-  # CHIPID is factory-programmed and unique; all-zeros means an unprogrammed
-  # part or a simulator. Never pin or compare against it -- a stale all-zero
-  # pin left by a test would make the real device look like the wrong device.
-  case "$out" in
-    0000000000000000) die "CHIPID reads all zeros.
-That is not a real RP2350 identity -- it means an unprogrammed part, or that
-picotool is talking to a simulator rather than hardware. Refusing to pin or
-trust this identity." ;;
-  esac
-  [ ${#out} -eq 16 ] || die "CHIPID reassembled to ${#out} hex chars, expected 16"
-  CHIPID_HEX="$out"
-}
+chipid() { try_chipid || die "$ERR"; }
 
 # require_board: refuse to act on any board other than the one phase 0 saw.
 require_board() {
@@ -362,80 +259,18 @@ assert_stock_or_die() {
 # -e and kept at full 24 bits: a genuinely locked page would decode as
 # ECC-invalid and be misreported as a read warning rather than as "LOCKED",
 # and masking to 16 bits would discard the third lock copy in bits 23:16.
-read_row_raw24() {
-  local sel="$1" out v
-  out="$(picotool otp get -n "$sel" 2>&1)" || die "OTP read failed for $sel:
-$out"
-  # F-619: this function had NO warning trap, unlike otp_field and read_rows.
-  # It is what reads the page-lock rows and the BOOT_FLAGS1/CRIT1 copies -- all
-  # majority-vote-encoded -- so an inconsistent redundant read was being parsed
-  # as a clean value in exactly the places redundancy is the thing being
-  # checked. Measured on real silicon 2026-09-17: `0x04b` resolves to the NAMED
-  # row (picotool prints `OTP_DATA_BOOT_FLAGS1 (RBIT-3)`) while `0x04c`/`0x04d`
-  # print bare, so the three reads are NOT symmetric and the A/B/C comparison
-  # below cannot be the thing that catches a degraded row. This trap is.
-  [[ ${out,,} == *warning* ]] \
-    && die "picotool reported a warning reading row $sel (redundant rows disagree or ECC invalid):
-$out"
-  v="$(printf '%s\n' "$out" | grep -oiE '^[[:space:]]*VALUE 0x[0-9a-f]+' | tail -1 \
-       | grep -oiE '0x[0-9a-f]+' | sed 's/^0[xX]//' | tr 'A-F' 'a-f')"
-  [ -n "$v" ] || die "could not parse a VALUE line for row $sel:
-$out"
-  printf '%06x' $(( 16#$v & 0xffffff ))
-}
+read_row_raw24() { try_read_row_raw24 "$1" || die "$ERR"; printf '%s' "$ROW_RAW24"; }
 
 check_page_locks() {
-  # Page-lock rows are NOT simply "zero = fine". Each is a byte replicated
-  # 3-way (majority-vote encoded) with three 2-bit permission fields, per
-  # picotool's own OTP table (generated from the RP2350 datasheet):
-  #
-  #   LOCK_S  (bits 0-1)  0x0 = page fully accessible by SECURE software
-  #   LOCK_NS (bits 2-3)  0x0/0x1 = Non-secure may read (0x1 = NS read-only)
-  #   LOCK_BL (bits 4-5)  0x0 = bootloader permits user reads AND writes
-  #
-  # picotool/PICOBOOT acts as SECURE software, so only LOCK_S and LOCK_BL gate
-  # us. A retail SeedHammer II ships with 0x040404 -- i.e. LOCK_NS=1, merely
-  # restricting Non-secure software to reads. An earlier version of this
-  # function required all-zero and would have declared that device permanently
-  # unusable. Verified against real hardware 2026-08-03.
-  local l v b0 b1 b2 maj i bit lock_s lock_ns lock_bl
-  for l in PAGE1_LOCK0 PAGE1_LOCK1 PAGE2_LOCK0 PAGE2_LOCK1; do
-    v="$(read_row_raw24 "$l")"
-    b0=$(( 16#$v & 0xff )); b1=$(( (16#$v >> 8) & 0xff )); b2=$(( (16#$v >> 16) & 0xff ))
-    # Majority-vote the three copies bit by bit.
-    maj=0
-    for i in 0 1 2 3 4 5 6 7; do
-      bit=$(( ((b0>>i)&1) + ((b1>>i)&1) + ((b2>>i)&1) ))
-      [ "$bit" -ge 2 ] && maj=$(( maj | (1<<i) ))
-    done
-    [ "$b0" = "$b1" ] && [ "$b1" = "$b2" ] \
-      || warn "$l copies disagree (0x$(printf %02x $b0)/0x$(printf %02x $b1)/0x$(printf %02x $b2)); using majority 0x$(printf %02x $maj)"
-
-    case "$l" in
-      PAGE1_LOCK1|PAGE2_LOCK1)
-        lock_s=$((  maj & 0x3 ));  lock_ns=$(( (maj >> 2) & 0x3 )); lock_bl=$(( (maj >> 4) & 0x3 ))
-        [ "$lock_s" -eq 0 ] || die "$l: LOCK_S=$lock_s -- Secure software may NOT write this page.
-picotool writes as Secure software, so no further boot key can be added to this
-device. This procedure is impossible on it. STOP."
-        [ "$lock_bl" -eq 0 ] || die "$l: LOCK_BL=$lock_bl -- the bootloader does not permit user writes
-to this page. No further boot key can be added. STOP."
-        info "$l = 0x$v (LOCK_S=$lock_s writable, LOCK_BL=$lock_bl writable, LOCK_NS=$lock_ns)"
-        ;;
-      *)
-        # PAGE*_LOCK0: KEY_W (bits 0-2), KEY_R (bits 3-5), NO_KEY_STATE (bit 6).
-        # Only KEY_R/KEY_W gate us -- they demand a hardware OTP key we cannot
-        # supply. NO_KEY_STATE only matters once a key is registered, so it is
-        # informational; a bare all-zero test here would STOP on a harmless
-        # device, the same shape as the page-lock bug that nearly killed this.
-        local key_w=$(( maj & 0x7 )) key_r=$(( (maj >> 3) & 0x7 )) nokey=$(( (maj >> 6) & 0x1 ))
-        [ "$key_r" -eq 0 ] && [ "$key_w" -eq 0 ] \
-          || die "$l = 0x$v -- this page requires a hardware OTP key (KEY_R=$key_r KEY_W=$key_w).
-We cannot supply one. This procedure cannot proceed on this device. STOP."
-        [ "$nokey" -eq 0 ] || warn "$l: NO_KEY_STATE=1 (informational; no key is registered)"
-        info "$l = 0x$v (KEY_R=0 KEY_W=0 -- no hardware key required)"
-        ;;
+  local rc=0 l
+  try_check_page_locks || rc=1
+  for l in "${PL_LINES[@]}"; do
+    case "${l%%$'\t'*}" in
+      warn) warn "${l#*$'\t'}" ;;
+      *)    info "${l#*$'\t'}" ;;
     esac
   done
+  [ "$rc" -eq 0 ] || die "$ERR"
   ok "OTP page permissions allow Secure writes -- boot-key rows are writable"
 }
 
@@ -897,8 +732,10 @@ case "$PHASE" in
   require_rp2350_bootsel
 
   hdr "Current state"
-  picotool otp get CRIT1.SECURE_BOOT_ENABLE || die "cannot read CRIT1.SECURE_BOOT_ENABLE (check 'picotool otp list')"
-  picotool otp get BOOT_FLAGS1.KEY_VALID    || die "cannot read BOOT_FLAGS1.KEY_VALID (check 'picotool otp list')"
+  pt_build_otp_get "" -- CRIT1.SECURE_BOOT_ENABLE
+  picotool "${PT_ARGV[@]}" || die "cannot read CRIT1.SECURE_BOOT_ENABLE (check 'picotool otp list')"
+  pt_build_otp_get "" -- BOOT_FLAGS1.KEY_VALID
+  picotool "${PT_ARGV[@]}" || die "cannot read BOOT_FLAGS1.KEY_VALID (check 'picotool otp list')"
 
   hdr "Asserting the board is stock"
   assert_stock_or_die
@@ -957,7 +794,8 @@ case "$PHASE" in
 
     hdr "1b -- burn the key hash into slot 0"
     confirm BURN-FACTORY
-    run picotool otp load "$WORKDIR/factory-otp.json"
+    pt_build_otp_load "" "$WORKDIR/factory-otp.json"
+    run picotool "${PT_ARGV[@]}"
   fi
 
   hdr "1c -- verify all 16 rows BEFORE setting the valid bit"
@@ -966,8 +804,10 @@ case "$PHASE" in
 
   hdr "1d -- mark valid and enable secure boot"
   confirm SET-VALID
-  run picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x1
-  run picotool otp set -s CRIT1.SECURE_BOOT_ENABLE 0x1
+  pt_build_otp_set "" -s -- BOOT_FLAGS1.KEY_VALID 0x1
+  run picotool "${PT_ARGV[@]}"
+  pt_build_otp_set "" -s -- CRIT1.SECURE_BOOT_ENABLE 0x1
+  run picotool "${PT_ARGV[@]}"
 
   ok_done "seal the board -- it would then boot only factory-key-signed images."
   ;;
@@ -1071,7 +911,8 @@ and do not trust phase 1's seal." ;;
 
   hdr "4b -- burn the key hash into slot 1"
   confirm BURN-MY-KEY
-  run picotool otp load "$WORKDIR/my-otp.json"
+  pt_build_otp_load "" "$WORKDIR/my-otp.json"
+  run picotool "${PT_ARGV[@]}"
 
   hdr "4c -- verify all 16 rows BEFORE setting the valid bit"
   if [ "$EXECUTE" -eq 1 ]; then verify_slot_or_die 1 "$WORKDIR/my-key.pem"
@@ -1079,7 +920,8 @@ and do not trust phase 1's seal." ;;
 
   hdr "4d -- mark slot 1 valid"
   confirm SET-VALID-SLOT1
-  run picotool otp set -s BOOT_FLAGS1.KEY_VALID 0x2   # slot1=0x2, slot2=0x4, slot3=0x8
+  pt_build_otp_set "" -s -- BOOT_FLAGS1.KEY_VALID 0x2   # slot1=0x2, slot2=0x4, slot3=0x8
+  run picotool "${PT_ARGV[@]}"
   if [ "$EXECUTE" -eq 1 ]; then
     KV2="$(otp_field BOOT_FLAGS1.KEY_VALID)"
     [ $((16#$KV2)) -eq 3 ] || die "KEY_VALID is 0x$KV2, expected 0x3 (slot 0 + slot 1)"
