@@ -20412,3 +20412,48 @@ E3b: the same steps on SeedHammer #1 (`DISABLE_OTP_BOOT`; `KEY_INVALID` only if
 plan §9 item 14 allows). **Irreversible: Brian's typed go-ahead naming the
 board's CHIPID and each step.** Depends on E3a, the fork key decision (E4) and
 H0's button and white-label rows.
+
+### F-702 — SeedHammer fork: Refugium features F1 to F7 (owning phase: **refugium-wallet build plan lane F**) `#seedhammer` `#refugium` `#mr1` `#funds-safety`
+
+**Status:** OPEN — owning phase: refugium-wallet `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` lane F (f929084)
+Filed 2026-10-05 by thread "SeedHammer fork for Refugium". Primary entry for the
+cross-repo ask `mr-gui-f-refugium-features`; companion in `bg002h/refugium-wallet`
+`design/FOLLOWUPS.md` (same id). Fork work lands in `bg002h/seedhammer`; its plan and
+reviews live here in `design/`, as for every fork feature.
+
+The phases (plan §5, lane F; Rust first, then a Go port with a provenance pin, tested
+in `cmd/emu`; risk set throughout):
+
+- **F1** mr1 string layer, payload reading and the card's QR. Waits on F-699 (E1, `mr-gui-e1-mr1-class`,
+  `Class::Mr` in me) and mr-codec's vectors.
+- **F2** plan entry (plan id as 4 words, session number, seed count, letters in use),
+  CHIPID read from OTP in picotool's spelling, the image-check code; holder entry.
+  Waits on `refugium-codes` (plan A7).
+- **F3** letter per seed and the set check (count, distinct letters, letters in use;
+  24 words unless the plan allows 12; non-English refused); words held until every
+  plate is checked. Waits on A7.
+- **F4** per-plate typed read-back against the held seed, plate result codes, summary
+  screen before power-off. Waits on A7.
+- **F5** ms1 plus Standard SeedQR plate layout from the held words (today's ms1 plate
+  carries a QR of the ms1 string, `backup/backup.go`); a 96-digit SeedQR must fit the
+  QR size cap. No upstream dependency: starts now.
+- **F6** public plates in numbered, countable groups (A7's grouping function), chunked
+  cards and mk1 plates included. Waits on A7.
+- **F7** Refugium build profile: NFC off while a secret is held (single-sig verify's
+  NFC gatherer included), the NFC `lock-boot` OTP writer and the `FOREVERLAURA!` QA
+  command removed, BIP-39 passphrase entry off in the seed sitting. A build test
+  asserts both commands are absent from the binary. No upstream dependency: starts now.
+
+F8 (seed from plate, `seat_records`, closing runs on the SeedHammer) is after v1.
+F9 is F-703. Done when: each phase's Done-when in the plan holds and both entries
+close in lockstep.
+
+### F-703 — SeedHammer fork: Refugium release F9 (owning phase: **refugium-wallet build plan lane F, after E4**) `#seedhammer` `#refugium` `#release` `#signing`
+
+**Status:** OPEN — owning phase: refugium-wallet `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` F9, blocked on E4 (Brian's fork-key decision)
+Filed 2026-10-05 by thread "SeedHammer fork for Refugium". Primary entry for
+`mr-gui-f9-fork-release`; companion in `bg002h/refugium-wallet` `design/FOLLOWUPS.md`.
+A signed UF2 under the key model Brian picks (E4; see `firmware-dual-distribution`),
+its reproducible unsigned build, and a fork `copy-signature` (today's flake hard-codes
+upstream's key). Depends on F-702 (F1 to F7) and E4. **Irreversible:** signing under the
+fork key needs Brian's typed go-ahead naming the unsigned image hash. Not started.
