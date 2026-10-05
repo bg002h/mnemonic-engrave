@@ -20481,3 +20481,14 @@ no Rust primary to fix first (checked by the reviewer; re-check when fixing).
 Filed 2026-10-05 from `design/agent-reports/refugium-F5-exec-review.md` M-3. F-702 F5
 made `EncodeMS1` wipe its payload; `EncodeMS1Preimage` (`codex32/msencode.go:61`) builds
 the same kind of buffer from a hashlock preimage and does not.
+
+### F-706 — a `text:` payload record with a non-ASCII rune panics Engrave Text at the engrave step (owning phase: none — ownerless residue) `#seedhammer` `#freetext` `#payload` `#crash`
+
+**Status:** OPEN — owning phase: none
+Filed 2026-10-05 from the F7 fold re-check (`design/agent-reports/refugium-F7-fold-recheck.md`).
+A systemwide payload `text:` record containing NBSP, U+200B or `é` passes the text,
+title, footer and Confirm screens, then `ftBuildPlate` panics with "unsupported rune" at
+the engrave step, in both the default and Refugium builds. The keyboard types ASCII only,
+so only a payload reaches it; the code is the same at fork `be00ef8`, so it predates
+F-702. Fix: refuse a rune the plate font lacks at admission or at the fit step, with a
+message naming its position.
