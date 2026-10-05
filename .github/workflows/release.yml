@@ -99,6 +99,12 @@ jobs:
         id: detect
         run: |
           BEFORE="${{ github.event.before }}"
+          # On a pull_request event, compare against the PR's base, not the
+          # previous head: the previous head may never have run (a PR opened
+          # with a merge conflict gets no pull_request run), so "identical to
+          # the green parent" would be unproven. base..merge-ref is the PR's
+          # whole change.
+          if [ "${{ github.event_name }}" = pull_request ]; then BEFORE="${{ github.event.pull_request.base.sha }}"; fi
           FULL() { echo "docs_only=false" >> "$GITHUB_OUTPUT"; echo "verdict: full tests ($1)"; }
           if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
             FULL "new ref"; exit 0
