@@ -20355,3 +20355,60 @@ toolkit and ms `test` jobs have no rust-cache, and the toolkit's `release.yml`
 re-runs the same 4085-test suite `rust.yml` already runs on every push. Also
 recorded: no CI job now runs the main suites with tests sharing one process
 (nextest isolation), so shared-state bugs surface only locally under `cargo test`.
+
+## The Refugium desktop app's asks (F-699 … F-701) — filed 2026-10-05
+
+Filed from the Refugium desktop app build plan, `bg002h/refugium-wallet`
+`design/IMPLEMENTATION_PLAN_mr_gui_v1.md` at `f929084` (§4, lane E; baseline me
+rev `ba03958`). Each is the primary of a cross-repo pair; the companion lives in
+`bg002h/refugium-wallet` `design/FOLLOWUPS.md` under the same `mr-gui-e*` id, and
+the two close in lockstep. Owner: the project thread "mnemonic-engrave for Refugium".
+
+### F-699 — `mr-gui-e1-mr1-class`: an mr1 record class in the systemwide container (owning phase: **plan phase E1**) `#cross-repo` `#refugium` `#container` `#risk-set`
+
+**Status:** OPEN — owning phase: E1 (after mnemonic-refugium M-1 and F-700)
+Companion: `bg002h/refugium-wallet` `design/FOLLOWUPS.md` `mr-gui-e1-mr1-class`.
+Today an mr1 string is `Class::Unknown` and is refused at pack time. Add
+`Class::Mr` with its packed string form (one record per chunk, canonical
+lowercase), the partial-set rule, vectors, a container spec §3.3 amendment and an
+R0 loop (normative admission: risk set). The library takes the mr1 string
+validator as an injected function (a trait object the caller supplies), so the
+`mnemonic_engrave` library has no `mr-codec` dependency; me's own CLI supplies one
+from `mr-codec` behind an optional feature `mr1-cli` that the app never enables.
+Done when: the vectors pass through both the CLI's validator and an injected one,
+and the app's codec check (plan A0) shows no `mr-codec` reached through me.
+Recon also noted, for the same phase to judge: the 255-record cap is not enforced
+(`public_data_hash` hashes `records.len() as u8`), and the digest must be computed
+from the packed blob, not the input list.
+
+### F-700 — `mr-gui-e2-library-surface`: a lean library surface for the app, and one md-codec (owning phase: **plan phase E2**) `#cross-repo` `#refugium` `#deps`
+
+**Status:** OPEN — owning phase: E2 (no dependencies; start first)
+Companion: `bg002h/refugium-wallet` `design/FOLLOWUPS.md` `mr-gui-e2-library-surface`.
+Region padding as a library function; a `[features]` table with a lean default
+(clap and rpassword stay in `main.rs`); `sysw::pack` and `open` keep AES-256-GCM;
+an md-codec pin equal to mnemonic-refugium's (me pins 0.47, mr 0.48.4).
+**Standing rule:** md-codec moves by tagged release; when mr re-pins md-codec,
+me is bumped in the same week. Done when: `refugium-wallet` builds against me
+with the lean features and one md-codec, and me's own tests pass.
+
+### F-701 — `mr-gui-e3-otp-tooling`: OTP tooling for Refugium, a rehearsal profile, and one pinned picotool (owning phase: **plan phases E3a, E3b**) `#cross-repo` `#refugium` `#otp` `#risk-set`
+
+**Status:** OPEN — owning phase: E3a now; E3b after E3a, E4 and H0
+Companion: `bg002h/refugium-wallet` `design/FOLLOWUPS.md` `mr-gui-e3-otp-tooling`.
+E3a: own the picotool version decision (2.3.1 by overlay with its pico-sdk, or
+2.2.0-a4 if 2.3.1's field names, `otp set` copy behaviour or erase semantics
+differ in a way the runbook does not cover), one pin used by E3a, the Sitting
+image, S4 and the fork's `nix develop`. Then `DISABLE_OTP_BOOT` write and
+read-back; `KEY_INVALID` 0xC accepted by the rehearsal script and its
+`--sh2-verify-valid` mode; the precheck rows (page locks, `ENABLE_OTP_BOOT` clear,
+`FLASH_DEVINFO_ENABLE` and `FLASH_DEVINFO`, white-label rows against H0's
+values); raw reads of all three copies of each boot-flag row; explicit-range
+erase and save; and a rehearsal profile (rehearsal key in slot 0, no white-label
+comparison, naming the rows it cannot prove). Done when the whole sequence passes
+on 4 MB Pico 2 boards, including an injected unequal copy the check refuses.
+Pico 2 burns are consumables and need no per-board go-ahead (plan §9 item 5).
+E3b: the same steps on SeedHammer #1 (`DISABLE_OTP_BOOT`; `KEY_INVALID` only if
+plan §9 item 14 allows). **Irreversible: Brian's typed go-ahead naming the
+board's CHIPID and each step.** Depends on E3a, the fork key decision (E4) and
+H0's button and white-label rows.
