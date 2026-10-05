@@ -20508,6 +20508,22 @@ provisioned board at its closing image check. The release check enforces it with
 pinned picotool's `info`. Anti-rollback is deferred until after v1, beside key rotation
 (UI brainstorm ruling 2026-10-05 07:40Z). Touches F-703.
 
+Extended 2026-10-05 (UI brainstorm ruling 08:10Z item 4, relayed by the UI Minors thread):
+the v1 fork image also carries **no partition table**, and Refugium's step 4 boots it by a
+normal power-on, never a flash-update boot. On a flash-update boot of an image with a
+partition table, the boot ROM's implicit buy can erase a flash sector
+(pico-bootrom-rp2350 `varm_launch_image.c` L206-212 and L434-460, `varm_flash_boot.c`
+L236-327, as cited by the UI thread); picotool 2.3.1 `load -x` reboots with
+REBOOT2_FLAG_REBOOT_TYPE_FLASH_UPDATE (`main.cpp` L5385-5389). Any flash write outside the
+image would fail Refugium's before-and-after check. The F9a/F9b release check refuses an
+image in which `picotool info -a` shows a partition table.
+Measured 2026-10-05 at fork main c0f9379 (TinyGo 0.41.1, the flake's flags, ELF output,
+both the default and `-tags refugium` builds): the unsealed image has exactly one picobin
+block, at 0x100000f8, holding IMAGE_DEF and LAST only, so no PARTITION_TABLE item
+(0x0a). It comes from TinyGo's `targets/rp2350_embedded_block.s`. Not measured: the
+image after `picotool seal --sign --clear` (no picotool here). The flake's seal call
+passes no partition table, but the release check above is what proves the sealed image.
+
 ### F-708 — `picobin.Image.HashData` hashes entry 0's size word for every clear LOAD_MAP entry (owning phase: none — ownerless residue) `#seedhammer` `#picobin` `#signing`
 
 **Status:** OPEN — owning phase: none (fix before F-703 if a v1 image uses `--pin-xip-sram`)
