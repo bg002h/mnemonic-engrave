@@ -20450,10 +20450,34 @@ close in lockstep.
 
 ### F-703 — SeedHammer fork: Refugium release F9 (owning phase: **refugium-wallet build plan lane F, after E4**) `#seedhammer` `#refugium` `#release` `#signing`
 
-**Status:** OPEN — owning phase: refugium-wallet `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` F9, blocked on E4 (Brian's fork-key decision)
+**Status:** OPEN — owning phase: refugium-wallet `design/IMPLEMENTATION_PLAN_mr_gui_v1.md` F9; waits on F1 to F7 and on the new offline v1 key
+E4 decided by Brian 2026-10-05 03:40Z: "Keep 846aa289 but we will plan to move to a new
+key before v1 release". Development and rehearsal builds sign with `846aa289…`; the v1
+fork release is signed under a new key made offline. Board model (03:51Z, "New
+SeedHammers"): boards #1 to #3 stay development boards on `846aa289…` and never run a v1
+release; v1 is provisioned onto new sealed units (SeedHammer #4, more only if needed);
+each Sitting release pins exactly one fork key hash.
 Filed 2026-10-05 by thread "SeedHammer fork for Refugium". Primary entry for
 `mr-gui-f9-fork-release`; companion in `bg002h/refugium-wallet` `design/FOLLOWUPS.md`.
 A signed UF2 under the key model Brian picks (E4; see `firmware-dual-distribution`),
 its reproducible unsigned build, and a fork `copy-signature` (today's flake hard-codes
 upstream's key). Depends on F-702 (F1 to F7) and E4. **Irreversible:** signing under the
 fork key needs Brian's typed go-ahead naming the unsigned image hash. Not started.
+
+### F-704 — `bip39.Mnemonic.Valid` accepts word indices aliased past the wordlist (owning phase: none — ownerless residue) `#seedhammer` `#bip39` `#seedqr`
+
+**Status:** OPEN — owning phase: none
+Filed 2026-10-05 from `design/agent-reports/refugium-F5-exec-review.md` I-1. The fork's
+`bip39.Mnemonic.Valid` builds entropy as `ent*2048|w` without range-checking each word,
+so adding 2048 to a word whose predecessor is odd leaves entropy and checksum unchanged
+and `Valid` passes. `seedqr.QR` and `CompactQR` would then encode the out-of-range index.
+`backup.EngraveSeedStringSeedQR` (F-702 F5) range-checks itself and is pinned by a test;
+the fix belongs in `Valid`. Go-only: rust-bip39 holds words, not raw indices, so there is
+no Rust primary to fix first (checked by the reviewer; re-check when fixing).
+
+### F-705 — `codex32.EncodeMS1Preimage` leaves its payload buffer unwiped (owning phase: none — ownerless residue) `#seedhammer` `#codex32` `#secret-handling`
+
+**Status:** OPEN — owning phase: none
+Filed 2026-10-05 from `design/agent-reports/refugium-F5-exec-review.md` M-3. F-702 F5
+made `EncodeMS1` wipe its payload; `EncodeMS1Preimage` (`codex32/msencode.go:61`) builds
+the same kind of buffer from a hashlock preimage and does not.
