@@ -438,7 +438,11 @@ every step under `rehearsal-work/e3a-<CHIPID>/`; summary in `design/HARDWARE_RES
 - R0. `nix develop .#otp` with `SEEDHAMMER_DIR` set; `picotool version -s` = 2.3.1. Run R's old e2e.
   Then, with no board attached: build the blinky to a scratch path with R's own tinygo command
   (`build_blinky`), run `sign-firmware.sh` on it and require `picotool info -a` →
-  `signature: verified` (picosign on 2.3.1's `seal` output, F12). Any failure stops here.
+  `signature: verified` (picosign on 2.3.1's `seal` output, F12) and
+  `load map entry 0: Clear 0x20000000->0x20082000` (both asserted by `sign-firmware.sh` step 7 since
+  the seal-patch plan, `IMPLEMENTATION_PLAN_e3a_picotool_seal_patch.md`). Also run
+  `scripts/test/seal-clear-test.sh "$(command -v picotool)"` and require the `.#otp` picotool's store
+  path to be the patched one recorded in `design/PICOTOOL_PIN.md`. Any failure stops here.
 - R1. Board in BOOTSEL: `capture` (read-only) before any write; commit its `otp get` transcripts as the
   replay fixtures (§6.2 case 12) and diff the line formats against the fake. Before R2, check from the
   capture every cell the §3.2 rehearsal column fixes, at its pre-R2 value: CRIT0 0 and CRIT1 0 in all
