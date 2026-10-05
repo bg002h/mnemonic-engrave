@@ -104,9 +104,11 @@ sig_verdict() {
 # first k bytes of the integer, then zeros (k = 32 - b2). picotool's own
 # signature is then wrong (measured 2026-10-05: 7 failing runs in 500 on the
 # patched build, 3 in 200 on 2.2.0-a4, 3 bad signatures in 1500 seals). The
-# pattern is matched exactly for k = 1..4; a hunk-B defect gives a
-# random-looking signature, which matches with probability ~2^-240, so it is
-# never retried.
+# pattern is matched exactly for k = 1..4. A retry can only go green if a
+# fresh seal then verifies through the verifier's own entry-order hash, so a
+# deterministic wrong digest (a hunk-B defect) can never be retried into a
+# pass; its random-looking signature also matches the pattern with
+# probability below 2^-223.
 der_to_raw_defect() {
   local line hex half k
   while IFS= read -r line; do
@@ -223,7 +225,8 @@ fi
 SF="$REPO/scripts/sign-firmware.sh"
 if grep -qE '^[^#]*\. "\$REPO_ROOT/scripts/lib/seal-check\.sh"' "$SF" \
    && grep -qE '^[^#]*seal_has_clear_entry "\$INFO"[[:space:]]*\\?$' "$SF" \
-   && grep -A1 -E '^[^#]*seal_has_clear_entry "\$INFO"' "$SF" | grep -qE '\|\|[[:space:]]*die '; then
+   && SFW="$(grep -A1 -E '^[^#]*seal_has_clear_entry "\$INFO"' "$SF")" \
+   && grep -qE '\|\|[[:space:]]*die ' <<<"$SFW"; then
   ok "sign-firmware.sh sources seal-check.sh and dies when seal_has_clear_entry fails"
 else
   bad "sign-firmware.sh is not wired to the shared Clear check (source + seal_has_clear_entry \"\$INFO\" || die)"

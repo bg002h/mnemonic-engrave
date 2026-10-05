@@ -73,6 +73,9 @@ SEEDHAMMER_DIR=/path/to/seedhammer nix develop .#otp
   `ERROR: unknown sram end` on the TinyGo blinky, and the fork's own firmware seal fails the same way.
   R's old e2e (`scripts/test/run-e2e.sh`) failed phases 3, 5 and 6 on it; the pre-E3a tree failed
   the same three. Without `--clear` the seal works and verifies.
+- **picotool's own `seal --sign` signature is wrong about 0.4% of the time** (`der_to_raw`,
+  `bintool/mbedtls_wrapper.c:169/179`, in every version we use; not fixed by our patch). Never use
+  it as a final signature: `picosign` is the signer (F-701).
 - **The cause is picotool, not the image** (`design/agent-reports/e3a-seal-clear-investigation.md`).
   An earlier version of this section put the fix in `sign-firmware.sh` or the blinky's link layout;
   that was wrong. Both images carry a valid IMAGE_DEF and the layout is irrelevant. Two upstream
@@ -116,7 +119,8 @@ inputs.mnemonic-engrave.url = "github:bg002h/mnemonic-engrave";   # or the git+h
 packages = [ inputs.mnemonic-engrave.packages.${system}.picotool ];
 ```
 
-The fork's devshell change is its own PR in the fork thread. It is **not** a prerequisite of E3a: the
+Held until bench R4 (see the hold at the top and F-701): do not merge the fork's devshell change
+before then. The fork's devshell change is its own PR in the fork thread. It is **not** a prerequisite of E3a: the
 bench uses `.#otp` here, with `SEEDHAMMER_DIR` pointing at a fork checkout.
 
 ## Moving the pin

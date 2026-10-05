@@ -95,7 +95,7 @@ body (needs two boards); the boot ROM revision of the real boards.
   moves to this flake. R's format comment (R:166-171) is updated for both.
 - `design/PICOTOOL_PIN.md`: version, nixpkgs rev, why 2.3.1, the `seal --sign` change, how the fork
   and the Sitting image consume the flake (`inputs.mnemonic-engrave.packages.${system}.picotool`).
-  The fork thread gets the pin; its devshell change is its own PR and is **not** a prerequisite of
+  The fork thread gets the pin (held until bench R4, F-701); its devshell change is its own PR and is **not** a prerequisite of
   this plan (§7 uses `.#otp` with `SEEDHAMMER_DIR` pointing at the fork checkout).
 
 ## 3. `scripts/refugium-otp.sh`

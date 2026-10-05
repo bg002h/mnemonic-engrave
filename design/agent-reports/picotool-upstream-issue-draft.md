@@ -1,5 +1,9 @@
 # DRAFT — upstream issue for `raspberrypi/picotool` (for Brian to post; not posted by Claude)
 
+*Note above the line, not for posting: the `der_to_raw` section may deserve its own issue. It is not
+in the patch, and our toolchain does not depend on it (`sign-firmware.sh` and the fork take the final
+signature from `picosign`), but anyone using `picotool seal --sign` as the final signer is affected.*
+
 *Drafted 2026-10-05 for F-701 (plan `design/IMPLEMENTATION_PLAN_e3a_picotool_seal_patch.md` §2).
 Edit freely. Everything below the line is the proposed issue body. Line numbers were checked
 against tag `2.3.1` (`2041936`) and `develop` at `ba3df40` (2026-09-28). The patch at the end is
@@ -60,7 +64,7 @@ a one-entry load map also reaches the model (`detect_generic_load_map_entry` cal
 ### Bug B — the Clear/pin size words are hashed after the image
 
 In the no-load-map branch of the BIN `get_lm_hash_data`, the Clear size word is appended to
-`to_hash` (2.3.1 `bintool.cpp:870`), then the pin size word (`:883`), and then the image is inserted
+`to_hash` (2.3.1 `bintool.cpp:871`), then the pin size word (`:883`), and then the image is inserted
 at the **front**:
 
 | | 2.3.1 | develop@ba3df40 |
@@ -135,10 +139,6 @@ empty before the insert).
 
 ### A separate bug found while testing: `der_to_raw` truncates short integers
 
-*(Brian: this one may deserve its own issue. It is not in the patch above, and our toolchain does
-not depend on it — `sign-firmware.sh` takes the final signature from `picosign`, which pads r and s —
-but anyone using `picotool seal --sign` as the final signer is affected.)*
-
 `bintool/mbedtls_wrapper.c` `der_to_raw` (2.3.1 lines 162-180; also in 2.2.0) handles a DER integer
 shorter than 32 bytes with
 
@@ -150,8 +150,8 @@ memcpy(r + (32 - b2), sig->der + 4, (32 - b2));   // length should be b2
 (and the same for `s` with `b3`). With `b2 = 31` this stores `00 XX 00 … 00` — the integer's first
 byte and 30 zero bytes — instead of `00` followed by the 31 bytes. Whenever r or s is below 2^247
 (roughly 1 signature in 256), `seal --sign` writes a signature that `picotool info -a` reports as
-`incorrect` and the boot ROM would reject. Measured on 2.3.1 and 2.2.0-a4: 3 such signatures in
-1500 seals, each of the form `00XX` + 60 zeros in one half, e.g.
+`incorrect` and the boot ROM would reject. Measured on 2.3.1 and 2.2.0-a4: 51 such signatures in
+13,000 seals (0.39%, as expected for r or s below 2^247), each of the form `00XX` + 60 zeros in one half, e.g.
 `0024000000000000000000000000000000000000000000000000000000000000A3878DCF…`. The fix is to copy
 `b2` (resp. `b3`) bytes.
 
