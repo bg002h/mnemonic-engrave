@@ -1,8 +1,13 @@
 # IMPLEMENTATION PLAN — E3a follow-up: carry the picotool 2.3.1 `seal --clear` fix in the flake (F-701)
 
-*Draft 1, 2026-10-05. Author: thread "mnemonic-engrave for Refugium". Baseline: mnemonic-engrave
+*Draft 2, 2026-10-05. Author: thread "mnemonic-engrave for Refugium". Baseline: mnemonic-engrave
 `39ee550` (master after PR 11 and PR 13). Risk set (a): this changes the firmware signing toolchain.
 R0 to 0 C / 0 I before code, a single implementer, then an adversarial review of the whole diff.*
+
+Draft 2 folds R0 round 1 (`design/agent-reports/e3a-seal-patch-plan-r0.md`, 0 C / 2 I / 6 M / 4 N;
+fold table §5). The reviewer re-verified the patch against source and the bootrom, recomputed the
+digest independently, and confirmed the nix override mechanics at `a7868a72` (`patches = []`,
+`version` stays 2.3.1, the patch applies without fuzz).
 
 Decision: Brian chose "Patch and report" on 2026-10-05 (decision card in the thread). Evidence:
 `design/agent-reports/e3a-seal-clear-investigation.md` (**INV**). The candidate patch is
@@ -45,7 +50,7 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
   different version.
 - **Fixture.** `scripts/test/fixtures/seal/blinky.uf2`: the unsealed TinyGo blinky R's `build_blinky`
   makes (INV's input image; IMAGE_DEF EXE/ARM/Secure/RP2350), with a `README.md` stating how it was
-  built (TinyGo version, target, R's command) and its sha256. It carries no key and no secret.
+  built (TinyGo version and source, target, R's exact command, fork commit if any) and its sha256 (N3). It carries no key and no secret.
 - **`scripts/test/seal-clear-test.sh <picotool> [--expect-fail]`.** In a temp dir: generate a
   throwaway secp256k1 key with `openssl ecparam`; run `picotool seal --sign --clear --quiet
   blinky.uf2 out.uf2 key.pem`; require exit 0; run `picotool info -a out.uf2`; require
@@ -54,18 +59,41 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
   2.3.1 source line that prints each). Also seal **without** `--clear` and require it
   verifies (P4 regression guard). With `--expect-fail` (the unpatched build) require exit 248 and
   "unknown sram end" on the `--clear` seal, proving the test can tell patched from unpatched. The
-  fixture's sha256 is checked first.
+  fixture's sha256 is checked first. Greps are anchored to whole lines, and `signature:` must appear
+  only as `verified` (the line prints twice in `info -a`; N1). **Tamper control (SP-M3):** flip one
+  payload byte of the sealed `out.uf2` (in a UF2 data block, inside the hashed range) and require
+  `info -a` to print `signature:           incorrect`, so the check can tell a correct signature from
+  a wrong one. Hunk B is otherwise proven only by the one-time mutation run (§3).
 - **CI.** In the `picotool argv probe` job (already builds `.#picotool` with nix, `contents: read`):
-  build `.#picotool-unpatched` too, then run `seal-clear-test.sh` on both. The probe's no-board gate
-  is not needed here (seal and `info` on a file touch no device), but the script runs `info -a` with
-  a file argument only.
-- **Docs.** `design/PICOTOOL_PIN.md`: replace "no overlay" with the patch, why, how to drop it when
-  upstream fixes both bugs, and that the store path changes; fix the seal section (cause is picotool,
-  not the image). F-701 progress: blocker resolved in the toolchain; bench R0 and R4 remain the
-  hardware proof. RUNBOOK prerequisites unchanged (`nix develop .#otp`).
+  build with explicit out-links, `nix build .#picotool -o pt-patched` and `nix build
+  .#picotool-unpatched -o pt-stock`, assert the two store paths differ, print the patched one, and
+  run the argv probe and `seal-clear-test.sh` on `pt-patched/bin/picotool`, and `seal-clear-test.sh
+  --expect-fail` on `pt-stock/bin/picotool` (SP-M2). The scripts run `info -a` with a file argument
+  only; no device is touched.
+- **The test must gate (SP-I1).** The probe job is not a required check today. This PR adds
+  `picotool-probe` (the job id) to `assemble`'s `needs:` so a red seal test can never be released,
+  and before merge the thread asks Brian, through Merging PRs 2, to make `picotool argv probe` a
+  required status check. Until he has, the PR body records the green probe run on the final head by
+  link, and the merge ask names that run.
+- **Docs, with the hardware hold written in (SP-I2).** Patched and stock both print `2.3.1`, so no
+  tool can enforce the hold; the words must. `design/PICOTOOL_PIN.md`, the RUNBOOK prerequisites note
+  (`RUNBOOK_custom_boot_key.md:85-88`) and F-701 each say, in these words: "The `seal --clear` fix is
+  in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, sign
+  real SeedHammer firmware only from the fork's shell (picotool 2.2.0-a4), and the fork does not move
+  to this picotool." PICOTOOL_PIN.md also gains: the patch, why, the two upstream bugs, how to drop
+  the patch once upstream fixes both, the patched store path as built in CI and on Brian's box
+  (SP-M5), and the seal section corrected (the cause is picotool, not the image). Every reference to
+  `design/patches/` (FOLLOWUPS F-701, PICOTOOL_PIN.md) is updated to `nix/patches/` (SP-M6).
+- **`sign-firmware.sh` checks the Clear entry (SP-M1).** After the final signature check it also
+  requires `load map entry 0:    Clear 0x20000000->0x20082000` in `picotool info -a` of the output,
+  else it refuses (an image sealed elsewhere without `--clear`, or one whose existing load map made
+  picotool ignore `--clear`, would otherwise pass as verified with no SRAM wipe). R's old e2e must
+  still pass with this check.
 - **Upstream issue draft** `design/agent-reports/picotool-upstream-issue-draft.md`: title, repro
-  (any TinyGo or SDK UF2 with an IMAGE_DEF, `seal --sign --clear`), both bugs with line numbers, the
-  patch, and the verification. Delivered to Brian as an editable draft; not posted by Claude.
+  (any TinyGo or SDK UF2 with an IMAGE_DEF, `seal --sign --clear`), both bugs with line numbers at
+  `2.3.1` **and** at `develop@ba3df40` (`main.cpp:5807`, `bintool.cpp:886`), every affected path
+  (UF2/BIN `--clear`, `--pin-xip-sram`, `--hash --clear`; ELF unaffected), the patch, and the
+  verification (SP-M4). Delivered to Brian as an editable draft; not posted by Claude.
 
 ## 3. Tests and gates
 
@@ -76,9 +104,13 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
   shown in the report. (Native cmake builds of the mutants are acceptable where nix cannot build
   here; say which.)
 - `run-e2e-otp.sh` and the argv probe still pass (the OTP tool is unaffected by the seal path).
-- Bench (unchanged §7 of the E3a plan): R0 runs `sign-firmware.sh` on the blinky with the patched
-  picotool and requires `signature: verified` after `picosign`; R4's phase 5 boots that image on the
-  Pico 2 (the first hardware boot of a 2.3.1-sealed, EXTRA_SECURITY image).
+- `seal-clear-test.sh` is added to the CI shellcheck list (N4).
+- Bench (E3a plan §7): R0 runs `sign-firmware.sh` on the blinky with the patched picotool and
+  requires `signature: verified` and the Clear entry after `picosign` (the E3a plan's R0 line is
+  updated to name the Clear entry); R4's phase 5 boots that image on the Pico 2. What R4 proves (N2):
+  hunk A's output, re-signed by `picosign`, boots under the boot ROM with its EXTRA_SECURITY block.
+  It does not prove hunk B (picosign recomputes the digest itself) and does not observe the SRAM
+  wipe; those rest on the CI test, the tamper control and the mutation run.
 - The fork does not move to this picotool until R4 has booted on hardware; the fork thread is told.
 
 ## 4. Done when
@@ -86,3 +118,20 @@ CI seal test (§3), the nix build in CI (§3), R's old e2e at bench R0, and a ha
 - CI green with both seal-test runs; `nix build .#picotool` on Brian's box prints `2.3.1`.
 - The upstream draft is with Brian.
 - Bench R0 and R4 pass (closes with the E3a bench rehearsal, not this PR).
+
+## 5. Fold table (R0 round 1)
+
+| finding | fold |
+|---|---|
+| SP-I1 seal test gates nothing | `picotool-probe` in `assemble.needs`; required-check ask before merge; green run linked in the PR §2 |
+| SP-I2 hardware hold not written down | exact hold wording in PICOTOOL_PIN, RUNBOOK:85-88 and F-701 §2 |
+| SP-M1 Clear entry never checked | `sign-firmware.sh` requires it; bench R0 names it §2, §3 |
+| SP-M2 out-links | explicit `-o`, store paths asserted different §2 |
+| SP-M3 hunk B in CI | tamper control §2; mutation run stays §3 |
+| SP-M4 issue line numbers | `develop@ba3df40` lines and all affected paths §2 |
+| SP-M5 2.3.1 does not prove patched | patched store path recorded in PICOTOOL_PIN §2 |
+| SP-M6 stale paths | `design/patches/` references updated §2 |
+| N1 anchored grep | §2 |
+| N2 what R4 proves | §3 |
+| N3 fixture provenance | §2 |
+| N4 shellcheck list | §3 |
