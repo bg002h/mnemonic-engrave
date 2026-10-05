@@ -128,6 +128,12 @@ jobs:
         if: steps.detect.outputs.docs_only != 'true'
         run: cargo clippy --all-targets --locked -- -D warnings
 
+      # F-700: the library as the Refugium app links it, with no CLI crate.
+      # Fails if library code starts to need clap or rpassword.
+      - name: clippy (library, no default features)
+        if: steps.detect.outputs.docs_only != 'true'
+        run: cargo clippy -p mnemonic-engrave --lib --no-default-features --locked -- -D warnings
+
       - name: Set up Go
         if: steps.detect.outputs.docs_only != 'true'
         uses: actions/setup-go@v5
