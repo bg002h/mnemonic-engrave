@@ -20419,7 +20419,7 @@ with the lean features and one md-codec, and me's own tests pass.
 
 ### F-701 — `mr-gui-e3-otp-tooling`: OTP tooling for Refugium, a rehearsal profile, and one pinned picotool (owning phase: **plan phases E3a, E3b**) `#cross-repo` `#refugium` `#otp` `#risk-set`
 
-**Status:** OPEN — owning phase: E3a now; E3b after E3a, E4 and H0
+**Status:** OPEN — owning phase: E3a now; E3b after E3a and H0 (E4 deferred to the release, below)
 E3a bench rehearsal R0-R10 PASSED 2026-10-06 on Pico 2 `66D3D60FF20ABF2F` (an already-sealed
 board, Brian's ruling): `design/HARDWARE_RESULT_2026-10-06_e3a.md`. E3a's part closes when that
 bench-result PR merges.
@@ -20438,8 +20438,12 @@ on 4 MB Pico 2 boards, including an injected unequal copy the check refuses.
 Pico 2 burns are consumables and need no per-board go-ahead (plan §9 item 5).
 E3b: the same steps on SeedHammer #1 (`DISABLE_OTP_BOOT`; `KEY_INVALID` only if
 plan §9 item 14 allows). **Irreversible: Brian's typed go-ahead naming the
-board's CHIPID and each step.** Depends on E3a, the fork key decision (E4) and
-H0's button and white-label rows.
+board's CHIPID and each step.** Depends on E3a and H0's button and white-label rows.
+No longer on the fork key decision (E4): Brian 2026-10-07 01:58Z, "Let's develop the software
+and only worry about keys when it comes to shipping…let's reuse keys we already use until we get
+ready to ship V1". E4a and E4b move to the release (refugium-wallet plan, Lane E); E3b runs on
+SeedHammer #1's existing key `846aa289…`. F-707's no-rollback-version, no-TBYB rule stays in
+force now.
 
 **Progress 2026-10-05: E3a implemented** (plan `design/IMPLEMENTATION_PLAN_e3a_refugium_otp.md`
 §8 step 2; report `design/agent-reports/e3a-impl-report.md`). The adversarial execution review closed at
