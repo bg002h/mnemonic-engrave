@@ -1,0 +1,25 @@
+ROW 0x0048: OTP_DATA_BOOT_FLAGS0 (RBIT-3)
+
+    VALUE 0x002000
+
+    field DISABLE_SRAM_WINDOW_BOOT (bit 21) = 0
+    field DISABLE_XIP_ACCESS_ON_SRAM_ENTRY (bit 20) = 0
+    field DISABLE_BOOTSEL_UART_BOOT (bit 19) = 0
+    field DISABLE_BOOTSEL_USB_PICOBOOT_IFC (bit 18) = 0
+    field DISABLE_BOOTSEL_USB_MSD_IFC (bit 17) = 0
+    field DISABLE_WATCHDOG_SCRATCH (bit 16) = 0
+    field DISABLE_POWER_SCRATCH (bit 15) = 0
+    field ENABLE_OTP_BOOT (bit 14) = 0
+    field DISABLE_OTP_BOOT (bit 13) = 1
+    field DISABLE_FLASH_BOOT (bit 12) = 0
+    field ROLLBACK_REQUIRED (bit 11) = 0
+    field HASHED_PARTITION_TABLE (bit 10) = 0
+    field SECURE_PARTITION_TABLE (bit 9) = 0
+    field DISABLE_AUTO_SWITCH_ARCH (bit 8) = 0
+    field SINGLE_FLASH_BINARY (bit 7) = 0
+    field OVERRIDE_FLASH_PARTITION_SLOT_SIZE (bit 6) = 0
+    field FLASH_DEVINFO_ENABLE (bit 5) = 0
+    field FAST_SIGCHECK_ROSC_DIV (bit 4) = 0
+    field FLASH_IO_VOLTAGE_1V8 (bit 3) = 0
+    field ENABLE_BOOTSEL_NON_DEFAULT_PLL_XOSC_CFG (bit 2) = 0
+    field ENABLE_BOOTSEL_LED (bit 1) = 0

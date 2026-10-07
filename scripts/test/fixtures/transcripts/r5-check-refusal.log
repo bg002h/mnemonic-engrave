@@ -1,0 +1,27 @@
+picotool 2.3.1 (pico-sdk 2.3.1 fingerprint: MAC0 present, DISABLE_BOOTSEL_EXEC2 absent)
+rehearsal key (slot 0): rehearsal-work/factory-key.pem sha256(X||Y)=cd027c2cf09d48647114272c2e888baf0b81530e6bbbd34713f08c3ed3a44b27
+rehearsal slot-1 key:      rehearsal-work/my-key.pem sha256(X||Y)=17644fb68cd715b4e723281ddbf007ad148eb8a2883c41c735a292d799e0eddb
+
+check --profile rehearsal --ser 66D3D60FF20ABF2F --slot1 valid --disable-otp-boot 0 --key-invalid 0
+  PASS  CHIPID                 66D3D60FF20ABF2F (= --ser)
+  PASS  SLOT0                  identity gate: --rehearsal-key's hash
+  PASS  CRIT0                  vote 0x000000, want 0x000000 in all 8
+  PASS  CRIT1                  vote 0x000001, want 0x000001 in all 8
+  PASS  SLOT1                  rehearsal slot-1 key, KEY_VALID 0x3
+  PASS  SLOT2                  empty
+  PASS  SLOT3                  empty
+  PASS  BOOT_FLAGS1            vote 0x000003: KEY_INVALID 0x0 (want 0x0), other bits 0x000000 (want 0x000000)
+  FAIL  BOOT_FLAGS0            copies differ: 0x000000/0x000000/0x002000 (copy 0 from -c 1)
+  PASS  FLASH_DEVINFO          FLASH_DEVINFO_ENABLE 0
+  PASS  USB_BOOT_FLAGS         copies equal (value not compared: CANNOT PROVE)
+  PASS  PAGE1_LOCK0            0x000000
+  PASS  PAGE1_LOCK1            0x040404
+  PASS  PAGE2_LOCK0            0x000000
+  PASS  PAGE2_LOCK1            0x040404
+
+CANNOT PROVE (rehearsal profile):
+  - that slot 0 holds SeedHammer's key (it holds --rehearsal-key's)
+  - the retail white-label, USB_BOOT_FLAGS and FLASH_DEVINFO values
+  - flash above 4 MB
+  - SeedHammer's on-device sealing (bootkey-rehearsal-fidelity-residue (b))
+RESULT: FAIL (1 row(s))

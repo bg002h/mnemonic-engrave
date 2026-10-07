@@ -1,0 +1,10 @@
+ROW 0x0040: OTP_DATA_CRIT1 (CRIT)
+
+    VALUE 0x000001
+
+    field GLITCH_DETECTOR_SENS (bits 5-6) = 0
+    field GLITCH_DETECTOR_ENABLE (bit 4) = 0
+    field BOOT_ARCH (bit 3) = 0
+    field DEBUG_DISABLE (bit 2) = 0
+    field SECURE_DEBUG_DISABLE (bit 1) = 0
+    field SECURE_BOOT_ENABLE (bit 0) = 1

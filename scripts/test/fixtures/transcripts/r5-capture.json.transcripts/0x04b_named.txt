@@ -1,0 +1,8 @@
+ROW 0x004b: OTP_DATA_BOOT_FLAGS1 (RBIT-3)
+
+    VALUE 0x000003
+
+    field DOUBLE_TAP (bit 19) = 0
+    field DOUBLE_TAP_DELAY (bits 16-18) = 0
+    field KEY_INVALID (bits 8-11) = 0
+    field KEY_VALID (bits 0-3) = 3
