@@ -3,7 +3,7 @@
 *Plan E3a §2 (`design/IMPLEMENTATION_PLAN_e3a_refugium_otp.md`), F-701; the seal patch is
 `design/IMPLEMENTATION_PLAN_e3a_picotool_seal_patch.md`.*
 
-> **HOLD.** The `seal --clear` fix is in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works from either shell.
+> **Hold lifted 2026-10-07.** Bench R4 booted a blinky sealed by the patched 2.3.1 (`seal --sign --clear`, then `picosign`) on Pico 2 `66D3D60FF20ABF2F`, and again after R6 and R9 (`design/HARDWARE_RESULT_2026-10-06_e3a.md`, PR 15). The patched 2.3.1 may now seal real SeedHammer firmware, and the fork may move to this picotool.
 
 ## What is pinned
 
@@ -96,12 +96,11 @@ SEEDHAMMER_DIR=/path/to/seedhammer nix develop .#otp
   (measured: output differs from stock only in the randomized signature). The patched `--clear`
   output's load map is semantically identical to 2.2.0-a4's, and verifies under both versions
   before and after the fork's `picosign` re-sign (investigation §5).
-- **The hold.** The `seal --clear` fix is in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works from either shell.
+- **The hold (lifted 2026-10-07).** Bench R4 booted a blinky sealed by the patched 2.3.1 (`seal --sign --clear`, then `picosign`) on Pico 2 `66D3D60FF20ABF2F`, and again after R6 and R9 (`design/HARDWARE_RESULT_2026-10-06_e3a.md`, PR 15). The patched 2.3.1 may now seal real SeedHammer firmware, and the fork may move to this picotool.
   What R4 proves when it passes: hunk A's output, re-signed by `picosign`, boots under the boot ROM
   with its EXTRA_SECURITY block. It does not prove hunk B (picosign recomputes the digest itself)
   and does not observe the SRAM wipe; those rest on the CI seal test, its tamper control and the
-  one-time hunk-revert mutation run (`design/agent-reports/e3a-seal-patch-impl-report.md`). When R4
-  passes, F-701 records it and this hold is lifted here, in the RUNBOOK and in F-701 together.
+  one-time hunk-revert mutation run (`design/agent-reports/e3a-seal-patch-impl-report.md`).
 - **Upstream.** An issue text is drafted for Brian to post
   (`design/agent-reports/picotool-upstream-issue-draft.md`).
 - **Dropping the patch** once an upstream release fixes both bugs: move `flake.lock` to a nixpkgs
@@ -119,8 +118,7 @@ inputs.mnemonic-engrave.url = "github:bg002h/mnemonic-engrave";   # or the git+h
 packages = [ inputs.mnemonic-engrave.packages.${system}.picotool ];
 ```
 
-Held until bench R4 (see the hold at the top and F-701): do not merge the fork's devshell change
-before then. The fork's devshell change is its own PR in the fork thread. It is **not** a prerequisite of E3a: the
+The hold on this change was lifted on 2026-10-07 (bench R4 passed, see the top and F-701). The fork's devshell change is its own PR in the fork thread. It is **not** a prerequisite of E3a: the
 bench uses `.#otp` here, with `SEEDHAMMER_DIR` pointing at a fork checkout.
 
 ## Moving the pin

@@ -83,9 +83,9 @@ Do not skip it.
   `scripts/refugium-otp.sh` refuses any other picotool.
   `scripts/pico2-bootkey-rehearsal.sh` accepts 2.2.0-a4 or 2.3.1, so the SH2
   steps below that sign an image the fork's build already sealed work from
-  either shell; sealing real SeedHammer firmware is held as follows.
+  either shell.
   `SEEDHAMMER_DIR` points at the fork checkout, which provides `cmd/picosign`.
-  **Hold (F-701):** The `seal --clear` fix is in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works from either shell.
+  **Hold lifted 2026-10-07 (F-701):** Bench R4 booted a blinky sealed by the patched 2.3.1 (`seal --sign --clear`, then `picosign`) on Pico 2 `66D3D60FF20ABF2F`, and again after R6 and R9 (`design/HARDWARE_RESULT_2026-10-06_e3a.md`, PR 15). The patched 2.3.1 may now seal real SeedHammer firmware, and the fork may move to this picotool.
   Whichever shell signs, `sign-firmware.sh` refuses an image whose load map
   lacks the `Clear 0x20000000->0x20082000` entry.
 - **A rehearsal board.** A plain **Pico 2** (~$5) — *not* a Pico 2 W as the
