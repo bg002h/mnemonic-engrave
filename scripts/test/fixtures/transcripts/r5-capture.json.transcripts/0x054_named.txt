@@ -1,0 +1,8 @@
+ROW 0x0054: OTP_DATA_FLASH_DEVINFO (ECC)
+
+    VALUE 0x0000
+
+    field CS1_SIZE (bits 12-15) = 0
+    field CS0_SIZE (bits 8-11) = 0
+    field D8H_ERASE_SUPPORTED (bit 7) = 0
+    field CS1_GPIO (bits 0-5) = 0

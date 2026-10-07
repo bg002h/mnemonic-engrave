@@ -18875,6 +18875,13 @@ RAW_VALUE[0] after an injected copy-0 change, and that result is written here. T
 CLOSED because R's WARNING trap fix stands. The correction is to the claim about `-c 1`, which F14
 and refugium-otp.sh's copy rule now rely on.
 
+**Silicon reading (2026-10-06, bench R8, Pico 2 `66D3D60FF20ABF2F`, picotool 2.3.1).** After R7
+injected 0x000803 into copy 0 of BOOT_FLAGS1 only: `otp get -c 1 -n --ser S 0x04b` printed `VALUE
+0x000803` with no RAW_VALUE line; `otp get -n --ser S BOOT_FLAGS1` printed
+`RAW_VALUE=0x000803;0x000003;0x000003 (WARNING - REDUNDANT ROWS AREN'T EQUAL)` and `VALUE 0x000003`.
+`-c 1` in its declared place reads copy 0 raw, and it equals RAW_VALUE[0]: F10 holds on silicon.
+`design/HARDWARE_RESULT_2026-10-06_e3a.md`.
+
 ### F-620 — the OTP json is named after a board it is not bound to
 
 **Status:** CLOSED 2026-09-17. The runbook now generates `~/.sh2/otp-bootkey-<fp8>-slot<N>.json` — named after what the content actually is — and states that only `--ser` binds a write to a board. Canonical file generated and verified byte-identical to both board-named predecessors (all three sha256 `b474f23a...92cc9`), which is the demonstration that the name never carried a binding. **Owning phase:** SH2 board 3 bring-up.
@@ -20413,6 +20420,9 @@ with the lean features and one md-codec, and me's own tests pass.
 ### F-701 — `mr-gui-e3-otp-tooling`: OTP tooling for Refugium, a rehearsal profile, and one pinned picotool (owning phase: **plan phases E3a, E3b**) `#cross-repo` `#refugium` `#otp` `#risk-set`
 
 **Status:** OPEN — owning phase: E3a now; E3b after E3a, E4 and H0
+E3a bench rehearsal R0-R10 PASSED 2026-10-06 on Pico 2 `66D3D60FF20ABF2F` (an already-sealed
+board, Brian's ruling): `design/HARDWARE_RESULT_2026-10-06_e3a.md`. E3a's part closes when that
+bench-result PR merges.
 Companion: `bg002h/refugium-wallet` `design/FOLLOWUPS.md` `mr-gui-e3-otp-tooling`.
 E3a: own the picotool version decision (2.3.1 by overlay with its pico-sdk, or
 2.2.0-a4 if 2.3.1's field names, `otp set` copy behaviour or erase semantics

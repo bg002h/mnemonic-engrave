@@ -15,9 +15,12 @@ That PR adds:
   `FAIL BOOT_FLAGS0 copies differ` and `FAIL BOOT_FLAGS1 copies differ` in them,
   so a refusal for a parse failure (`unreadable: …`) does not count;
 - `r5-capture.json` and `r7-capture.json` with their `.transcripts/`
-  directories: the captures taken right after those refusals. R1's board is
-  stock, so only these hold silicon's RAW_VALUE and WARNING lines. Case 12
+  directories: the captures taken right after those refusals. R1's copies all
+  agree, so only these hold silicon's RAW_VALUE and WARNING lines. Case 12
   replays both and requires RAW_VALUE in `0x048_named.txt` (R5) and
   `0x04b_named.txt` (R7);
 - `BENCH_RUN`, an empty marker. Once it exists, an empty or partial directory
   fails case 12.
+
+The committed set comes from the 2026-10-06 bench (Pico 2 `66D3D60FF20ABF2F`), whose R1 capture
+was taken on an already-sealed board: see `design/HARDWARE_RESULT_2026-10-06_e3a.md`.
