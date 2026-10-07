@@ -20499,9 +20499,8 @@ on the TinyGo blinky.
   only checks `signature:.*verified`; it should also source `scripts/lib/seal-check.sh` and require
   `seal_has_clear_entry "$SIGINFO"`. Low risk today (the fork's build seals with `--clear`); do it with
   a bench flash to confirm current dev images pass.
-- **Hold:** The `seal --clear` fix is in the toolchain but not yet proven on hardware. Until bench R4 boots a 2.3.1-sealed image, do not let 2.3.1 seal real SeedHammer firmware: an image `sign-firmware.sh` would seal itself (no SIGNATURE section yet) is sealed from the fork's shell (picotool 2.2.0-a4), and the fork does not move to this picotool. Signing an image the fork's build already sealed (R phase 5b, `sh2-flash`) works from either shell.
-  **Bench R4 (E3a plan §7) is the gate that lifts it**, in this entry, `design/PICOTOOL_PIN.md` and
-  `design/RUNBOOK_custom_boot_key.md` together.
+- **Hold lifted 2026-10-07.** Bench R4 booted a blinky sealed by the patched 2.3.1 (`seal --sign --clear`, then `picosign`) on Pico 2 `66D3D60FF20ABF2F`, and again after R6 and R9 (`design/HARDWARE_RESULT_2026-10-06_e3a.md`, PR 15). The patched 2.3.1 may now seal real SeedHammer firmware, and the fork may move to this picotool.
+  Lifted in this entry, `design/PICOTOOL_PIN.md` and `design/RUNBOOK_custom_boot_key.md` together.
 
 ### F-702 — SeedHammer fork: Refugium features F1 to F7 (owning phase: **refugium-wallet build plan lane F**) `#seedhammer` `#refugium` `#mr1` `#funds-safety`
 
