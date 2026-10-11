@@ -126,6 +126,7 @@ jobs:
   test:
     name: test (${{{{ matrix.os }}}})
     runs-on: ${{{{ matrix.os }}}}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -155,6 +156,7 @@ jobs:
   build:
     name: build {bin_} (${{{{ matrix.name }}}})
     runs-on: ${{{{ matrix.os }}}}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -221,6 +223,7 @@ jobs:
     needs: [test, build]
     if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.tag != '' || github.event.inputs.sign_dry_run == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
