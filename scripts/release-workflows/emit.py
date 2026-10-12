@@ -131,6 +131,7 @@ MD_SMOKE = '''          # A REAL acceptance pass, on this platform, using the co
 # broken build.
 TEST_SETUP = {
  "mt": """      - name: Install the shells the history-purge tests drive
+        if: steps.docs.outputs.docs_only != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh fish
