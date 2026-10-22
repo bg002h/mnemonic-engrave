@@ -48,3 +48,8 @@ run 39724127812    release                        pull_request   success    ok
   release/assemble + sign + release                skipped    ok (allowed skip)
 pr-checks: PASS (mnemonic-engrave 370fa5066020e18b67a6f1115f6f4d7fad48e135)
 ```
+
+## L2 (docs head 3dbd16873c81ca5070c5b1e80421f9bc20229f64, previous head 370fa5066020e18b67a6f1115f6f4d7fad48e135)
+
+- run 39724997419 job 119646759705 `release/test (rust + go)`: `docs-only: all 1 files changed since the previous PR head 370fa5066020e18b67a6f1115f6f4d7fad48e135 are documentation, the merged base d3f6886ef0808d53c712ecaded8fb068f6dd6214 is an ancestor of it, and 'test (rust + go)' passed on it; skipping the guarded steps`
+- run 39724997419 job 119646759738 `release/picotool argv probe`: `docs-only: all 1 files changed since the previous PR head 370fa5066020e18b67a6f1115f6f4d7fad48e135 are documentation, the merged base d3f6886ef0808d53c712ecaded8fb068f6dd6214 is an ancestor of it, and 'picotool argv probe' passed on it; skipping the guarded steps`
