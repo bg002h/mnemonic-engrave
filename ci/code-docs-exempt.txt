@@ -1,0 +1,28 @@
+# ci/code-docs-exempt.txt -- files ci/code-docs-check.sh does not scan. One
+# ERE per line, matched against the repo-relative path; # starts a comment.
+# List a file here only when no step that ci/docs-only.sh guards runs it, and
+# say why in the comment above it.
+
+# Run only by release.yml's test job, in a step before the docs-only guard.
+^scripts/check-minisign-pin\.sh$
+
+# Not run by CI: local generators, plan gates and helpers. No workflow, and
+# no script a workflow runs, names any of them.
+^scripts/acceptance-count\.py$
+^scripts/descriptor-seam-vectors/rows\.py$
+^scripts/followups-status\.sh$
+^scripts/gen-mt1-vectors\.py$
+^scripts/gen-sa-fixture\.py$
+^scripts/gen-tx-journey\.sh$
+^scripts/h[256]-plan-blocks-vs-tree\.sh$
+^scripts/importability-matrix\.py$
+^scripts/liana-live-gate\.sh$
+^scripts/mutation-run\.py$
+^scripts/plan-apply-gate-go\.sh$
+^scripts/plan-build-gate\.sh$
+^scripts/policy-generate\.py$
+^scripts/push-master\.sh$
+^scripts/release-workflows/emit\.py$
+^scripts/spec-check\.py$
+^scripts/test/shot-server-security-test\.py$
+^scripts/verify-returnsite-sweep\.sh$

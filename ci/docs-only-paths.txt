@@ -10,3 +10,11 @@
 + ^[^/]+\.md$
 # read by scripts/refugium-otp.sh and scripts/test/run-e2e-otp.sh
 - ^design/hardware/
+# Named by code that guarded steps build or run (ci/code-docs-check.sh):
+# crates/me-cli/src/seal/mod.rs
+- ^design/SPEC_encrypted_payload_delivery\.md$
+# flake.nix, scripts/pico2-bootkey-rehearsal.sh, scripts/refugium-otp.sh
+- ^design/PICOTOOL_PIN\.md$
+- ^design/HARDWARE_INVENTORY\.md$
+# scripts/test/fake_picotool.py
+- ^design/agent-reports/e3a-g-facts\.md$
