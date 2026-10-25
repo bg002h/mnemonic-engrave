@@ -326,13 +326,28 @@ jobs:
     name: build me-preview (all targets)
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: read
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: true
 
+      - name: Docs-only change? (skips the steps below when every changed file is documentation)
+        id: docs
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          CHECK_NAME: build me-preview (all targets)
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/docs-only.sh
+
       - name: Set up Go
+        if: steps.docs.outputs.docs_only != 'true'
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -340,6 +355,7 @@ jobs:
           cache-dependency-path: preview/go.sum
 
       - name: Extract version from Cargo.toml
+        if: steps.docs.outputs.docs_only != 'true'
         id: ver
         run: |
           VERSION="$(grep -m1 '^version' crates/me-cli/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')"
@@ -347,6 +363,7 @@ jobs:
           echo "me-preview version: $VERSION"
 
       - name: Cross-compile me-preview for all targets
+        if: steps.docs.outputs.docs_only != 'true'
         working-directory: preview
         env:
           CGO_ENABLED: '0'
@@ -372,6 +389,7 @@ jobs:
           build windows amd64 .exe
 
       - name: Verify baked-in version (lockstep)
+        if: steps.docs.outputs.docs_only != 'true'
         working-directory: preview
         env:
           VERSION: ${{ steps.ver.outputs.version }}
@@ -382,6 +400,7 @@ jobs:
           test "$GOT" = "me-preview ${VERSION}"
 
       - name: Upload me-preview artifacts
+        if: steps.docs.outputs.docs_only != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: me-preview-binaries
@@ -397,6 +416,9 @@ jobs:
     name: build me (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: read
     strategy:
       fail-fast: false
       matrix:
@@ -425,35 +447,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Docs-only change? (skips the steps below when every changed file is documentation)
+        id: docs
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          CHECK_NAME: build me (${{ matrix.name }})
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/docs-only.sh
+
       - name: Install Rust toolchain
+        if: steps.docs.outputs.docs_only != 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
           targets: ${{ matrix.target }}
 
       - name: Install cross
-        if: matrix.use_cross
+        if: matrix.use_cross && steps.docs.outputs.docs_only != 'true'
         run: cargo install cross --locked --version 0.2.5
 
       - name: Build (cross)
-        if: matrix.use_cross
+        if: matrix.use_cross && steps.docs.outputs.docs_only != 'true'
         env:
           RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=.
         run: cross build --release --target ${{ matrix.target }} -p mnemonic-engrave
 
       - name: Build (cargo, unix)
-        if: ${{ !matrix.use_cross && runner.os != 'Windows' }}
+        if: ${{ !matrix.use_cross && runner.os != 'Windows' && steps.docs.outputs.docs_only != 'true' }}
         env:
           RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=.
         run: cargo build --release --target ${{ matrix.target }} -p mnemonic-engrave
 
       - name: Build (cargo, windows)
-        if: ${{ !matrix.use_cross && runner.os == 'Windows' }}
+        if: ${{ !matrix.use_cross && runner.os == 'Windows' && steps.docs.outputs.docs_only != 'true' }}
         env:
           RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=.
         run: cargo build --release --target ${{ matrix.target }} -p mnemonic-engrave
 
       - name: Stage binary
+        if: steps.docs.outputs.docs_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -465,6 +500,7 @@ jobs:
           fi
 
       - name: Upload me artifact
+        if: steps.docs.outputs.docs_only != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: me-${{ matrix.target }}
