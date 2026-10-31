@@ -7,9 +7,9 @@ Paths below are relative to this Git root, including when working inside a crate
 Read [CLAUDE.md](CLAUDE.md) explicitly; AGENTS.md does not load it automatically.
 Read applicable ancestor guidance too. Existing process rules remain applicable;
 verify historical architecture/status statements against source.
-Read the shared [guide](https://github.com/bg002h/mnemonic-toolkit/blob/docs/constellation-architecture/docs/architecture/README.md) and [workflow](https://github.com/bg002h/mnemonic-toolkit/blob/docs/constellation-architecture/docs/architecture/WORKFLOW.md).
+Read the shared [guide](https://github.com/bg002h/mnemonic-toolkit/blob/99b4801cb9fa14b17d48d7b11dc793112eb2bafd/docs/architecture/README.md) and [workflow](https://github.com/bg002h/mnemonic-toolkit/blob/99b4801cb9fa14b17d48d7b11dc793112eb2bafd/docs/architecture/WORKFLOW.md).
 For sibling checkouts/worktrees, prefer local `../mnemonic-toolkit/docs/architecture/`;
-remote links support standalone checkouts while documentation branches await integration.
+remote fallbacks pin a delivered guide revision. See its workflow for refreshing the pin.
 Check Git status, the current branch, Cargo.toml and Cargo.lock before editing.
 Preserve unrelated work and use explicit task-owned paths when staging.
 
@@ -19,9 +19,10 @@ Preserve unrelated work and use explicit task-owned paths when staging.
   [lib.rs](crates/me-cli/src/lib.rs) exposes host operations; [main.rs](crates/me-cli/src/main.rs)
   owns CLI stream/output policy. Library consumers can disable default CLI features.
 - [bundle.rs](crates/me-cli/src/bundle.rs) admits public md/mk, refuses ms/mt, and
-  must validate supported descriptors before reporting plate counts.
+  uses [descriptor intake](crates/me-cli/src/descriptor/mod.rs) before reporting plate counts.
 - [sysw records](crates/me-cli/src/sysw/record.rs) distinguish secret/bearer material.
-  Keep seal and sysw container formats separate even where primitives are shared.
+  Keep [seal](crates/me-cli/src/seal/mod.rs) and sysw formats separate.
+  [ndef.rs](crates/me-cli/src/ndef.rs) owns host NDEF framing.
 - [mnemonic-io-lib](crates/mnemonic-io-lib/src/lib.rs) owns reusable mechanisms;
   callers keep classification, refusal, permissions and output policy.
 - [preview.rs](crates/me-cli/src/preview.rs), [preview/go.mod](preview/go.mod) and the
