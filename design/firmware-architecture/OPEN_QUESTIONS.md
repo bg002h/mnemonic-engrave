@@ -14,16 +14,19 @@ This document records concrete discrepancies between current firmware code (`see
 - **Consequence:** Running builds or tests in `/scratch/code/shibboleth/seedhammer` without fast-forwarding `main` omits the entire `-tags refugium` build profile, `backup.EngraveSeedStringSeedQR`, and the `picotool seal --clear` Nix flake integration.
 - **Action:** Fast-forward `/scratch/code/shibboleth/seedhammer` `main` to `origin/main` (`git merge --ff-only origin/main`) when no local work is in flight.
 
-### OQ-2: Go Toolchain Floor (`go1.26` in `CLAUDE.md` vs `go 1.25.10` in `go.mod`)
-- **Normative instruction (`mnemonic-engrave/CLAUDE.md`):** States `"Minimum Go toolchain floor is go1.26 across all repos with Go code (`seedhammer`, `mnemonic-engrave/preview`). Never downgrade below go1.26"`.
-- **Observed code (`seedhammer/go.mod`, `mnemonic-engrave/preview/go.mod`):** Both files declare `go 1.25.10`, and the active workspace toolchain (`mise`) provides `go1.25.9` / `go1.25.10` because TinyGo 0.39.0's compiler pipeline caps supported Go standard library versions at `go1.25.x`.
-- **Status:** Tracked in [FOLLOWUPS.md](../FOLLOWUPS.md) (`F-238`). Maintain `go 1.25.10` in `go.mod` until TinyGo supports `go1.26`.
+### OQ-2: Host Go 1.26 Compiler Floor vs. `go 1.25.10` Module Directive (`F-494`)
+- **Observed state (`seedhammer/flake.nix:50–63`, `.github/workflows/test.yml:12`, `mnemonic-engrave/CLAUDE.md:42–46`):**
+  - Host Go tests require **Go 1.26** (CI `.github/workflows/test.yml:12` selects `1.26`, `/scratch/code/shibboleth/.toolchain/go` provides `go1.26.7`, Nix flake provides `go1.26.3`, and `gui/op/draw_test.go:176` uses Go 1.26's `testing.ArtifactDir`).
+  - Meanwhile, `seedhammer/go.mod` and `mnemonic-engrave/preview/go.mod` declare `go 1.25.10` because the pinned **TinyGo `0.41.1`** (`seedhammer/flake.nix:52`) checks the module's `go` directive against its `go1.18..go1.25` compatibility range.
+- **Status:** Documented and closed in [FOLLOWUPS.md](../FOLLOWUPS.md) (`F-494`, lines 16616–16638). Run host `go test` with Go 1.26 (`/scratch/code/shibboleth/.toolchain/go/bin/go` or inside `nix develop`), and retain `go 1.25.10` in `go.mod` until the pinned TinyGo version supports `go 1.26`.
 
-### OQ-3: Conflicting Orchestration Policies Between `seedhammer/CLAUDE.md` and `mnemonic-engrave/CLAUDE.md`
+### OQ-3: Reconciling Orchestration Policies Between `seedhammer/CLAUDE.md` and `mnemonic-engrave/CLAUDE.md`
 - **Observed discrepancy:**
-  - `seedhammer/CLAUDE.md` (dated `2026-06-17`) instructs: *"Default to ultracode (`uc`) for code changes"*.
-  - `mnemonic-engrave/CLAUDE.md` (dated `2026-07-26`) instructs: *"Default to direct implementation... Reserve `/ultracode` for genuinely high-risk work"* and explicitly notes that `uc` burned disproportionate quota on low-risk work.
-- **Reconciliation:** The 2026-07-26 risk-scoped policy in `mnemonic-engrave/CLAUDE.md` supersedes the 2026-06-17 blanket `ultracode` rule. `GEMINI.md` in `seedhammer` codifies the reconciled 2026-07-26 policy.
+  - `seedhammer/CLAUDE.md` (dated `2026-06-17`) contains the earlier blanket policy (*"Default ON for every substantial task; token cost is not a constraint"*).
+  - `mnemonic-engrave/CLAUDE.md:11–26` (revised `2026-07-26`, amended through `2026-08-28`) explicitly supersedes the `2026-06-17` blanket rule with a **risk-scoped** policy (*"Trigger it when the work is in the RISK SET below; otherwise work solo and verify inline... Cost is not the constraint; relevance is"*).
+- **Reconciliation:** Follow the risk-scoped policy in `mnemonic-engrave/CLAUDE.md:11–26` together with `/scratch/code/CLAUDE.md`:
+  - **Risk set (orchestrate + mandatory `0C/0I` gates, TDD, separate report-persist commit before fold commit, build gate on every fold, and whole-diff review):** (a) irreversible or physically destructive actions (OTP/fuse writes, firmware signing/flashing, tags/releases); (b) anything touching funds, seeds, keys, or addresses; (c) normative codec behavior changes (wire format, identity/stub algorithms, validation, admission); (d) work spanning many files or repos where no single context holds the whole picture.
+  - **Everything else runs solo with inline verification:** refactors, merges/upstream syncs, build/toolchain/environment work, docs, CI, debugging, and Q&A.
 
 ---
 
@@ -63,11 +66,12 @@ This document records concrete discrepancies between current firmware code (`see
 - **`FIRMWARE-QUICKSTART.txt` (line 122):** Documents building with `-ldflags="-X main.Version=seedhammerii-$(git rev-parse HEAD)"`, whereas `flake.nix` now stamps `v0.0.0-bg<short-sha>[-dirty]` (`gui/gui_test.go` / `gui/gui.go:parseVersion`).
 - **`design/PICOTOOL_PIN.md` (line 121):** States *"The fork's devshell change is its own PR in the fork thread"*, which has already landed on `seedhammer` `origin/main` in commit `abdcb1825ed3bde5e01ff0e4da33f76f08f604c2`.
 
-### OQ-9: `me-preview` Submodule Lag & Engraving Speed Mismatch
-- **Observed state:** `preview/` builds against `third_party/seedhammer` (`7b6f2fbbdb909ef812ccc8c90768280c5fa7a4d4`), which points to the `bg002h/seedhammer` fork but lags `seedhammer` `origin/main` (`abdcb182`) by 24 commits. Furthermore:
-  - Production `SH2` hardware (`cmd/controller/platform_sh2.go:223` and `internal/sh2/params.go`) uses `engravingSpeed = 4 * mm` (halved for deep steel cuts).
-  - `preview/params.go:18` and four test files inside `seedhammer` (`engrave/engrave_test.go`, `backup/backup_test.go`, `gui/gui_test.go`, `stepper/stepper_test.go`) still define `engravingSpeed = 8 * mm` copies (`F-127`, `F-213`).
-- **Consequence:** Golden `.bin` step counts in tests and `me-preview` are calibrated to `8 * mm`, while physical `SH2` cuts emit twice as many steps per millimeter (`4 * mm`), and `third_party/seedhammer` lacks the latest 24 fork commits (including Refugium F5/F7).
+### OQ-9: `me-preview` Submodule Lag vs. Test-Local `8 * mm` Engraving Speed (`F-127`, `F-213`)
+- **Observed state:**
+  - Spatial calibration on `SH2` is fixed at **`mm = 200 / 8 * 256 = 6,400` microsteps/mm** (`cmd/controller/platform_sh2.go:195–201`, `internal/sh2/params.go:20–29`).
+  - Production `SH2` hardware (`cmd/controller/platform_sh2.go:211–223` and `internal/sh2/params.go`) sets `engravingSpeed = 4 * mm` (4 mm/s). Because the needle solenoid fires on a fixed 25 ms period (`needlePeriod`), halving feed speed from 8 mm/s to 4 mm/s halves dot spacing on steel (`0.20` mm → `0.10` mm) and increases the number of sampled timing words in the PIO stream (`stepper/stepper.go:41–77`), while physical microsteps per millimeter (`6,400`) remain unchanged.
+  - As documented in `cmd/controller/platform_sh2.go:218–221`, four test-local parameter copies (`engrave/engrave_test.go`, `backup/backup_test.go`, `gui/gui_test.go`, `stepper/stepper_test.go`) deliberately remain at `8 * mm` so golden `.bin` timing streams do not churn when machine feed speed is tuned.
+  - Separately, `mnemonic-engrave/preview/` builds against `third_party/seedhammer` (`7b6f2fbbdb909ef812ccc8c90768280c5fa7a4d4`), which lags `seedhammer` `origin/main` (`abdcb182`) by 24 commits (`F-213`), and `preview/params.go:18` still carries `EngravingSpeed: 8 * mm` (`F-127`).
 
 ---
 
@@ -79,8 +83,8 @@ This document records concrete discrepancies between current firmware code (`see
 
 ### OQ-11: Pre-Existing `gofmt -l` Unformatted Baseline (`F-499`)
 - **Observed state:** Five files in `seedhammer` (`gui/transaction.go`, `gui/transaction_golden_test.go`, `gui/transaction_txrecord_test.go`, `mt/mt.go`, `mt/mt_test.go`) carry pre-existing unformatted lines (`F-499`).
-- **Guidance:** Do not run repo-wide `gofmt -w .` inside feature PRs; format only touched hunks until `F-499` lands as a dedicated formatting commit.
+- **Guidance:** Do not run repo-wide `gofmt -w .` inside feature PRs; diff `gofmt -l .` against this five-file baseline and format only touched hunks until `F-499` lands as a dedicated formatting commit.
 
-### OQ-12: `bip39.MnemonicSeed` Lacks NFKD Normalization (`F-76`)
+### OQ-12: `bip39.MnemonicSeed` Lacks NFKD Normalization
 - **Observed code (`bip39/bip39.go:261`):** `MnemonicSeed` passes the passphrase string directly to `pbkdf2.Key` without Unicode NFKD normalization.
 - **Current safety boundary:** `passphrase.ValidatePassphrase` (`passphrase/passphrase.go`) and the on-device touch keyboard strictly enforce printable ASCII (`0x20..0x7E`), where NFKD is an identity transform. If non-ASCII passphrases are ever admitted via `sysw` or NFC, NFKD normalization will be required for BIP-39 compliance.
