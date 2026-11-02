@@ -91,7 +91,7 @@ Environment overrides, all optional:
 | `CUT_RELEASE_SIBLINGS` | parent of the main checkout: `dirname "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"` | where the sibling clones live (follow-on scan, §8) |
 | `CUT_RELEASE_DATE` | `date +%F` | date in the new CHANGELOG heading. It must match `^[0-9]{4}-[0-9]{2}-[0-9]{2}$`, else exit 2 `cut-release: CUT_RELEASE_DATE must be YYYY-MM-DD` |
 | `CUT_RELEASE_POLL_SECONDS` | `15` | sleep between polls |
-| `CUT_RELEASE_CACHE` | `${XDG_CACHE_HOME:-$HOME/.cache}/cut-release` | downloads go to `<cache>/<tag>/`, which is deleted and recreated per verify |
+| `CUT_RELEASE_CACHE` | `${XDG_CACHE_HOME:-$HOME/.cache}/cut-release` | downloads go to `<cache>/<tag>/`, which is deleted and recreated per verify (the delete is guarded, §5.4). It must be an absolute path other than `/`, else exit 2 `cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '<cache>')`, checked right after `CUT_RELEASE_DATE`, in every mode, before any other work |
 | `CUT_RELEASE_PUSH_VIA_STAGING` | `<script dir>/push-via-staging.sh` | test seam |
 | `CUT_RELEASE_PUBKEY_FILE` | `<script dir>/../minisign.pub` | test seam |
 
@@ -380,6 +380,21 @@ place of `DRY RUN`, then a third line:
 
 ### 5.4 Verify (one tag; shared by `--push` and `--verify`)
 
+**Cache directory.** Before V1, verify deletes and recreates `<cache>/<tag>`
+(`<cache>` is `CUT_RELEASE_CACHE` or its default). It first checks, in this
+order, and on the first failure prints one line to stderr, exits 2 and deletes
+nothing: (1) `<cache>` is an absolute path other than `/` (a run of slashes
+counts as `/`): `cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '<cache>')`;
+(2) `<tag>` has no `/` and is not `.` or `..`: `cut-release: '<tag>' cannot name a cache directory: it has a '/' or is '.' or '..'`;
+(3) the directory is exactly `<cache>/<tag>` and lies strictly below
+`<cache>`: `cut-release: refusing to delete '<dir>': it is not exactly '<cache>/<tag>' strictly below the cache`.
+The delete is `rm -rf -- "${d:?}"`. Check (1) has already run in `main`
+before any change, so no new exit appears after the tag push. Checks (2) and
+(3) cannot fail from the command line (a tag reaches this point only after its
+prefix matched a table row, no prefix has a `/`, and a tag ends in
+`MAJOR.MINOR.PATCH`); they guard the function itself, and rows 74 and 75 call
+it directly.
+
 The section opens with `== verify <tag>`. Every check runs, even after a
 FAIL. Each prints `   ok    <text>` or `   FAIL  <text>`:
 
@@ -649,14 +664,23 @@ A dry run prints the same block, computed from the pre-run state.
 
 The harness prints `ok <row>` or `FAIL <row>: <why>` per row and ends with
 `cut-release.test: <p> passed, <f> failed`. It exits 0 iff f = 0 and the
-number of rows run equals the expected count: 78 by default, 70 with
-`--offline` (rows 1-70). A row "shows L" when the named stream has L as a whole line.
+number of rows run equals the expected count: 85 by default, 77 with
+`--offline` (rows 1-77). A row "shows L" when the named stream has L as a whole line.
 `<12>`, `<sha>`, `<c sha>` (commit (c)'s full sha) and `<git-dir>`
 (`git rev-parse --absolute-git-dir` in the fixture checkout) in expected
 text are computed by the harness.
 
 **Harness setup.** `T=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test/run-$$`,
-never under /tmp. T is deleted on full success. `PATH=$T/bin:$HOME/.cargo/bin:$PATH`.
+never under /tmp. T is deleted on full success. Every recursive delete in the
+harness and its fixtures is `rm -rf -- "${VAR:?}"`. Deleting `T` itself (at
+the start and at the end) is refused unless `T` matches
+`*/cut-release-test/run-*`. Deleting any other path (`mk_eng`'s argument, the
+paths `fresh` clears, `FXDIR`, `FXBARE`, the assets directory) is refused
+unless it lies strictly below `T` and has no `..` component. A refusal deletes
+nothing, prints `cut-release.test: refusing to delete '<path>': <why>` to
+stderr and exits 2. Fake gh's merge scratch clone is deleted only when it
+lies below `T`, else fake gh prints `fake gh: refusing to delete '<dir>': it is not below <T>` to stderr and exits 1.
+Rows 76 and 77 test this. `PATH=$T/bin:$HOME/.cargo/bin:$PATH`.
 The rest of the environment: `CUT_RELEASE_SIBLINGS=$T/none` (an empty dir),
 `CUT_RELEASE_DATE=2026-11-01`, `CUT_RELEASE_POLL_SECONDS=0`,
 `CUT_RELEASE_CACHE=$T/cache`, `CARGO_TARGET_DIR=$T/target`,
@@ -724,7 +748,8 @@ default). Every fixture change is committed and pushed (helper
   `pr checks` answer from `FAKE_PR_*` env; `pr view` always answers
   `"isCrossRepository": false`. `pr merge` does
   `git merge --no-ff` of the head in a scratch clone of the bare remote,
-  then pushes. `FAKE_GH_KILL=TERM`: on the first `run list` call, runs
+  then pushes and deletes the clone (guarded as in Harness setup).
+  `FAKE_GH_KILL=TERM`: on the first `run list` call, runs
   `kill -TERM "$CUT_RELEASE_TEST_PID"`. `FAKE_GH_DRAFT=1`: `release view`
   answers `isDraft: true`. `FAKE_GH_FAIL=1`: on every `run list` call fake gh prints `fake gh: simulated failure` to stderr and exits 1 (the script makes no `run list` call before the tag push).
   `FAKE_PR_MERGE_STATE=<s>`: `pr view` answers that
@@ -809,20 +834,27 @@ code and what it shows:
 | 68 | cr_follow_on_engrave_demo | `CUT_RELEASE_SIBLINGS=$T/sib`, holding an engrave clone whose two demo files are engrave master's ms lines, copied byte-exact as for F-tk, plus a modified tracked `README.md`; `--dry-run ms-cli-v0.20.3`; then, in `$T/sib/mnemonic-engrave`, run the printed (a) `sed` and `git commit` lines | 0; the commit changes exactly the two demo files, 7 lines; `README.md` is still modified and uncommitted; `grep -c 'ms-cli-v0.20.2'` is 0 in both files (I-6) |
 | 69 | cr_stale_staging | a second clone pushes a commit that is not an ancestor of the bare master tip to `refs/heads/ci/staging` of the bare remote; `--push ms-cli-v0.20.3`, then `--dry-run ms-cli-v0.20.3` | 3 both times; `cut-release: origin has ci/staging at <12>; push-via-staging.sh cannot push a new release commit over it (an interrupted or failed staging run left it). If no staging run is in progress, delete it, then run again: git push origin --delete ci/staging` (`<12>` = the unrelated commit); no tag on the bare remote; bare master unchanged; HEAD unchanged; tree clean; `$T/pvs.log` absent or empty; then, with ci/staging set to the sha of HEAD and then to its parent, --dry-run ms-cli-v0.20.3 exits 0 both times with $T/pvs.log absent or empty |
 | 70 | cr_push_gh_fails_after_tag | `FAKE_GH_FAIL=1`; `--push ms-cli-v0.20.3`; then F-tk with `--push mnemonic-toolkit-v0.105.2` | 7 both times; stderr shows `cut-release: stopped after the tag push by a failing command (above); the tags are pushed and stay pushed: never delete or move them.` and the finish line (the toolkit run also the pins-PR line with (c)'s sha); the tag is on the bare remote; `<git-dir>/cut-release/follow-on.txt` exists; toolkit: local master = bare master = (b) |
+| 71 | cr_cache_root_slash | `CUT_RELEASE_CACHE=/`; `--verify ms-cli-v0.20.2`, run from `$T/none` | 2; `cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '/')`; stdout has no line starting `== verify`; `$T/gh.log` absent or empty |
+| 72 | cr_cache_root_relative | `CUT_RELEASE_CACHE=cache`; `--verify ms-cli-v0.20.2`, run from `$T/none`; then F-ms ready to push, as row 36 (`cr_push_run_failed`) sets it up, `CUT_RELEASE_CACHE=cache`, `--push ms-cli-v0.20.3` | 2; the same line with `'cache'`; stdout has no line starting `== verify`; `$T/none/cache` does not exist; the push: 2, the same line, nothing changed (tree clean, HEAD and the bare remote unchanged, gh.log and pvs.log empty, no local or remote tag `ms-cli-v0.20.3`) |
+| 73 | cr_cache_root_empty | source the script, `set +e`, `CR_CACHE=''`, call `verify_tag ms-cli-v0.20.2` (the command line cannot reach this: `${CUT_RELEASE_CACHE:-...}` turns an empty variable into the default) | 2; the same line with `''`; stdout has no line starting `== verify` |
+| 74 | cr_cache_tag_slash | `$T/cache` and `$T/escape/ms-cli-v0.20.2/keep` exist. Source the script, `set +e`, call `verify_tag '../escape/ms-cli-v0.20.2'`; then `cache_guard <tag> "$CR_CACHE/<tag>"` for the tags `.`, `..` and `a/b`; then the command line `--verify 'x/ms-cli-v0.20.2'` | verify_tag: 2; `cut-release: '../escape/ms-cli-v0.20.2' cannot name a cache directory: it has a '/' or is '.' or '..'`; `$T/escape/ms-cli-v0.20.2/keep` still exists. Each cache_guard: 2 and that line for its tag. Command line: 2; `cut-release: 'x/ms-cli-v0.20.2' is not a release tag of any repo in the table` (U8; it never reaches verify_tag) |
+| 75 | cr_cache_dir_not_below | source the script, `set +e`; `cache_guard ms-cli-v0.20.2 <dir>` for <dir> = `$T/cache`, `$T/cache/other`, `$T`, `$T/cache/ms-cli-v0.20.2/x`; then `cache_guard '' $T/cache/` (an empty tag, which only check (3) catches); then `cache_guard ms-cli-v0.20.2 $T/cache/ms-cli-v0.20.2` | the first four: 2; `cut-release: refusing to delete '<dir>': it is not exactly '<T>/cache/ms-cli-v0.20.2' strictly below the cache`. The empty tag: 2; `cut-release: refusing to delete '<T>/cache/': it is not exactly '<T>/cache/' strictly below the cache`. The last: 0 and nothing on stderr |
+| 76 | cr_harness_rm_guards | `rm_T` and `rm_below_T` called in subshells. A scratch directory `<cache-root>/guard.XXXXXX` (made by `mktemp -d`; it matches no `*/cut-release-test/run-*`) holds a file `keep`; `$T/guard/cut-release-test/run-1` holds `sub`; `$T/guard/outside` exists | with `T` = the scratch directory: `rm_T`, and `rm_below_T <scratch>/x`: 2; `cut-release.test: refusing to delete '<scratch>': T is not */cut-release-test/run-*`; `keep` survives. `rm_T` with `T` empty: 2, the same line with `''`. With `T` = `run-1`: `rm_below_T` of `outside`, of `run-1` itself and of `''`: 2; `cut-release.test: refusing to delete '<path>': it is not strictly below <run-1>`; of `run-1/sub/../../outside`: 2; `cut-release.test: refusing to delete '<path>': it has a '..' component`; `outside` and `sub` survive. `rm_below_T run-1/sub`: 0, `sub` gone. `rm_T`: 0, `run-1` gone. The scratch directory is removed at the end of the row with `rm -f` and `rmdir` |
+| 77 | cr_static_rm | `grep -nE '(^|[^[:alnum:]_])rm +(-[A-Za-z]*[rR][A-Za-z]*\|--recursive)( \|$)'` over `scripts/cut-release.sh`, the harness, `fixtures/cut-release/fake-gh` and `fake-pvs`, comment lines dropped | exactly 4 lines (1 in the script, 2 in the harness, 1 in fake-gh), each matching `rm -<flags> -- "${NAME:?}"` |
 
 Network rows (skipped by `--offline`; need gh auth and rustup's cargo
 first on PATH; the real key and push-via-staging):
 
 | # | row | command | expect |
 |---|---|---|---|
-| 71 | crn_verify_ms | `--verify ms-cli-v0.20.2` | 0; `   ok    SHA256SUMS.x86_64 signed: Trusted comment: ms ms-cli-v0.20.2 SHA256SUMS.x86_64` (same for aarch64, portable), `   ok    every asset of ms-cli-v0.20.1 is present (names with 0.20.1 -> 0.20.2)`, `   ok    ms-0.20.2-x86_64-linux-musl.tar.gz matches SHA256SUMS.x86_64`, `   ok    RAN ms --version -> ms 0.20.2`, `== verify ms-cli-v0.20.2: 7 ok, 0 failed` |
-| 72 | crn_verify_mt | `--verify mt-cli-v0.1.1` | 0; `   ok    SHA256SUMS.portable signed: Trusted comment: mt mt-cli-v0.1.1 SHA256SUMS.portable`, `== verify mt-cli-v0.1.1: 5 ok, 0 failed` |
-| 73 | crn_verify_md_unsigned | `--verify descriptor-mnemonic-md-cli-v0.20.3` | 8; `   FAIL  no SHA256SUMS.aarch64.minisig asset (unsigned release)`, `   FAIL  no SHA256SUMS.portable.minisig asset (unsigned release)`, `   ok    RAN md --version -> md 0.20.3`, `== verify descriptor-mnemonic-md-cli-v0.20.3: 4 ok, 2 failed` |
-| 74 | crn_verify_engrave_retired | `--verify v0.12.0` | 8; `   FAIL  SHA256SUMS.minisig does not verify:` then a line containing `Signature key id in SHA256SUMS.minisig is CA39ECB257009A0F`; `   ok    RAN me --version -> me 0.12.0` |
-| 75 | crn_verify_all | `--verify` | exit 0 iff the last line is `== verify: 7 release(s), 0 failed`; otherwise 8; exactly 7 `== verify <tag>:` lines |
-| 76 | crn_real_mt_dry | clone `https://github.com/bg002h/mnemonic-transaction` (`--reference-if-able $CUT_RELEASE_SIBLINGS_REAL/mnemonic-transaction`); make a bare copy the clone's origin; `cargo fetch --locked`; X from the manifest, N = X's triple with patch+1 (X's triple if X has `-`); `--dry-run mt-cli-v<N>` | 0; `== mt-cli <X> -> <N> (crates/mt-cli/Cargo.toml)`, `== built: mt --version = 'mt <N>'`, `== DRY RUN OK: nothing was pushed; tracked files are as they were`; tree clean |
-| 77 | crn_real_ms_dry | as 76 for mnemonic-secret; in the clone, insert `## ms-codec [Unreleased]`,``,`- test.`,`` and `## ms-cli [Unreleased]`,``,`- test.`,`` above the first `## ` line, commit, push to the bare copy; `--dry-run ms-codec-v<Nc> ms-cli-v<N>` | 0; `== pin: crates/ms-cli/Cargo.toml ms-codec =<Xc> -> =<Nc>`, `== Cargo.lock: 2 version line(s) changed (ms-codec ms-cli)`, `== built: ms --version = 'ms <N>'`; tree clean |
-| 78 | crn_real_tk_dry | as 76 for mnemonic-toolkit; if CHANGELOG's `## [Unreleased]` body is empty, add `- test.` under it and commit; `--dry-run mnemonic-toolkit-v<N>` | 0; shows `== toolkit (b): README markers 2,` (prefix), and exactly one of the two `== toolkit (c): check_cli_pins.py` lines; tree clean |
+| 78 | crn_verify_ms | `--verify ms-cli-v0.20.2` | 0; `   ok    SHA256SUMS.x86_64 signed: Trusted comment: ms ms-cli-v0.20.2 SHA256SUMS.x86_64` (same for aarch64, portable), `   ok    every asset of ms-cli-v0.20.1 is present (names with 0.20.1 -> 0.20.2)`, `   ok    ms-0.20.2-x86_64-linux-musl.tar.gz matches SHA256SUMS.x86_64`, `   ok    RAN ms --version -> ms 0.20.2`, `== verify ms-cli-v0.20.2: 7 ok, 0 failed` |
+| 79 | crn_verify_mt | `--verify mt-cli-v0.1.1` | 0; `   ok    SHA256SUMS.portable signed: Trusted comment: mt mt-cli-v0.1.1 SHA256SUMS.portable`, `== verify mt-cli-v0.1.1: 5 ok, 0 failed` |
+| 80 | crn_verify_md_unsigned | `--verify descriptor-mnemonic-md-cli-v0.20.3` | 8; `   FAIL  no SHA256SUMS.aarch64.minisig asset (unsigned release)`, `   FAIL  no SHA256SUMS.portable.minisig asset (unsigned release)`, `   ok    RAN md --version -> md 0.20.3`, `== verify descriptor-mnemonic-md-cli-v0.20.3: 4 ok, 2 failed` |
+| 81 | crn_verify_engrave_retired | `--verify v0.12.0` | 8; `   FAIL  SHA256SUMS.minisig does not verify:` then a line containing `Signature key id in SHA256SUMS.minisig is CA39ECB257009A0F`; `   ok    RAN me --version -> me 0.12.0` |
+| 82 | crn_verify_all | `--verify` | exit 0 iff the last line is `== verify: 7 release(s), 0 failed`; otherwise 8; exactly 7 `== verify <tag>:` lines |
+| 83 | crn_real_mt_dry | clone `https://github.com/bg002h/mnemonic-transaction` (`--reference-if-able $CUT_RELEASE_SIBLINGS_REAL/mnemonic-transaction`); make a bare copy the clone's origin; `cargo fetch --locked`; X from the manifest, N = X's triple with patch+1 (X's triple if X has `-`); `--dry-run mt-cli-v<N>` | 0; `== mt-cli <X> -> <N> (crates/mt-cli/Cargo.toml)`, `== built: mt --version = 'mt <N>'`, `== DRY RUN OK: nothing was pushed; tracked files are as they were`; tree clean |
+| 84 | crn_real_ms_dry | as 76 for mnemonic-secret; in the clone, insert `## ms-codec [Unreleased]`,``,`- test.`,`` and `## ms-cli [Unreleased]`,``,`- test.`,`` above the first `## ` line, commit, push to the bare copy; `--dry-run ms-codec-v<Nc> ms-cli-v<N>` | 0; `== pin: crates/ms-cli/Cargo.toml ms-codec =<Xc> -> =<Nc>`, `== Cargo.lock: 2 version line(s) changed (ms-codec ms-cli)`, `== built: ms --version = 'ms <N>'`; tree clean |
+| 85 | crn_real_tk_dry | as 76 for mnemonic-toolkit; if CHANGELOG's `## [Unreleased]` body is empty, add `- test.` under it and commit; `--dry-run mnemonic-toolkit-v<N>` | 0; shows `== toolkit (b): README markers 2,` (prefix), and exactly one of the two `== toolkit (c): check_cli_pins.py` lines; tree clean |
 
 `CUT_RELEASE_SIBLINGS_REAL` defaults to `/scratch/code/shibboleth` and is
 used only for `--reference-if-able`. Fake gh run ids are `1000 + position`
@@ -843,7 +875,7 @@ number of crates passed.
    repo. Engrave's CI does not run the new test: that would mean changing
    `release.yml`, which is out of scope. The test is a local gate.
 5. Gate: `bash scripts/test/cut-release.test.sh` →
-   `cut-release.test: 78 passed, 0 failed` (with gh logged in and
+   `cut-release.test: 85 passed, 0 failed` (with gh logged in and
    `$HOME/.cargo/bin` first on PATH), plus engrave's existing CI green on
    the PR. shellcheck is not on the build machine, so it is not a gate;
    row 50 runs `bash -n`.
