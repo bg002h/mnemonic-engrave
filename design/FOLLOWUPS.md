@@ -20639,3 +20639,48 @@ images have only entry 0 as a clear entry, so the hash is right; an image sealed
 `--clear --pin-xip-sram` has a second clear entry and would hash wrongly, so
 `picosign` would compute a signature the boot ROM rejects. Fork-native code (no Rust
 primary). Fix with a test image that has two clear entries.
+
+### F-709 — cut-release spec r1: 20 Minors and 5 Nits, deferred (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r1.md` (r1: 0C/7I/20M/5N; the 7 Importants are folded in the spec). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the r1 spec's: fold r1 added offline rows 51-68, so the network rows M1, M2, M10 and M12 call 51-55, 53, 56-58 and 58 are now 69-73, 71, 74-76 and 76 (rows 33-49 are unchanged).
+
+Minors (one line each):
+
+
+- M1: P2-P21 carry no mode column. `--verify` needs no checkout, and `--land-pr` needs only P1-P3 and P9. A builder that applies P10-P21 to `--verify` breaks rows 51-55 (fails closed).
+- M2: V4's behaviour for a `SHA256SUMS*` with no `.minisig` is undecided (skip, which is what row 53's "4 ok, 2 failed" needs, measured), and so is whether V2's `--` line counts as ok.
+- M3: §5.3 step 3 does not say which of the two refusal texts print, or in what order, when PVS exits non-zero and its output has the bypass line.
+- M4: The resume path (X = N for every crate) is undecided: does step 7 check `<bin> --version`, and what does the Cargo.lock line print for 0 crates? Also: does `--push` print §5.2's would-lines with `PUSH:`?
+- M5: A crate row with no CHANGELOG in a repo that has one (mnemonic-io-lib in engrave) gets `== CHANGELOG: none in mnemonic-engrave`, which is false. C7's handling of a D with no CHANGELOG is only implied.
+- M6: §8(d)'s line format omits the `origin/<default>:` prefix that `git grep <rev>` prints (measured). The builder must be told to strip it.
+- M7: §8(b) does not say whether P and X are regex-escaped, as (a) does. Run as printed (unescaped) it changes exactly 4 lines for ms, md and mk and 1 for gui today (measured).
+- M8: P1 omits `curl` (engrave §5.1 step 8 and toolkit `install-assets.test.sh`), `readelf` (that test's glibc floors) and `timeout` (V6).
+- M9: P20 matches `mnemonic-toolkit-v[0-9.]+`, while `install-pin-check.yml` matches `mnemonic-toolkit-v[0-9]+\.[0-9]+\.[0-9]+` (measured). A first mention ending in "." would refuse falsely, so use the workflow's regex.
+- M10: Rows 56-58 must name the bare copy `<repo>.git`, or P3 refuses. The spec does not say so.
+- M11: §8(a) stops at the commit and push. `check-install-links.sh`'s own FAIL text says "rebuild with demo/sh2/build.sh, and redeploy", so the live page stays stale until `demo/sh2/deploy.sh` runs, which the block does not list.
+- M12: (c)'s toml branch "insert after `[installer-ahead]`" is today's real case (measured) but has no offline row. F-tk exercises only the append branch, and row 58 does not check the toml.
+- M13: §5.3 step 3's "origin/<default> is unchanged" is false when PVS's master push was rejected because origin moved. The printed reset is still right; say "does not have the release commit".
+- M14: §8(b)'s mirrors grep also lists GUI-tier pins that must not move: `manual-gui.yml:227` and `cross-tool-differential.yml:88` for md (measured). Only (d) says some references are deliberate.
+- M15: On a re-run after a bypass, PVS re-stages a SHA that is already on master. Its `ci/staging` push is a no-op and it reads the old check runs, so the re-run tags with no new CI evidence. The STOP rests on the operator having read the previous output.
+- M16: P7 runs only for `--push`. `--land-pr` performs an irreversible merge with uncommitted tooling unchecked.
+- M17: Restore-on-failure by trap is stated only for `--dry-run`. A Ctrl-C during `--push`'s build leaves files modified; the next run's P13 lists them.
+- M18: P18's "origin tag" could come from `ls-remote` or from local tags after the fetch; the spec does not say which. With local tags, a local-only tag would count.
+- M19: `--land-pr` step 2 runs the release-pins check in any repo. A `release-pins-*` head outside the toolkit is refused with "does not contain mnemonic-toolkit-v<V>" (fails closed, but the message misleads).
+- M20: Low-risk rules with no row (each fails closed):
+  - usage: U3, U4, U5, U6, U8
+  - preflight: P1, P2, P8, P9, P10, P15 local-only, P16
+  - CHANGELOG: C2
+  - the `-dev` version rule
+  - toolkit: the (b) invariant exit 4, the (c) checks exit 4, a missing `mnemonic)` entry
+  - §5.1: the step 4 and step 6 failures; step 8 (there is no engrave fixture)
+  - §7: not OPEN, wrong base, no checks, checks timeout, merge failure, ancestry failure
+  - §8: the (b) block and the 40-line cap
+
+Nits (one line each):
+
+- N1: §5.3 step 3 says "drop the local commit", but the toolkit has two.
+- N2: `--help`'s "6 tag push failed (no tag pushed)" is wrong for the peel-mismatch exit 6, where a tag is on origin.
+- N3: P15 local-only says "if you made it by hand", but an interrupted cut-release.sh run leaves local tags too.
+- N4: Row 49's "(its refs are refs/tags/<tag>)" cannot be checked by grep when the refs are in a variable.
+- N5: Rows 35-39 and 42 omit their command and asset setup; they implicitly reuse row 34's and row 33's.

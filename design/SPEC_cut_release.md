@@ -100,7 +100,13 @@ stdout. Every refusal starts with `cut-release: ` and goes to stderr.
 
 Code shape. The script is `set -euo pipefail` functions behind a main guard
 (`if [ "${BASH_SOURCE[0]}" = "$0" ]; then main "$@"; fi`), so the test can
-source it. It uses here-strings, never `echo | grep -q` (F-695). These
+source it. It uses here-strings, never `echo | grep -q` (F-695). The three
+operator texts that contain the words `git push` (§5.3 step 3's second
+toolkit line, the §5.3 step 4a pins-PR line and §6.3 step 4's exit-9 text)
+are each written as one line of a here-document that starts in column 1
+with `cut-release: ` and contains no `"`, `$(` or backtick. Every other
+`git push` in the script is a command, and no comment names it (row 49).
+These
 functions have fixed names and signatures, because rows 28-32 call them:
 
 - `lock_diff_check <old-lock> <new-lock> <crate>...`
@@ -168,13 +174,15 @@ from the latest release of each prefix: every binary prints exactly
 | P9 | `--push`/`--verify`/`--land-pr`: `gh auth status` fails | `cut-release: gh is not logged in (gh auth login)` | 3 |
 | P10 | `git fetch --quiet --tags origin` fails | `cut-release: git fetch origin failed:` + git's stderr, each line indented 3 spaces | 3 |
 | P11 | current branch is not the default | `cut-release: on branch '<b>'; release from <default> (git switch <default>)` | 3 |
-| P12 | `HEAD` ≠ `origin/<default>` | `cut-release: HEAD <12> is not origin/<default> <12>; the release commit must sit directly on the remote tip (git pull --ff-only, or land your commits first)` | 3 |
+| P12 | `HEAD` ≠ `origin/<default>`, and `origin/<default>` is not an ancestor of `HEAD` | `cut-release: HEAD <12> is not origin/<default> <12>; the release commit must sit directly on the remote tip (git pull --ff-only, or land your commits first)` | 3 |
+| P12a | `origin/<default>` is a proper ancestor of `HEAD` (HEAD is <k> commits ahead) | `cut-release: HEAD <12> is <k> commit(s) ahead of origin/<default> <12>; the release commit must sit directly on the remote tip. A 'release: ...' commit from an interrupted cut-release.sh run: drop it (git reset --hard origin/<default>) and run again. A 'pins: installer -> ...' commit: finish as cut-release.sh printed when it stopped, and never land it without its pull request. Any other commit: land it first.` | 3 |
 | P13 | `git status --porcelain --untracked-files=no` non-empty | `cut-release: tracked files are modified; the release commit carries only what cut-release.sh writes. Commit or restore them first:` then `   <path>` per file | 3 |
 | P14 | `rust-toolchain.toml` has `channel = "<c>"`, `<c>` numeric, and `cargo --version` does not start with `cargo <c> ` | `cut-release: cargo --version is '<out>' but rust-toolchain.toml pins <c>; put rustup's cargo first on PATH (PATH=$HOME/.cargo/bin:$PATH)` | 3 |
-| P15 | tag on origin (`git ls-remote --tags origin refs/tags/<tag>`) / only local | `cut-release: tag <tag> already exists on origin` / `cut-release: tag <tag> already exists locally but not on origin; delete it if you made it by hand: git tag -d <tag>` | 3 |
+| P15 | tag on origin (`git ls-remote --tags origin refs/tags/<tag>`) / only local | `cut-release: tag <tag> already exists on origin` then `cut-release: if an interrupted cut-release.sh --push pushed it: cut-release.sh --verify <tag>, then the moves in <git-dir>/cut-release/follow-on.txt` / `cut-release: tag <tag> already exists locally but not on origin; delete it if you made it by hand: git tag -d <tag>` | 3 |
 | P16 | `cargo metadata --no-deps --format-version 1 --offline` fails | `cut-release: cargo metadata failed:` + its stderr indented 3 | 3 |
 | P17 | N not newer than the manifest version X (rule below) | `cut-release: <tag>: <crate> is <X> in <manifest>; <N> is not newer` | 3 |
 | P18 | the newest origin tag `^<prefix>[0-9]+\.[0-9]+\.[0-9]+$` (version L) is not older than N | `cut-release: <tag>: origin already has <prefix><L>, which is not older than <N>` | 3 |
+| P22 | N ≠ X, and N is not a successor of X. With no '-' suffix on X, N is none of X.Y.(Z+1), X.(Y+1).0, (X+1).0.0. With a '-' suffix, triple(N) ≠ triple(X) | `cut-release: <tag>: <crate> is <X> in <manifest>; the next version is one of <X.Y.Z+1> <X.Y+1.0> <X+1.0.0> (a skip is released by hand)`. For a '-' suffix: `cut-release: <tag>: <crate> is <X> in <manifest>; the next version is <triple(X)> (a skip is released by hand)` | 3 |
 | P19 | toolkit, X = N | `cut-release: mnemonic-toolkit is already <N> in crates/mnemonic-toolkit/Cargo.toml; the toolkit release needs its version bump in commit (b), so release it by hand or restore the previous version` | 3 |
 | P20 | toolkit, the first `mnemonic-toolkit-v[0-9.]+` in `scripts/install.sh` is not `mnemonic-toolkit-v<X>` | `cut-release: scripts/install.sh self-pins mnemonic-toolkit-v<Y> but Cargo.toml says <X>; land the previous release's pins PR first` | 3 |
 | P21 | a workspace member's path dependency on a bumped crate has a metadata `req` other than `=X`, `^X` or `*` | `cut-release: <manifest> pins <crate> at '<req>'; expected '=<X>', '^<X>' or no version (fix the pin by hand first)` | 3 |
@@ -312,19 +320,35 @@ place of `DRY RUN`, then a third line:
    `cut-release: the release commit IS on origin/<default>. If the output above shows a bypass, STOP and report it; otherwise re-run the same command: it finds the commit on <default>, re-stages it and tags.`
    If not:
    `cut-release: origin/<default> is unchanged. To retry, drop the local commit and run again: git reset --hard origin/<default>`.
+   For the toolkit, the IS-on-origin line is replaced by these two lines,
+   because a re-run is refused (P12a, then P19):
+   `cut-release: the toolkit release commit (b) <12> IS on origin/master; its tag goes on (c) <12>, which is only on local master (do not reset it). If the output above shows a bypass, STOP and report it.`
+   `cut-release: otherwise finish by hand: git tag -a mnemonic-toolkit-v<N> -m 'mnemonic-toolkit <N>' <c sha> && git push origin refs/tags/mnemonic-toolkit-v<N>; when its release, man-pages, install-pin-check and changelog-check runs are completed/success (gh run list --repo bg002h/mnemonic-toolkit --branch mnemonic-toolkit-v<N>): cut-release.sh --verify mnemonic-toolkit-v<N>, then the pins-PR line below.`
+   They are followed by the pins-PR line of §5.3 step 4a.
    On success: `== FREEZE LIFTED`. Any exit between the FREEZE line and
    that point prints `== FREEZE LIFTED` before its refusal lines. The
    freeze covers only the push-via-staging window: tags go on an explicit
    SHA, so later commits to the branch do no harm.
 4. Tags: `git tag -a <tag> -m '<crate> <N>' <sha>` for each, then one
-   `git push --atomic origin refs/tags/<t1> [refs/tags/<t2>]`. If the push
-   fails: delete the local tags (only those `git ls-remote` shows absent),
-   print
-   `cut-release: pushing the tags failed (atomic; none is on origin):` and
-   git's output indented 3, then exit 6. Afterwards, each
+   `git push --atomic origin refs/tags/<t1> [refs/tags/<t2>]`.
+   If the push fails, read `git ls-remote origin refs/tags/<t>^{}` for every tag.
+   - If every tag peels to `<sha>`, print `== the tag push reported an error, but origin has every tag on <12>; continuing` and continue.
+   - If no tag is on origin, delete the local tags and print `cut-release: pushing the tags failed (atomic; none is on origin):` with git's output indented 3. Then print `cut-release: re-run the same command; it finds the release commit on <default> and tags it` (for the toolkit, §5.3 step 3's two toolkit lines instead), and exit 6.
+   - Otherwise print `cut-release: after the failed push origin has <t> -> <x|absent>` (one line per tag), then `cut-release: STOP and report it`, and exit 6.
+
+   Afterwards, each
    `git ls-remote origin refs/tags/<t>^{}` must equal `<sha>`. If not:
    `cut-release: origin's <t> peels to <x>, not <sha>; STOP and report it`,
    exit 6. Print `== tag <t> -> <12> pushed`.
+4a. **Finishing lines.**
+   - Before the tag push, write the §8 block, computed from the pre-run state as a dry run prints it, to `<git-dir>/cut-release/follow-on.txt` (`<git-dir>` = `git rev-parse --absolute-git-dir`).
+   - The toolkit writes the §6.3 step 5 PR body to `<git-dir>/cut-release/pins-pr-body.md` before §6.3 step 1.
+   - From the tag push on, the script traps INT, TERM and HUP. The trap prints `cut-release: interrupted after the tag push; the tags are pushed and stay pushed: never delete or move them.` and exits 7.
+   - The trap, and every exit 7, 8 or 9, ends with:
+     `cut-release: finish: cut-release.sh --verify <bin tags>; once it shows 0 failed, make the follow-on moves in <git-dir>/cut-release/follow-on.txt`
+   - For the toolkit, until §6.3 step 5 has opened the PR (and except after §6.3 step 4's exit 9), it then adds the pins-PR line:
+     `cut-release: pins PR: git checkout --quiet --detach <c sha> && sh scripts/install-assets.test.sh && git checkout --quiet master && git push origin <c sha>:refs/heads/release-pins-<N> && gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <git-dir>/cut-release/pins-pr-body.md`
+   - The trap keys on a variable set after the tag push, never on `$?`. Measured: bash runs an EXIT trap after SIGINT with `$?` = 0.
 5. Wait for each tag's §3 workflows, by run id. Poll
    `gh run list --repo <slug> --branch <tag> --event push --limit 50 --json databaseId,name,headSha,status,conclusion,url`
    until a run with that `name` and `headSha` = sha exists. Allow at most 40
@@ -347,7 +371,7 @@ place of `DRY RUN`, then a third line:
    (already checked in step 4). Any FAIL gives
    `cut-release: <tag> did not verify (above); the tags stay pushed. STOP and report it.`
    and exit 8. Exits 7 and 8 also print
-   `== follow-on pins are NOT listed: the release is not verified` and skip §8.
+   `== follow-on pins are NOT listed: the release is not verified` and skip §8; they end with the step 4a finishing lines.
 7. The §8 follow-on block, then `== DONE: <tags> published and verified`,
    exit 0.
 
@@ -426,7 +450,7 @@ plus 4 installer lines. This is exactly precedent `b0801244`/`1402d547`.
   `== toolkit (c): check_cli_pins.py fails on (c); the pins PR owes the GUI manual's {#installer-ahead} section (listed below)`.
 - Print
   `== toolkit (c): install.sh self-pin <P> -> <T>; first_signed mnemonic <"" -> "N"|already "V">; Examples.md <k> installer line(s); [installer-ahead] toolkit-tag-implied = "<T>"`.
-- Commit (b) from the index (message §5.3, subject
+- On `--push` only (at §5.3 step 1), commit (b) from the index (message §5.3, subject
   `release: mnemonic-toolkit <N> (installer self-pin follows in the pins commit)`).
   Then `git add` (c)'s three files and commit (c):
   ```
@@ -451,17 +475,23 @@ plus 4 installer lines. This is exactly precedent `b0801244`/`1402d547`.
 3. Wait (§5.3 step 5), then verify T (§5.4).
 4. Run `sh scripts/install-assets.test.sh` at (c). Its last stdout line
    must be `[install-assets.test] OK`. Otherwise exit 9:
-   `cut-release: scripts/install-assets.test.sh failed on (c) <12>; the pins PR was not opened. The tag is published; fix forward in a toolkit PR.`
+   `cut-release: scripts/install-assets.test.sh failed on (c) <12>; the pins PR was not opened. The tag is published. Fix forward on top of (c): git push origin <c sha>:refs/heads/release-pins-<N>, commit the fix to that branch, then gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <git-dir>/cut-release/pins-pr-body.md (a PR without (c) leaves the tag off master).`
 5. `git push origin <c>:refs/heads/release-pins-<N>`, then
-   `gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <f>`.
+   `gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <git-dir>/cut-release/pins-pr-body.md`.
    The body is the §6.4 owed block, followed by
    `Tagged commit: <c sha>. Merge with a merge commit only: squash or rebase would leave the tag off master.`
    If this fails, exit 9:
-   `cut-release: could not open the pins PR (above); (c) is at refs/heads/release-pins-<N>; open it by hand: gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>'`.
+   `cut-release: could not open the pins PR (above); (c) is at refs/heads/release-pins-<N>; open it by hand: gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <git-dir>/cut-release/pins-pr-body.md`.
+   On success, `<url>` is the last line `gh pr create` printed on stdout and
+   `<number>` is the digits after its final `/pull/`. If that line does not
+   match `^https://github\.com/bg002h/mnemonic-toolkit/pull/[0-9]+$`, exit 9:
+   `cut-release: gh pr create exited 0 but printed no pull request URL; find the PR: gh pr list --repo bg002h/mnemonic-toolkit --head release-pins-<N>`.
 6. §8 block, then
    `== toolkit: pins PR <url> is open as a draft; it owes the text above. Its author marks it ready, then: cut-release.sh --land-pr <number>`
-   then `== DONE: <T> published and verified`, exit 0. Local master stays at
-   (c), one commit ahead of origin until the PR merges.
+   then `== DONE: <T> published and verified`, exit 0. Just before the `== DONE` line it runs `git checkout --quiet master && git reset --quiet --keep <b>`: local master
+   equals origin/master, and (c) stays reachable from the tag and
+   `release-pins-<N>`. Every exit after the tag push (7, 8, 9, or a trapped
+   signal) does the same reset first.
 
 A toolkit dry run prints these lines, in place of §5.2's:
 
@@ -484,15 +514,20 @@ These are followed by the §8 block and the `DRY RUN OK` line.
      docs/manual-gui/src/80-troubleshooting/82-binary-and-launch.md {#installer-ahead}: name <T> as installed ahead of the GUI's <G> and say what a GUI user sees differently (precedent 1402d547; create the section as in af986ee4 if it is missing)
      docs/manual-gui/CHANGELOG.md: one line for the declaration
      re-check: python3 docs/manual-gui/tests/check_cli_pins.py --manual-dir docs/manual-gui --install-sh scripts/install.sh
-     land it: cut-release.sh --land-pr <number>   (from a mnemonic-toolkit checkout)
+     land it: cut-release.sh --land-pr <PR number>   (from a mnemonic-toolkit checkout)
 ```
+
+`<PR number>`, here and in §8 (b), is printed as it stands: the PR it names
+does not exist yet when the text is written (the PR body, `follow-on.txt`,
+a dry run). On `--push`, the §6.3 step 6 line that follows §8 names the
+pins PR's number.
 
 ## 7. `--land-pr <n>` (merge-readiness check; any table repo)
 
 Run it inside a checkout of the repo; the slug comes from origin. It does
 not need a clean tree or the default branch.
 
-1. `gh pr view <n> --repo <slug> --json state,isDraft,baseRefName,headRefName,headRefOid,mergeStateStatus,url`.
+1. `gh pr view <n> --repo <slug> --json state,isDraft,baseRefName,headRefName,headRefOid,mergeStateStatus,url,isCrossRepository`.
    Exit 3 with `cut-release: PR #<n> is <STATE>, not OPEN`,
    `cut-release: PR #<n> is a draft; its author marks it ready (gh pr ready <n>) once the owed edits are in`,
    or `cut-release: PR #<n> targets '<b>', not <default>`.
@@ -517,10 +552,18 @@ not need a clean tree or the default branch.
 6. Fetch; `git merge-base --is-ancestor <headRefOid> origin/<default>`, else
    exit 9
    `cut-release: <12> is not on origin/<default> after the merge; STOP and report it`.
-   Then `git push origin --delete <headRefName>`, allowed once ancestry
-   holds (Brian 2026-10-14). Print
-   `== merged PR #<n> (<url>) as a merge commit; <headRefName> deleted`,
-   exit 0.
+   Then, only if `isCrossRepository` is false and
+   `git ls-remote origin refs/heads/<headRefName>` prints `<headRefOid>`, run
+   `git push origin --delete <headRefName>` (allowed once ancestry holds,
+   Brian 2026-10-14) and print
+   `== merged PR #<n> (<url>) as a merge commit; <headRefName> deleted`.
+   Otherwise print
+   `== merged PR #<n> (<url>) as a merge commit; <headRefName> left in place (<reason>)`,
+   where `<reason>` is `it is a fork's branch` or
+   `origin's <headRefName> is <12>, not the merged <12>`.
+   If the delete fails, print
+   `cut-release: merged, but deleting <headRefName> failed:` with git's output
+   indented 3, and exit 9. Otherwise exit 0.
 
 ## 8. Follow-on block (printed, never performed)
 
@@ -551,7 +594,7 @@ and `check-install-links.sh` printed OK.
      cd <S>/mnemonic-engrave && git switch master && git pull --ff-only
      sed -i 's#\b<P>\b#<T>#g; s#\b<stem><X>-#<stem><N>-#g' demo/sh2/src/index.html demo/sh2/CLI_SPINE.md
      ./demo/sh2/check-install-links.sh
-     git commit -am 'demo/sh2: install block advertises <label> v<N>'
+     git commit -m 'demo/sh2: install block advertises <label> v<N>' -- demo/sh2/src/index.html demo/sh2/CLI_SPINE.md
      scripts/push-via-staging.sh master
 ```
 
@@ -573,7 +616,7 @@ the 4 ms installer lines changed.
      Examples golden: <T> and <P> differ in length; keep the --list GIT_TAG column 37 wide
      GUI manual: python3 docs/manual-gui/tests/check_cli_pins.py --manual-dir docs/manual-gui --install-sh scripts/install.sh
        if it fails: [installer-ahead] <key> = "<T>" in pinned-upstream.toml, plus {#installer-ahead} text (holder-facing: the PR's author writes it; precedent 99310923)
-     gates: sh scripts/install-assets.test.sh; then land it: cut-release.sh --land-pr <number>
+     gates: sh scripts/install-assets.test.sh; then land it: cut-release.sh --land-pr <PR number>
 ```
 
 `<key>` is `ms-cli-tag-implied`, `md-cli-tag-implied`,
@@ -603,9 +646,11 @@ A dry run prints the same block, computed from the pre-run state.
 
 The harness prints `ok <row>` or `FAIL <row>: <why>` per row and ends with
 `cut-release.test: <p> passed, <f> failed`. It exits 0 iff f = 0 and the
-number of rows run equals the expected count: 58 by default, 50 with
-`--offline` (rows 1-50). A row "shows L" when the named stream has L as a whole line.
-`<12>` and `<sha>` in expected text are computed by the harness.
+number of rows run equals the expected count: 76 by default, 68 with
+`--offline` (rows 1-68). A row "shows L" when the named stream has L as a whole line.
+`<12>`, `<sha>`, `<c sha>` (commit (c)'s full sha) and `<git-dir>`
+(`git rev-parse --absolute-git-dir` in the fixture checkout) in expected
+text are computed by the harness.
 
 **Harness setup.** `T=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test/run-$$`,
 never under /tmp. T is deleted on full success. `PATH=$T/bin:$HOME/.cargo/bin:$PATH`.
@@ -657,8 +702,11 @@ default). Every fixture change is committed and pushed (helper
   and prints `== OK: <sha> is on $1, CI green, no bypass`. `red` prints
   `FATAL: CI is not green for <sha> -- NOT pushing $1.` and exits 1.
   `bypass` pushes, prints `remote: Bypassed rule violations for refs/heads/$1:`
-  then the OK line, and exits 0.
-- **fake gh** logs every call to `$T/gh.log` and answers exactly the calls
+  then the OK line, and exits 0. `silent` pushes, prints nothing, and exits 0.
+  `landed-fail` pushes, prints `FATAL: origin/$1 is not <sha> after the push`,
+  and exits 1.
+- **fake gh** logs every call to `$T/gh.log`, which the harness empties
+  before each row, and answers exactly the calls
   of §5.3, §5.4, §6.3 and §7. Any other call prints
   `fake gh: unexpected: <args>` and exits 99. Runs: one per name in
   `FAKE_GH_WORKFLOWS` (default: the tag's §3 list plus `fuzz-smoke`), with
@@ -669,9 +717,17 @@ default). Every fixture change is committed and pushed (helper
   file, and `<sums>.minisig` signed with `$T/key/sec` and trusted comment
   `<bin> <tag> <sums>`. `pr create` prints
   `https://github.com/bg002h/mnemonic-toolkit/pull/77`. `pr view` and
-  `pr checks` answer from `FAKE_PR_*` env. `pr merge` does
+  `pr checks` answer from `FAKE_PR_*` env; `pr view` always answers
+  `"isCrossRepository": false`. `pr merge` does
   `git merge --no-ff` of the head in a scratch clone of the bare remote,
-  then pushes.
+  then pushes. `FAKE_GH_KILL=TERM`: on the first `run list` call, runs
+  `kill -TERM "$CUT_RELEASE_TEST_PID"`. `FAKE_GH_DRAFT=1`: `release view`
+  answers `isDraft: true`. `FAKE_PR_MERGE_STATE=<s>`: `pr view` answers that
+  merge state (default CLEAN). `FAKE_PR_BRANCH_MOVES=1`: after merging,
+  `pr merge` pushes one more commit to the head branch. `mk_assets` env
+  `MK_ASSETS_COMMENT=<c>` sets the trusted comment; `MK_ASSETS_TAMPER=1`
+  appends a byte to the archive after the sums are written;
+  `MK_ASSETS_BINVER=<v>` makes the archived bin print `<bin> <v>`.
 
 Offline rows (F-ms unless named). Each row is a command, then its exit
 code and what it shows:
@@ -702,8 +758,8 @@ code and what it shows:
 | 22 | cr_stale_pin | ms-cli pin `=0.10.0`; codec U with entries; `--dry-run ms-codec-v0.10.2` | 3; `cut-release: crates/ms-cli/Cargo.toml pins ms-codec at '=0.10.0'; expected '=0.10.1', '^0.10.1' or no version (fix the pin by hand first)` |
 | 23 | cr_toolchain_mismatch | add `rust-toolchain.toml` with `[toolchain]` + `channel = "1.85.0"`; put first on PATH a fake `cargo` that prints `cargo 9.9.9 (fake)` for `--version` | 3; `cut-release: cargo --version is 'cargo 9.9.9 (fake)' but rust-toolchain.toml pins 1.85.0; put rustup's cargo first on PATH (PATH=$HOME/.cargo/bin:$PATH)` |
 | 24 | cr_push_tooling_dirty | copy cut-release.sh, push-via-staging.sh and minisign.pub into a committed scratch repo `$T/eng`; modify `$T/eng/minisign.pub`; run `$T/eng/scripts/cut-release.sh --push ms-cli-v0.20.3` | 3; `cut-release: minisign.pub in <T>/eng has uncommitted changes; a release runs only committed tooling` |
-| 25 | cr_dry_run_ms_two_tags | codec U with entries (as row 21); `--dry-run ms-codec-v0.10.2 ms-cli-v0.20.3` | 0. Shows: `== ms-codec 0.10.1 -> 0.10.2 (crates/ms-codec/Cargo.toml)`; `== ms-cli 0.20.2 -> 0.20.3 (crates/ms-cli/Cargo.toml)`; `== pin: crates/ms-cli/Cargo.toml ms-codec =0.10.1 -> =0.10.2`; `== CHANGELOG: CHANGELOG.md '## ms-codec [Unreleased]' -> '## ms-codec [0.10.2] — 2026-11-01'`; `== CHANGELOG: CHANGELOG.md '## ms-cli [Unreleased]' -> '## ms-cli [0.20.3] — 2026-11-01'`; `== Cargo.lock: 2 version line(s) changed (ms-codec ms-cli)`; `== built: ms --version = 'ms 0.20.3'`; `DRY RUN: would commit 4 file(s): CHANGELOG.md Cargo.lock crates/ms-cli/Cargo.toml crates/ms-codec/Cargo.toml`; `DRY RUN: would run push-via-staging.sh master`; `DRY RUN: would tag ms-codec-v0.10.2 on the release commit and push refs/tags/ms-codec-v0.10.2`; `DRY RUN: would wait for ms-codec-v0.10.2 workflows: none`; `DRY RUN: would wait for ms-cli-v0.20.3 workflows: release man-release`; `DRY RUN: would check ms-codec-v0.10.2 points at the release commit`; `DRY RUN: would verify ms-cli-v0.20.3: ms-0.20.3-x86_64-linux-musl.tar.gz in SHA256SUMS.x86_64, every SHA256SUMS* signed, 'ms 0.20.3'`; `     mnemonic-engrave: not found at <T>/none/mnemonic-engrave; check it by hand`; `== DRY RUN OK: nothing was pushed; tracked files are as they were`. After: `git status --porcelain` empty, HEAD unchanged, `git ls-remote` of the bare remote unchanged, no local tag `ms-cli-v0.20.3` |
-| 26 | cr_dry_run_resume | commit ms-cli 0.20.3 + the promoted CHANGELOG by hand (lock updated); `--dry-run ms-cli-v0.20.3` | 0; `== ms-cli is already 0.20.3 (crates/ms-cli/Cargo.toml); no version edit`, `== CHANGELOG: CHANGELOG.md already has '## ms-cli [0.20.3]'`, `DRY RUN: nothing to commit; would stage HEAD <12> as it is` |
+| 25 | cr_dry_run_ms_two_tags | codec U with entries (as row 21); `--dry-run ms-codec-v0.10.2 ms-cli-v0.20.3` | 0. Shows: `== ms-codec 0.10.1 -> 0.10.2 (crates/ms-codec/Cargo.toml)`; `== ms-cli 0.20.2 -> 0.20.3 (crates/ms-cli/Cargo.toml)`; `== pin: crates/ms-cli/Cargo.toml ms-codec =0.10.1 -> =0.10.2`; `== CHANGELOG: CHANGELOG.md '## ms-codec [Unreleased]' -> '## ms-codec [0.10.2] — 2026-11-01'`; `== CHANGELOG: CHANGELOG.md '## ms-cli [Unreleased]' -> '## ms-cli [0.20.3] — 2026-11-01'`; `== Cargo.lock: 2 version line(s) changed (ms-codec ms-cli)`; `== built: ms --version = 'ms 0.20.3'`; `DRY RUN: would commit 4 file(s): CHANGELOG.md Cargo.lock crates/ms-cli/Cargo.toml crates/ms-codec/Cargo.toml`; `DRY RUN: would run push-via-staging.sh master`; `DRY RUN: would tag ms-codec-v0.10.2 on the release commit and push refs/tags/ms-codec-v0.10.2`; `DRY RUN: would wait for ms-codec-v0.10.2 workflows: none`; `DRY RUN: would wait for ms-cli-v0.20.3 workflows: release man-release`; `DRY RUN: would check ms-codec-v0.10.2 points at the release commit`; `DRY RUN: would verify ms-cli-v0.20.3: ms-0.20.3-x86_64-linux-musl.tar.gz in SHA256SUMS.x86_64, every SHA256SUMS* signed, 'ms 0.20.3'`; `     mnemonic-engrave: not found at <T>/none/mnemonic-engrave; check it by hand`; `== DRY RUN OK: nothing was pushed; tracked files are as they were`. After: `git status --porcelain` empty; `$T/gh.log` absent or empty; the bare remote's `git ls-remote` output equals its pre-run output; HEAD unchanged; no local tag named in the command |
+| 26 | cr_dry_run_resume | commit ms-cli 0.20.3 + the promoted CHANGELOG by hand (lock updated); `--dry-run ms-cli-v0.20.3` | 0; `== ms-cli is already 0.20.3 (crates/ms-cli/Cargo.toml); no version edit`, `== CHANGELOG: CHANGELOG.md already has '## ms-cli [0.20.3]'`, `DRY RUN: nothing to commit; would stage HEAD <12> as it is`. After: `$T/gh.log` absent or empty; the bare remote's `git ls-remote` output equals its pre-run output; HEAD unchanged; no local tag named in the command |
 | 27 | cr_wrong_version_output | main.rs prints `ms 9.9.9`; `--dry-run ms-cli-v0.20.3` | 4; `cut-release: ms --version printed 'ms 9.9.9', not 'ms 0.20.3'`, last line `cut-release: tracked files restored; nothing was committed or pushed`; tree clean |
 | 28 | cr_fn_lock_diff_check | source the script; old lock vs a copy with ms-cli's version line and one dependency line changed | rc 1; `cut-release: Cargo.lock changed beyond the bumped crates' version lines (2 line(s) changed, 1 expected):` |
 | 29 | cr_fn_promote_plain | `changelog_promote` on `## Unreleased`,``,`- x.`,``,`## mnemonic-gui [0.63.0] — 2026-09-25` with `## mnemonic-gui [0.64.0] — 2026-11-01` | the file is exactly `## Unreleased`,``,`## mnemonic-gui [0.64.0] — 2026-11-01`,``,`- x.`,``,`## mnemonic-gui [0.63.0] — 2026-09-25` |
@@ -713,35 +769,53 @@ code and what it shows:
 | 33 | cr_push_ms_happy | codec U with entries; `--push --trailer 'Co-Authored-By: Test <t@example.invalid>' ms-codec-v0.10.2 ms-cli-v0.20.3`; assets for ms-cli-v0.20.2 (prev) and ms-cli-v0.20.3 | 0; bare master = the release commit, subject `release: ms-codec 0.10.2 + ms-cli 0.20.3`, trailer present; both tags annotated and peeling to it; the committed CHANGELOG lines 3-9 are `## ms-cli [Unreleased]`,``,`## ms-cli [0.20.3] — 2026-11-01`,``,`- a fix.`,``,`## ms-codec [Unreleased]`; shows `   ok    RAN ms --version -> ms 0.20.3`, `   not waited: fuzz-smoke run 1003 completed/success`, `== FREEZE LIFTED`, `== DONE: ms-codec-v0.10.2 ms-cli-v0.20.3 published and verified`; gh.log has no `fake gh: unexpected` |
 | 34 | cr_push_staging_red | `FAKE_PVS=red`, `--push ms-cli-v0.20.3` | 5; `cut-release: push-via-staging.sh exited 1; no tag was pushed.` and `cut-release: origin/master is unchanged. To retry, drop the local commit and run again: git reset --hard origin/master`; no tag on the bare remote |
 | 35 | cr_push_bypass_line | `FAKE_PVS=bypass` | 5; `cut-release: push-via-staging.sh output contains 'Bypassed rule violations'; not tagging. STOP and report it.`; no tag on the bare remote |
-| 36 | cr_push_run_failed | `FAKE_GH_CONCLUSION=failure` | 7; `cut-release: run 1001 (release, ms-cli-v0.20.3) concluded 'failure': <url>`, `cut-release: the tags are pushed and stay pushed: never delete or move them.`, `== follow-on pins are NOT listed: the release is not verified`; the tag is on the bare remote |
+| 36 | cr_push_run_failed | `FAKE_GH_CONCLUSION=failure` | 7; `cut-release: run 1001 (release, ms-cli-v0.20.3) concluded 'failure': <url>`, `cut-release: the tags are pushed and stay pushed: never delete or move them.`, `== follow-on pins are NOT listed: the release is not verified`; the tag is on the bare remote; it also shows the finish line |
 | 37 | cr_push_bad_signature | ms-cli-v0.20.3 signed with a second key | 8; a line starting `   FAIL  SHA256SUMS.x86_64.minisig does not verify:` |
 | 38 | cr_push_missing_minisig | no `.minisig` in assets | 8; `   FAIL  no SHA256SUMS.x86_64.minisig asset (unsigned release)` |
 | 39 | cr_push_missing_asset | prev has `ms-0.20.2-macos-arm64.tar.gz`, new lacks `ms-0.20.3-macos-arm64.tar.gz` | 8; `   FAIL  missing vs ms-cli-v0.20.2: ms-0.20.3-macos-arm64.tar.gz` |
-| 40 | cr_toolkit_dry_run | F-tk; `--dry-run mnemonic-toolkit-v0.105.2` | 0; `== toolkit (b): README markers 2, .examples-build/gen.sh 5 line(s), Examples.md 4 line(s); 4 installer line(s) left for (c)`, `== toolkit (c): install.sh self-pin mnemonic-toolkit-v0.105.1 -> mnemonic-toolkit-v0.105.2; first_signed mnemonic "" -> "0.105.2"; Examples.md 4 installer line(s); [installer-ahead] toolkit-tag-implied = "mnemonic-toolkit-v0.105.2"`, `== toolkit (c): check_cli_pins.py fails on (c); the pins PR owes the GUI manual's {#installer-ahead} section (listed below)`, `DRY RUN: would commit (b) 7 file(s): .examples-build/Examples.md .examples-build/gen.sh CHANGELOG.md Cargo.lock README.md crates/mnemonic-toolkit/Cargo.toml crates/mnemonic-toolkit/README.md`, `DRY RUN: would commit (c) 3 file(s): .examples-build/Examples.md docs/manual-gui/pinned-upstream.toml scripts/install.sh`; tree clean |
+| 40 | cr_toolkit_dry_run | F-tk; `--dry-run mnemonic-toolkit-v0.105.2` | 0; `== toolkit (b): README markers 2, .examples-build/gen.sh 5 line(s), Examples.md 4 line(s); 4 installer line(s) left for (c)`, `== toolkit (c): install.sh self-pin mnemonic-toolkit-v0.105.1 -> mnemonic-toolkit-v0.105.2; first_signed mnemonic "" -> "0.105.2"; Examples.md 4 installer line(s); [installer-ahead] toolkit-tag-implied = "mnemonic-toolkit-v0.105.2"`, `== toolkit (c): check_cli_pins.py fails on (c); the pins PR owes the GUI manual's {#installer-ahead} section (listed below)`, `DRY RUN: would commit (b) 7 file(s): .examples-build/Examples.md .examples-build/gen.sh CHANGELOG.md Cargo.lock README.md crates/mnemonic-toolkit/Cargo.toml crates/mnemonic-toolkit/README.md`, `DRY RUN: would commit (c) 3 file(s): .examples-build/Examples.md docs/manual-gui/pinned-upstream.toml scripts/install.sh`; tree clean. After: `$T/gh.log` absent or empty; the bare remote's `git ls-remote` output equals its pre-run output; HEAD unchanged; no local tag named in the command; no bare `release-pins-*` |
 | 41 | cr_toolkit_pins_ok | F-tk plus a committed `docs/manual-gui/src/82.md` holding `{#installer-ahead}` | 0; `== toolkit (c): check_cli_pins.py OK` |
-| 42 | cr_toolkit_push_happy | F-tk; `--push mnemonic-toolkit-v0.105.2` | 0; bare master = (b); (c)'s parent = (b); the tag peels to (c); bare branch `release-pins-0.105.2` = (c); gh.log has `pr create` with `--draft`; shows `== toolkit: pins PR https://github.com/bg002h/mnemonic-toolkit/pull/77 is open as a draft; it owes the text above. Its author marks it ready, then: cut-release.sh --land-pr 77` |
-| 43 | cr_toolkit_install_assets_fail | as 42 with `FAKE_INSTALL_ASSETS=fail` | 9; `cut-release: scripts/install-assets.test.sh failed on (c) <12>; the pins PR was not opened. The tag is published; fix forward in a toolkit PR.`; no `pr create` in gh.log |
+| 42 | cr_toolkit_push_happy | F-tk; `--push mnemonic-toolkit-v0.105.2` | 0; bare master = (b); (c)'s parent = (b); the tag peels to (c); bare branch `release-pins-0.105.2` = (c); gh.log has `pr create` with `--draft` and `--body-file <git-dir>/cut-release/pins-pr-body.md`, and that file contains `land it: cut-release.sh --land-pr <PR number>`; shows `== toolkit: pins PR https://github.com/bg002h/mnemonic-toolkit/pull/77 is open as a draft; it owes the text above. Its author marks it ready, then: cut-release.sh --land-pr 77`; at exit, local master = bare master = (b) |
+| 43 | cr_toolkit_install_assets_fail | as 42 with `FAKE_INSTALL_ASSETS=fail` | 9; `cut-release: scripts/install-assets.test.sh failed on (c) <12>; the pins PR was not opened. The tag is published. Fix forward on top of (c): git push origin <c sha>:refs/heads/release-pins-0.105.2, commit the fix to that branch, then gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-0.105.2 --draft --title 'pins: installer -> mnemonic-toolkit-v0.105.2' --body-file <git-dir>/cut-release/pins-pr-body.md (a PR without (c) leaves the tag off master).`; no `pr create` in gh.log |
 | 44 | cr_land_pr_draft | `FAKE_PR_DRAFT=true`; `--land-pr 77` | 3; `cut-release: PR #77 is a draft; its author marks it ready (gh pr ready 77) once the owed edits are in` |
 | 45 | cr_land_pr_failed_check | one check bucket `fail` named `manual-gui` | 9; `cut-release: PR #77 check 'manual-gui' is fail: <link>` |
-| 46 | cr_land_pr_happy | after row 42; PR ready, checks pass/skipping, state CLEAN | 0; bare master is a merge commit with (c) as a parent; branch `release-pins-0.105.2` gone; `== merged PR #77 (<url>) as a merge commit; release-pins-0.105.2 deleted` |
+| 46 | cr_land_pr_happy | after row 42; PR ready, checks pass/skipping, state CLEAN | 0; bare master is a merge commit with (c) as a parent; branch `release-pins-0.105.2` gone; `== merged PR #77 (<url>) as a merge commit; release-pins-0.105.2 deleted`; gh.log has exactly one `pr merge` line, `pr merge 77 --repo bg002h/mnemonic-toolkit --merge --match-head-commit <c sha>`. The fake `pr merge` answers only that argv shape; any other prints `fake gh: unexpected: <args>` and exits 99 |
 | 47 | cr_land_pr_tag_not_in_pr | head = a commit not containing the tag | 9; `cut-release: PR #77 does not contain mnemonic-toolkit-v0.105.2 (<12>); merging it would leave the tag off master` |
-| 48 | cr_dry_run_mt | F-mt; `--dry-run mt-cli-v0.1.2` | 0; `== CHANGELOG: none in mnemonic-transaction`, `== Cargo.lock: 1 version line(s) changed (mt-cli)`, `DRY RUN: would commit 2 file(s): Cargo.lock crates/mt-cli/Cargo.toml`, `DRY RUN: would wait for mt-cli-v0.1.2 workflows: release` |
-| 49 | cr_static_push | `grep -nE '\bgit push\b' scripts/cut-release.sh` | exactly 3 lines. One contains `--atomic origin` (its refs are `refs/tags/<tag>`), one contains `refs/heads/release-pins-`, one contains `origin --delete`. None contains `--tags`, `--force`, ` -f `, `HEAD:` or `--mirror` (default-branch pushes happen only inside push-via-staging) |
+| 48 | cr_dry_run_mt | F-mt; `--dry-run mt-cli-v0.1.2` | 0; `== CHANGELOG: none in mnemonic-transaction`, `== Cargo.lock: 1 version line(s) changed (mt-cli)`, `DRY RUN: would commit 2 file(s): Cargo.lock crates/mt-cli/Cargo.toml`, `DRY RUN: would wait for mt-cli-v0.1.2 workflows: release`. After: `$T/gh.log` absent or empty; the bare remote's `git ls-remote` output equals its pre-run output; HEAD unchanged; no local tag named in the command |
+| 49 | cr_static_push | `grep -nE '\bgit push\b' scripts/cut-release.sh`; L1 = its output lines that match `^[0-9]+:cut-release: `, L2 = the other lines | L2: exactly 3 lines. One contains `--atomic origin` (its refs are `refs/tags/<tag>`), one contains `refs/heads/release-pins-`, one contains `origin --delete`. None contains `--tags`, `--force`, ` -f `, `HEAD:` or `--mirror` (default-branch pushes happen only inside push-via-staging). L1: after its `<n>:`, every line starts with `cut-release: otherwise finish by hand: `, `cut-release: pins PR: ` or `cut-release: scripts/install-assets.test.sh failed on (c) `, and no line contains `"`, `$(` or a backtick (§2 code shape) |
 | 50 | cr_bash_n | `bash -n` on the script and the harness | rc 0 |
+| 51 | cr_ahead_of_origin | one local commit, subject `release: ms-cli 0.20.3`, not pushed; `--dry-run ms-cli-v0.20.3` | 3; the P12a text with k = 1 (I-2) |
+| 52 | cr_toolkit_already_bumped | F-tk with the crate at 0.105.2 (fx_commit); `--dry-run mnemonic-toolkit-v0.105.2` | 3; `cut-release: mnemonic-toolkit is already 0.105.2 in crates/mnemonic-toolkit/Cargo.toml; the toolkit release needs its version bump in commit (b), so release it by hand or restore the previous version` |
+| 53 | cr_toolkit_selfpin_lags | F-tk with install.sh naming `mnemonic-toolkit-v0.105.0`; `--dry-run mnemonic-toolkit-v0.105.2` | 3; `cut-release: scripts/install.sh self-pins mnemonic-toolkit-v0.105.0 but Cargo.toml says 0.105.1; land the previous release's pins PR first` |
+| 54 | cr_push_pvs_no_ok_line | `FAKE_PVS=silent`; `--push ms-cli-v0.20.3` | 5; `cut-release: push-via-staging.sh exited 0 without its '== OK:' line; not tagging`; no tag on the bare remote |
+| 55 | cr_push_pvs_failed_after_landing | `FAKE_PVS=landed-fail`; `--push ms-cli-v0.20.3`; then the same command with `FAKE_PVS=ok` | first run: 5; `cut-release: push-via-staging.sh exited 1; no tag was pushed.` and `cut-release: the release commit IS on origin/master. If the output above shows a bypass, STOP and report it; otherwise re-run the same command: it finds the commit on master, re-stages it and tags.`; no tag. Second run: 0; `== ms-cli is already 0.20.3 (crates/ms-cli/Cargo.toml); no version edit`; the tag peels to the first run's commit; bare master unchanged by the second run |
+| 56 | cr_toolkit_pvs_failed_after_landing | F-tk; `FAKE_PVS=landed-fail`; `--push mnemonic-toolkit-v0.105.2`; then run the printed `git tag -a … && git push …` | 5; the two I-1 lines with (b)'s and (c)'s `<12>`; `<git-dir>/cut-release/pins-pr-body.md` exists; no tag. After the printed commands run: the tag peels to (c) |
+| 57 | cr_push_tag_push_fails | the bare remote gets a pre-receive hook that rejects `refs/tags/*`; `--push ms-cli-v0.20.3` | 6; `cut-release: pushing the tags failed (atomic; none is on origin):` and `cut-release: re-run the same command; it finds the release commit on master and tags it`; no local tag; bare master = the release commit |
+| 58 | cr_push_run_never_appears | `FAKE_GH_WORKFLOWS=fuzz-smoke`; `--push ms-cli-v0.20.3` | 7; `cut-release: no 'release' run appeared for ms-cli-v0.20.3 within 10 minutes`; the finish line |
+| 59 | cr_push_interrupted_after_tag | `FAKE_GH_KILL=TERM`; run as `bash -c 'export CUT_RELEASE_TEST_PID=$$; exec <script> --push ms-cli-v0.20.3'` | 7; stderr ends with the interrupted line and the finish line; line 1 of `<git-dir>/cut-release/follow-on.txt` is `== FOLLOW-ON: not done by this script; each is a commit or PR in the named repo`; the tag is on the bare remote |
+| 60 | cr_toolkit_run_failed | F-tk; `FAKE_GH_CONCLUSION=failure`; `--push mnemonic-toolkit-v0.105.2` | 7; shows the pins-PR line with (c)'s sha; local master = bare master = (b); no bare `release-pins-0.105.2` |
+| 61 | cr_push_release_draft | `FAKE_GH_DRAFT=1`; `--push ms-cli-v0.20.3` | 8; `   FAIL  release is a draft` |
+| 62 | cr_push_trusted_comment | ms-cli-v0.20.3 assets with `MK_ASSETS_COMMENT='ms ms-cli-v0.20.2 SHA256SUMS.x86_64'` | 8; `   FAIL  SHA256SUMS.x86_64 trusted comment is 'ms ms-cli-v0.20.2 SHA256SUMS.x86_64', not '... ms-cli-v0.20.3 SHA256SUMS.x86_64'` |
+| 63 | cr_push_checksum_mismatch | `MK_ASSETS_TAMPER=1` | 8; `   FAIL  ms-0.20.3-x86_64-linux-musl.tar.gz does not match SHA256SUMS.x86_64` |
+| 64 | cr_push_wrong_binary_version | `MK_ASSETS_BINVER=0.20.2` | 8; `   FAIL  ms --version printed 'ms 0.20.2', not 'ms 0.20.3'` |
+| 65 | cr_version_skip | `--dry-run ms-cli-v0.20.4` | 3; `cut-release: ms-cli-v0.20.4: ms-cli is 0.20.2 in crates/ms-cli/Cargo.toml; the next version is one of 0.20.3 0.21.0 1.0.0 (a skip is released by hand)` (I-4) |
+| 66 | cr_land_pr_not_clean | row 42's state; PR ready, checks pass, `FAKE_PR_MERGE_STATE=BLOCKED`; `--land-pr 77` | 9; `cut-release: PR #77 merge state is BLOCKED, not CLEAN`; no `pr merge` in gh.log |
+| 67 | cr_land_pr_branch_moved | as row 46, with `FAKE_PR_BRANCH_MOVES=1` | 0; `== merged PR #77 (<url>) as a merge commit; release-pins-0.105.2 left in place (origin's release-pins-0.105.2 is <12>, not the merged <12>)`; the bare branch still exists (I-5) |
+| 68 | cr_follow_on_engrave_demo | `CUT_RELEASE_SIBLINGS=$T/sib`, holding an engrave clone whose two demo files are engrave master's ms lines, copied byte-exact as for F-tk, plus a modified tracked `README.md`; `--dry-run ms-cli-v0.20.3`; then, in `$T/sib/mnemonic-engrave`, run the printed (a) `sed` and `git commit` lines | 0; the commit changes exactly the two demo files, 7 lines; `README.md` is still modified and uncommitted; `grep -c 'ms-cli-v0.20.2'` is 0 in both files (I-6) |
 
 Network rows (skipped by `--offline`; need gh auth and rustup's cargo
 first on PATH; the real key and push-via-staging):
 
 | # | row | command | expect |
 |---|---|---|---|
-| 51 | crn_verify_ms | `--verify ms-cli-v0.20.2` | 0; `   ok    SHA256SUMS.x86_64 signed: Trusted comment: ms ms-cli-v0.20.2 SHA256SUMS.x86_64` (same for aarch64, portable), `   ok    every asset of ms-cli-v0.20.1 is present (names with 0.20.1 -> 0.20.2)`, `   ok    ms-0.20.2-x86_64-linux-musl.tar.gz matches SHA256SUMS.x86_64`, `   ok    RAN ms --version -> ms 0.20.2`, `== verify ms-cli-v0.20.2: 7 ok, 0 failed` |
-| 52 | crn_verify_mt | `--verify mt-cli-v0.1.1` | 0; `   ok    SHA256SUMS.portable signed: Trusted comment: mt mt-cli-v0.1.1 SHA256SUMS.portable`, `== verify mt-cli-v0.1.1: 5 ok, 0 failed` |
-| 53 | crn_verify_md_unsigned | `--verify descriptor-mnemonic-md-cli-v0.20.3` | 8; `   FAIL  no SHA256SUMS.aarch64.minisig asset (unsigned release)`, `   FAIL  no SHA256SUMS.portable.minisig asset (unsigned release)`, `   ok    RAN md --version -> md 0.20.3`, `== verify descriptor-mnemonic-md-cli-v0.20.3: 4 ok, 2 failed` |
-| 54 | crn_verify_engrave_retired | `--verify v0.12.0` | 8; `   FAIL  SHA256SUMS.minisig does not verify:` then a line containing `Signature key id in SHA256SUMS.minisig is CA39ECB257009A0F`; `   ok    RAN me --version -> me 0.12.0` |
-| 55 | crn_verify_all | `--verify` | exit 0 iff the last line is `== verify: 7 release(s), 0 failed`; otherwise 8; exactly 7 `== verify <tag>:` lines |
-| 56 | crn_real_mt_dry | clone `https://github.com/bg002h/mnemonic-transaction` (`--reference-if-able $CUT_RELEASE_SIBLINGS_REAL/mnemonic-transaction`); make a bare copy the clone's origin; `cargo fetch --locked`; X from the manifest, N = X's triple with patch+1 (X's triple if X has `-`); `--dry-run mt-cli-v<N>` | 0; `== mt-cli <X> -> <N> (crates/mt-cli/Cargo.toml)`, `== built: mt --version = 'mt <N>'`, `== DRY RUN OK: nothing was pushed; tracked files are as they were`; tree clean |
-| 57 | crn_real_ms_dry | as 56 for mnemonic-secret; in the clone, insert `## ms-codec [Unreleased]`,``,`- test.`,`` and `## ms-cli [Unreleased]`,``,`- test.`,`` above the first `## ` line, commit, push to the bare copy; `--dry-run ms-codec-v<Nc> ms-cli-v<N>` | 0; `== pin: crates/ms-cli/Cargo.toml ms-codec =<Xc> -> =<Nc>`, `== Cargo.lock: 2 version line(s) changed (ms-codec ms-cli)`, `== built: ms --version = 'ms <N>'`; tree clean |
-| 58 | crn_real_tk_dry | as 56 for mnemonic-toolkit; if CHANGELOG's `## [Unreleased]` body is empty, add `- test.` under it and commit; `--dry-run mnemonic-toolkit-v<N>` | 0; shows `== toolkit (b): README markers 2,` (prefix), and exactly one of the two `== toolkit (c): check_cli_pins.py` lines; tree clean |
+| 69 | crn_verify_ms | `--verify ms-cli-v0.20.2` | 0; `   ok    SHA256SUMS.x86_64 signed: Trusted comment: ms ms-cli-v0.20.2 SHA256SUMS.x86_64` (same for aarch64, portable), `   ok    every asset of ms-cli-v0.20.1 is present (names with 0.20.1 -> 0.20.2)`, `   ok    ms-0.20.2-x86_64-linux-musl.tar.gz matches SHA256SUMS.x86_64`, `   ok    RAN ms --version -> ms 0.20.2`, `== verify ms-cli-v0.20.2: 7 ok, 0 failed` |
+| 70 | crn_verify_mt | `--verify mt-cli-v0.1.1` | 0; `   ok    SHA256SUMS.portable signed: Trusted comment: mt mt-cli-v0.1.1 SHA256SUMS.portable`, `== verify mt-cli-v0.1.1: 5 ok, 0 failed` |
+| 71 | crn_verify_md_unsigned | `--verify descriptor-mnemonic-md-cli-v0.20.3` | 8; `   FAIL  no SHA256SUMS.aarch64.minisig asset (unsigned release)`, `   FAIL  no SHA256SUMS.portable.minisig asset (unsigned release)`, `   ok    RAN md --version -> md 0.20.3`, `== verify descriptor-mnemonic-md-cli-v0.20.3: 4 ok, 2 failed` |
+| 72 | crn_verify_engrave_retired | `--verify v0.12.0` | 8; `   FAIL  SHA256SUMS.minisig does not verify:` then a line containing `Signature key id in SHA256SUMS.minisig is CA39ECB257009A0F`; `   ok    RAN me --version -> me 0.12.0` |
+| 73 | crn_verify_all | `--verify` | exit 0 iff the last line is `== verify: 7 release(s), 0 failed`; otherwise 8; exactly 7 `== verify <tag>:` lines |
+| 74 | crn_real_mt_dry | clone `https://github.com/bg002h/mnemonic-transaction` (`--reference-if-able $CUT_RELEASE_SIBLINGS_REAL/mnemonic-transaction`); make a bare copy the clone's origin; `cargo fetch --locked`; X from the manifest, N = X's triple with patch+1 (X's triple if X has `-`); `--dry-run mt-cli-v<N>` | 0; `== mt-cli <X> -> <N> (crates/mt-cli/Cargo.toml)`, `== built: mt --version = 'mt <N>'`, `== DRY RUN OK: nothing was pushed; tracked files are as they were`; tree clean |
+| 75 | crn_real_ms_dry | as 74 for mnemonic-secret; in the clone, insert `## ms-codec [Unreleased]`,``,`- test.`,`` and `## ms-cli [Unreleased]`,``,`- test.`,`` above the first `## ` line, commit, push to the bare copy; `--dry-run ms-codec-v<Nc> ms-cli-v<N>` | 0; `== pin: crates/ms-cli/Cargo.toml ms-codec =<Xc> -> =<Nc>`, `== Cargo.lock: 2 version line(s) changed (ms-codec ms-cli)`, `== built: ms --version = 'ms <N>'`; tree clean |
+| 76 | crn_real_tk_dry | as 74 for mnemonic-toolkit; if CHANGELOG's `## [Unreleased]` body is empty, add `- test.` under it and commit; `--dry-run mnemonic-toolkit-v<N>` | 0; shows `== toolkit (b): README markers 2,` (prefix), and exactly one of the two `== toolkit (c): check_cli_pins.py` lines; tree clean |
 
 `CUT_RELEASE_SIBLINGS_REAL` defaults to `/scratch/code/shibboleth` and is
 used only for `--reference-if-able`. Fake gh run ids are `1000 + position`
@@ -762,7 +836,7 @@ number of crates passed.
    repo. Engrave's CI does not run the new test: that would mean changing
    `release.yml`, which is out of scope. The test is a local gate.
 5. Gate: `bash scripts/test/cut-release.test.sh` →
-   `cut-release.test: 58 passed, 0 failed` (with gh logged in and
+   `cut-release.test: 76 passed, 0 failed` (with gh logged in and
    `$HOME/.cargo/bin` first on PATH), plus engrave's existing CI green on
    the PR. shellcheck is not on the build machine, so it is not a gate;
    row 50 runs `bash -n`.
