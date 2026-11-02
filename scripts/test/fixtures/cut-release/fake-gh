@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# fixture: a fake gh for scripts/test/cut-release.test.sh. It answers exactly
+# the calls cut-release.sh makes (spec sections 5.3, 5.4, 6.3 and 7), logs every
+# call to $T/gh.log, and answers anything else with "fake gh: unexpected: ...".
+#
+#   FAKE_GH_WORKFLOWS   space-separated run names (default: the tag's list + fuzz-smoke)
+#   FAKE_GH_CONCLUSION  conclusion of every run (default success)
+#   FAKE_GH_KILL=TERM   on the first run list call, TERM $CUT_RELEASE_TEST_PID
+#   FAKE_GH_FAIL=1      every run list call fails
+#   FAKE_GH_DRAFT=1     release view answers isDraft true
+#   FAKE_PR_STATE FAKE_PR_DRAFT FAKE_PR_BASE FAKE_PR_HEAD FAKE_PR_OID
+#   FAKE_PR_MERGE_STATE FAKE_PR_CHECKS FAKE_PR_BRANCH_MOVES
+set -u
+T=${CUT_RELEASE_TEST_T:?}
+printf '%s\n' "$*" >>"$T/gh.log"
+
+unexpected() {
+    echo "fake gh: unexpected: $*"
+    printf 'fake gh: unexpected: %s\n' "$*" >>"$T/gh.log"
+    exit 99
+}
+
+# value of --flag in the arguments
+flag() {
+    local want=$1 a prev=""
+    shift
+    for a in "$@"; do
+        if [ "$prev" = "$want" ]; then printf '%s' "$a"; return 0; fi
+        prev=$a
+    done
+    return 1
+}
+
+repo_name() { local r; r=$(flag --repo "$@") || unexpected "$@"; printf '%s' "${r#bg002h/}"; }
+
+tag_workflows() {
+    case "$1" in
+        mnemonic-toolkit-v*) echo "release man-pages install-pin-check changelog-check" ;;
+        ms-cli-v*) echo "release man-release" ;;
+        ms-codec-v*) echo "" ;;
+        descriptor-mnemonic-md-cli-v*) echo "release man-pages" ;;
+        md-codec-v*) echo "" ;;
+        mk-cli-v*) echo "release musl-binaries CI" ;;
+        mk-codec-v*) echo "CI" ;;
+        mt-cli-v*) echo "release" ;;
+        mnemonic-gui-v*) echo "build schema-mirror" ;;
+        mnemonic-io-lib-v*) echo "" ;;
+        v*) echo "release" ;;
+        *) echo "" ;;
+    esac
+}
+
+conclusion=${FAKE_GH_CONCLUSION:-success}
+
+case "${1:-} ${2:-}" in
+    "auth status")
+        exit 0
+        ;;
+    "run list")
+        repo=$(repo_name "$@")
+        tag=$(flag --branch "$@") || unexpected "$@"
+        if [ "${FAKE_GH_KILL:-}" = TERM ] && [ ! -e "$T/gh.killed" ]; then
+            : >"$T/gh.killed"
+            kill -TERM "$CUT_RELEASE_TEST_PID"
+        fi
+        if [ "${FAKE_GH_FAIL:-}" = 1 ]; then
+            echo "fake gh: simulated failure" >&2
+            exit 1
+        fi
+        sha=$(git --git-dir="$T/remote/$repo.git" rev-parse "refs/tags/$tag^{commit}" 2>/dev/null || true)
+        if [ -n "${FAKE_GH_WORKFLOWS+x}" ]; then
+            names=$FAKE_GH_WORKFLOWS
+        else
+            names="$(tag_workflows "$tag") fuzz-smoke"
+        fi
+        out='[]'
+        i=0
+        for n in $names; do
+            i=$((i + 1))
+            out=$(jq -c --arg n "$n" --argjson id $((1000 + i)) --arg s "$sha" --arg c "$conclusion" \
+                --arg u "https://github.com/bg002h/$repo/actions/runs/$((1000 + i))" \
+                '. + [{databaseId: $id, name: $n, headSha: $s, status: "completed", conclusion: $c, url: $u}]' <<<"$out")
+        done
+        printf '%s\n' "$out"
+        ;;
+    "run view")
+        repo=$(repo_name "$@")
+        id=$3
+        jq -nc --arg c "$conclusion" --arg u "https://github.com/bg002h/$repo/actions/runs/$id" \
+            '{status: "completed", conclusion: $c, url: $u}'
+        ;;
+    "release view")
+        tag=$3
+        d=$T/assets/$tag
+        if [ ! -d "$d" ]; then
+            echo "release not found" >&2
+            exit 1
+        fi
+        draft=false
+        if [ "${FAKE_GH_DRAFT:-}" = 1 ]; then draft=true; fi
+        names=$(cd "$d" && ls -1)
+        jq -nc --argjson d "$draft" --arg names "$names" \
+            '{isDraft: $d, isPrerelease: false, assets: [($names | split("\n") | .[] | select(. != "") | {name: .})]}'
+        ;;
+    "release list")
+        out='[]'
+        if [ -d "$T/assets" ]; then
+            for d in "$T"/assets/*/; do
+                [ -d "$d" ] || continue
+                out=$(jq -c --arg t "$(basename "$d")" '. + [{tagName: $t, isDraft: false, isPrerelease: false}]' <<<"$out")
+            done
+        fi
+        printf '%s\n' "$out"
+        ;;
+    "release download")
+        tag=$3
+        dir=$(flag --dir "$@") || unexpected "$@"
+        d=$T/assets/$tag
+        [ -d "$d" ] || { echo "release not found" >&2; exit 1; }
+        pats=()
+        prev=""
+        for a in "$@"; do
+            if [ "$prev" = --pattern ]; then pats+=("$a"); fi
+            prev=$a
+        done
+        got=0
+        for f in "$d"/*; do
+            b=$(basename "$f")
+            for p in "${pats[@]}"; do
+                # shellcheck disable=SC2053
+                if [[ $b == $p ]]; then cp "$f" "$dir/$b"; got=1; break; fi
+            done
+        done
+        [ "$got" -eq 1 ] || { echo "no assets match the file pattern" >&2; exit 1; }
+        ;;
+    "pr create")
+        echo "Creating pull request for release-pins into master"
+        echo "https://github.com/bg002h/mnemonic-toolkit/pull/77"
+        ;;
+    "pr view")
+        repo=$(repo_name "$@")
+        head=${FAKE_PR_HEAD:-release-pins-0.105.2}
+        oid=${FAKE_PR_OID:-$(git --git-dir="$T/remote/$repo.git" rev-parse "refs/heads/$head" 2>/dev/null || true)}
+        jq -nc --arg st "${FAKE_PR_STATE:-OPEN}" --argjson dr "${FAKE_PR_DRAFT:-false}" \
+            --arg base "${FAKE_PR_BASE:-master}" --arg head "$head" --arg oid "$oid" \
+            --arg ms "${FAKE_PR_MERGE_STATE:-CLEAN}" --arg url "https://github.com/bg002h/$repo/pull/$3" \
+            '{state: $st, isDraft: $dr, baseRefName: $base, headRefName: $head, headRefOid: $oid,
+              mergeStateStatus: $ms, url: $url, isCrossRepository: false}'
+        ;;
+    "pr checks")
+        if [ -n "${FAKE_PR_CHECKS:-}" ]; then
+            printf '%s\n' "$FAKE_PR_CHECKS"
+        else
+            echo '[{"name":"manual-gui","bucket":"pass","link":"https://example.invalid/1"},{"name":"lint","bucket":"skipping","link":"https://example.invalid/2"}]'
+        fi
+        ;;
+    "pr merge")
+        repo=$(repo_name "$@")
+        n=$3
+        # the only accepted argv shape
+        if [ "$#" -ne 8 ] || [ "$4" != --repo ] || [ "$6" != --merge ] || [ "$7" != --match-head-commit ]; then
+            unexpected "$@"
+        fi
+        head=${FAKE_PR_HEAD:-release-pins-0.105.2}
+        bare=$T/remote/$repo.git
+        tip=$(git --git-dir="$bare" rev-parse "refs/heads/$head")
+        if [ "$tip" != "$8" ]; then
+            echo "fake gh: head branch moved: $tip" >&2
+            exit 1
+        fi
+        scratch=$(mktemp -d "$T/merge.XXXXXX")
+        git clone -q "$bare" "$scratch/w"
+        (
+            cd "$scratch/w"
+            git merge -q --no-ff -m "Merge pull request #$n" "origin/$head"
+            git push -q origin HEAD
+            if [ "${FAKE_PR_BRANCH_MOVES:-}" = 1 ]; then
+                git checkout -q -b moved "origin/$head"
+                git commit -q --allow-empty -m "one more commit on the head branch"
+                git push -q origin "HEAD:refs/heads/$head"
+            fi
+        ) || exit 1
+        rm -rf "$scratch"
+        ;;
+    *)
+        unexpected "$@"
+        ;;
+esac

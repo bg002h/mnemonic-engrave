@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# fixture: stands in for push-via-staging.sh. FAKE_PVS = ok (default) | red | bypass | silent | landed-fail
+set -u
+T=${CUT_RELEASE_TEST_T:?}
+sha=$(git rev-parse HEAD)
+printf '%s %s\n' "$*" "$sha" >>"$T/pvs.log"
+case "${FAKE_PVS:-ok}" in
+    ok)
+        git push -q origin "HEAD:refs/heads/$1" || exit 1
+        echo "== OK: $sha is on $1, CI green, no bypass"
+        ;;
+    red)
+        echo "FATAL: CI is not green for $sha -- NOT pushing $1."
+        exit 1
+        ;;
+    bypass)
+        git push -q origin "HEAD:refs/heads/$1" || exit 1
+        echo "remote: Bypassed rule violations for refs/heads/$1:"
+        echo "== OK: $sha is on $1, CI green, no bypass"
+        ;;
+    silent)
+        git push -q origin "HEAD:refs/heads/$1" || exit 1
+        ;;
+    landed-fail)
+        git push -q origin "HEAD:refs/heads/$1" || exit 1
+        echo "FATAL: origin/$1 is not $sha after the push"
+        exit 1
+        ;;
+    *)
+        echo "fake-pvs: unknown FAKE_PVS=$FAKE_PVS" >&2
+        exit 99
+        ;;
+esac
