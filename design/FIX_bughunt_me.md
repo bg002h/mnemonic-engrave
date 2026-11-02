@@ -83,8 +83,11 @@ No new variant and no new text: `PreviewError::Spawn` displays as
    `opts.write(true).create(true);`.
 2. After the `#[cfg(unix)]` block that calls
    `f.set_permissions(std::fs::Permissions::from_mode(0o600))?;` (line 62)
-   and before `f.write_all(bytes)`, add the line `f.set_len(0)?;`. It is not
-   under `#[cfg(unix)]`.
+   and before `f.write_all(bytes)`, add the three lines
+   `if f.metadata()?.is_file() {` / `    f.set_len(0)?;` / `}` (four-space
+   indent inside the function). They are not under `#[cfg(unix)]`. A pipe,
+   FIFO or tty has no length to truncate (`ftruncate` returns EINVAL), and
+   `truncate(true)` ignored them too.
 3. Doc comment lines 37-40 (the paragraph beginning "`truncate(true)` is
    load-bearing") become:
 
@@ -155,7 +158,7 @@ the measurements are below.
 | #2 | `design/SPEC_me_preview_hardening.md`, A1, new paragraph after line 40 (`happens to match).`), before line 42 (`Placement:`) | (none) | `` `render_plate` removes any existing `plate-<idx>.<ext>` before it spawns `me-preview`, so the F9 check judges only this run's output; a removal error other than not-found is reported as `cannot run me-preview: <error>`. `` |
 | L5 | `design/SPEC_encrypted_payload_delivery.md` §5, new paragraph after line 487 (`... confirmed empirically in §3.1.`), before `## 6.` | (none) | `` `to_uf2` refuses (panics on) a blob longer than the 64 KiB region; the CLI never passes one. `` |
 | #1 | `design/SPEC_me_preview_hardening.md:106` | `` `.write(true).create(true).truncate(true)` `` | `` `.write(true).create(true)` `` (derived: R5 drops `truncate(true)`, so this text would otherwise be false) |
-| #1 | `design/SPEC_me_preview_hardening.md:108` | `` **`truncate(true)` is load-bearing (R0 I2):** `` | `` Truncation is load-bearing (R0 I2) and happens after the mode is set (`set_len(0)` after `set_permissions`), so a refused chmod leaves the existing file unchanged. `` The rest of the bullet (`` `fs::write` truncates; without it a shrinking overwrite ...``) is kept. |
+| #1 | `design/SPEC_me_preview_hardening.md:108` | `` **`truncate(true)` is load-bearing (R0 I2):** `` | `` Truncation is load-bearing (R0 I2) and happens after the mode is set (`set_len(0)` after `set_permissions`, on a regular file only; a pipe or FIFO is written without truncation), so a refused chmod leaves the existing file unchanged. `` The rest of the bullet (`` `fs::write` truncates; without it a shrinking overwrite ...``) is kept. |
 | #1 | `design/SPEC_me_preview_hardening.md:118-120` | `**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3)` and the residual that follows | `` `.mode(0o600)` binds only on create, so on Unix `write_private` also calls `set_permissions(0o600)` on the open file (F-244): an overwrite of a pre-existing file ends at 0o600, and a refused chmod fails the write before any byte of the old file is touched (R0 L3, superseded). `` |
 
 The #3 change has no spec delta (R3: SPEC_systemwide_payloads.md:151 already
@@ -168,12 +171,13 @@ Command for every row (one row by exact name):
     cargo +1.85.0 nextest run --locked --workspace -E 'test(/(^|::)<row>$/)'
 
 All rows in one run: `-E 'test(/^bughunt_me_/)'`. Every row below was run on
-the unmodified base (log of that run: 11 run, 2 passed, 9 failed, 693
+the unmodified base (log of that run: 13 run, 2 passed, 11 failed, 693
 skipped; the 2 passes are 06 and 07, the FALSE POSITIVEs, which stay green).
 
 | row | item | RED on base (panic text, `bughunt.rs:line`) | GREEN after |
 |---|---|---|---|
 | `bughunt_me_01_write_private_keeps_old_file_when_chmod_fails` | #1 | :52 `the write failed (chmod EPERM) yet the old file was destroyed` (left `[]`) | #1 |
+| `bughunt_me_01b_pack_out_to_a_fifo_still_writes` (new) | #1 | PASSES on base (regression guard, not a RED row); with #1 step 2 as first written it fails at the exit assert, stderr `me: <ff>: Invalid argument (os error 22)` | #1 (stays green) |
 | `bughunt_me_02_stale_preview_is_not_this_runs_render` | #2 | :80 `a sidecar that wrote nothing must be refused, got Ok(".../plate-1.svg")` | #2 |
 | `bughunt_me_02b_unremovable_stale_preview_is_a_spawn_error` (new) | #2 | :247 `an unremovable stale plate must be a Spawn error, got Err(EmptyOutput { ..., reason: "output is not a regular file" })` | #2 |
 | `bughunt_me_03_pack_passphrase_without_secrets_is_well_formed` | #3 | :105 `blob has bytes past the header's declared end (len 77, declared 61)` | #3 |
@@ -186,6 +190,11 @@ skipped; the 2 passes are 06 and 07, the FALSE POSITIVEs, which stay green).
 | `bughunt_me_05b_uf2_cap_is_the_64k_seal_region` (new) | L5 | :321 `a 65537-byte blob was accepted` | L5 |
 
 Why each new row exists (a ruling asserts behaviour the original row does not):
+- 01b: R5 must not regress `--out` to a pipe or FIFO. Body, at the end of
+  `crates/me-cli/tests/bughunt.rs`: mkfifo `ff` in a tempdir; a reader thread
+  `std::fs::read(ff)`; run `me sysw pack --no-passphrase --out <ff> text:6869`;
+  assert exit 0 ("pack to a FIFO must succeed: <stderr>") and that the FIFO
+  bytes equal a `--out reg.bin` run's bytes.
 - 02b: R2's "any other error becomes `PreviewError::Spawn`, displayed as
   `cannot run me-preview: ...`", and that the unremovable entry is left alone.
 - 03b: R3's "the same unsealed container the `None` path builds" (byte
@@ -236,13 +245,14 @@ Gate (capture each to a file once, then grep):
 5. `cargo +1.85.0 nextest run --locked --workspace -E 'test(/^bughunt_me_/)'`
 
 Expected (all five items built, S3 ruled (b), so `as_with_argv_and_in_together_is_usage` passes unchanged):
-- 1: `704 tests run: 704 passed, 2 skipped` (691 base + 7 triage rows + 6
+- 1: `705 tests run: 705 passed, 2 skipped` (691 base + 7 triage rows + 7
   new rows).
 - 2: exit 0 (no doctests in the workspace; each `test result:` line reads
   `0 passed; 0 failed`).
 - 3, 4: exit 0.
-- 5: `13 tests run: 13 passed, 693 skipped`.
-Before #4 lands: 5 reads `13 tests run: 9 passed, 4 failed` (04, 04b, 04c, 04d).
+- 5: `14 tests run: 14 passed, 693 skipped`.
+Before #4 lands: 5 reads `14 tests run: 10 passed, 4 failed` (04, 04b, 04c, 04d;
+derived: the run of 13 plus 01b, which passes without #4).
 
 ## STOP sections
 
