@@ -4,6 +4,8 @@
 //! Verified on real hardware 2026-08-06: a data-family UF2 at 0x10E00000 lands
 //! byte-exact and leaves the signed image untouched.
 
+use super::wire::REGION_LEN;
+
 /// Normative and not configurable. §5 derives it so the blob clears the signed
 /// image and stays inside physical flash; past 0x11000000 a write wraps to
 /// 0x10000000 and destroys the firmware.
@@ -20,6 +22,11 @@ const FLAG_FAMILY_ID_PRESENT: u32 = 0x0000_2000;
 const PAYLOAD: usize = 256;
 
 pub fn to_uf2(blob: &[u8]) -> Vec<u8> {
+    assert!(
+        blob.len() as u64 <= REGION_LEN,
+        "seal blob {} bytes exceeds the {REGION_LEN}-byte seal region",
+        blob.len()
+    );
     debug_assert!(!blob.is_empty(), "a blob is always >= 52 bytes");
     let num_blocks = blob.len().div_ceil(PAYLOAD) as u32;
     let mut out = Vec::with_capacity(num_blocks as usize * 512);
