@@ -133,7 +133,7 @@ Strings: none. Spec: none.
 
 Behaviour: an unseated slot's declared origin must equal
 `md.DefaultOrigin(st.list.Wrapper, account)` at the lowest free account
-(taken origins keyed by `composerOriginKey`); otherwise the self-check
+(taken origins keyed by `composerOriginKey`: every seated slot's origin, plus each earlier unseated slot's default once it is assigned, as md `resolveOrigins` does); otherwise the self-check
 refuses. New error string: `"self-check: unseated slot @%d declares %s, not the default %s"`
 (architect S2: the grade's `§4f's` has no glyph; `TestProductionStringsAreDrawable` stays green).
 Spec: none.
@@ -151,6 +151,8 @@ Behaviour: a parsed key re-encodes to the same xpub string. `Key` gains
 `xpubMeta bool`, `xpubDepth uint8`, `xpubChildNumber uint32`; `ParseKey` sets
 them from `xpub.Depth()` and `xpub.ChildIndex()`; `ExtendedKey` uses them
 instead of `uint8(len(k.DerivationPath))`. Strings: none. Spec: none.
+
+Also in `nonstandard/parse.go` `parseBlueWalletDescriptor`: change `pub, err := xpub.ECPubKey()` to `_, err = xpub.ECPubKey()` and `network, err := bip32.NetworkFor(xpub)` to `_, err = bip32.NetworkFor(xpub)`, and replace the `desc.Keys = append(desc.Keys, bip380.Key{ … })` statement with `k, err := bip380.ParseKey(path, []byte(val)); if err != nil { return nil, fmt.Errorf("bluewallet: invalid xpub: %q", val) }; k.MasterFingerprint = binary.BigEndian.Uint32(fp); desc.Keys = append(desc.Keys, k)`.
 
 ### 2.8 fix-06a, fix-06c — `bip380` `Parse` checks
 
@@ -215,12 +217,13 @@ Strings: none. Spec: none. Committed font output does not change (§5).
 Decision: a host seam (no device test needed, no new type or command). New
 file `cmd/controller/lockboot_values.go`, `//go:build !refugium`, holding the
 `otp*` consts (`otpVolumeLabel="SHII"` and the rest) moved from
-`lockboot_default.go` (`tinygo && rp && !refugium`), function vars
-`otpWriteWhiteLabelAddr`, `otpWriteWhiteLabelString`, `otpAddBootKey`, and
+`lockboot_default.go` (`tinygo && rp && !refugium`), function vars (declared
+below), and
 `func writeOTPValues(keyHash, version string) error`, which returns the
 label-address error instead of `fmt.Printf("label addr err: %v", err)` and
 then continuing. Removed string: `"label addr err: %v"`. Behaviour: on a
 failed label-address write no white-label string and no boot key is written.
+Declare in `cmd/controller/lockboot_values.go` (untagged in the default build): `var ( otpWriteWhiteLabelAddr = func(row uint16) error { return otp.WriteWhiteLabelAddr(row) }; otpWriteWhiteLabelString = func(idx uint8, s string) error { return otp.WriteWhiteLabelString(idx, s) }; otpAddBootKey = func(hash []byte) (int, error) { return otp.AddBootKey(hash) } )`. They are func literals, not method values: `gui`'s `TestRefugiumFileSetsCarryNoForbiddenLiteralOrCall` positive control needs a call expression naming each OTP writer in the default file set.
 Host build: the seam gives the package host-buildable files, so a main
 package with files must declare `main`. Architect S4 adds
 `cmd/controller/main_host.go` (sha256
@@ -367,8 +370,10 @@ is the measured failure on the base tree.
 | `gui` · `TestBughuntSh231bSupplyMultisigQuestionBack` | PASS (not skipped) | :290 `Back on the passphrase question carried on with passphrase "" to "Your seed is at slots"` |
 | `gui` · `TestBughuntSh232Slip39PassphraseQuestionBack` | PASS | :331 `...recovered a seed with the empty passphrase: ok=true entropy=61cf4d6c0d8a07d8c2fd3cff22432664` |
 | `gui` · `TestBughuntSh221SelfCheckUnseatedSlotOrigin` | PASS | :162 ACCEPTED for m/84'/0'/0' and m/48'/0'/7'/2' |
+| `gui` · `TestBughuntSh221SelfCheckTwoUnseatedSlots` (new, `gui/bughunt_sh2_21b_test.go`) | PASS | guards fix-21's earlier-slot marking; with it dropped: :35 `the self-check REFUSED an honest build with two unseated slots: self-check: unseated slot @2 declares m/48h/0h/2h/2h, not the default m/48'/0'/0'/2'` |
 | `gui` · `TestBughuntSh222PickScreenWrapHidesCursor` | PASS | :232 `Button3 returned row 2, but the page on screen draws only rows 0..1 (the cursor was left on a row page 0 does not show).` |
 | `bip380` · `TestBughuntSh201XpubDepthChildRewritten` | PASS | :56/:59 `key 0/1 re-encodes to a different xpub` |
+| `nonstandard` · `TestBughuntSh2_01_BlueWalletRoundTrip` (new, `nonstandard/bughunt_sh2_01bw_test.go`): for each `deriv` in `""`, `"Derivation: m/48'/0'/0'\n"`, `"Derivation: m/48'/0'/0'/2'\n"`, `OutputDescriptor([]byte("Name: sh\nPolicy: 1 of 1\n" + deriv + "Format: P2WSH\n\n5A0804E3: " + x))` (x = `xpub6F148LnjUhGrHfEN6Pa8VkwF8L6FJqYALxAkuHfacfVhMLVY4MRuUVMxr9pguAv67DHx1YFxqoKN8s4QfZtD9sR2xRCffTqi9E8FiFLAYk8`) must succeed and `d.Keys[0].String()` must contain x, else `t.Errorf("fix-01: BlueWallet key with %q re-encodes as %s, want %s", deriv, got, x)`. Run: `go test -count=1 -run '^TestBughuntSh2_01_BlueWalletRoundTrip$' ./nonstandard/` | PASS | :16 `fix-01: BlueWallet key with "" re-encodes as xpub67UWhCiWHp3t…` (and the `m/48'/0'/0'` case as `xpub6D7vGZGi…`) |
 | `bip380` · `TestBughuntSh206aParseThreshold` | PASS | :77 thresholds 5, 3, 0, -1 of 2 keys accepted |
 | `bip380` · `TestBughuntSh206cScriptTypeMismatch` | PASS | :104 wpkh/pkh/tr(sortedmulti) and wsh(key) accepted |
 | `nonstandard` · `TestBughuntSh206bBlueWalletThreshold` | PASS | :31 Policy "0 of 2", "3 of 2", "-1 of 2" accepted |
@@ -432,7 +437,7 @@ After the build each reports SKIP with that text. Slugs as §9.2.
 today; no skip. Rows 15, 16, 17 and 44 have no host row (UNRESOLVED,
 `sh-needs-seam-tinygo-drivers`).
 
-Counts: 23 rows fixed (22 existing plus new 39), 37 skipped, 1 FP passing.
+Counts: 25 rows fixed (22 existing plus new 39, 01bw and 21b), 37 skipped, 1 FP passing.
 
 ## 7. Tests that change
 
@@ -440,27 +445,65 @@ Counts: 23 rows fixed (22 existing plus new 39), 37 skipped, 1 FP passing.
 |---|---|---|
 | `gui` · `TestComposerSelfCheckRefusesAFaultInjectedBuilderOutput`, case "the decoded md1 puts two slots at ONE origin with no fingerprints" (`composer_selfcheck_test.go:147-150`; the want-substring is at :150) | want-substring "without two distinct fingerprints" | the case now gets `self-check: unseated slot @1 declares m/48h/0h/0h/2h, not the default m/48'/0'/1'/2'` and its want-substring changes to `"self-check: unseated slot @1 declares m/48h/0h/0h/2h, not the default m/48'/0'/1'/2'"` |
 | `bip380` · `TestDescriptors` (`bip380_test.go:202`, 6 descriptors) | DeepEqual on `Key` | expectations gain `xpubMeta`, `xpubDepth`, `xpubChildNumber` per key (fix-01) |
-| `nonstandard` · `TestDescriptors` (`parse_test.go:107`, 3 BlueWallet fixtures) | DeepEqual on `Key` | same new fields (fix-01) |
+| `gui` · `TestScan/Descriptor` (`gui/scan_test.go`) | DeepEqual on the scanned `*bip380.Descriptor` | insert, immediately before the line `if want := test.Content; !reflect.DeepEqual(got, want) {`: `if gd, ok := got.(*bip380.Descriptor); ok { if wd, ok := test.Content.(*bip380.Descriptor); ok { if gd.Title != wd.Title \|\| gd.Encode() != wd.Encode() { t.Errorf("scanner decoded\n%s\nexpected\n%s", gd.Encode(), wd.Encode()) }; break } }` (fix-01: compare the re-encoded descriptor; the literal cannot set the unexported xpub metadata) |
+| `sysw` · `TestTitledZeroKeyDescriptorClassifiesUnknown` (helper `titledZeroKey`, `sysw/descriptor_test.go`) | builds the descriptor via `nonstandard.OutputDescriptor([]byte("Name: my wallet"))` | replace the helper body after `t.Helper()` with: `if _, err := nonstandard.OutputDescriptor([]byte("Name: my wallet")); err == nil { t.Fatal("fix-06b/50: the BlueWallet branch must refuse a titled zero-key file") }; return &bip380.Descriptor{Title: "my wallet", Type: bip380.SortedMulti}`; change the test's comment "ACCEPTS it" to "refused it before fix-06b/50; the classifier must still fail closed on a hand-built titled zero-key descriptor" |
 | `nonstandard` · `TestDescriptorSeamDeviceColumn` (`descriptor_seam_test.go:158`) | passes | 11 rows flip with `device admits = false, want true (OutputDescriptor err = nonstandard: unrecognized output descriptor format)`: 2 graded BlueWallet rows (`no-format-header`, `zero-cosigner-lines`) and 9 from 06a/06c; fixed by the re-pin (29/45, probe 0) |
 
-No other fork test fails on the fixed copies (`go test -count=1 ./...` per
-copy; s4 all ok).
+No other fork test fails with all fixes applied to one copy (`go test -count=1 ./...`) (with §2.14's func-literal vars; method values fail the `gui` Refugium positive control).
 
 ## 8. Build impact
 
 Each item is one `owed-to-build` line in the §9.1 entry.
 
-1. **Fix the fork (§3)**, me side of 6b/50 first: apply
-   `FIX_bughunt_sh2-s3-me.diff`, regenerate, sha256 must be `34093bfd…674b`
-   (today `ed3706e29fde0ee86e13accd0ecc6492ea2ad9391ff2d911d798d69bb03760f4`
-   in `crates/me-cli/tests/descriptor_seam.rs:46`).
+0. In the fork: `git switch -c bughunt/sh2-fix origin/bughunt/triage && for s in 1 2 3 4 5; do git merge --no-edit origin/bughunt/triage-s$s; done` (merges cleanly; 17 `bughunt_sh2_*_test.go` files).
+1. **Fix the fork first (§3: fix-06a, fix-06c in `bip380/bip380.go`; fix-06b/50 in `nonstandard/parse.go`), then the me side of 6b/50:** apply `FIX_bughunt_sh2-s3-me.diff`; set the last line of `scripts/descriptor-seam-vectors/goprobe/go.mod` to `replace seedhammer.com => <absolute path of the fixed fork worktree>`; then `cd scripts/descriptor-seam-vectors && (cd rsprobe && cargo build --offline) && python3 gen.py ../../crates/me-cli/testdata/descriptor_seam_vectors.json`. Its last `wrote` line must end `sha256 34093bfd3aa8f303670098838ff6fe76c7cb7485199338088f795d9e15b0674b` (today `ed3706e2…` in `crates/me-cli/tests/descriptor_seam.rs:46`). Restore the `replace` line before committing.
 2. Copy byte-identically, apply `FIX_bughunt_sh2-s3-fork.diff`: sha
    `34093bfd…674b`, `wantDeviceTrue = 29`, `wantDeviceFalse = 45`,
    `wantPanicEncode = 0`.
 3. Apply the §4 spec delta to `design/SPEC_descriptor_input.md` §4.2.
-4. Apply the fork fixes in §3 and the §7 test expectations.
+4. Apply the §7 test expectations. Add the row file `gui/bughunt_sh2_21b_test.go` (§6.1, row 21b) with this exact body:
+
+~~~go
+package gui
+
+import (
+	"testing"
+
+	"seedhammer.com/md"
+)
+
+// Bug 21 (second case): with TWO unseated slots the codec gives them the two
+// lowest free accounts (§4f, md resolveOrigins: "no other slot (declared or
+// filled earlier) holds"), so the self-check must count an earlier unseated
+// slot's origin as taken, or it refuses an honest build.
+func TestBughuntSh221SelfCheckTwoUnseatedSlots(t *testing.T) {
+	list := md.PathList{Wrapper: md.ComposeWsh, Paths: []md.SpendPath{
+		{Keys: &md.KeySet{K: 2, N: 3, Sorted: true}},
+	}}
+	st := &composerState{list: list, reg: &seedRegistry{}}
+	st.sources = []composerSource{{kind: composerSourceKey, seedID: -1}}
+	fp := [4]byte{0x73, 0xc5, 0xda, 0x00}
+	origin := composerTestOrigin(2, 1)
+	st.assigned = []composerAssignment{
+		{src: 0, account: 1, origin: origin, fingerprint: fp, fpPresent: true},
+		{src: -1}, {src: -1},
+	}
+	declared := []*md.SlotOrigin{{Origin: origin, Fingerprint: fp, FpPresent: true}, nil, nil}
+	c, err := md.ComposeWith(list, declared)
+	if err != nil {
+		t.Fatalf("md.ComposeWith: %v", err)
+	}
+	chunks, err := c.Chunks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := composerSelfCheck(st, chunks); err != nil {
+		t.Errorf("the self-check REFUSED an honest build with two unseated slots: %v", err)
+	}
+}
+~~~
 5. Add the 39 seam (`cmd/controller/lockboot_values.go`, the move out of
-   `lockboot_default.go`) and its row `bughunt_sh2_39_test.go`; add
+   `lockboot_default.go`) and write its row with `sed -n '5,31p' /scratch/cache/bughunt/sh2/fixdoc-probe/s39.diff | sed 's/^+//' > cmd/controller/bughunt_sh2_39_test.go` (sha256 `61160852f25428c2d7802ad1998cac6bde08ffa0ddd37991582def46a3a55311`); add
    `cmd/controller/main_host.go` (§2.14); host `go build ./...` must still pass.
 6. Update the comment at `cmd/emu/confinement_test.go:89-96`, which
    describes the OTP consts as living only in `lockboot_default.go`; point 1
@@ -477,7 +520,7 @@ Each item is one `owed-to-build` line in the §9.1 entry.
 
 **Gate (not a change).** Fork: `go test -timeout 20m ./...`, oraclelive
 `-run '^$'`, the wasm vets, tinygo (CI), and every §6.1 row by exact name
-with its count quoted (23). me: `cargo nextest run --locked`, `cargo test
+with its count quoted (25). me: `cargo nextest run --locked`, `cargo test
 --locked --doc`, `cargo fmt --check`, `cargo clippy --locked --all-targets --
 -D warnings`, and the seam filter of the "How checked" table. No mutation
 gate (Go); the whole-diff review keeps both slices.
@@ -570,6 +613,14 @@ later)" is the grade's fix-NN; "RED row" is the §6.2 row.
 |---|---|---|---|---|
 | S3 | M | `sh2-me-refusal-device-claim` | `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed) | next me FIX |
 | M-S2a | M | `sh2-selfcheck-refusal-row` | the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap | sh2 FIX build |
+
+**FIX review r1 minors** (report `design/agent-reports/bughunt-sh2-fix-review-r1.md`; same columns).
+
+| # | grade | slug | What | owner |
+|---|---|---|---|---|
+| M-1 | M | `sh2-50a-single-guard-row` | No row isolates a single 50a guard: planting the no-keys guard alone or the policy guard alone leaves row 50a GREEN; only removing all four fails it. Add one row per guard (FIX review r1, M-1). | end-of-project minors |
+| M-2 | M | `sh2-item6-comment-text` | FIX §8 item 6 says to update the `cmd/emu/confinement_test.go:89-96` comment but gives no new comment text; comment-only, no behaviour change (FIX review r1, M-2). | end-of-project minors |
+| N-1 | N | `sh2-fix21-path-notation` | The fix-21 error string mixes path notations: the declared origin prints as `m/48h/0h/2h/2h`, the default as `m/48'/0'/0'/2'` (FIX review r1, N-1). | end-of-project minors |
 
 **Architect S3 Important** (not deferred-minor; append under this heading):
 
