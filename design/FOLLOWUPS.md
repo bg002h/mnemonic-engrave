@@ -21283,3 +21283,8 @@ Source: `design/agent-reports/whole-diff-cut-release-rm-guards.md` (5909af53), d
 
 - **M1** No row exercises fake gh's `"${T:?}"/merge.?*` refusal (`scripts/test/fixtures/cut-release/fake-gh`): with it removed the offline suite still passes 77/0 (controller-planted). Fails closed: `scratch` is always `$T/merge.XXXXXX` from `mktemp -d`. Fix text (spec, replace "Rows 76 and 77 test this."): "Row 76 tests the harness deletes; row 77 checks that every recursive delete has the guarded shape (fake gh's refusal itself is not exercised)."
 - **N1** Each failed or `CUT_RELEASE_TEST_ONLY` run leaves `~/.cache/cut-release-test/run-<pid>` (kept by design); reviewer and controller plant runs left about 31.
+
+Source: `design/agent-reports/review-ci-userns-me.md` (f64933de), deferred-minor, owner: next phase that touches me CI.
+
+- **M1** `bughunt_me_01` skips on GitHub-hosted runners (no /etc/subuid range); nothing sets `ME_REQUIRE_USERNS=1`, so the FIX #1 regression runs only locally. Fix: run it with `ME_REQUIRE_USERNS=1` on a job where /etc/subuid is provisioned.
+- **N1** The skip is an `eprintln!` only; nextest reports it as PASS (same as `ME_REQUIRE_GO`).
