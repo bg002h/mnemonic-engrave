@@ -20639,3 +20639,110 @@ images have only entry 0 as a clear entry, so the hash is right; an image sealed
 `--clear --pin-xip-sram` has a second clear entry and would hash wrongly, so
 `picosign` would compute a signature the boot ROM rejects. Fork-native code (no Rust
 primary). Fix with a test image that has two clear entries.
+
+### F-709 — cut-release spec r1: 20 Minors and 5 Nits, deferred (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r1.md` (r1: 0C/7I/20M/5N; the 7 Importants are folded in the spec). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the r1 spec's: fold r1 added offline rows 51-68, so the network rows M1, M2, M10 and M12 call 51-55, 53, 56-58 and 58 were 69-73, 71, 74-76 and 76 after fold r1 and are now 71-75, 73, 76-78 and 78 (fold r2 added offline rows 69 and 70; rows 33-49 are unchanged).
+
+Minors (one line each):
+
+
+- M1: P2-P21 carry no mode column. `--verify` needs no checkout, and `--land-pr` needs only P1-P3 and P9. A builder that applies P10-P21 to `--verify` breaks rows 51-55 (fails closed).
+- M2: V4's behaviour for a `SHA256SUMS*` with no `.minisig` is undecided (skip, which is what row 53's "4 ok, 2 failed" needs, measured), and so is whether V2's `--` line counts as ok.
+- M3: §5.3 step 3 does not say which of the two refusal texts print, or in what order, when PVS exits non-zero and its output has the bypass line.
+- M4: The resume path (X = N for every crate) is undecided: does step 7 check `<bin> --version`, and what does the Cargo.lock line print for 0 crates? Also: does `--push` print §5.2's would-lines with `PUSH:`?
+- M5: A crate row with no CHANGELOG in a repo that has one (mnemonic-io-lib in engrave) gets `== CHANGELOG: none in mnemonic-engrave`, which is false. C7's handling of a D with no CHANGELOG is only implied.
+- M6: §8(d)'s line format omits the `origin/<default>:` prefix that `git grep <rev>` prints (measured). The builder must be told to strip it.
+- M7: §8(b) does not say whether P and X are regex-escaped, as (a) does. Run as printed (unescaped) it changes exactly 4 lines for ms, md and mk and 1 for gui today (measured).
+- M8: P1 omits `curl` (engrave §5.1 step 8 and toolkit `install-assets.test.sh`), `readelf` (that test's glibc floors) and `timeout` (V6).
+- M9: P20 matches `mnemonic-toolkit-v[0-9.]+`, while `install-pin-check.yml` matches `mnemonic-toolkit-v[0-9]+\.[0-9]+\.[0-9]+` (measured). A first mention ending in "." would refuse falsely, so use the workflow's regex.
+- M10: Rows 56-58 must name the bare copy `<repo>.git`, or P3 refuses. The spec does not say so.
+- M11: §8(a) stops at the commit and push. `check-install-links.sh`'s own FAIL text says "rebuild with demo/sh2/build.sh, and redeploy", so the live page stays stale until `demo/sh2/deploy.sh` runs, which the block does not list.
+- M12: (c)'s toml branch "insert after `[installer-ahead]`" is today's real case (measured) but has no offline row. F-tk exercises only the append branch, and row 58 does not check the toml.
+- M13: §5.3 step 3's "origin/<default> is unchanged" is false when PVS's master push was rejected because origin moved. The printed reset is still right; say "does not have the release commit".
+- M14: §8(b)'s mirrors grep also lists GUI-tier pins that must not move: `manual-gui.yml:227` and `cross-tool-differential.yml:88` for md (measured). Only (d) says some references are deliberate.
+- M15: On a re-run after a bypass, PVS re-stages a SHA that is already on master. Its `ci/staging` push is a no-op and it reads the old check runs, so the re-run tags with no new CI evidence. The STOP rests on the operator having read the previous output.
+- M16: P7 runs only for `--push`. `--land-pr` performs an irreversible merge with uncommitted tooling unchecked.
+- M17: Restore-on-failure by trap is stated only for `--dry-run`. A Ctrl-C during `--push`'s build leaves files modified; the next run's P13 lists them.
+- M18: P18's "origin tag" could come from `ls-remote` or from local tags after the fetch; the spec does not say which. With local tags, a local-only tag would count.
+- M19: `--land-pr` step 2 runs the release-pins check in any repo. A `release-pins-*` head outside the toolkit is refused with "does not contain mnemonic-toolkit-v<V>" (fails closed, but the message misleads).
+- M20: Low-risk rules with no row (each fails closed):
+  - usage: U3, U4, U5, U6, U8
+  - preflight: P1, P2, P8, P9, P10, P15 local-only, P16
+  - CHANGELOG: C2
+  - the `-dev` version rule
+  - toolkit: the (b) invariant exit 4, the (c) checks exit 4, a missing `mnemonic)` entry
+  - §5.1: the step 4 and step 6 failures; step 8 (there is no engrave fixture)
+  - §7: not OPEN, wrong base, no checks, checks timeout, merge failure, ancestry failure
+  - §8: the (b) block and the 40-line cap
+
+Nits (one line each):
+
+- N1: §5.3 step 3 says "drop the local commit", but the toolkit has two.
+- N2: `--help`'s "6 tag push failed (no tag pushed)" is wrong for the peel-mismatch exit 6, where a tag is on origin.
+- N3: P15 local-only says "if you made it by hand", but an interrupted cut-release.sh run leaves local tags too.
+- N4: Row 49's "(its refs are refs/tags/<tag>)" cannot be checked by grep when the refs are in a variable.
+- N5: Rows 35-39 and 42 omit their command and asset setup; they implicitly reuse row 34's and row 33's.
+
+### F-710 — cut-release spec r2: 15 Minors, 4 Nits and 2 design concerns, deferred (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r2.md` (r2: 0C/3I/15M/4N; the 3 Importants are folded in the spec by fold r2). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the spec's at the r2 review head (`f54464bc`): fold r2 added offline rows 69 and 70 and renumbered the network rows 69-76 to 71-78, so the network rows the lines call 71 (first design concern), 75 (M14) and 76 (M11, M14) are now 73, 77 and 78 (rows 1-68 are unchanged).
+
+Minors (one line each):
+
+- M1 [pre-existing] §7 step 2 says "`git fetch` the head": `git fetch origin <branch>` does not bring the tag (measured: tags `[]`; plain `git fetch origin` does; `git merge-base --is-ancestor "<tag>^{}" ...` then rc 128, not the exit-9 refusal). Rows 46/47 run in the checkout that created the tag, so they cannot see it. Fix: "`git fetch --quiet --tags origin`". Conditions: the builder fetches only the head branch, and `--land-pr` runs in a checkout without the tag; fails closed.
+- M2 [fold] Toolkit exit 5 after (b) landed: `follow-on.txt` is written only before the tag push and the `finish:` line only follows exits 7/8/9, so the by-hand recovery never lists the engrave-demo and reference moves; add to the second I-1 line "..., then the pins-PR line below, then the moves in <git-dir>/cut-release/follow-on.txt" and write the file with `pins-pr-body.md` before §6.3 step 1.
+- M3 [fold] For a lib-only run `<bin tags>` is empty, so the finish line prints `cut-release.sh --verify ; once it shows 0 failed ...`: bare `--verify` checks all seven CLIs, five of which fail today (V3/V4), so the condition cannot hold; omit the `--verify` clause when there is no bin tag. Conditions: lib-only run and an exit 7 (mk-codec CI) or a signal.
+- M4 [pre-existing, E4/E9 touched] §6.3 step 5's exit-9 text says "(c) is at refs/heads/release-pins-<N>" even when the `git push` (not `gh`) failed; the complete pins-PR line is printed right after it and works, so only the claim is wrong.
+- M5 [fold] §6.3 step 4's exit-9 text says "commit the fix to that branch, then gh pr create ...": `gh pr create --head` explicitly skips pushing (`gh pr create --help`), so the fix commit never reaches the PR; add "push it" after "commit the fix to that branch". Conditions: step-4 exit 9 and an operator who takes the text literally.
+- M6 [fold] Rows pin printed recovery text but run only one command (row 56's tag line): the 4a pins-PR line, the two exit-9 texts and the `finish:` line are never executed by a row (I ran the pins-PR line in `sandbox-b`: it works from both the exit-5 and the exit-7 state), row 56 does not assert that the pins-PR line follows or that local master stays at (c), and rows 43, 59, 61-64 do not assert the reset or finish line; extend row 60 to run the printed pins-PR line and assert bare `release-pins-0.105.2` = (c) and the `pr create` argv.
+- M7 [fold] No row for step 4's "origin has every tag" and "mixed" outcomes or the peel-mismatch exit 6; the mixed outcome is unreachable under `--atomic`, the other two fail closed.
+- M8 [pre-existing] `--trailer` goes "to `git commit --trailer`", but the toolkit makes two commits; say whether (c) carries it (cosmetic, no row).
+- M9 [pre-existing] Fake gh "answers exactly the calls of §5.3, §5.4, §6.3 and §7": P9's `gh auth status` is §4 and `gh release download`'s argv is nowhere fixed, so a literal fake answers 99 to every `--push`, `--verify` and `--land-pr` row; row 33's "gh.log has no `fake gh: unexpected`" is vacuous unless the fake also logs that line. Fails loudly (red harness).
+- M10 [pre-existing] "Rows 44-47 run on the F-tk state that row 42 leaves" but row 43 (`as 42 with FAKE_INSTALL_ASSETS=fail`) needs a fresh F-tk (a re-run after row 42 meets P15) and sits between them; rows 66/67 also need "row 42's state" again. Say that each row builds its own fixture directory and that rows 44-47, 66 and 67 first re-run row 42's setup.
+- M11 [pre-existing; deepens F-709 M12] §6.2's "insert right after the `[installer-ahead]` line": the real `pinned-upstream.toml` has two comment lines containing `[installer-ahead]` (lines 95, 119) before the header (line 123), so an unanchored match misplaces the key; say "the line that is exactly `[installer-ahead]`". F-tk's file has no such comment and row 76 cannot see placement; the PR's CI would reject it (fails closed).
+- M12 [fold] A Ctrl-C or crash inside the toolkit's PVS window leaves the checkout detached at (b) and no trap runs (4a starts at the tag push): P11 then P12a say "finish as cut-release.sh printed", nothing was printed, and if (b) had landed the P12a "drop it" advice discards (c) and P19 then refuses. Conditions: signal inside PVS and (b) already landed.
+- M13 [pre-existing; the fold added more] Printed commands name `cut-release.sh` bare (`--verify`, `--land-pr 77`, P15 hint), but §2 says other repos reach it by absolute path, so they are not runnable as printed from a toolkit checkout; print the script's absolute path (the banner already has it).
+- M14 [pre-existing] Network row 75 inserts `## ms-cli [Unreleased]` unconditionally; once the real CHANGELOG carries one, C2 fires and the row fails (row 76 handles the same case).
+- M15 [pre-existing] §5.4 has no FAIL text for a failed download (`gh release download` under `set -e` aborts `--verify` with exit 1 instead of a FAIL line and exit 8).
+
+Nits (one line each):
+
+- N1 [pre-existing] Tag regex accepts `ms-cli-v0.20.03`; P22 may pass it numerically and cargo rejects the manifest (`invalid leading zero in patch version number`, measured) with step 4's misleading "run 'cargo fetch'" text; reject leading zeros in the tag regex.
+- N2 [pre-existing] Row 4 pins only line 1 of `--help`; the exit-code table is unpinned.
+- N3 [pre-existing] Row 25 lists `would check <lib tag>` before `would verify <bin tag>`; §5.2 puts verify first (rows match by membership, so harmless).
+- N4 [fold] Review labels `(I-2)`, `(I-4)`, `(I-5)`, `(I-6)` remain inside rows 51, 65, 67, 68 and mean nothing to the builder.
+
+Design concerns (ungraded):
+
+- V6 runs the archive's binary even after V4/V5 FAIL or when the sums file is unsigned (rows 37, 63, 71 pin that); consider running it only when V5 passed and the sums file verified.
+- The resume path tags `HEAD` (origin tip) after PVS re-stages it; if commits sit on top of the original release commit it tags the later tip. It still has manifest N, a matching heading and CI, so not graded.
+
+### F-711 — cut-release spec r3: 6 Minors and 3 Nits (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build (M1, M2, M3, M4, M6, N1, N2 and N3 closed 2026-11-01 by the spec burn-down commit 67c3cb20; M5 stays open)
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r3.md` (r3, last round: 0C/0I/6M/3N). Each line below is the review's line, verbatim. Burn-down at the owning phase: the build's first commit applies the exact spec fix texts of M1, M2, M3, M4, M6, N1 and N2 (N3 is folded into M2's fix), because M1, M4 and M6 leave points a builder would otherwise have to decide; M5 (the review gate scripts) stays open.
+
+Minors (one line each):
+
+- **M1 [fold; text is the r2 reviewer's I-2 fix] The EXIT trap's guard omits exit 6, and the instant of "the variable set after the tag push" is undecided.** Measured: set right after `git push --atomic` returns, step 4's post-push `exit 6` (peel mismatch) becomes exit 7 with a "stopped by a failing command" line (`out/trap-exit6_after_push.err`). Conditions: a remote tag that peels differently or reads empty right after an atomic push, and the builder choosing that instant. Fails closed, the exit-6 text still prints first. Fix, anchor 4a bullet 1, old `and no exit 7, 8 or 9 and no signal trap has begun (a third variable they set).` new `and no exit 6, 7, 8 or 9 and no signal trap has begun (a third variable they set; step 4's exit 6 after the push sets it too, so the EXIT trap never changes an exit 6).` and, same bullet, after `and also EXIT.` insert ` The variable set after the tag push is set the moment git push --atomic returns 0, or when step 4 prints the "continuing" line.`
+- **M2 [fold; r2 reviewer's text] P23 refuses when S is a proper ancestor of HEAD (state I-1d), prints a false reason, and the S = HEAD exemption has no row.** Measured in `sb-anc`. Conditions: a kept/bypass staging from an earlier release, and master moved past it before the next release. Fix: P23 condition old `prints a sha S, and S is not the sha of \`HEAD\`` new `prints a sha S, S is not the sha of \`HEAD\`, and \`git merge-base --is-ancestor <S> HEAD\` exits non-zero (an S unknown locally counts as not an ancestor)`; after the §4 table add `P23: <12> is the first 12 characters of S. S = HEAD (the resume path) and S behind HEAD (an old staging a fast-forward covers) are allowed.`; row 69 setup old `pushes an unrelated commit to` new `pushes a commit that is not an ancestor of the bare master tip to`, and append to its expect `; then, with ci/staging set to the sha of HEAD and then to its parent, --dry-run ms-cli-v0.20.3 exits 0 both times with $T/pvs.log absent or empty`.
+- **M3 [fold; r2 reviewer's text] `FAKE_GH_FAIL=1` "on its first `run list` call" is ambiguous in row 70, which runs two cut-release processes.** A gh.log- or marker-derived "first" fails only the ms leg; the toolkit leg then exits 0 and the row goes red for a fixture reason. Test-only. Fix, old `on its first \`run list\` call fake gh prints` new `on every \`run list\` call fake gh prints`, and append `(the script makes no \`run list\` call before the tag push)`.
+- **M4 [fold; the open point 1] Whether the traps print step 6's NOT-listed line.** Conditions for a wrong claim: an abort or signal after a clean verify (the §8 block) and a builder printing it. Fix: 4a bullet 1, old `(for the toolkit after the §6.3 step 6 reset), and exits 7.` new the same followed by ` Neither trap prints step 6's \`== follow-on pins are NOT listed\` line: an abort can come after a clean verify, and the finishing lines are true in every state.`; §5.3 step 6, old `Exits 7 and 8 also print` new `Exits 7 and 8 from steps 5 and 6 (not the traps' exit 7) also print`.
+- **M5 [fold; gate tooling] Gate blind spots (Q4).** `mech_checks.py` check 5 (quoted text matches a template) prints but never fails; a defined-but-wrong exit code and a deleted-but-quoted refusal pass; `row49_check.py` ignores the spec's row 49 and §2 wording; none of the scripts is committed. Fix: `fail()` on any unmatched text except the known row-59 header; add `bin/exit_cross.py`; read row 49's prefixes and counts from the spec; commit the scripts under `scripts/` with a "does not cover" line (CLAUDE.md pattern).
+- **M6 [pre-existing r1 text, a path added by the fold] A failing toolkit reset inside an exit path is undecided; under `set -e` it aborts the exit path.** Measured (`sb-reset`): an uncommitted edit to `install.sh` makes `git reset --keep` fail, the trap returns rc 128 and prints no finishing line. Conditions: toolkit run, any post-tag exit, tracked edits to a file that differs between (b) and (c) during the wait. Fix, §6.3 step 6, old `does the same reset first.` new the same followed by ` A failing reset is ignored: its git error shows, and the exit code and the finishing lines are unchanged.`
+
+Nits (one line each):
+
+- N1 [fold; open point 2] 4a bullet 2, old `- The trap, and every exit 7, 8 or 9, ends with:` new `- The signal trap, the EXIT trap and every exit 7, 8 or 9 end with:`.
+- N2 [fold] `--help` line `7 a release run failed` no longer covers the signal and EXIT traps' exit 7: new `7 a release run failed or the script stopped after the tag push` (row 4 pins only line 1).
+- N3 [fold] The fold report says "no deviation", but the r2 fix's P23 parenthetical (`<12>` = first 12 of S; S = HEAD is the resume path) is absent from the spec. Folded into M2's fix.
+
+### F-712 — cut-release whole-diff r1: 1 Minor and 1 Nit (owning phase: none; ownerless residue)
+
+**Status:** OPEN — deferred-minor (RULES.md). Filed from `design/agent-reports/whole-diff-cut-release-r1.md` (r1, single Opus slice: 0C/0I/1M/1N on e1d25113).
+
+- **M1 Post-push peel-mismatch `exit 6` is untested (plant J survives; build deviation 12).** `scripts/cut-release.sh:1328-1333`. Reaching it needs the tag on origin moved between the atomic push and `ls-remote`. The report gives the exact row `cr_push_tag_moved_after_push` (a post-receive hook on the fixture bare repo moves the tag to `master~1`; expects exit 6 and the "peels to" line); the reviewer ran it: passes on e1d25113, fails with plant J. Applying it also needs a spec row 79 in SPEC §11.
+- N1 `CUT_RELEASE_TEST_ONLY` runs leave `~/.cache/cut-release-test/run-*` directories behind (the harness prints "kept <dir>").
