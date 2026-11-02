@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# cut-release.test.sh -- the 78 rows of design/SPEC_cut_release.md section 9.
+# cut-release.test.sh -- the 85 rows of design/SPEC_cut_release.md section 9.
 #
-#   bash scripts/test/cut-release.test.sh            # 78 rows (70 offline cr_, 8 network crn_)
-#   bash scripts/test/cut-release.test.sh --offline  # rows 1-70 only
+#   bash scripts/test/cut-release.test.sh            # 85 rows (77 offline cr_, 8 network crn_)
+#   bash scripts/test/cut-release.test.sh --offline  # rows 1-77 only
 #
 # Prints "ok <row>" or "FAIL <row>: <why>" per row and ends with
 # "cut-release.test: <p> passed, <f> failed". Exit 0 iff no row failed and the
-# number of rows run is the expected 78 (70 with --offline).
+# number of rows run is the expected 85 (77 with --offline).
 #
 # Everything runs against local bare repos under $T, a fake gh, a fake
-# push-via-staging and a throwaway minisign key. The network rows (71-78) use
+# push-via-staging and a throwaway minisign key. The network rows (78-85) use
 # the real key, the real push-via-staging seam and read-only gh calls.
 # This test is a local gate (spec section 10 step 4); no workflow runs it.
 set -uo pipefail
@@ -27,8 +27,8 @@ for a in "$@"; do
         *) echo "usage: $0 [--offline]" >&2; exit 2 ;;
     esac
 done
-EXPECT=78
-[ "$OFFLINE" -eq 0 ] || EXPECT=70
+EXPECT=85
+[ "$OFFLINE" -eq 0 ] || EXPECT=77
 
 CACHEROOT=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test
 mkdir -p "$CACHEROOT"
@@ -969,6 +969,117 @@ cr_push_gh_fails_after_tag() {
     x_eq "$(git -C "$FXDIR" rev-parse HEAD)" "$b" "local master vs bare master"
     x_eq "$(git --git-dir="$FXBARE" rev-parse "$c^")" "$b" "(b) is master"
 }
+cr_cache_root_slash() {
+    fresh; FXDIR=$T/none
+    CUT_RELEASE_CACHE=/ run_cr --verify ms-cli-v0.20.2
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '/')"
+    if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
+    [ ! -s "$T/gh.log" ] || rowfail "gh was called"
+}
+cr_cache_root_relative() {
+    fresh; FXDIR=$T/none
+    CUT_RELEASE_CACHE=cache run_cr --verify ms-cli-v0.20.2
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is 'cache')"
+    if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
+    [ ! -e "$T/none/cache" ] || rowfail "a relative cache directory was created"
+    fx_ms; mk_prev_ms; mk_assets ms-cli-v0.20.3; snap
+    CUT_RELEASE_CACHE=cache run_cr --push ms-cli-v0.20.3
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is 'cache')"
+    x_untouched ms-cli-v0.20.3
+    x_no_remote_tag ms-cli-v0.20.3
+}
+cr_cache_root_empty() {
+    fresh
+    local rc=0
+    (source "$CR_REAL"; set +e; CR_CACHE=''; verify_tag ms-cli-v0.20.2) >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '')"
+    if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
+}
+cr_cache_tag_slash() {
+    fresh
+    local rc=0 t
+    mkdir -p "$T/cache" "$T/escape/ms-cli-v0.20.2"
+    : >"$T/escape/ms-cli-v0.20.2/keep"
+    (source "$CR_REAL"; set +e; verify_tag '../escape/ms-cli-v0.20.2') >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 2
+    x_err "cut-release: '../escape/ms-cli-v0.20.2' cannot name a cache directory: it has a '/' or is '.' or '..'"
+    [ -f "$T/escape/ms-cli-v0.20.2/keep" ] || rowfail "verify_tag deleted a directory outside the cache"
+    for t in . .. a/b; do
+        rc=0
+        (source "$CR_REAL"; set +e; cache_guard "$t" "$CR_CACHE/$t") >"$OUT" 2>"$ERR" || rc=$?
+        RC=$rc
+        x_rc 2
+        x_err "cut-release: '$t' cannot name a cache directory: it has a '/' or is '.' or '..'"
+    done
+    FXDIR=$T/none
+    run_cr --verify 'x/ms-cli-v0.20.2'
+    x_rc 2
+    x_err "cut-release: 'x/ms-cli-v0.20.2' is not a release tag of any repo in the table"
+}
+cr_cache_dir_not_below() {
+    fresh
+    local rc d
+    for d in "$T/cache" "$T/cache/other" "$T" "$T/cache/ms-cli-v0.20.2/x"; do
+        rc=0
+        (source "$CR_REAL"; set +e; cache_guard ms-cli-v0.20.2 "$d") >"$OUT" 2>"$ERR" || rc=$?
+        RC=$rc
+        x_rc 2
+        x_err "cut-release: refusing to delete '$d': it is not exactly '$T/cache/ms-cli-v0.20.2' strictly below the cache"
+    done
+    rc=0
+    (source "$CR_REAL"; set +e; cache_guard '' "$T/cache/") >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 2
+    x_err "cut-release: refusing to delete '$T/cache/': it is not exactly '$T/cache/' strictly below the cache"
+    rc=0
+    (source "$CR_REAL"; set +e; cache_guard ms-cli-v0.20.2 "$T/cache/ms-cli-v0.20.2") >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 0
+    [ ! -s "$ERR" ] || rowfail "the good path wrote to stderr: $(head -c 200 "$ERR")"
+}
+cr_harness_rm_guards() {
+    fresh
+    local g=$T/guard bad run out p
+    run=$g/cut-release-test/run-1; out=$g/outside
+    bad=$(mktemp -d "$CACHEROOT/guard.XXXXXX") || { rowfail "mktemp failed"; return; }
+    : >"$bad/keep"
+    mkdir -p "$run/sub" "$out"
+    ( T=$bad; rm_T ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '$bad': T is not */cut-release-test/run-*"
+    [ -f "$bad/keep" ] || rowfail "rm_T deleted a T that is not */cut-release-test/run-*"
+    ( T=''; rm_T ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '': T is not */cut-release-test/run-*"
+    ( T=$bad; rm_below_T "$bad/x" ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '$bad': T is not */cut-release-test/run-*"
+    for p in "$out" "$run" ''; do
+        ( T=$run; rm_below_T "$p" ) >"$OUT" 2>"$ERR"; RC=$?
+        x_rc 2; x_err "cut-release.test: refusing to delete '$p': it is not strictly below $run"
+    done
+    ( T=$run; rm_below_T "$run/sub/../../outside" ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '$run/sub/../../outside': it has a '..' component"
+    [ -d "$out" ] && [ -d "$run/sub" ] || rowfail "a refused rm_below_T deleted something"
+    ( T=$run; rm_below_T "$run/sub" ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 0
+    [ ! -e "$run/sub" ] || rowfail "rm_below_T did not delete a path below T"
+    ( T=$run; rm_T ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 0
+    [ ! -e "$run" ] || rowfail "rm_T did not delete a T that matches"
+    rm -f -- "$bad/keep"; rmdir -- "$bad"
+}
+cr_static_rm() {
+    fresh
+    local hits bad
+    hits=$(grep -nE '(^|[^[:alnum:]_])rm +(-[A-Za-z]*[rR][A-Za-z]*|--recursive)( |$)' "$CR_REAL" "$SELF" "$FIX/fake-gh" "$FIX/fake-pvs" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+    x_eq "$(printf '%s\n' "$hits" | grep -c . || true)" 4 "recursive rm lines"
+    bad=$(printf '%s\n' "$hits" | grep -vE 'rm +-[A-Za-z]+ +-- +"\$\{[A-Za-z_]+:\?\}"' | grep . || true)
+    [ -z "$bad" ] || rowfail "recursive rm without -- and \${NAME:?}: $(printf '%s' "$bad" | tr '\n' '|')"
+}
 
 # --------------------------------------------------------------- network rows
 CUT_RELEASE_SIBLINGS_REAL=${CUT_RELEASE_SIBLINGS_REAL:-/scratch/code/shibboleth}
@@ -1106,6 +1217,8 @@ ROW_LIST=(
     cr_toolkit_pvs_failed_after_landing cr_push_tag_push_fails cr_push_run_never_appears cr_push_interrupted_after_tag cr_toolkit_run_failed
     cr_push_release_draft cr_push_trusted_comment cr_push_checksum_mismatch cr_push_wrong_binary_version cr_version_skip
     cr_land_pr_not_clean cr_land_pr_branch_moved cr_follow_on_engrave_demo cr_stale_staging cr_push_gh_fails_after_tag
+    cr_cache_root_slash cr_cache_root_relative cr_cache_root_empty cr_cache_tag_slash cr_cache_dir_not_below
+    cr_harness_rm_guards cr_static_rm
 )
 NET_LIST=(
     crn_verify_ms crn_verify_mt crn_verify_md_unsigned crn_verify_engrave_retired crn_verify_all
