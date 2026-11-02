@@ -2,6 +2,8 @@
 
 This file is auto-loaded by Claude Code when starting a session in this repository.
 
+@AGENTS.md
+
 ## What this is
 
 `mnemonic-engrave` is the m-format constellation sibling that gets constellation strings (`md1`/`mk1`) engraved on a **SeedHammer II** machine. It provides the Rust CLI `me` (crate `crates/me-cli`): a converter (single `md1`/`mk1` → NDEF; refuses `ms1`), plus `me bundle` / `me bundle --preview` (the latter via the `me-preview` Go sidecar that reuses upstream SeedHammer curve math, pinned via the `third_party/seedhammer` submodule). SeedHammer firmware planning/design docs also live here, in `design/` — the fork itself (`bg002h/seedhammer`) is kept clean. Dual-licensed **MIT OR Unlicense**.
