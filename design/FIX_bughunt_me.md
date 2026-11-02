@@ -6,9 +6,6 @@ bind), triage `design/agent-reports/bughunt-triage-me.md`, RED tests
 that adds this document. Scope: #4, #2, L5, #3 and #1 (coordinator decision);
 L7 is not fixed here.
 
-**#4 is blocked by STOP S1/S3 below. Build #1, #2, #3 and L5 now; build #4
-only after the architect answers S1 and S3.**
-
 Toolchain for every command: `export PATH=$HOME/.cargo/bin:$PATH`, then
 `cargo +1.85.0 ...`. Never `--release`. Do not touch `firmware/`,
 `third_party/` or the submodule.
@@ -16,7 +13,7 @@ Toolchain for every command: `export PATH=$HOME/.cargo/bin:$PATH`, then
 ## 1. Code changes (exact)
 
 Every change below was applied to a scratch worktree at the base commit and
-passed the gate in section 5 (the one failing test is S3's). Apply the hunks
+passed the gate in section 5. Apply the hunks
 as written; `cargo fmt` is already applied to them.
 
 ### L5 (R4): `crates/me-cli/src/seal/uf2.rs`
@@ -107,36 +104,59 @@ No new variant and no new text: `PreviewError::Spawn` displays as
    survives" becomes "without set_len(0) the tail of the longer write
    survives".
 
-### #4 (R1): `crates/me-cli/src/main.rs` (BLOCKED: S1, S3)
+### #4 (R1): `crates/me-cli/src/main.rs`
 
-As ruled (fix-04): at the top of the `if let Some(p) = in_path {` branch of
-`read_records` (line 3044), before `std::fs::read_to_string`, add:
+1. `read_records` signature (line 3039-3043). After `allow_argv_secret: bool,`
+   add the parameter `as_present: bool,`.
+2. Line 3044: `if let Some(p) = in_path {` becomes
+   `if let Some(p) = in_path.filter(|_| argv.is_empty()) {`.
+3. Inside `if !argv.is_empty() {`, immediately after the closing `}` of the
+   `for (i, r) in argv.iter().enumerate()` guard loop (base line 3156) and
+   before the comment `// §6b — \`-\` MEANS STDIN, ...`, insert:
 
 ```rust
-        if !argv.is_empty() {
-            return Err((
-                "pass records on argv OR via --in, not both".to_string(),
-                EXIT_USAGE,
-            ));
+        // R1 (bug hunt #4): argv AND --in. Checked AFTER the guard above, for
+        // the pack arm's rule: a flag-shape usage error must not pre-empt a
+        // refusal about material already in the shell's history.
+        if in_path.is_some() {
+            if !as_present {
+                return Err((
+                    "pass records on argv OR via --in, not both".to_string(),
+                    EXIT_USAGE,
+                ));
+            }
+            // With `--as`, the caller's §5.1 shape check refuses this
+            // invocation in its own words. Read neither --in nor stdin.
+            return Ok(Records {
+                records: argv.to_vec(),
+                document: argv.join("\n"),
+            });
         }
 ```
 
-Refusal: stderr exactly `me: pass records on argv OR via --in, not both`
-followed by a newline (the caller at line 1514 adds `me: `), exit 2
-(`EXIT_USAGE`), stdout empty, nothing written. Same text and code as seal's
-refusal at main.rs:936-939. If the architect picks S3 option (b), the
-placement changes as the ruling says; the text and exit code do not.
+4. Caller, line 1511. The call becomes
+   `read_records(records, r#in.as_ref(), *allow_argv_secret, r#as.is_some())`.
+   Then run `cargo +1.85.0 fmt --all`, which wraps it as
+   `let (recs, document) =\n                match read_records(...) {` with the
+   arms indented one level.
+5. Unit tests in `mod tests`, lines 3618 and 3638. Append `, false` to each
+   call, giving `read_records(std::slice::from_ref(&rec), None, false, false)`
+   and `read_records(&["text:6869".to_string()], None, false, false)`.
+
+The full diff is saved at `/scratch/cache/bughunt/me/arch-s1s3.patch`. fmt,
+clippy (`-D warnings`, all targets, workspace) and the suite are all clean;
+the measurements are below.
 
 ## 2. Spec delta (exact)
 
 | # | file:line | old | new |
 |---|---|---|---|
-| #4 | `design/SPEC_systemwide_payloads.md:908` | the row's text ends `(F-416, amended 2026-08-29)** \|` | append before the closing ` \|`: ` Records on argv together with \`--in\` are refused: \`me: pass records on argv OR via --in, not both\`, exit 2.` (subject to S3) |
+| #4 | `design/SPEC_systemwide_payloads.md:908` | the row's text ends `(F-416, amended 2026-08-29)** \|` | append before the closing ` \|`: ` Without \`--as\`, records on argv together with \`--in\` are refused after the argv bearer/secret guard: \`me: pass records on argv OR via --in, not both\`, exit 2.` |
 | #2 | `design/SPEC_me_preview_hardening.md`, A1, new paragraph after line 40 (`happens to match).`), before line 42 (`Placement:`) | (none) | `` `render_plate` removes any existing `plate-<idx>.<ext>` before it spawns `me-preview`, so the F9 check judges only this run's output; a removal error other than not-found is reported as `cannot run me-preview: <error>`. `` |
 | L5 | `design/SPEC_encrypted_payload_delivery.md` §5, new paragraph after line 487 (`... confirmed empirically in §3.1.`), before `## 6.` | (none) | `` `to_uf2` refuses (panics on) a blob longer than the 64 KiB region; the CLI never passes one. `` |
 | #1 | `design/SPEC_me_preview_hardening.md:106` | `` `.write(true).create(true).truncate(true)` `` | `` `.write(true).create(true)` `` (derived: R5 drops `truncate(true)`, so this text would otherwise be false) |
 | #1 | `design/SPEC_me_preview_hardening.md:108` | `` **`truncate(true)` is load-bearing (R0 I2):** `` | `` Truncation is load-bearing (R0 I2) and happens after the mode is set (`set_len(0)` after `set_permissions`), so a refused chmod leaves the existing file unchanged. `` The rest of the bullet (`` `fs::write` truncates; without it a shrinking overwrite ...``) is kept. |
-| #1 | `design/SPEC_me_preview_hardening.md:118-119` | `**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3)` and the residual that follows | STOP S2 |
+| #1 | `design/SPEC_me_preview_hardening.md:118-119` | `**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3)` and the residual that follows | `` `.mode(0o600)` binds only on create, so on Unix `write_private` also calls `set_permissions(0o600)` on the open file (F-244): an overwrite of a pre-existing file ends at 0o600, and a refused chmod fails the write before any byte of the old file is touched (R0 L3, superseded). `` |
 
 The #3 change has no spec delta (R3: SPEC_systemwide_payloads.md:151 already
 states the rule).
@@ -160,6 +180,8 @@ skipped; the 2 passes are 06 and 07, the FALSE POSITIVEs, which stay green).
 | `bughunt_me_03b_pack_passphrase_without_secrets_is_the_unsealed_form` (new) | #3 | :271 `no secrets: expected the unsealed form (61 bytes), got 77 bytes` | #3 |
 | `bughunt_me_04_pack_in_file_plus_argv_does_not_drop_argv` | #4 | :135 `exit 0 but the argv record was silently dropped: "text:6162"` | #4 |
 | `bughunt_me_04b_pack_in_plus_argv_refusal_text_and_exit` (new) | #4 | :296 `refusal`: left `(Some(0), "sealing:  NOT SEALED ...")`, right `(Some(2), "me: pass records on argv OR via --in, not both\n")` | #4 |
+| `bughunt_me_04c_argv_bearer_guard_precedes_not_both` (new) | #4 | :352 `left: Some(0) right: Some(3)` (argv dropped, exit 0) | #4 |
+| `bughunt_me_04d_as_argv_bearer_guard_precedes_single_document_with_in` (new) | #4 | :372 `left: Some(2) right: Some(3)`, stderr `me: --as packs exactly one descriptor per invocation.` | #4 |
 | `bughunt_me_05_uf2_oversize_blob_never_addresses_past_flash_end` | L5 | :153 `block 8192 targets 0x11000000, past the end of flash` | L5 |
 | `bughunt_me_05b_uf2_cap_is_the_64k_seal_region` (new) | L5 | :321 `a 65537-byte blob was accepted` | L5 |
 
@@ -175,10 +197,6 @@ Why each new row exists (a ruling asserts behaviour the original row does not):
 
 ## 4. Tests that change
 
-- `crates/me-cli/tests/descriptor_as.rs:135`
-  `as_with_argv_and_in_together_is_usage`: FAILS under fix-04 as ruled
-  (stderr is the "not both" text, not §5.1's `--as packs exactly one
-  descriptor per invocation.`). What happens to it is STOP S3.
 - `crates/mnemonic-io-lib/src/write.rs` unit test
   `a_shrinking_overwrite_leaves_no_stale_tail`: text only (section 1, #1
   step 4); it passes before and after.
@@ -206,7 +224,7 @@ invocation" appears for `me`.
 ## 6. Build order and gate
 
 Order, one commit each (GREEN for its rows): L5, #3, #2, #1, spec delta for
-those four, then #4 with its spec row once S1/S3 are answered. After each
+those four, then #4 with its spec row. After each
 commit run that item's rows by exact name.
 
 Gate (capture each to a file once, then grep):
@@ -218,52 +236,18 @@ Gate (capture each to a file once, then grep):
 5. `cargo +1.85.0 nextest run --locked --workspace -E 'test(/^bughunt_me_/)'`
 
 Expected (all five items built, S3 resolved so `as_with_argv_and_in_together_is_usage` passes or is changed as ruled):
-- 1: `702 tests run: 702 passed, 2 skipped` (691 base + 7 triage rows + 4
-  new rows). Measured with fix-04 as ruled and the test unchanged:
-  `702 tests run: 701 passed, 1 failed, 2 skipped`, the failure being
-  `as_with_argv_and_in_together_is_usage`.
+- 1: `704 tests run: 704 passed, 2 skipped` (691 base + 7 triage rows + 6
+  new rows).
 - 2: exit 0 (no doctests in the workspace; each `test result:` line reads
   `0 passed; 0 failed`).
 - 3, 4: exit 0.
-- 5: `11 tests run: 11 passed, 693 skipped`.
-Before #4 lands: 5 reads `11 tests run: 9 passed, 2 failed` (04, 04b).
+- 5: `13 tests run: 13 passed, 693 skipped`.
+Before #4 lands: 5 reads `13 tests run: 9 passed, 4 failed` (04, 04b, 04c, 04d).
 
 ## STOP sections
 
-**S1 (#4 order against the argv bearer guard).** fix-04 refuses "not both"
-at exit 2 before the argv bearer/secret guard (`read_records`, the argv
-branch, R2/G-P3.5) ever runs. The comment at main.rs:1519-1524 states the
-pack arm's rule: "a flag-shape usage error must not pre-empt a refusal about
-material that is already in the shell's history". So `me sysw pack --in f
-tx:<hex>` would exit 2 with "not both" instead of exit 3 with the bearer
-refusal and its history advice. Seal (main.rs:934-938) refuses "not both"
-first, so fix-04 matches seal. Question: keep fix-04's placement, or run the
-argv guard first and refuse "not both" after it? (The lost advice is
-secret-handling and so never gates on its own; the order is still a product
-point the grade did not weigh.)
+**S1:** Ruled: design/agent-reports/architect-bughunt-me.md
 
-**S2 (#1, SPEC_me_preview_hardening.md:118-119).** R5 says "correct
-'0o600 binds on CREATE' to cite F-244's explicit `set_permissions`" but gives
-no text. Proposed: replace
-`**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3) — acceptable residual: the NDEF/manifest targets are user-named and the preview targets are forced-fresh by A1.`
-with
-`` `.mode(0o600)` binds only on create, so `write_private` also calls `set_permissions(0o600)` on the open file (F-244): an overwrite of a pre-existing file ends at 0o600, and a refused chmod fails the write before any byte of the old file is touched (R0 L3, superseded). ``
-Needs the architect's yes or a replacement text.
+**S2:** Ruled: design/agent-reports/architect-bughunt-me.md
 
-**S3 (#4 against SPEC_descriptor_input.md §5.1) — Important against R1 as
-written.** §5.1 (lines 905-911) is normative: "Supplying `--as` ... with both
-argv and `--in`, is `EXIT_USAGE` (2): *"--as packs exactly one descriptor per
-invocation."*", and the `--in` row at SPEC_systemwide_payloads.md:908 says
-§5.1 governs when `--as` is present. fix-04 runs inside `read_records`,
-before the `--as` check at main.rs:1526-1533, so `me sysw pack
---no-passphrase --as md1 <desc> --in f` changes from exit 2 with §5.1's text
-to exit 2 with "not both" (probed on both binaries), and
-`as_with_argv_and_in_together_is_usage` fails. Options:
-- (a) keep fix-04; amend §5.1's sentence (drop "or with both argv and
-  `--in`", or say the "not both" refusal comes first) and change the test's
-  expected text to `pass records on argv OR via --in, not both`;
-- (b) refuse "not both" only when `--as` is absent (e.g. pass `r#as.is_some()`
-  into the check, or move it after the `--as` block), keeping §5.1 and the
-  test unchanged; the #4 spec sentence then says "Without `--as`, records on
-  argv together with `--in` are refused: ...".
-Either needs exact text from the architect.
+**S3:** Ruled: design/agent-reports/architect-bughunt-me.md

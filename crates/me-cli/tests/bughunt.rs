@@ -330,3 +330,49 @@ fn bughunt_me_05b_uf2_cap_is_the_64k_seal_region() {
         "seal blob 65537 bytes exceeds the 65536-byte seal region"
     );
 }
+
+/// FIX R1 + architect S1: with argv AND `--in`, the argv bearer/secret guard
+/// still runs first (exit 3, its own refusal), so "not both" never pre-empts
+/// a refusal about material already in the shell's history.
+#[test]
+fn bughunt_me_04c_argv_bearer_guard_precedes_not_both() {
+    let dir = tempfile::tempdir().unwrap();
+    let recs = dir.path().join("recs.txt");
+    std::fs::write(&recs, "text:6162\n").unwrap();
+    let out = dir.path().join("p.bin");
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--in"])
+        .arg(&recs)
+        .arg("--out")
+        .arg(&out)
+        .arg("tx:00")
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&a.stderr).into_owned();
+    assert_eq!(a.status.code(), Some(3), "stderr:\n{err}");
+    assert!(err.contains("is a `tx:` record on ARGV"), "stderr:\n{err}");
+    assert!(!err.contains("not both"), "stderr:\n{err}");
+    assert!(!out.exists(), "nothing may be written");
+}
+
+/// Architect S1 + S3: the same order holds with `--as`: the bearer refusal
+/// (exit 3) precedes §5.1's shape refusal.
+#[test]
+fn bughunt_me_04d_as_argv_bearer_guard_precedes_single_document_with_in() {
+    let dir = tempfile::tempdir().unwrap();
+    let doc = dir.path().join("document.txt");
+    std::fs::write(&doc, "text:6162\n").unwrap();
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--as", "md1", "--in"])
+        .arg(&doc)
+        .arg("tx:00")
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&a.stderr).into_owned();
+    assert_eq!(a.status.code(), Some(3), "stderr:\n{err}");
+    assert!(err.contains("is a `tx:` record on ARGV"), "stderr:\n{err}");
+    assert!(
+        !err.contains("--as packs exactly one descriptor per invocation."),
+        "stderr:\n{err}"
+    );
+}
