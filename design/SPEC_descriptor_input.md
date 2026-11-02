@@ -388,8 +388,9 @@ Measured (probe over the fork's own shipped fixtures plus constructed variants):
 | CRLF line endings throughout | **REFUSE**, generic message | see §4.6 |
 | `Name: only\n` and nothing else | **ACCEPT**, 0 keys, `Script=Unknown` | see below |
 
-Three of those rows are defects in the Go parser, and `me` must not reproduce
-them:
+Three of those rows were defects in the Go parser, and `me` must not reproduce
+them. The sh2 bug hunt fixed all three on the device (fix-06b/50; see the
+amendment after item 4):
 
 1. **`Format:` absent ⇒ `Script` stays `UnknownScript`, and `Descriptor.Encode()`
    then PANICS** — `bip380.go:167`, `panic("unknown script")`, reached because
@@ -429,6 +430,17 @@ them:
    sentence above — that the parser panics — describes fork `main`, which
    does not yet carry the `!= 4` guard; it amends in P3.5, with the fix that
    falsifies it.
+
+**AMENDED (sh2 bug-hunt, fix-06b/50).** `parseBlueWalletDescriptor` now
+refuses, in this order, with `bluewallet: missing Policy header`,
+`bluewallet: missing Format header`, `bluewallet: no keys` and
+`bluewallet: invalid threshold %d of %d`, and applies the `Derivation:`
+path to every key. Defects 1 and 2 are refused on the device; the holder
+still sees the generic "nonstandard: unrecognized output descriptor
+format" from `OutputDescriptor`. Defect 3 is accepted on the device with
+the path applied to every key; `me` still refuses it. The table above
+records the pre-fix measurement, and the seam's "narrowed" covers note is
+dropped for these rows.
 
 **NORMATIVE:** `me` **refuses** four shapes: a BlueWallet file with no
 `Format:` header; one with zero cosigner lines; one in which **any cosigner
@@ -550,6 +562,8 @@ Shapes the Go parser **accepts and should not**, measured:
 | `sh(wpkh(sortedmulti(2,…)))` | ACCEPT (`P2SH_P2WPKH`, `SortedMulti`) | a single-key wrapper around a multi; the device cannot even derive an address from it (measured: `address: multisig script: Nested Segwit (P2SH-P2WPKH): unsupported descriptor`) |
 | `tr(sortedmulti(2,…))` | ACCEPT | taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` is not a descriptor |
 | `wpkh(sortedmulti(2,…))`, `pkh(sortedmulti(2,…))` | ACCEPT | a single-key script wrapping a multi |
+
+> **AMENDED (sh2 bug-hunt, fix-06a/06c).** The last three rows' device column is the pre-fix measurement; the device now refuses them (§4.7 amendment).
 
 ### 4.4 Format 3 — `{label, descriptor}` JSON
 
@@ -802,6 +816,8 @@ That second pair is now MEASURED (R0 r2's NEW-I4): both ACCEPT on the device
 derivable address — conjunct 5's reaches-programs-that-cannot-derive class —
 and §7's narrowed-shape bullet names them, with §6 rows.
 
+> **AMENDED (sh2 bug-hunt, fix-06a/06c/06b/50).** The device measurements above are pre-fix. The fixed device REFUSES nine of the fourteen §4.7 shapes (`tr(sortedmulti)`, `wpkh(sortedmulti)`, `pkh(sortedmulti)`, `sh(wpkh(sortedmulti))`, `wsh(KEY)`, `sh(KEY)`, `k=0`, `k=−1`, `k>n`) and still ACCEPTS five (`n=16` directly under `sh`, `n=21` under `wsh`, the mixed-network multisig, the hardened use site, the non-consecutive multipath). `me`'s refusals are unchanged; the seam rows carry the measured `device_admits` (29 true, 45 false of 74).
+
 **Why a narrowing profile and not a port.** Three options were considered:
 
 - **Port `bip380` to Rust line-for-line.** Guarantees agreement — including
@@ -980,8 +996,8 @@ Two boundary rules that fall out of it (R0 r2):
   WELL-FORMED BlueWallet file or pretty JSON does (measured: the fork's own
   `sh` fixture, 14 lines, read whole is ACCEPT, `#tk50fvpm`, a fixed point;
   a malformed one does not: no `Name:` is a device REFUSE (measured), while
-  no `Format:` is refused by `me` at §4.2's NORMATIVE rule even though the
-  DEVICE parses it and then panics on re-encode (§4.2 defect 1) — either
+  no `Format:` is refused by `me` at §4.2's NORMATIVE rule and since the sh2 bug hunt the
+  DEVICE refuses it too (§4.2 amendment) — either
   way it falls through) — the
   input IS a descriptor and gets the "--as decides" block at `EXIT_USAGE`
   (2) when at least one `--as` value carries it in this build — otherwise
@@ -1669,6 +1685,7 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   `device_admits` like any other, **`device_admits` is now present on every
   row**, and requirement 5's non-vacuity count skips none. S2 does not touch
   `Encode`, so the two `"panic:encode"` rows are unchanged.
+  **AMENDED (sh2 bug-hunt, fix-06b/50):** the parser now refuses §4.2 defects 1–2, so `"panic:encode"` retired too; no row carries `device_probe`, and both halves pin its count at 0.
 - **`covers`** (REQUIRED, non-empty array of coverage-manifest tags): which
   required-row bullets this row discharges; additional tags are permitted
   only for the rows the manifest names (R0 r7's NEW-M1 — see the manifest
@@ -1711,7 +1728,7 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   `k=−1`, `k>n`, `n=16` with the `sortedmulti` DIRECTLY under `sh`, `n=21`
   under `wsh`, a mixed mainnet/testnet multisig, a hardened use-site
   component (`<0;1>/*h`), and a non-consecutive multipath (`<0;2>/*`):
-  `host_admits=false`, `device_admits=true`. These are the rows the invariant
+  `host_admits=false`, `device_admits` measured (true before the sh2 bug hunt; nine are false since, §4.7 amendment). These are the rows the invariant
   is *for*. And one row on the ACCEPTED side that r1's prescription would
   have wrongly refused: `sh(wsh(sortedmulti(2, 16 keys)))` —
   `host_admits=true`, spendable, with its `canonical` and `address_0`
@@ -1734,7 +1751,7 @@ paragraph below; R0 r6's NEW-I1; `wallet_id` from walk W10) — plus the columns
   (parse ACCEPTS, `Encode()` panics — measured, R0 r6's NEW-M6; the zero-key
   row is §4.2 defect 2's exact `Name: only` spelling — a zero-key file WITH
   a `Format:` header encodes cleanly (`wsh(sortedmulti(0,))#w47tv00x`,
-  measured) and the marker does not apply to it, R0 r7's NEW-M2);
+  measured) and the marker does not apply to it, R0 r7's NEW-M2); **AMENDED (sh2 bug-hunt):** both rows now carry a measured `device_admits: false` and no `device_probe`.
 - **`wsh(multi(…/<0;1>/*))`, a miniscript descriptor, and
   `wsh(multi(…/0/*))`** — `false`/`false` on the host/device axes, the
   `neither` rows the vacuity check needs. **AMENDED 2026-08-29 (S2): the
@@ -2055,7 +2072,7 @@ rest.
   and §4.1's discarded diagnostics are real and are recorded here. Under §3 the
   Rust primary is written correct and the Go side converges *later*, as its own
   cycle. This cycle changes Go in exactly one place — §5.2's `sysw.Classify`
-  arm — and nothing else.
+  arm — and nothing else. **AMENDED (sh2 bug-hunt):** the sh2 bug-hunt FIX is that later Go cycle for §4.2 defects 1–3 and §4.3's threshold gap.
 - **`me seal`'s descriptor path.** `seal.Classify` already returns
   `ClassDescriptor` and `permitted` already refuses it (§2.4). Whether the
   `seal` container should carry descriptors is a separate question with a
