@@ -161,3 +161,97 @@ report describes.
 which step 4a writes before §6.3 step 1, so the number cannot exist yet (true
 of the committed step 5 too). What the body prints there is undecided, and a
 builder will STOP on it. Suggest the r2 brief or the next architect question.
+
+## E9 (follow-up): the PR number in the pins-PR texts
+
+**Ruling.** Change the `<number>` placeholders as follows:
+- **Body, follow-on.txt, dry run and every §8 copy:** keep them number-free.
+  The §6.4 line and §8 (b)'s line print the literal `<PR number>`.
+- **§6.3 step 6's stdout line:** keep `<number>`, now defined as the digits at
+  the end of the URL that `gh pr create` prints. That line is the one place
+  where the number exists.
+- **No `gh pr edit`.**
+
+This applies to the body and to §8's copies alike (§8 (c) is the §6.4 block,
+and §8 (b) has the same undefined `<number>`). Counts stay at 76/68.
+
+**Why.** The body file is the same for every create:
+- 4a writes it before §6.3 step 1 (draft line 339);
+- the by-hand creates use it: 4a's pins-PR line, §6.3 step 4's exit 9 and
+  step 5's exit 9 (lines 344, 472, 478).
+
+So the body must stand without the number on every path. A `gh pr edit` would
+fix only the script's own path. It would also add a gh call, a fake-gh
+answer, and a new exit after the PR already exists, all for a number the PR
+page already shows.
+
+The same holds for follow-on.txt and the dry run, which are written before
+any PR exists, and for §8 (b), whose PR someone opens later.
+
+On `--push`, step 6's line follows §8 and carries the real number. Row 42
+already expects `--land-pr 77`, taken from the fake's
+`https://github.com/bg002h/mnemonic-toolkit/pull/77`. `gh pr create --help`
+(gh 2.102.0) says: "Upon success, the URL of the created pull request will be
+printed."
+
+Typing the placeholder fails closed: the shell refuses the `<PR` redirect,
+and a quoted copy hits U6 (exit 2).
+
+The URL-parse refusal below gets no row. It fails closed (exit 9 names the
+problem and a read-only `gh pr list --head`, checked against
+`gh pr list --help`). It is reachable only if gh changes its success output,
+the same class as M20.
+
+**Exact texts** (anchors are in the draft; E1-E8 do not touch them).
+
+E9a, §6.3 step 5 (line 478). Anchor:
+```
+   `cut-release: could not open the pins PR (above); (c) is at refs/heads/release-pins-<N>; open it by hand: gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <git-dir>/cut-release/pins-pr-body.md`.
+```
+Replacement: the anchor line unchanged, followed by:
+```
+   On success, `<url>` is the last line `gh pr create` printed on stdout and
+   `<number>` is the digits after its final `/pull/`. If that line does not
+   match `^https://github\.com/bg002h/mnemonic-toolkit/pull/[0-9]+$`, exit 9:
+   `cut-release: gh pr create exited 0 but printed no pull request URL; find the PR: gh pr list --repo bg002h/mnemonic-toolkit --head release-pins-<N>`.
+```
+E9b, §6.4 (line 507). Anchor:
+```
+     land it: cut-release.sh --land-pr <number>   (from a mnemonic-toolkit checkout)
+```
+Replacement:
+```
+     land it: cut-release.sh --land-pr <PR number>   (from a mnemonic-toolkit checkout)
+```
+E9c, after §6.4's block. Anchor:
+```
+## 7. `--land-pr <n>` (merge-readiness check; any table repo)
+```
+Replacement:
+```
+`<PR number>`, here and in §8 (b), is printed as it stands: the PR it names
+does not exist yet when the text is written (the PR body, `follow-on.txt`,
+a dry run). On `--push`, the §6.3 step 6 line that follows §8 names the
+pins PR's number.
+
+## 7. `--land-pr <n>` (merge-readiness check; any table repo)
+```
+E9d, §8 (b) (line 604). Anchor:
+```
+     gates: sh scripts/install-assets.test.sh; then land it: cut-release.sh --land-pr <number>
+```
+Replacement:
+```
+     gates: sh scripts/install-assets.test.sh; then land it: cut-release.sh --land-pr <PR number>
+```
+E9e, row 42 (line 759). Anchor:
+```
+gh.log has `pr create` with `--draft`;
+```
+Replacement:
+```
+gh.log has `pr create` with `--draft` and `--body-file <git-dir>/cut-release/pins-pr-body.md`, and that file contains `land it: cut-release.sh --land-pr <PR number>`;
+```
+Row 42 amended: it now also tests E4 and E9b. No row is added, so the counts
+stay 76/68. Fold needed: yes, together with E1-E8 in the one fold commit;
+run `bin/mech_checks.py` on the result.
