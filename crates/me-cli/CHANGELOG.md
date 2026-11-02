@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Test `bughunt_me_01` skips where `unshare --map-auto` has no subuid range**
+  (the GitHub runner), and fails there under `ME_REQUIRE_USERNS=1`, as
+  `ME_REQUIRE_GO=1` does for the Go oracle.
 - **md-codec moves from 0.47.0 to 0.48.4** (F-700), the same rev
   mnemonic-refugium pins, so a program linking both holds one md-codec. 0.48.x
   adds API and changes no wire format.

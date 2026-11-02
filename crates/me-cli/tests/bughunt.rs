@@ -17,8 +17,38 @@ fn me() -> Command {
 /// existing file before a chmod that can fail. The file is made writable by
 /// but NOT owned by the caller inside a user namespace (subuid-mapped owner),
 /// no sudo. A failed write must leave the old contents alone.
+///
+/// Needs `unshare -U --map-auto` with an /etc/subuid range (the GitHub runner
+/// has none). Auto-skips when that probe fails UNLESS `ME_REQUIRE_USERNS=1`
+/// (then the missing capability fails hard).
 #[test]
 fn bughunt_me_01_write_private_keeps_old_file_when_chmod_fails() {
+    let probe_dir = tempfile::tempdir().unwrap();
+    let probe_ok = std::process::Command::new("unshare")
+        .args([
+            "-U",
+            "--map-auto",
+            "--map-root-user",
+            "sh",
+            "-c",
+            "touch p && chown 1 p",
+        ])
+        .current_dir(probe_dir.path())
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !probe_ok {
+        let msg = "user-namespace chown (unshare -U --map-auto with an /etc/subuid range) \
+                   is unavailable; set ME_REQUIRE_USERNS=1 to make this a failure";
+        if std::env::var("ME_REQUIRE_USERNS")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+        {
+            panic!("ME_REQUIRE_USERNS=1 but {msg}");
+        }
+        eprintln!("SKIP bughunt_me_01: {msg}");
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
     let f = dir.path().join("old.bin");
