@@ -26,3 +26,9 @@
 ^scripts/spec-check\.py$
 ^scripts/test/shot-server-security-test\.py$
 ^scripts/verify-returnsite-sweep\.sh$
+
+# Not run by CI: the release script and its local test gate (spec section 10
+# step 4: no workflow runs either). Both name other repos' README.md and
+# CHANGELOG.md files, which they edit in those repos, never in this one.
+^scripts/cut-release\.sh$
+^scripts/test/cut-release\.test\.sh$

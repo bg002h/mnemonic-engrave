@@ -1125,9 +1125,12 @@ run_row() {
     fi
 }
 
-for r in "${ROW_LIST[@]}"; do run_row "$r"; done
+# CUT_RELEASE_TEST_ONLY="row row ..." runs just those rows (a development aid;
+# the row count then differs from the expected one, so the exit status is 1).
+only() { [ -z "${CUT_RELEASE_TEST_ONLY:-}" ] || [[ " $CUT_RELEASE_TEST_ONLY " == *" $1 "* ]]; }
+for r in "${ROW_LIST[@]}"; do only "$r" && run_row "$r"; done
 if [ "$OFFLINE" -eq 0 ]; then
-    for r in "${NET_LIST[@]}"; do run_row "$r"; done
+    for r in "${NET_LIST[@]}"; do only "$r" && run_row "$r"; done
 fi
 
 echo "cut-release.test: $PASSED passed, $FAILED failed"
