@@ -4,6 +4,14 @@ This file is auto-loaded by Claude Code when starting a session in this reposito
 
 @AGENTS.md
 
+## Known hazards
+
+- **Bundle admission (me-cli).** `me bundle` admits public md1/mk1 strings only; ms1 (including a hashlock preimage plate) and mt1 are refused. The plate count is a completeness claim, so a plate that does not decode through descriptor intake refuses the bundle instead of being counted.
+- **seal and sysw stay separate (me-cli).** The `seal` and `sysw` container formats are separate on purpose; do not merge or cross-wire them. The sysw record classes distinguish secret and bearer material from public material.
+- **mnemonic-io-lib seam.** The library owns reusable IO and safety mechanisms only. Callers keep classification, refusal, permissions and output policy; do not hoist policy into the library.
+- **mt1 design lives here.** The normative mt1 spec and the independent vector generator are owned by this repo. mnemonic-transaction holds copies, so a change here must be re-synced there, and reference vectors are never regenerated from mt-codec.
+- **md-codec and miniscript pins.** me-cli builds md-codec from git at a rev that must equal mnemonic-refugium's. The workspace miniscript `[patch.crates-io]` rev must equal descriptor-mnemonic's at that md-codec rev, or md-codec does not compile; adding the patch line is not enough until `Cargo.lock` moves onto it. Do not assume every planned consumer of the shared md pin exists.
+
 ## What this is
 
 `mnemonic-engrave` is the m-format constellation sibling that gets constellation strings (`md1`/`mk1`) engraved on a **SeedHammer II** machine. It provides the Rust CLI `me` (crate `crates/me-cli`): a converter (single `md1`/`mk1` → NDEF; refuses `ms1`), plus `me bundle` / `me bundle --preview` (the latter via the `me-preview` Go sidecar that reuses upstream SeedHammer curve math, pinned via the `third_party/seedhammer` submodule). SeedHammer firmware planning/design docs also live here, in `design/` — the fork itself (`bg002h/seedhammer`) is kept clean. Dual-licensed **MIT OR Unlicense**.
