@@ -383,7 +383,10 @@ fn bughunt_me_04d_as_argv_bearer_guard_precedes_single_document_with_in() {
 fn bughunt_me_01b_pack_out_to_a_fifo_still_writes() {
     let dir = tempfile::tempdir().unwrap();
     let ff = dir.path().join("ff");
-    let st = std::process::Command::new("mkfifo").arg(&ff).status().unwrap();
+    let st = std::process::Command::new("mkfifo")
+        .arg(&ff)
+        .status()
+        .unwrap();
     assert!(st.success(), "mkfifo (setup)");
     let reader = {
         let ff = ff.clone();
