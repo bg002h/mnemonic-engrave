@@ -1536,6 +1536,27 @@ newest_of() { # prefix, tags on stdin -> newest tag
     sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1 | awk -v p="$p" 'NF{print p $0}'
 }
 
+# cache_root_check: CR_CACHE must be an absolute path other than "/" (a run of
+# slashes is "/"); refuses with exit 2 otherwise (spec 2, CUT_RELEASE_CACHE)
+cache_root_check() {
+  if [[ $CR_CACHE != /* || $CR_CACHE != *[!/]* ]]; then
+    refuse 2 "CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '$CR_CACHE')"
+  fi
+}
+# cache_guard <tag> <dir>: run before verify deletes <dir>. Refuses with exit 2
+# unless the cache root is sound, <tag> is one plain path component and <dir>
+# is exactly "$CR_CACHE/<tag>", strictly below the cache (spec 5.4)
+cache_guard() {
+  local tag=$1 dir=$2
+  cache_root_check
+  case $tag in
+    */*|.|..) refuse 2 "'$tag' cannot name a cache directory: it has a '/' or is '.' or '..'" ;;
+  esac
+  if [ "$dir" != "$CR_CACHE/$tag" ] || [[ $dir != "$CR_CACHE"/?* ]]; then
+    refuse 2 "refusing to delete '$dir': it is not exactly '$CR_CACHE/$tag' strictly below the cache"
+  fi
+}
+
 verify_tag() {
   local tag=$1 slug prefix N bin archive d rel names list prevtag PV pn want s out rc c comment
   VF_OK=0; VF_FAIL=0
@@ -1543,7 +1564,8 @@ verify_tag() {
   row_by_prefix "$prefix"
   slug="bg002h/$R_REPO"; bin=$R_BIN; archive=$(archive_name "$N")
   d="$CR_CACHE/$tag"
-  rm -rf "$d"; mkdir -p "$d"
+  cache_guard "$tag" "$d"
+  rm -rf -- "${d:?}"; mkdir -p "$d"
   say "== verify $tag"
   # V1
   if ! rel=$(gh release view "$tag" --repo "$slug" --json isDraft,isPrerelease,assets 2>/dev/null); then
@@ -1764,6 +1786,7 @@ main() {
   if ! [[ $CR_DATE =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
     refuse 2 "CUT_RELEASE_DATE must be YYYY-MM-DD"
   fi
+  cache_root_check
   need_tools
   case "$MODE" in
     verify)

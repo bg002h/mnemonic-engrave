@@ -33,11 +33,35 @@ EXPECT=85
 CACHEROOT=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test
 mkdir -p "$CACHEROOT"
 T=$(readlink -f "$CACHEROOT")/run-$$
-rm -rf "$T"
+# Every recursive delete in this file goes through rm_T or rm_below_T (spec
+# section 9, Harness setup). A refusal deletes nothing and exits 2.
+rm_refuse() { echo "cut-release.test: refusing to delete '$1': $2" >&2; exit 2; }
+t_check() {
+    case ${T:-} in
+        */cut-release-test/run-*) ;;
+        *) rm_refuse "${T:-}" "T is not */cut-release-test/run-*" ;;
+    esac
+}
+rm_T() { t_check; rm -rf -- "${T:?}"; }
+rm_below_T() { # path...
+    local p
+    t_check
+    for p in "$@"; do
+        case $p in
+            */..|*/../*) rm_refuse "$p" "it has a '..' component" ;;
+        esac
+        case $p in
+            "${T:?}"/?*) ;;
+            *) rm_refuse "$p" "it is not strictly below $T" ;;
+        esac
+    done
+    for p in "$@"; do rm -rf -- "${p:?}"; done
+}
+rm_T
 mkdir -p "$T/bin" "$T/key" "$T/key2" "$T/none" "$T/remote" "$T/work"
 KEEP=0
 cleanup() {
-    if [ "$KEEP" -eq 0 ]; then rm -rf "$T"; else echo "cut-release.test: kept $T" >&2; fi
+    if [ "$KEEP" -eq 0 ]; then rm_T; else echo "cut-release.test: kept $T" >&2; fi
 }
 trap cleanup EXIT
 
@@ -80,7 +104,7 @@ minisign -G -W -f -p "$T/key2/pub" -s "$T/key2/sec" >/dev/null 2>&1 || { echo "c
 # The script under test runs from a committed scratch copy, so its own
 # "committed tooling only" check (P7) does not depend on the state of this tree.
 mk_eng() { # dir
-    rm -rf "$1"
+    rm_below_T "$1"
     mkdir -p "$1/scripts"
     cp "$CR_REAL" "$ROOT/scripts/push-via-staging.sh" "$1/scripts/"
     cp "$ROOT/minisign.pub" "$1/minisign.pub"
@@ -114,7 +138,7 @@ x_eq() { [ "$1" = "$2" ] || rowfail "$3: got '$1', wanted '$2'"; }
 
 fresh() {
     cd "$T" || return 1
-    rm -rf "$T/remote" "$T/work" "$T/assets" "$T/clone2" "$T/sib" "$T/cache" "$T/eng" "$T/fakebin" "$T/pk" "$T"/merge.*
+    rm_below_T "$T/remote" "$T/work" "$T/assets" "$T/clone2" "$T/sib" "$T/cache" "$T/eng" "$T/fakebin" "$T/pk" "$T"/merge.*
     rm -f "$T/gh.log" "$T/pvs.log" "$T/gh.killed" "$T/out" "$T/err"
     mkdir -p "$T/remote" "$T/work"
     FXDIR=""; FXBARE=""; FXREPO=""; FXDEF=""
@@ -147,7 +171,7 @@ x_no_remote_tag() { # tag...
 fx_init() { # repo default
     FXREPO=$1; FXDEF=$2
     FXDIR=$T/work/$1; FXBARE=$T/remote/$1.git
-    rm -rf "$FXDIR" "$FXBARE"
+    rm_below_T "$FXDIR" "$FXBARE"
     git init -q --bare -b "$2" "$FXBARE"
     git init -q -b "$2" "$FXDIR"
     git -C "$FXDIR" remote add origin "$FXBARE"
@@ -272,7 +296,7 @@ mk_assets() {
         *) echo "mk_assets: no recipe for $tag" >&2; return 1 ;;
     esac
     d=$T/assets/$tag
-    rm -rf "$d" "$T/pk"
+    rm_below_T "$d" "$T/pk"
     mkdir -p "$d" "$T/pk"
     printf '#!/bin/sh\necho "%s %s"\n' "$bin" "${MK_ASSETS_BINVER:-$n}" >"$T/pk/$bin"
     chmod +x "$T/pk/$bin"
@@ -1087,7 +1111,7 @@ net_clone() { # repo default : a clone of the real repo whose origin is a bare c
     local repo=$1 def=$2
     FXREPO=$repo; FXDEF=$def
     FXDIR=$T/work/$repo; FXBARE=$T/remote/$repo.git
-    rm -rf "$FXDIR" "$FXBARE"
+    rm_below_T "$FXDIR" "$FXBARE"
     GIT_CONFIG_GLOBAL=/dev/null git clone -q --bare --reference-if-able "$CUT_RELEASE_SIBLINGS_REAL/$repo" "https://github.com/bg002h/$repo" "$FXBARE" || return 1
     git clone -q "$FXBARE" "$FXDIR" || return 1
     (cd "$FXDIR" && cargo fetch --locked >/dev/null 2>&1) || return 1
