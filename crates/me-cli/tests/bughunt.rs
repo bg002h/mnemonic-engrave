@@ -218,3 +218,115 @@ fn bughunt_me_07_pack_mt_set_missing_strings_never_panics() {
         );
     }
 }
+
+/// FIX R2 (#2): a `plate-1.svg` that `render_plate` cannot remove (here a
+/// non-empty directory) is reported as `PreviewError::Spawn`, displayed as
+/// `cannot run me-preview: <io error>`, before the sidecar runs.
+#[test]
+fn bughunt_me_02b_unremovable_stale_preview_is_a_spawn_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let sidecar = dir.path().join("fake-sidecar");
+    std::fs::write(&sidecar, "#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::set_permissions(&sidecar, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let stale = dir.path().join("plate-1.svg");
+    std::fs::create_dir(&stale).unwrap();
+    std::fs::write(stale.join("keep"), "x").unwrap();
+    let mut r = None;
+    for _ in 0..500 {
+        let x = preview::render_plate(&sidecar, "md1other", dir.path(), 1, false);
+        if matches!(&x, Err(preview::PreviewError::Spawn(e)) if e.kind() == std::io::ErrorKind::ExecutableFileBusy)
+        {
+            std::thread::sleep(Duration::from_millis(10));
+            continue;
+        }
+        r = Some(x);
+        break;
+    }
+    let r = r.expect("ETXTBSY never cleared");
+    let Err(e @ preview::PreviewError::Spawn(_)) = r else {
+        panic!("an unremovable stale plate must be a Spawn error, got {r:?}");
+    };
+    assert!(
+        e.to_string().starts_with("cannot run me-preview: "),
+        "display: {e}"
+    );
+    assert!(
+        stale.join("keep").exists(),
+        "the directory must be left alone"
+    );
+}
+
+/// FIX R3 (#3): with no secret records, `pack` with a passphrase emits the
+/// same unsealed container as `pack` without one.
+#[test]
+fn bughunt_me_03b_pack_passphrase_without_secrets_is_the_unsealed_form() {
+    let recs = || vec!["text:6869".to_string()];
+    let sealed = sysw::pack(
+        recs(),
+        Some("abandon ability able about above"),
+        sysw::wire::MIN_ITERATIONS,
+    )
+    .expect("a valid passphrase with no secrets must pack");
+    let plain = sysw::pack(recs(), None, sysw::wire::MIN_ITERATIONS).expect("pack None");
+    assert_eq!(
+        sealed,
+        plain,
+        "no secrets: expected the unsealed form ({} bytes), got {} bytes",
+        plain.len(),
+        sealed.len()
+    );
+}
+
+/// FIX R1 (#4): records on argv together with `--in` are refused with the
+/// seal refusal's text at exit 2, and nothing is written.
+#[test]
+fn bughunt_me_04b_pack_in_plus_argv_refusal_text_and_exit() {
+    let dir = tempfile::tempdir().unwrap();
+    let recs = dir.path().join("recs.txt");
+    std::fs::write(&recs, "text:6162\n").unwrap();
+    let out = dir.path().join("p.bin");
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--in"])
+        .arg(&recs)
+        .arg("--out")
+        .arg(&out)
+        .arg("text:6869")
+        .output()
+        .unwrap();
+    assert_eq!(
+        (
+            a.status.code(),
+            String::from_utf8_lossy(&a.stderr).into_owned()
+        ),
+        (
+            Some(2),
+            "me: pass records on argv OR via --in, not both\n".to_string()
+        ),
+        "refusal"
+    );
+    assert!(a.stdout.is_empty(), "stdout must be empty");
+    assert!(!out.exists(), "nothing may be written");
+}
+
+/// FIX R4 (L5): `to_uf2` accepts a blob of exactly `seal::wire::REGION_LEN`
+/// (65536) bytes and panics, with the ruled text, one byte over.
+#[test]
+fn bughunt_me_05b_uf2_cap_is_the_64k_seal_region() {
+    let cap = seal::wire::REGION_LEN as usize;
+    assert_eq!(cap, 65_536);
+    let uf2 = seal::uf2::to_uf2(&vec![0xA5u8; cap]);
+    assert_eq!(uf2.len(), cap / 256 * 512, "exactly 64 KiB is accepted");
+    let r = std::panic::catch_unwind(|| seal::uf2::to_uf2(&vec![0xA5u8; cap + 1]));
+    let Err(p) = r else {
+        panic!("a {}-byte blob was accepted", cap + 1);
+    };
+    let msg = p
+        .downcast_ref::<String>()
+        .cloned()
+        .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+        .unwrap_or_default();
+    assert_eq!(
+        msg,
+        "seal blob 65537 bytes exceeds the 65536-byte seal region"
+    );
+}
