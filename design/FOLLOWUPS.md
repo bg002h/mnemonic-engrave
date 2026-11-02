@@ -20722,7 +20722,7 @@ Design concerns (ungraded):
 
 ### F-711 — cut-release spec r3: 6 Minors and 3 Nits (owning phase: cut-release build)
 
-**Status:** OPEN — owning phase: cut-release build
+**Status:** OPEN — owning phase: cut-release build (M1, M2, M3, M4, M6, N1, N2 and N3 closed 2026-11-01 by the spec burn-down commit 67c3cb20; M5 stays open)
 deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r3.md` (r3, last round: 0C/0I/6M/3N). Each line below is the review's line, verbatim. Burn-down at the owning phase: the build's first commit applies the exact spec fix texts of M1, M2, M3, M4, M6, N1 and N2 (N3 is folded into M2's fix), because M1, M4 and M6 leave points a builder would otherwise have to decide; M5 (the review gate scripts) stays open.
 
 Minors (one line each):
