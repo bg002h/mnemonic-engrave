@@ -527,6 +527,13 @@ pub fn pack_deterministic_with(
             return Err(SyswError::NotEnterableOnDevice(tok.to_string()));
         }
     }
+    // No secret records: nothing to encrypt, so the unsealed container (the
+    // CLI's decide_sealing rule), after the passphrase checks above still ran.
+    if payload.secret.is_empty() {
+        let mut blob = header.encode().to_vec();
+        blob.extend_from_slice(&pub_bytes);
+        return bound(blob);
+    }
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
 
