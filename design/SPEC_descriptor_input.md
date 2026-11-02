@@ -388,8 +388,9 @@ Measured (probe over the fork's own shipped fixtures plus constructed variants):
 | CRLF line endings throughout | **REFUSE**, generic message | see §4.6 |
 | `Name: only\n` and nothing else | **ACCEPT**, 0 keys, `Script=Unknown` | see below |
 
-Three of those rows are defects in the Go parser, and `me` must not reproduce
-them:
+Three of those rows were defects in the Go parser, and `me` must not reproduce
+them. The sh2 bug hunt fixed all three on the device (fix-06b/50; see the
+amendment after item 4):
 
 1. **`Format:` absent ⇒ `Script` stays `UnknownScript`, and `Descriptor.Encode()`
    then PANICS** — `bip380.go:167`, `panic("unknown script")`, reached because
@@ -429,6 +430,17 @@ them:
    sentence above — that the parser panics — describes fork `main`, which
    does not yet carry the `!= 4` guard; it amends in P3.5, with the fix that
    falsifies it.
+
+**AMENDED (sh2 bug-hunt, fix-06b/50).** `parseBlueWalletDescriptor` now
+refuses, in this order, with `bluewallet: missing Policy header`,
+`bluewallet: missing Format header`, `bluewallet: no keys` and
+`bluewallet: invalid threshold %d of %d`, and applies the `Derivation:`
+path to every key. Defects 1 and 2 are refused on the device; the holder
+still sees the generic "nonstandard: unrecognized output descriptor
+format" from `OutputDescriptor`. Defect 3 is accepted on the device with
+the path applied to every key; `me` still refuses it. The table above
+records the pre-fix measurement, and the seam's "narrowed" covers note is
+dropped for these rows.
 
 **NORMATIVE:** `me` **refuses** four shapes: a BlueWallet file with no
 `Format:` header; one with zero cosigner lines; one in which **any cosigner
