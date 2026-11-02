@@ -376,3 +376,39 @@ fn bughunt_me_04d_as_argv_bearer_guard_precedes_single_document_with_in() {
         "stderr:\n{err}"
     );
 }
+
+/// FIX R5 (#1): `--out` to a FIFO must keep working once truncation moves
+/// from `truncate(true)` at open to `set_len(0)` (a FIFO has no length).
+#[test]
+fn bughunt_me_01b_pack_out_to_a_fifo_still_writes() {
+    let dir = tempfile::tempdir().unwrap();
+    let ff = dir.path().join("ff");
+    let st = std::process::Command::new("mkfifo").arg(&ff).status().unwrap();
+    assert!(st.success(), "mkfifo (setup)");
+    let reader = {
+        let ff = ff.clone();
+        std::thread::spawn(move || std::fs::read(ff).unwrap())
+    };
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(&ff)
+        .arg("text:6869")
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "pack to a FIFO must succeed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let fifo_bytes = reader.join().unwrap();
+    let reg = dir.path().join("reg.bin");
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(&reg)
+        .arg("text:6869")
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(0));
+    assert_eq!(fifo_bytes, std::fs::read(&reg).unwrap());
+}
