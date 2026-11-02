@@ -14,11 +14,13 @@ decide); architect ruling `architect-sh2-s3q3.md` (b4bae63e).
 Scope: fork packages `gui`, `bip380`, `nonstandard`, `codex32`, `picobin`,
 `driver/otp`, `cmd/vectorfont`, `cmd/controller` (39's seam); in this repo
 (mnemonic-engrave) only the 6b/50 delta: the descriptor-seam vectors, their
-sha pin, and `design/SPEC_descriptor_input.md` §4.2. The grade's line holds:
+sha pin, and the amendments to `design/SPEC_descriptor_input.md` listed in §4
+(architect S3 widened the graded delta). The grade's line holds:
 "No toolkit manual change is needed: these are device and fork-internal
 paths, and no `mr` or `md-cli` flag or printed text changes." Every M and N
-is deferred (§9.2). Four points this document could not decide are STOPs
-(§10) and are not written into any build item.
+is deferred (§9.2). Four points the author could not decide were ruled by the architect
+(`design/agent-reports/architect-sh2-fixdoc-stops.md`, S1-S4) and are folded
+into the items below (§10).
 
 S3-Q3: keep `bc/*`. It is upstream code, and F-234 Q2 may use it. UR items stay deferred until wired (architect-sh2-s3q3).
 
@@ -49,7 +51,7 @@ active toolchain here was cargo 1.97.0-nightly.
 | RED s2 | same, s2 | 21, 22 FAIL |
 | RED s3 | `go test -count=1 -run '^TestBughuntSh2' ./bip380/ ./nonstandard/ ./codex32/` | 01, 06a, 06c, 06b, 50a, 50b, 50c, 11 FAIL |
 | RED s4 | `go test -count=1 -run '^TestBughuntSh2' ./picobin/ ./driver/otp/` | 07, 13, 14 FAIL |
-| RED s5 | `go test -count=1 -run '^TestBughuntSh2' ./cmd/vectorfont/` | 30c, 30d (with the new `c` subtest), 49 FAIL |
+| RED s5 | `go test -count=1 -run '^TestBughuntSh2' ./cmd/vectorfont/` | 30c, 30d (with the new `c` and `s` subtests), 49 FAIL |
 | RED 39 | `go test -count=1 -run '^TestBughuntSh239' ./cmd/controller/` (s39 copy, base `writeOTPValues`) | FAIL, see §6 |
 | GREEN s1 | RED s1 command on the fx1 copy | 6 PASS, `ok  	seedhammer.com/gui	0.069s` |
 | GREEN s2 | on fx2 | 2 PASS, `ok  	seedhammer.com/gui	0.007s` |
@@ -61,7 +63,7 @@ active toolchain here was cargo 1.97.0-nightly.
 | font regen | §5 | base and fixed both `generate exit=0`, `diff exit=0` |
 | me seam today | `PATH=$HOME/.cargo/bin:$PATH cargo nextest run --locked -p mnemonic-engrave -E 'binary_id(/descriptor_seam/) \| test(/descriptor_seam/)'` | `Summary [   0.038s] 19 tests run: 19 passed, 665 skipped` |
 | fork seam today | `go test -count=1 -run '^TestDescriptorSeam' ./nonstandard/` (s3) | `ok  	seedhammer.com/nonstandard	0.027s` |
-| host build with 39 seam | `go build ./...` (s39 copy) | FAIL: `runtime.main_main·f: function main is undeclared in the main package` (STOP 4) |
+| host build with 39 seam | `go build ./...` (s39 copy) | FAIL: `runtime.main_main·f: function main is undeclared in the main package`; with `main_host.go` (§2.14, architect S4) `go build ./...` rc=0 |
 
 ## 1. Summary
 
@@ -76,7 +78,7 @@ one two-repo delta (6b/50):
 | 31a | `gui` · `supplyMultisigPolicyFlow` | Back on the passphrase keyboard ends the supply flow |
 | 31b | same | Back on the passphrase question ends the supply flow |
 | 32 | `gui` · `recoverSLIP39Flow` | Back on the passphrase question ends recovery |
-| 21 | `gui` · `composerSelfCheck` | an unseated slot's origin must be §4f's default |
+| 21 | `gui` · `composerSelfCheck` | an unseated slot's origin must be the default origin |
 | 22 | `gui` · `composerPickScreenFrom` | wrapping never leaves the cursor off-page |
 | 01 | `bip380` · `Key`, `ParseKey`, `ExtendedKey` | xpub depth and child number survive re-encode |
 | 06a | `bip380` · `Parse` | multikey threshold range check |
@@ -86,13 +88,17 @@ one two-repo delta (6b/50):
 | 07 | `picobin` · `HashData` | each zero-fill entry hashes its own size word |
 | 13 | `driver/otp` · `WriteWhiteLabelString` | string placement keyed by entry, not by the caller's index |
 | 14 | `driver/otp` · `ReadWhiteLabelString` | valid bit tested with `&` |
-| 30c, 30d, 49 | `cmd/vectorfont` · `parseSegments`, `optimizeSegments` | repeated `s` and relative `l`/`h`/`v`/`c` pen tracking; stale pen in optimize |
-| 39 | `cmd/controller` · `writeOTPValues` (new, host seam) | a label-address write error stops the OTP sequence |
+| 30c, 30d, 49 | `cmd/vectorfont` · `parseSegments`, `optimizeSegments` | repeated `s` and relative `l`/`h`/`v`/`c`/`s` pen tracking; stale pen in optimize |
+| 39 | `cmd/controller` · `writeOTPValues` (new, host seam), `main_host.go` (host stub) | a label-address write error stops the OTP sequence |
 
 Counts: C 0 · I 22 (2, 3, 4, 31a, 31b, 32, 21, 22, 1, 6a, 6b, 6c, 11, 50a,
 50b, 50c, 7, 13, 14, 30c, 30d, 49) · M 26 · N 11 · FP 1 (40) · UNRESOLVED 4
 (15, 16, 17, 44; 39 resolved by the seam) · open product questions 0 ·
-STOPs 4.
+STOPs 0 (S1-S4 ruled). The architect's rulings change four graded items:
+30d now covers `s` (S1), 21 has a new string (S2), the 6b/50 delta takes the
+whole seam regeneration (S3) and 39 gains a host `main` (S4). Filed beyond
+the grade (§9.2): one Important, `sh2-me-canonical-depth` (owner: next me
+FIX; does not block this build), and the Minor `sh2-me-refusal-device-claim`.
 
 ## 2. Holder-visible behaviour, per fix
 
@@ -128,10 +134,9 @@ Strings: none. Spec: none.
 Behaviour: an unseated slot's declared origin must equal
 `md.DefaultOrigin(st.list.Wrapper, account)` at the lowest free account
 (taken origins keyed by `composerOriginKey`); otherwise the self-check
-refuses. New error string, as the grade rules it:
-`"self-check: unseated slot @%d declares %s, not §4f's default %s"`.
-This string fails `TestProductionStringsAreDrawable` (the `§` has no glyph);
-its final wording is STOP 2. Spec: none.
+refuses. New error string: `"self-check: unseated slot @%d declares %s, not the default %s"`
+(architect S2: the grade's `§4f's` has no glyph; `TestProductionStringsAreDrawable` stays green).
+Spec: none.
 
 ### 2.6 fix-22 — pick screen wrap (`gui/composer_paged.go` `composerPickScreenFrom`)
 
@@ -155,7 +160,7 @@ New errors, word for word:
 
 On the device both surface through `OutputDescriptor` as the generic
 "nonstandard: unrecognized output descriptor format". Spec: none here; their
-seam-vector consequence is STOP 3(b).
+seam-vector consequence is the S3 re-pin (§4, §8 items 1-2, 11).
 
 ### 2.9 fix-06b/50 (06b, 50a, 50b, 50c) — BlueWallet parser (`nonstandard/parse.go` `parseBlueWalletDescriptor`)
 
@@ -197,8 +202,10 @@ Strings: none. Spec: none.
   newPen.Mul(2).Sub(newCtrl2)`.
 - 30d (`parseSegments`): `h` and `v` set `pen = p`; the `l` loop uses `p =
   p.Add(newPen).Sub(pen)` for i>0; the `c` loop computes `d :=
-  newPen.Sub(pen)` and adds `d` to p1, p2 and p3 for i>0. Relative repeated
-  `s` is not covered (STOP 1).
+  newPen.Sub(pen)` and adds `d` to p1, p2 and p3 for i>0. The `s` loop does the same as `c` for i>0: `d := newPen.Sub(pen)` is added
+  to p2 and p3 (p1 stays the reflection `newPen.Mul(2).Sub(newCtrl2)`).
+  In the row, a cubic's end point is `Args[2]`: the check becomes
+  `last := segs[len(segs)-1]; got := last.Args[0]; if last.Op == SegmentOpCubeTo { got = last.Args[2] }`.
 - 49 (`optimizeSegments`): `p0 = p1` before `continue skip`.
 
 Strings: none. Spec: none. Committed font output does not change (§5).
@@ -214,7 +221,34 @@ file `cmd/controller/lockboot_values.go`, `//go:build !refugium`, holding the
 label-address error instead of `fmt.Printf("label addr err: %v", err)` and
 then continuing. Removed string: `"label addr err: %v"`. Behaviour: on a
 failed label-address write no white-label string and no boot key is written.
-The host build consequence is STOP 4. Spec: none.
+Host build: the seam gives the package host-buildable files, so a main
+package with files must declare `main`. Architect S4 adds
+`cmd/controller/main_host.go` (sha256
+`c24f6260ebc818322945d4f1312232ce7a50f0270f44d0647aea16a55bec0a17`), whose tag
+is the exact complement of `main.go`'s `tinygo && rp`, the same pattern as
+`cmd/emu/main_notjs.go`; text verbatim:
+
+~~~go
+//go:build !(tinygo && rp)
+
+// This file exists so `go build ./...` and `go vet ./...` succeed on a host.
+// The seam in lockboot_values.go gives the package host-buildable files, and a
+// main package with files must declare main.
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	fmt.Fprintln(os.Stderr, "controller is a device build: build it with tinygo -target pico-plus2")
+	os.Exit(2)
+}
+~~~
+
+The message names the CI target (`.github/workflows/test.yml:150,153`). On a
+host `go run ./cmd/controller` prints that line and exits 2. Spec: none.
 
 ## 3. Code delta (production)
 
@@ -225,7 +259,7 @@ The host build consequence is STOP 4. Spec: none.
 | `gui/derive_xpub.go` | fix-04 |
 | `gui/multisig.go` | fix-31 |
 | `gui/slip39_polish.go` | fix-32 |
-| `gui/composer_selfcheck.go` | fix-21 (string per STOP 2) |
+| `gui/composer_selfcheck.go` | fix-21 |
 | `gui/composer_paged.go` | fix-22 |
 | `bip380/bip380.go` | fix-01, fix-06a, fix-06c |
 | `nonstandard/parse.go` | fix-06b/50 |
@@ -234,13 +268,15 @@ The host build consequence is STOP 4. Spec: none.
 | `driver/otp/otp.go` | fix-13, fix-14 |
 | `cmd/vectorfont/main.go` | fix-30c, fix-30d, fix-49 |
 | `cmd/controller/lockboot_values.go` (new), `cmd/controller/lockboot_default.go` | fix-39 seam |
+| `cmd/controller/main_host.go` (new) | fix-39 host `main`, `//go:build !(tinygo && rp)` (architect S4, text in §2.14) |
 | `nonstandard/testdata/` (vendored seam file) | copied byte-identically from me after §8 item 1 |
+| `nonstandard/descriptor_seam_test.go` | sha re-pin and `wantDeviceTrue = 29`, `wantDeviceFalse = 45`, `wantPanicEncode = 0` (patch `design/FIX_bughunt_sh2-s3-fork.diff`) |
 
-mnemonic-engrave: `scripts/descriptor-seam-vectors/` output regenerated and
-`crates/me-cli/tests/descriptor_seam.rs:46` re-pinned (§8 items 1-2; held by
-STOP 3).
+mnemonic-engrave: `scripts/descriptor-seam-vectors/` (`rows.py`, `comment.json`)
+output regenerated and `crates/me-cli/tests/descriptor_seam.rs` re-pinned
+(patch `design/FIX_bughunt_sh2-s3-me.diff`, §8 items 1-2).
 
-## 4. Spec delta (this repo: `design/SPEC_descriptor_input.md` §4.2)
+## 4. Spec delta (this repo: `design/SPEC_descriptor_input.md` §4.2, §4.3, §4.7, §7, §9)
 
 The table (lines 380-388) is unchanged: it records the pre-fix measurement.
 
@@ -269,6 +305,38 @@ is unchanged:
 > the path applied to every key; `me` still refuses it. The table above
 > records the pre-fix measurement, and the seam's "narrowed" covers note is
 > dropped for these rows.
+
+Architect S3 adds these texts (the fixed device refuses nine more §4.7 shapes
+and retires `panic:encode`). Line numbers are the architect's, against the
+spec at the head this FIX builds on; the quoted text locates each edit (the
+real lines are 1671 and 1714 for the 1670 and 1713 anchors).
+
+- After the §4.3 table (line 552):
+  > **AMENDED (sh2 bug-hunt, fix-06a/06c).** The last three rows' device column is the pre-fix measurement; the device now refuses them (§4.7 amendment).
+- After §4.7 line 803:
+  > **AMENDED (sh2 bug-hunt, fix-06a/06c/06b/50).** The device measurements above are pre-fix. The fixed device REFUSES nine of the fourteen §4.7 shapes (`tr(sortedmulti)`, `wpkh(sortedmulti)`, `pkh(sortedmulti)`, `sh(wpkh(sortedmulti))`, `wsh(KEY)`, `sh(KEY)`, `k=0`, `k=−1`, `k>n`) and still ACCEPTS five (`n=16` directly under `sh`, `n=21` under `wsh`, the mixed-network multisig, the hardened use site, the non-consecutive multipath). `me`'s refusals are unchanged; the seam rows carry the measured `device_admits` (29 true, 45 false of 74).
+- Line 984: replace "even though the DEVICE parses it and then panics on re-encode (§4.2 defect 1)" with "and since the sh2 bug hunt the DEVICE refuses it too (§4.2 amendment)".
+- §7, after "...are unchanged." (1670):
+  > **AMENDED (sh2 bug-hunt, fix-06b/50):** the parser now refuses §4.2 defects 1–2, so `"panic:encode"` retired too; no row carries `device_probe`, and both halves pin its count at 0.
+- Line 1713: replace "`device_admits=true`" with "`device_admits` measured (true before the sh2 bug hunt; nine are false since, §4.7 amendment)".
+- After "R0 r7's NEW-M2);" (1737): " **AMENDED (sh2 bug-hunt):** both rows now carry a measured `device_admits: false` and no `device_probe`."
+- After line 2058: " **AMENDED (sh2 bug-hunt):** the sh2 bug-hunt FIX is that later Go cycle for §4.2 defects 1–3 and §4.3's threshold gap."
+
+The seam sync is two committed patches, byte for byte from the architect's
+probe: `design/FIX_bughunt_sh2-s3-me.diff` (sha256
+`5f719fbac10630178336cb69e969da345cb18b2dcbfb53faeaf93eea534da612`: `rows.py`,
+`comment.json`, `descriptor_seam.rs`; adds the 2 F-530 rows, retires
+`panic:encode`, flips the 11 device rows) and
+`design/FIX_bughunt_sh2-s3-fork.diff` (sha256
+`b9d95f1d343eaa3ef46966844c3525e61db8d4925ad42d7ed88b1fbfb8b48f6f`:
+`nonstandard/descriptor_seam_test.go`). The regenerated file has 74 rows,
+84550 bytes and sha256
+`34093bfd3aa8f303670098838ff6fe76c7cb7485199338088f795d9e15b0674b`. The
+16-key row keeps its canonical byte-identical in this build (me's canonical
+change is filed as `sh2-me-canonical-depth`, §9.2). After the flips 5 of the
+14 narrowed-4.7 rows stay device-true (sh-16-keys, wsh-21-keys, mixed-network,
+the hardened use-site, the non-consecutive multipath) and 2 of the 5
+narrowed-4.2 rows stay true; the spec's §2.3 and its lines 1519 and 1887 (coverage counts) need no edit.
 
 ## 5. Font regeneration (30c, 30d, 49)
 
@@ -312,11 +380,11 @@ is the measured failure on the base tree.
 | `driver/otp` · `TestBughuntSh213WhiteLabelSpaceUTF16Neighbour` | PASS | :54 `new string placed at table row 21, want >= 26 (overlaps the UTF-16 product string at rows 16..25)`; :63 `UTF-16 product string overwritten: 41 00 41 00 41 00 41 00 41 00 53 48 49 49 41 00 41 00 41 00, want 41 00 41 00 41 00 41 00 41 00 41 00 41 00 41 00 41 00 41 00` |
 | `driver/otp` · `TestBughuntSh214WhiteLabelValidBit` | PASS | :99 `ReadWhiteLabelString = "SHII" for an entry whose valid bit is clear, want ""` |
 | `cmd/vectorfont` · `TestBughuntSh230cRepeatedS` | PASS | :72 `second curve's first control point = {0 0}, want {3 3}` |
-| `cmd/vectorfont` · `TestBughuntSh230dRepeatedRelative` (subtests `l`, `h`, `v` and the new `c` subtest `{"m0,0 c1,0 1,0 1,0 1,0 1,0 1,0", bezier.Pt(2, 0)}`) | PASS, all four subtests | :97 `"m0,0 l1,0 1,0" ends at {1 0}, want {2 0}`; `"m0,0 h1 1" ends at {1 0}, want {2 0}`; `"m0,0 v1 1" ends at {0 1}, want {0 2}`; new subtest `"m0,0 c1,0 1,0 1,0 1,0 1,0 1,0" ends at {1 0}, want {2 0}` |
+| `cmd/vectorfont` · `TestBughuntSh230dRepeatedRelative` (subtests `l`, `h`, `v`, the new `c` subtest `{"m0,0 c1,0 1,0 1,0 1,0 1,0 1,0", bezier.Pt(2, 0)}` and the new `s` subtest `{"m0,0 s1,0 1,0 1,0 1,0", bezier.Pt(2, 0)}`; a cubic's end is read from `Args[2]`) | PASS, all five subtests | :102 `"m0,0 l1,0 1,0" ends at {1 0}, want {2 0}`; `"m0,0 h1 1" ends at {1 0}, want {2 0}`; `"m0,0 v1 1" ends at {0 1}, want {0 2}`; `"m0,0 c1,0 1,0 1,0 1,0 1,0 1,0" ends at {1 0}, want {2 0}`; `"m0,0 s1,0 1,0 1,0 1,0" ends at {1 0}, want {2 0}` |
 | `cmd/vectorfont` · `TestBughuntSh249OptimizeStalePen` | PASS | :118 `optimized path [{5 5} {7 5} {6 9}], want [{5 5} {7 5} {6 5} {6 9}] (the backtrack to (6,5) must survive)` |
 | `cmd/controller` · `TestBughuntSh239LockBootStopsOnLabelAddrError` (new file `cmd/controller/bughunt_sh2_39_test.go`, written with the seam) | PASS | stdout `label addr err: otp: unsupported modification`; :22 `writeOTPValues = <nil>, want otp: unsupported modification`; :25 `after a failed label address write: 8 string writes, 1 boot key writes; want 0, 0` |
 
-The 30d `c` subtest is added to the existing row's table; 39's row is new,
+The 30d `c` and `s` subtests are added to the existing row's table; 39's row is new,
 written RED against the seam with base `writeOTPValues` behaviour first.
 
 ### 6.2 Deferred rows (each gets `t.Skip("deferred-minor: <slug>")`, body unchanged)
@@ -370,11 +438,10 @@ Counts: 23 rows fixed (22 existing plus new 39), 37 skipped, 1 FP passing.
 
 | test | today | after the build |
 |---|---|---|
-| `gui` · `TestComposerSelfCheckRefusesAFaultInjectedBuilderOutput`, case "the decoded md1 puts two slots at ONE origin with no fingerprints" (`composer_selfcheck_test.go:167`) | want-substring "without two distinct fingerprints" | the case now gets `self-check: unseated slot @1 declares m/48h/0h/0h/2h, not §4f's default m/48'/0'/1'/2'`; its want-substring changes to fix-21's string (final wording per STOP 2) |
-| `gui` · `TestProductionStringsAreDrawable` (`font_coverage_test.go:239`) | passes | with the grade's string it fails: `composer_selfcheck.go:200 carries '§' (U+00A7): no face has a glyph for it`, :245 `1 undrawable rune site(s)` (STOP 2) |
+| `gui` · `TestComposerSelfCheckRefusesAFaultInjectedBuilderOutput`, case "the decoded md1 puts two slots at ONE origin with no fingerprints" (`composer_selfcheck_test.go:147-150`; the want-substring is at :150) | want-substring "without two distinct fingerprints" | the case now gets `self-check: unseated slot @1 declares m/48h/0h/0h/2h, not the default m/48'/0'/1'/2'` and its want-substring changes to `"self-check: unseated slot @1 declares m/48h/0h/0h/2h, not the default m/48'/0'/1'/2'"` |
 | `bip380` · `TestDescriptors` (`bip380_test.go:202`, 6 descriptors) | DeepEqual on `Key` | expectations gain `xpubMeta`, `xpubDepth`, `xpubChildNumber` per key (fix-01) |
 | `nonstandard` · `TestDescriptors` (`parse_test.go:107`, 3 BlueWallet fixtures) | DeepEqual on `Key` | same new fields (fix-01) |
-| `nonstandard` · `TestDescriptorSeamDeviceColumn` (`descriptor_seam_test.go:158`) | passes | 11 rows flip with `device admits = false, want true (OutputDescriptor err = nonstandard: unrecognized output descriptor format)`: 2 graded BlueWallet rows (`no-format-header`, `zero-cosigner-lines`) and 9 from 06a/06c (STOP 3) |
+| `nonstandard` · `TestDescriptorSeamDeviceColumn` (`descriptor_seam_test.go:158`) | passes | 11 rows flip with `device admits = false, want true (OutputDescriptor err = nonstandard: unrecognized output descriptor format)`: 2 graded BlueWallet rows (`no-format-header`, `zero-cosigner-lines`) and 9 from 06a/06c; fixed by the re-pin (29/45, probe 0) |
 
 No other fork test fails on the fixed copies (`go test -count=1 ./...` per
 copy; s4 all ok).
@@ -383,29 +450,30 @@ copy; s4 all ok).
 
 Each item is one `owed-to-build` line in the §9.1 entry.
 
-1. **Fix the fork (§3)**, me side of 6b/50 first: regenerate
-   `scripts/descriptor-seam-vectors/` output for the two graded BlueWallet
-   rows (`no-format-header`, `zero-cosigner-lines`) and re-pin its sha256
-   (today `ed3706e29fde0ee86e13accd0ecc6492ea2ad9391ff2d911d798d69bb03760f4`)
-   in `crates/me-cli/tests/descriptor_seam.rs:46`. Held by STOP 3.
-2. Copy that output byte-identically to the fork's `nonstandard/testdata/`
-   and re-pin the same sha in `nonstandard/descriptor_seam_test.go:42`
-   (`wantDeviceTrue = 40`, `wantDeviceFalse = 34` at :73-74 move with it).
-   Held by STOP 3.
+1. **Fix the fork (§3)**, me side of 6b/50 first: apply
+   `FIX_bughunt_sh2-s3-me.diff`, regenerate, sha256 must be `34093bfd…674b`
+   (today `ed3706e29fde0ee86e13accd0ecc6492ea2ad9391ff2d911d798d69bb03760f4`
+   in `crates/me-cli/tests/descriptor_seam.rs:46`).
+2. Copy byte-identically, apply `FIX_bughunt_sh2-s3-fork.diff`: sha
+   `34093bfd…674b`, `wantDeviceTrue = 29`, `wantDeviceFalse = 45`,
+   `wantPanicEncode = 0`.
 3. Apply the §4 spec delta to `design/SPEC_descriptor_input.md` §4.2.
-4. Apply the fork fixes in §3 and the §7 test expectations (fix-21 string per
-   STOP 2).
+4. Apply the fork fixes in §3 and the §7 test expectations.
 5. Add the 39 seam (`cmd/controller/lockboot_values.go`, the move out of
-   `lockboot_default.go`) and its row `bughunt_sh2_39_test.go`; host
-   `go build ./...` must still pass (STOP 4).
+   `lockboot_default.go`) and its row `bughunt_sh2_39_test.go`; add
+   `cmd/controller/main_host.go` (§2.14); host `go build ./...` must still pass.
 6. Update the comment at `cmd/emu/confinement_test.go:89-96`, which
-   describes the OTP consts as living only in `lockboot_default.go`.
+   describes the OTP consts as living only in `lockboot_default.go`; point 1
+   of `cmd/emu/confinement_test.go:94` now names `main_host.go` (the bare
+   build succeeds and exits 2).
 7. CI's tinygo `./cmd/controller` build and `GOOS=js GOARCH=wasm go vet
    [-tags refugium] ./cmd/emu/` pass on the head (tinygo is not available
    locally).
 8. Run §5's font regeneration; expect no diff.
 9. Add `t.Skip("deferred-minor: <slug>")` to every §6.2 row.
 10. Append §9 to `design/FOLLOWUPS.md` and the F-234 sentence (§9.3).
+11. Apply the §4 S3 spec amendments (§4.3, §4.7, §7 and §9 of
+    `design/SPEC_descriptor_input.md`).
 
 **Gate (not a change).** Fork: `go test -timeout 20m ./...`, oraclelive
 `-run '^$'`, the wasm vets, tinygo (CI), and every §6.1 row by exact name
@@ -424,8 +492,8 @@ gate (Go); the whole-diff review keeps both slices.
 - **Surfaced:** sh2 bug hunt; grade `design/agent-reports/bughunt-grade-sh2.md`; FIX `design/FIX_bughunt_sh2.md`.
 - **Grade:** I ×22 (2, 3, 4, 31a, 31b, 32, 21, 22, 1, 6a, 6b, 6c, 11, 50a, 50b, 50c, 7, 13, 14, 30c, 30d, 49) plus 39 (host seam).
 - **Companion:** seedhammer fork (`gui`, `bip380`, `nonstandard`, `codex32`, `picobin`, `driver/otp`, `cmd/vectorfont`, `cmd/controller`).
-- **Build impact (1):** me seam vectors regenerated for the graded BlueWallet rows and sha re-pinned in `crates/me-cli/tests/descriptor_seam.rs`: `owed-to-build`
-- **Build impact (2):** fork `nonstandard/testdata/` copied byte-identically and sha re-pinned in `nonstandard/descriptor_seam_test.go`: `owed-to-build`
+- **Build impact (1):** me seam vectors regenerated (`FIX_bughunt_sh2-s3-me.diff`; 74 rows, sha `34093bfd…674b`) and re-pinned in `crates/me-cli/tests/descriptor_seam.rs`: `owed-to-build`
+- **Build impact (2):** fork `nonstandard/testdata/` copied byte-identically and sha and counts (29/45/0) re-pinned in `nonstandard/descriptor_seam_test.go` (`FIX_bughunt_sh2-s3-fork.diff`): `owed-to-build`
 - **Build impact (3):** `SPEC_descriptor_input.md` §4.2 lead-in and AMENDED paragraph per FIX §4: `owed-to-build`
 - **Build impact (4):** fork fixes per FIX §3 and test expectations per FIX §7: `owed-to-build`
 - **Build impact (5):** 39 host seam and its RED row; host `go build ./...` passes: `owed-to-build`
@@ -434,6 +502,7 @@ gate (Go); the whole-diff review keeps both slices.
 - **Build impact (8):** font regeneration shows no diff: `owed-to-build`
 - **Build impact (9):** `t.Skip("deferred-minor: <slug>")` on every deferred row: `owed-to-build`
 - **Build impact (10):** FOLLOWUPS deferred entries and the F-234 cross-link appended: `owed-to-build`
+- **Build impact (11):** spec §4.3/§4.7/§7/§9 amendments per FIX §4 (architect S3): `owed-to-build`
 - **Status:** `open`
 - **Tier:** v1
 ~~~
@@ -495,6 +564,20 @@ later)" is the grade's fix-NN; "RED row" is the §6.2 row.
 | S1-Q2 | N | `sh-supply-reask` | Back in supply multisig could re-ask the passphrase question instead of returning to the menu. | end-of-project minors |
 | 15, 16, 17, 44 | UNRESOLVED | `sh-needs-seam-tinygo-drivers` | pio, st25r3916 and clrc663 reports are UNRESOLVED and need a host seam or a device test. | device-test work |
 
+**Architect S3 minor.**
+
+| # | grade | slug | What | owner |
+|---|---|---|---|---|
+| S3 | M | `sh2-me-refusal-device-claim` | `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed) | next me FIX |
+
+**Architect S3 Important** (not deferred-minor; append under this heading):
+
+~~~markdown
+### `sh2-me-canonical-depth` — me's promotion canonical rebuilds xpub depth/child from the origin; the fixed fork keeps the key's own (repo: **mnemonic-engrave**; owning phase: **next me FIX**)
+
+- **Surfaced:** architect S3. **Where:** `cascade.rs:262-277`, `gate.rs:336-349`, `cascade_tests.rs:249-272`, spec 405/663-666/1059. **What:** after fix-01, me's and the device's canonical differ for a key whose depth/child disagree with its origin. **Seam:** row `sh-wsh-sortedmulti-16-keys` uses `canonical_from`/`origin_serialised` until this lands. **Status:** `open` **Tier:** v1
+~~~
+
 **UR wiring trigger (architect fold 2).** The "Why deferred" line of
 `sh-ur-fountain-bounds` (fix-10), `sh-ur-hdkey-index-range` (fix-36),
 `sh-ur-range-shape` (fix-37) and `sh-ur-script-type-mismatch` (fix-38) ends
@@ -523,27 +606,4 @@ cuts against the whole point." Append to that item, as its last sentence:
 
 ## 10. STOPs
 
-Not build items; each needs a ruling before the build starts its item.
-
-1. **Relative repeated `s` (vectorfont).** `m0,0 s1,0 1,0 1,0 1,0` ends at
-   {0 0} on base and {1 0} after the ruled fix-30d/30c; correct is {2 0}. The
-   grade extended 30d to `c` only; whether 30d also covers relative `s` (fix
-   and subtest) is undecided.
-2. **fix-21's ruled string contains `§`.** `"self-check: unseated slot @%d
-   declares %s, not §4f's default %s"` fails `TestProductionStringsAreDrawable`
-   (`composer_selfcheck.go:200 carries '§' (U+00A7): no face has a glyph for
-   it`). The replacement wording (or a glyph) is undecided.
-3. **The 6b/50 seam regeneration exceeds the graded delta.** (a) `rows.py`
-   lacks the 2 F-530 rows, so a regeneration today writes 72 rows, not 74
-   (`seam-fix.json`: 72 rows, sha `e1a426c4…`). (b) 06a/06c flip 9 more
-   device rows (tr/wpkh/pkh/sh-wpkh-sortedmulti, wsh-of-key, sh-of-key,
-   threshold-zero/-negative/-exceeds-keys), touching spec §4.7, §2.3 and §7
-   (lines 984, 1519, 1664-1666, 1735, 1887, 2054); the device column becomes
-   29/45. (c) The `panic:encode` marker goes stale (`wantPanicEncode` at
-   :175, `POP.device_probe`, `rows.py:291/295`, spec §7 line 1664). (d) The
-   16-key canonical and the me sha both change. All are beyond the two-repo
-   delta the brief allows.
-4. **The 39 seam breaks host `go build ./...`** (`function main is undeclared
-   in the main package`). A host stub `main` would fix it (precedent
-   `cmd/emu/main_notjs.go`), but that is a new file whose name, build tag
-   and wording are undecided.
+None open; S1-S4 ruled in design/agent-reports/architect-sh2-fixdoc-stops.md.
