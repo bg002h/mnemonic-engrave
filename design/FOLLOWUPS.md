@@ -9950,6 +9950,8 @@ than ~21 min.
 2. **Raw bytes or UR?** The fork vendors `bc/ur`. UR is self-describing and
    multi-part, which is worth something for recovery, at a size cost — and it is
    arguably a *third* format to know, which cuts against the whole point.
+   Choosing UR wires the fork's `bc/*`, which carries deferred defects `sh-ur-*`
+   (sh2 bughunt); that phase takes them first.
 3. **What states the QR's content type**, so a recoverer knows whether they are
    holding a transaction, a descriptor or a seed? A plate legend is the obvious
    answer and costs text budget.
@@ -20746,3 +20748,480 @@ Nits (one line each):
 
 - **M1 Post-push peel-mismatch `exit 6` is untested (plant J survives; build deviation 12).** `scripts/cut-release.sh:1328-1333`. Reaching it needs the tag on origin moved between the atomic push and `ls-remote`. The report gives the exact row `cr_push_tag_moved_after_push` (a post-receive hook on the fixture bare repo moves the tag to `master~1`; expects exit 6 and the "peels to" line); the reviewer ran it: passes on e1d25113, fails with plant J. Applying it also needs a spec row 79 in SPEC §11.
 - N1 `CUT_RELEASE_TEST_ONLY` runs leave `~/.cache/cut-release-test/run-*` directories behind (the harness prints "kept <dir>").
+
+### `sh2-bughunt-importants` — the sh2 bug-hunt Importants (repo: **seedhammer fork + mnemonic-engrave**; owning phase: **sh2 FIX build**)
+
+- **Surfaced:** sh2 bug hunt; grade `design/agent-reports/bughunt-grade-sh2.md`; FIX `design/FIX_bughunt_sh2.md`.
+- **Grade:** I ×22 (2, 3, 4, 31a, 31b, 32, 21, 22, 1, 6a, 6b, 6c, 11, 50a, 50b, 50c, 7, 13, 14, 30c, 30d, 49) plus 39 (host seam).
+- **Companion:** seedhammer fork (`gui`, `bip380`, `nonstandard`, `codex32`, `picobin`, `driver/otp`, `cmd/vectorfont`, `cmd/controller`).
+- **Build impact (1):** me seam vectors regenerated (`FIX_bughunt_sh2-s3-me.diff`; 74 rows, sha `34093bfd…674b`) and re-pinned in `crates/me-cli/tests/descriptor_seam.rs`: `owed-to-build`
+- **Build impact (2):** fork `nonstandard/testdata/` copied byte-identically and sha and counts (29/45/0) re-pinned in `nonstandard/descriptor_seam_test.go` (`FIX_bughunt_sh2-s3-fork.diff`): `owed-to-build`
+- **Build impact (3):** `SPEC_descriptor_input.md` §4.2 lead-in and AMENDED paragraph per FIX §4: `owed-to-build`
+- **Build impact (4):** fork fixes per FIX §3 and test expectations per FIX §7: `owed-to-build`
+- **Build impact (5):** 39 host seam and its RED row; host `go build ./...` passes: `owed-to-build`
+- **Build impact (6):** `cmd/emu/confinement_test.go:89-96` comment updated: `owed-to-build`
+- **Build impact (7):** CI tinygo and wasm vet green on the head: `owed-to-build`
+- **Build impact (8):** font regeneration shows no diff: `owed-to-build`
+- **Build impact (9):** `t.Skip("deferred-minor: <slug>")` on every deferred row: `owed-to-build`
+- **Build impact (10):** FOLLOWUPS deferred entries and the F-234 cross-link appended: `owed-to-build`
+- **Build impact (11):** spec §4.3/§4.7/§7/§9 amendments per FIX §4 (architect S3): `owed-to-build`
+- **Status:** `open`
+- **Tier:** v1
+
+### `sh-nfc-scanner-overflow-sticky` — The NFC scanner keeps the overflow error after the oversized tag ends; clear on EOF or error (fix-09). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 9; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** The NFC scanner keeps the overflow error after the oversized tag ends; clear on EOF or error (fix-09).
+- **Fix (for later):** the grade's fix-09.
+- **RED row:** `TestBughuntSh209ScannerOverflowSticky`, skipped with `t.Skip("deferred-minor: sh-nfc-scanner-overflow-sticky")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-multisig-verify-pp-back` — Back on the verify-flow passphrase keyboard goes forward to "not checked yet"; step back (fix-33). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 33; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back on the verify-flow passphrase keyboard goes forward to "not checked yet"; step back (fix-33).
+- **Fix (for later):** the grade's fix-33.
+- **RED row:** `TestBughuntSh233MultisigVerifyPassphraseCancel`, skipped with `t.Skip("deferred-minor: sh-multisig-verify-pp-back")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-build-which-md1-back` — Back on "Which md1?" is taken as Full policy; abort the flow (fix-42). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 42; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back on "Which md1?" is taken as Full policy; abort the flow (fix-42).
+- **Fix (for later):** the grade's fix-42.
+- **RED row:** `TestBughuntSh242BuildWhichMd1Back`, skipped with `t.Skip("deferred-minor: sh-build-which-md1-back")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-composer-resume-back-seat` — Back on the first resumed slot releases @1's seat; keep it (fix-48). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 48; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back on the first resumed slot releases @1's seat; keep it (fix-48).
+- **Fix (for later):** the grade's fix-48.
+- **RED row:** `TestBughuntSh248ComposerSeatResumeBack`, skipped with `t.Skip("deferred-minor: sh-composer-resume-back-seat")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-md1-gather-index-past-total` — A chunk index past the total is accepted; classify as gatherIgnored (fix-05). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 5; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** A chunk index past the total is accepted; classify as gatherIgnored (fix-05).
+- **Fix (for later):** the grade's fix-05.
+- **RED row:** `TestBughuntSh205Md1GatherIndexPastTotal`, skipped with `t.Skip("deferred-minor: sh-md1-gather-index-past-total")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-jobtime-60-min` — Job time prints "60 min" or "2 h 0 min"; carry into hours and print "2 h" (fix-23). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 23; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Job time prints "60 min" or "2 h 0 min"; carry into hours and print "2 h" (fix-23).
+- **Fix (for later):** the grade's fix-23.
+- **RED row:** `TestBughuntSh223JobTimeCarriesMinutesIntoHours`, skipped with `t.Skip("deferred-minor: sh-jobtime-60-min")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-truncate-doc` — The truncateForDisplay doc says at most n; the contract is n plus the marker; fix the doc (fix-24). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 24; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** The truncateForDisplay doc says at most n; the contract is n plus the marker; fix the doc (fix-24).
+- **Fix (for later):** the grade's fix-24.
+- **RED row:** `TestBughuntSh224TruncateForDisplayAtMostN`, skipped with `t.Skip("deferred-minor: sh-truncate-doc")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-legacy-keyless-path-at-creation` — A legacy keyless first path is refused at finish, not at creation (fix-45). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 45; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** A legacy keyless first path is refused at finish, not at creation (fix-45).
+- **Fix (for later):** the grade's fix-45.
+- **RED row:** `TestBughuntSh245LegacyFirstKeylessPathRefusedAtCreation`, skipped with `t.Skip("deferred-minor: sh-legacy-keyless-path-at-creation")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-payload-merge-same-txid` — Signed and unsigned copies of one txid count as two candidates; merge on txid (fix-51). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 51; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Signed and unsigned copies of one txid count as two candidates; merge on txid (fix-51).
+- **Fix (for later):** the grade's fix-51.
+- **RED row:** `TestBughuntSh251PayloadMergeNeedsIdenticalBytes`, skipped with `t.Skip("deferred-minor: sh-payload-merge-same-txid")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-fountain-bounds` — The UR fountain decoder panics or OOMs on seqLen 0, a length mismatch, a huge seqLen or seqNum 0; latent, becomes I when wired (fix-10). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 10a-d; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/fountain`
+- **What:** The UR fountain decoder panics or OOMs on seqLen 0, a length mismatch, a huge seqLen or seqNum 0; latent, becomes I when wired (fix-10).
+- **Fix (for later):** the grade's fix-10.
+- **RED row:** `TestBughuntSh210aSeqLenZero`, `10bDataLengthMismatch`, `10cHugeSeqLen`, `10dSeqNumZero`, skipped with `t.Skip("deferred-minor: sh-ur-fountain-bounds")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-10, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bip39-valid-bounds` — bip39 `Valid` panics on 0 or 27 words (fix-12). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 12; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bip39`
+- **What:** bip39 `Valid` panics on 0 or 27 words (fix-12).
+- **Fix (for later):** the grade's fix-12.
+- **RED row:** `TestBughuntSh212ValidPanicsOnEmptyAndLong`, skipped with `t.Skip("deferred-minor: sh-bip39-valid-bounds")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-tapleaf-pkh-as-pk` — TapLeavesChunks describes a pkh leaf as pk; latent, becomes I when wired (fix-34). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 34; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `md`
+- **What:** TapLeavesChunks describes a pkh leaf as pk; latent, becomes I when wired (fix-34).
+- **Fix (for later):** the grade's fix-34.
+- **RED row:** `TestBughuntSh234PkhLeafDescribedAsPk`, skipped with `t.Skip("deferred-minor: sh-tapleaf-pkh-as-pk")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-parsepath-unhardened-overflow` — ParsePath wraps an unhardened index of 2^31 or more (fix-35). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 35; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bip32`
+- **What:** ParsePath wraps an unhardened index of 2^31 or more (fix-35).
+- **Fix (for later):** the grade's fix-35.
+- **RED row:** `TestBughuntSh235ParsePathUnhardenedOverflow`, skipped with `t.Skip("deferred-minor: sh-parsepath-unhardened-overflow")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-hdkey-index-range` — A UR HD key index of 2^31 or more wraps; latent, becomes I when wired (fix-36). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 36; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/urtypes`
+- **What:** A UR HD key index of 2^31 or more wraps; latent, becomes I when wired (fix-36).
+- **Fix (for later):** the grade's fix-36.
+- **RED row:** `TestBughuntSh236HDKeyIndexAtLeast2p31`, skipped with `t.Skip("deferred-minor: sh-ur-hdkey-index-range")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-36, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-range-shape` — The UR encoder's range shape is refused by its own parser; latent, becomes I when wired (fix-37). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 37; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/urtypes`
+- **What:** The UR encoder's range shape is refused by its own parser; latent, becomes I when wired (fix-37).
+- **Fix (for later):** the grade's fix-37.
+- **RED row:** `TestBughuntSh237RangeDerivationShape`, skipped with `t.Skip("deferred-minor: sh-ur-range-shape")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-37, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-script-type-mismatch` — UR accepts wpkh or pkh(sortedmulti); latent, becomes I when wired (fix-38). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 38; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/urtypes`
+- **What:** UR accepts wpkh or pkh(sortedmulti); latent, becomes I when wired (fix-38).
+- **Fix (for later):** the grade's fix-38.
+- **RED row:** `TestBughuntSh238ScriptTypeMismatch`, skipped with `t.Skip("deferred-minor: sh-ur-script-type-mismatch")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-38, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-codex32-newseed-length` — NewSeed emits lengths that New refuses; add a library check behind F-116 (fix-47). (repo: **seedhammer fork**; owning phase: **F-116**)
+
+- **Surfaced:** sh2 bug hunt, finding 47; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `codex32`
+- **What:** NewSeed emits lengths that New refuses; add a library check behind F-116 (fix-47).
+- **Fix (for later):** the grade's fix-47.
+- **RED row:** `TestBughuntSh247NewSeedOutputRejectedByNew`, skipped with `t.Skip("deferred-minor: sh-codex32-newseed-length")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-md1-single-chunk-error` — A lone md1 chunk reports "not supported" instead of "chunk set incomplete" (fix-52). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 52; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/policyprobe`
+- **What:** A lone md1 chunk reports "not supported" instead of "chunk set incomplete" (fix-52).
+- **Fix (for later):** the grade's fix-52.
+- **RED row:** `TestBughuntSh252OneChunkOfSetKeepsRealError`, skipped with `t.Skip("deferred-minor: sh-md1-single-chunk-error")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-type2-large-tag` — A Type 2 read stops at 848 bytes with a clean EOF; return an error or read it all (fix-08). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 8; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `nfc/type2`
+- **What:** A Type 2 read stops at 848 bytes with a clean EOF; return an error or read it all (fix-08).
+- **Fix (for later):** the grade's fix-08.
+- **RED row:** `TestBughuntSh208Type2LargeTag`, skipped with `t.Skip("deferred-minor: sh-type2-large-tag")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ndef-empty-record` — Minimal or zero-length Text/URI records are mis-sized (fix-18). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 18; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `nfc/ndef`
+- **What:** Minimal or zero-length Text/URI records are mis-sized (fix-18).
+- **Fix (for later):** the grade's fix-18.
+- **RED row:** `TestBughuntSh218NdefEmptyTextURIRecord`, skipped with `t.Skip("deferred-minor: sh-ndef-empty-record")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-uf2-payload-size` — A uf2 payload size of 477..479 panics; refuse (fix-19). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 19; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `uf2`
+- **What:** A uf2 payload size of 477..479 panics; refuse (fix-19).
+- **Fix (for later):** the grade's fix-19.
+- **RED row:** `TestBughuntSh219PayloadSizeOverData`, skipped with `t.Skip("deferred-minor: sh-uf2-payload-size")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-uf2-start-addr-zero` — A uf2 at address 0 is reported as non-contiguous (fix-20). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 20; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `uf2`
+- **What:** A uf2 at address 0 is reported as non-contiguous (fix-20).
+- **Fix (for later):** the grade's fix-20.
+- **RED row:** `TestBughuntSh220StartAddrZero`, skipped with `t.Skip("deferred-minor: sh-uf2-start-addr-zero")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-alpha4-wide-span` — alpha4.New panics on very wide bounds (fix-25). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 25; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `image/alpha4`
+- **What:** alpha4.New panics on very wide bounds (fix-25).
+- **Fix (for later):** the grade's fix-25.
+- **RED row:** `TestBughuntSh225Alpha4WideSpan`, skipped with `t.Skip("deferred-minor: sh-alpha4-wide-span")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bspline-nil` — InterpolatePoints(nil) panics (fix-26). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 26; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bspline`
+- **What:** InterpolatePoints(nil) panics (fix-26).
+- **Fix (for later):** the grade's fix-26.
+- **RED row:** `TestBughuntSh226InterpolateNil`, skipped with `t.Skip("deferred-minor: sh-bspline-nil")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-golden-roundtrip` — The golden test encoder does not round-trip (fix-27a). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 27a; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `internal/golden`
+- **What:** The golden test encoder does not round-trip (fix-27a).
+- **Fix (for later):** the grade's fix-27a.
+- **RED row:** `TestBughuntSh227aRoundTrip`, `27aCompareBSplineUpdateThenCheck`, skipped with `t.Skip("deferred-minor: sh-golden-roundtrip")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-golden-zero-count` — The golden decoder accepts a zero-count header (fix-27b). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 27b; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `internal/golden`
+- **What:** The golden decoder accepts a zero-count header (fix-27b).
+- **Fix (for later):** the grade's fix-27b.
+- **RED row:** `TestBughuntSh227bZeroCountHeader`, skipped with `t.Skip("deferred-minor: sh-golden-zero-count")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-golden-svg-aspect` — The golden SVG width is 0 from integer aspect math (fix-27c). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 27c; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `internal/golden`
+- **What:** The golden SVG width is 0 from integer aspect math (fix-27c).
+- **Fix (for later):** the grade's fix-27c.
+- **RED row:** `TestBughuntSh227cVectorizeAspect`, skipped with `t.Skip("deferred-minor: sh-golden-svg-aspect")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-biptool-short-seed` — biptool derive -path m bip39 -words 12 panics (fix-28). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 28; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/biptool`
+- **What:** biptool derive -path m bip39 -words 12 panics (fix-28).
+- **Fix (for later):** the grade's fix-28.
+- **RED row:** `TestBughuntSh228Bip39ShortSeed`, skipped with `t.Skip("deferred-minor: sh-biptool-short-seed")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-assets-palette-256` — The assets tool accepts 256 colours (fix-29). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 29; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/assets`
+- **What:** The assets tool accepts 256 colours (fix-29).
+- **Fix (for later):** the grade's fix-29.
+- **RED row:** `TestBughuntSh229AssetsPalette256`, skipped with `t.Skip("deferred-minor: sh-assets-palette-256")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-vectorfont-first-line` — vectorfont panics on a path starting with a line (fix-30a). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 30a; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/vectorfont`
+- **What:** vectorfont panics on a path starting with a line (fix-30a).
+- **Fix (for later):** the grade's fix-30a.
+- **RED row:** `TestBughuntSh230aSpliceFirstLine`, skipped with `t.Skip("deferred-minor: sh-vectorfont-first-line")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-vectorfont-missing-input` — vectorfont reports EOF for a missing input file (fix-30b). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 30b; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/vectorfont`
+- **What:** vectorfont reports EOF for a missing input file (fix-30b).
+- **Fix (for later):** the grade's fix-30b.
+- **RED row:** `TestBughuntSh230bRunMissingInput`, skipped with `t.Skip("deferred-minor: sh-vectorfont-missing-input")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bezier-degenerate-sample` — A degenerate bezier samples the origin (fix-41). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 41; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bezier`
+- **What:** A degenerate bezier samples the origin (fix-41).
+- **Fix (for later):** the grade's fix-41.
+- **RED row:** `TestBughuntSh241SampleNoOrigin`, skipped with `t.Skip("deferred-minor: sh-bezier-degenerate-sample")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bounds-empty-inverted` — Bounds.Empty is wrong for an inverted y (fix-43). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 43; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bezier`
+- **What:** Bounds.Empty is wrong for an inverted y (fix-43).
+- **Fix (for later):** the grade's fix-43.
+- **RED row:** `TestBughuntSh243BoundsEmpty`, skipped with `t.Skip("deferred-minor: sh-bounds-empty-inverted")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-glyphtrace-short-channel` — glyphtrace ranks a short channel worst (fix-46). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 46; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/glyphtrace`
+- **What:** glyphtrace ranks a short channel worst (fix-46).
+- **Fix (for later):** the grade's fix-46.
+- **RED row:** `TestBughuntSh246ShortChannelNotWorst`, skipped with `t.Skip("deferred-minor: sh-glyphtrace-short-channel")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-supply-reask` — Back in supply multisig could re-ask the passphrase question instead of returning to the menu. (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding S1-Q2; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back in supply multisig could re-ask the passphrase question instead of returning to the menu.
+- **RED row:** none; no host row.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-needs-seam-tinygo-drivers` — pio, st25r3916 and clrc663 reports are UNRESOLVED and need a host seam or a device test. (repo: **seedhammer fork**; owning phase: **device-test work**)
+
+- **Surfaced:** sh2 bug hunt, finding 15, 16, 17, 44; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `driver/pio`, `driver/st25r3916`, `driver/clrc663`
+- **What:** pio, st25r3916 and clrc663 reports are UNRESOLVED and need a host seam or a device test.
+- **RED row:** none; no host row.
+- **Why deferred:** graded UNRESOLVED.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-me-refusal-device-claim` — `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed) (repo: **mnemonic-engrave**; owning phase: **next me FIX**)
+
+- **Surfaced:** architect S3; FIX `design/FIX_bughunt_sh2.md`.
+- **What:** `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed)
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-selfcheck-refusal-row` — the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap (repo: **seedhammer fork**; owning phase: **sh2 FIX build**)
+
+- **Surfaced:** architect S2; FIX `design/FIX_bughunt_sh2.md`.
+- **What:** the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-50a-single-guard-row` — No row isolates a single 50a guard: planting the no-keys guard alone or the policy guard alone leaves row 50a GREEN; only removing all four fails it. Add one row per guard (FIX review r1, M-1). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** FIX review r1, M-1; report `design/agent-reports/bughunt-sh2-fix-review-r1.md`.
+- **What:** No row isolates a single 50a guard: planting the no-keys guard alone or the policy guard alone leaves row 50a GREEN; only removing all four fails it. Add one row per guard (FIX review r1, M-1).
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-item6-comment-text` — FIX §8 item 6 says to update the `cmd/emu/confinement_test.go:89-96` comment but gives no new comment text; comment-only, no behaviour change (FIX review r1, M-2). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** FIX review r1, M-2; report `design/agent-reports/bughunt-sh2-fix-review-r1.md`.
+- **What:** FIX §8 item 6 says to update the `cmd/emu/confinement_test.go:89-96` comment but gives no new comment text; comment-only, no behaviour change (FIX review r1, M-2).
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-fix21-path-notation` — The fix-21 error string mixes path notations: the declared origin prints as `m/48h/0h/2h/2h`, the default as `m/48'/0'/0'/2'` (FIX review r1, N-1). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** FIX review r1, N-1; report `design/agent-reports/bughunt-sh2-fix-review-r1.md`.
+- **What:** The fix-21 error string mixes path notations: the declared origin prints as `m/48h/0h/2h/2h`, the default as `m/48'/0'/0'/2'` (FIX review r1, N-1).
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-me-canonical-depth` — me's promotion canonical rebuilds xpub depth/child from the origin; the fixed fork keeps the key's own (repo: **mnemonic-engrave**; owning phase: **next me FIX**)
+
+- **Surfaced:** architect S3. **Where:** `cascade.rs:262-277`, `gate.rs:336-349`, `cascade_tests.rs:249-272`, spec 405/663-666/1059. **What:** after fix-01, me's and the device's canonical differ for a key whose depth/child disagree with its origin. **Seam:** row `sh-wsh-sortedmulti-16-keys` uses `canonical_from`/`origin_serialised` until this lands. **Status:** `open` **Tier:** v1
+
+### `sh-ur-hdkey-depth-noop` — The UR HD key decoder treats depth as a no-op. Ungraded; needs a RED row when wired. (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, architect notes 3 and 4; FIX `design/FIX_bughunt_sh2.md`.
+- **Where:** `bc/urtypes/urtypes.go` `hdkeyFor` (from line 86)
+- **What:** The UR HD key decoder treats depth as a no-op. Ungraded; needs a RED row when wired.
+- **RED row:** none yet; one is written when `bc/*` is wired.
+- **Why deferred:** ungraded; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies the fix, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-multisig-threshold-unbounded` — `desc.Threshold = m.Threshold` is unbounded (the UR counterpart of 6a). Ungraded; needs a RED row when wired. (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, architect notes 3 and 4; FIX `design/FIX_bughunt_sh2.md`.
+- **Where:** `bc/urtypes/urtypes.go`, around line 403
+- **What:** `desc.Threshold = m.Threshold` is unbounded (the UR counterpart of 6a). Ungraded; needs a RED row when wired.
+- **RED row:** none yet; one is written when `bc/*` is wired.
+- **Why deferred:** ungraded; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies the fix, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
