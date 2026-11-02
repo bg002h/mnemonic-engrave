@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# cut-release.test.sh -- the 78 rows of design/SPEC_cut_release.md section 9.
+# cut-release.test.sh -- the 85 rows of design/SPEC_cut_release.md section 9.
 #
-#   bash scripts/test/cut-release.test.sh            # 78 rows (70 offline cr_, 8 network crn_)
-#   bash scripts/test/cut-release.test.sh --offline  # rows 1-70 only
+#   bash scripts/test/cut-release.test.sh            # 85 rows (77 offline cr_, 8 network crn_)
+#   bash scripts/test/cut-release.test.sh --offline  # rows 1-77 only
 #
 # Prints "ok <row>" or "FAIL <row>: <why>" per row and ends with
 # "cut-release.test: <p> passed, <f> failed". Exit 0 iff no row failed and the
-# number of rows run is the expected 78 (70 with --offline).
+# number of rows run is the expected 85 (77 with --offline).
 #
 # Everything runs against local bare repos under $T, a fake gh, a fake
-# push-via-staging and a throwaway minisign key. The network rows (71-78) use
+# push-via-staging and a throwaway minisign key. The network rows (78-85) use
 # the real key, the real push-via-staging seam and read-only gh calls.
 # This test is a local gate (spec section 10 step 4); no workflow runs it.
 set -uo pipefail
@@ -27,17 +27,41 @@ for a in "$@"; do
         *) echo "usage: $0 [--offline]" >&2; exit 2 ;;
     esac
 done
-EXPECT=78
-[ "$OFFLINE" -eq 0 ] || EXPECT=70
+EXPECT=85
+[ "$OFFLINE" -eq 0 ] || EXPECT=77
 
 CACHEROOT=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test
 mkdir -p "$CACHEROOT"
 T=$(readlink -f "$CACHEROOT")/run-$$
-rm -rf "$T"
+# Every recursive delete in this file goes through rm_T or rm_below_T (spec
+# section 9, Harness setup). A refusal deletes nothing and exits 2.
+rm_refuse() { echo "cut-release.test: refusing to delete '$1': $2" >&2; exit 2; }
+t_check() {
+    case ${T:-} in
+        */cut-release-test/run-*) ;;
+        *) rm_refuse "${T:-}" "T is not */cut-release-test/run-*" ;;
+    esac
+}
+rm_T() { t_check; rm -rf -- "${T:?}"; }
+rm_below_T() { # path...
+    local p
+    t_check
+    for p in "$@"; do
+        case $p in
+            */..|*/../*) rm_refuse "$p" "it has a '..' component" ;;
+        esac
+        case $p in
+            "${T:?}"/?*) ;;
+            *) rm_refuse "$p" "it is not strictly below $T" ;;
+        esac
+    done
+    for p in "$@"; do rm -rf -- "${p:?}"; done
+}
+rm_T
 mkdir -p "$T/bin" "$T/key" "$T/key2" "$T/none" "$T/remote" "$T/work"
 KEEP=0
 cleanup() {
-    if [ "$KEEP" -eq 0 ]; then rm -rf "$T"; else echo "cut-release.test: kept $T" >&2; fi
+    if [ "$KEEP" -eq 0 ]; then rm_T; else echo "cut-release.test: kept $T" >&2; fi
 }
 trap cleanup EXIT
 
@@ -80,7 +104,7 @@ minisign -G -W -f -p "$T/key2/pub" -s "$T/key2/sec" >/dev/null 2>&1 || { echo "c
 # The script under test runs from a committed scratch copy, so its own
 # "committed tooling only" check (P7) does not depend on the state of this tree.
 mk_eng() { # dir
-    rm -rf "$1"
+    rm_below_T "$1"
     mkdir -p "$1/scripts"
     cp "$CR_REAL" "$ROOT/scripts/push-via-staging.sh" "$1/scripts/"
     cp "$ROOT/minisign.pub" "$1/minisign.pub"
@@ -114,7 +138,7 @@ x_eq() { [ "$1" = "$2" ] || rowfail "$3: got '$1', wanted '$2'"; }
 
 fresh() {
     cd "$T" || return 1
-    rm -rf "$T/remote" "$T/work" "$T/assets" "$T/clone2" "$T/sib" "$T/cache" "$T/eng" "$T/fakebin" "$T/pk" "$T"/merge.*
+    rm_below_T "$T/remote" "$T/work" "$T/assets" "$T/clone2" "$T/sib" "$T/cache" "$T/eng" "$T/fakebin" "$T/pk" "$T"/merge.*
     rm -f "$T/gh.log" "$T/pvs.log" "$T/gh.killed" "$T/out" "$T/err"
     mkdir -p "$T/remote" "$T/work"
     FXDIR=""; FXBARE=""; FXREPO=""; FXDEF=""
@@ -147,7 +171,7 @@ x_no_remote_tag() { # tag...
 fx_init() { # repo default
     FXREPO=$1; FXDEF=$2
     FXDIR=$T/work/$1; FXBARE=$T/remote/$1.git
-    rm -rf "$FXDIR" "$FXBARE"
+    rm_below_T "$FXDIR" "$FXBARE"
     git init -q --bare -b "$2" "$FXBARE"
     git init -q -b "$2" "$FXDIR"
     git -C "$FXDIR" remote add origin "$FXBARE"
@@ -272,7 +296,7 @@ mk_assets() {
         *) echo "mk_assets: no recipe for $tag" >&2; return 1 ;;
     esac
     d=$T/assets/$tag
-    rm -rf "$d" "$T/pk"
+    rm_below_T "$d" "$T/pk"
     mkdir -p "$d" "$T/pk"
     printf '#!/bin/sh\necho "%s %s"\n' "$bin" "${MK_ASSETS_BINVER:-$n}" >"$T/pk/$bin"
     chmod +x "$T/pk/$bin"
@@ -969,6 +993,117 @@ cr_push_gh_fails_after_tag() {
     x_eq "$(git -C "$FXDIR" rev-parse HEAD)" "$b" "local master vs bare master"
     x_eq "$(git --git-dir="$FXBARE" rev-parse "$c^")" "$b" "(b) is master"
 }
+cr_cache_root_slash() {
+    fresh; FXDIR=$T/none
+    CUT_RELEASE_CACHE=/ run_cr --verify ms-cli-v0.20.2
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '/')"
+    if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
+    [ ! -s "$T/gh.log" ] || rowfail "gh was called"
+}
+cr_cache_root_relative() {
+    fresh; FXDIR=$T/none
+    CUT_RELEASE_CACHE=cache run_cr --verify ms-cli-v0.20.2
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is 'cache')"
+    if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
+    [ ! -e "$T/none/cache" ] || rowfail "a relative cache directory was created"
+    fx_ms; mk_prev_ms; mk_assets ms-cli-v0.20.3; snap
+    CUT_RELEASE_CACHE=cache run_cr --push ms-cli-v0.20.3
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is 'cache')"
+    x_untouched ms-cli-v0.20.3
+    x_no_remote_tag ms-cli-v0.20.3
+}
+cr_cache_root_empty() {
+    fresh
+    local rc=0
+    (source "$CR_REAL"; set +e; CR_CACHE=''; verify_tag ms-cli-v0.20.2) >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '')"
+    if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
+}
+cr_cache_tag_slash() {
+    fresh
+    local rc=0 t
+    mkdir -p "$T/cache" "$T/escape/ms-cli-v0.20.2"
+    : >"$T/escape/ms-cli-v0.20.2/keep"
+    (source "$CR_REAL"; set +e; verify_tag '../escape/ms-cli-v0.20.2') >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 2
+    x_err "cut-release: '../escape/ms-cli-v0.20.2' cannot name a cache directory: it has a '/' or is '.' or '..'"
+    [ -f "$T/escape/ms-cli-v0.20.2/keep" ] || rowfail "verify_tag deleted a directory outside the cache"
+    for t in . .. a/b; do
+        rc=0
+        (source "$CR_REAL"; set +e; cache_guard "$t" "$CR_CACHE/$t") >"$OUT" 2>"$ERR" || rc=$?
+        RC=$rc
+        x_rc 2
+        x_err "cut-release: '$t' cannot name a cache directory: it has a '/' or is '.' or '..'"
+    done
+    FXDIR=$T/none
+    run_cr --verify 'x/ms-cli-v0.20.2'
+    x_rc 2
+    x_err "cut-release: 'x/ms-cli-v0.20.2' is not a release tag of any repo in the table"
+}
+cr_cache_dir_not_below() {
+    fresh
+    local rc d
+    for d in "$T/cache" "$T/cache/other" "$T" "$T/cache/ms-cli-v0.20.2/x"; do
+        rc=0
+        (source "$CR_REAL"; set +e; cache_guard ms-cli-v0.20.2 "$d") >"$OUT" 2>"$ERR" || rc=$?
+        RC=$rc
+        x_rc 2
+        x_err "cut-release: refusing to delete '$d': it is not exactly '$T/cache/ms-cli-v0.20.2' strictly below the cache"
+    done
+    rc=0
+    (source "$CR_REAL"; set +e; cache_guard '' "$T/cache/") >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 2
+    x_err "cut-release: refusing to delete '$T/cache/': it is not exactly '$T/cache/' strictly below the cache"
+    rc=0
+    (source "$CR_REAL"; set +e; cache_guard ms-cli-v0.20.2 "$T/cache/ms-cli-v0.20.2") >"$OUT" 2>"$ERR" || rc=$?
+    RC=$rc
+    x_rc 0
+    [ ! -s "$ERR" ] || rowfail "the good path wrote to stderr: $(head -c 200 "$ERR")"
+}
+cr_harness_rm_guards() {
+    fresh
+    local g=$T/guard bad run out p
+    run=$g/cut-release-test/run-1; out=$g/outside
+    bad=$(mktemp -d "$CACHEROOT/guard.XXXXXX") || { rowfail "mktemp failed"; return; }
+    : >"$bad/keep"
+    mkdir -p "$run/sub" "$out"
+    ( T=$bad; rm_T ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '$bad': T is not */cut-release-test/run-*"
+    [ -f "$bad/keep" ] || rowfail "rm_T deleted a T that is not */cut-release-test/run-*"
+    ( T=''; rm_T ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '': T is not */cut-release-test/run-*"
+    ( T=$bad; rm_below_T "$bad/x" ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '$bad': T is not */cut-release-test/run-*"
+    for p in "$out" "$run" ''; do
+        ( T=$run; rm_below_T "$p" ) >"$OUT" 2>"$ERR"; RC=$?
+        x_rc 2; x_err "cut-release.test: refusing to delete '$p': it is not strictly below $run"
+    done
+    ( T=$run; rm_below_T "$run/sub/../../outside" ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 2; x_err "cut-release.test: refusing to delete '$run/sub/../../outside': it has a '..' component"
+    [ -d "$out" ] && [ -d "$run/sub" ] || rowfail "a refused rm_below_T deleted something"
+    ( T=$run; rm_below_T "$run/sub" ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 0
+    [ ! -e "$run/sub" ] || rowfail "rm_below_T did not delete a path below T"
+    ( T=$run; rm_T ) >"$OUT" 2>"$ERR"; RC=$?
+    x_rc 0
+    [ ! -e "$run" ] || rowfail "rm_T did not delete a T that matches"
+    rm -f -- "$bad/keep"; rmdir -- "$bad"
+}
+cr_static_rm() {
+    fresh
+    local hits bad
+    hits=$(grep -nE '(^|[^[:alnum:]_])rm +(-[A-Za-z]*[rR][A-Za-z]*|--recursive)( |$)' "$CR_REAL" "$SELF" "$FIX/fake-gh" "$FIX/fake-pvs" | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+    x_eq "$(printf '%s\n' "$hits" | grep -c . || true)" 4 "recursive rm lines"
+    bad=$(printf '%s\n' "$hits" | grep -vE 'rm +-[A-Za-z]+ +-- +"\$\{[A-Za-z_]+:\?\}"' | grep . || true)
+    [ -z "$bad" ] || rowfail "recursive rm without -- and \${NAME:?}: $(printf '%s' "$bad" | tr '\n' '|')"
+}
 
 # --------------------------------------------------------------- network rows
 CUT_RELEASE_SIBLINGS_REAL=${CUT_RELEASE_SIBLINGS_REAL:-/scratch/code/shibboleth}
@@ -976,7 +1111,7 @@ net_clone() { # repo default : a clone of the real repo whose origin is a bare c
     local repo=$1 def=$2
     FXREPO=$repo; FXDEF=$def
     FXDIR=$T/work/$repo; FXBARE=$T/remote/$repo.git
-    rm -rf "$FXDIR" "$FXBARE"
+    rm_below_T "$FXDIR" "$FXBARE"
     GIT_CONFIG_GLOBAL=/dev/null git clone -q --bare --reference-if-able "$CUT_RELEASE_SIBLINGS_REAL/$repo" "https://github.com/bg002h/$repo" "$FXBARE" || return 1
     git clone -q "$FXBARE" "$FXDIR" || return 1
     (cd "$FXDIR" && cargo fetch --locked >/dev/null 2>&1) || return 1
@@ -1106,6 +1241,8 @@ ROW_LIST=(
     cr_toolkit_pvs_failed_after_landing cr_push_tag_push_fails cr_push_run_never_appears cr_push_interrupted_after_tag cr_toolkit_run_failed
     cr_push_release_draft cr_push_trusted_comment cr_push_checksum_mismatch cr_push_wrong_binary_version cr_version_skip
     cr_land_pr_not_clean cr_land_pr_branch_moved cr_follow_on_engrave_demo cr_stale_staging cr_push_gh_fails_after_tag
+    cr_cache_root_slash cr_cache_root_relative cr_cache_root_empty cr_cache_tag_slash cr_cache_dir_not_below
+    cr_harness_rm_guards cr_static_rm
 )
 NET_LIST=(
     crn_verify_ms crn_verify_mt crn_verify_md_unsigned crn_verify_engrave_retired crn_verify_all

@@ -180,7 +180,11 @@ case "${1:-} ${2:-}" in
                 git push -q origin "HEAD:refs/heads/$head"
             fi
         ) || exit 1
-        rm -rf "$scratch"
+        case $scratch in
+            "${T:?}"/merge.?*) ;;
+            *) echo "fake gh: refusing to delete '$scratch': it is not below $T" >&2; exit 1 ;;
+        esac
+        rm -rf -- "${scratch:?}"
         ;;
     *)
         unexpected "$@"
