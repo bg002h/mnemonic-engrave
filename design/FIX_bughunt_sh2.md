@@ -461,7 +461,7 @@ Each item is one `owed-to-build` line in the §9.1 entry.
    `34093bfd…674b`, `wantDeviceTrue = 29`, `wantDeviceFalse = 45`,
    `wantPanicEncode = 0`.
 3. Apply the §4 spec delta to `design/SPEC_descriptor_input.md` §4.2.
-4. Apply the §7 test expectations. Add the row file `gui/bughunt_sh2_21b_test.go` (§6.1, row 21b) with this exact body:
+4. Apply every other §3 fork fix (every §3 table row except fix-06a, fix-06c and fix-06b/50, applied in item 1, and the fix-39 rows, applied in item 5) and the §7 test expectations. Add the row file `gui/bughunt_sh2_21b_test.go` (§6.1, row 21b) with this exact body:
 
 ~~~go
 package gui
