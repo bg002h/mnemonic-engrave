@@ -143,6 +143,11 @@ pub fn render_plate(
     let ext = if png { "png" } else { "svg" };
     let format = if png { "png" } else { "svg" };
     let out_path = dir.join(format!("plate-{idx}.{ext}"));
+    match std::fs::remove_file(&out_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(PreviewError::Spawn(e)),
+    }
 
     let mut child = Command::new(sidecar)
         .arg("render")
