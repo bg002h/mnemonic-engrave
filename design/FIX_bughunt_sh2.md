@@ -564,11 +564,12 @@ later)" is the grade's fix-NN; "RED row" is the §6.2 row.
 | S1-Q2 | N | `sh-supply-reask` | Back in supply multisig could re-ask the passphrase question instead of returning to the menu. | end-of-project minors |
 | 15, 16, 17, 44 | UNRESOLVED | `sh-needs-seam-tinygo-drivers` | pio, st25r3916 and clrc663 reports are UNRESOLVED and need a host seam or a device test. | device-test work |
 
-**Architect S3 minor.**
+**Architect S2/S3 minors.**
 
 | # | grade | slug | What | owner |
 |---|---|---|---|---|
 | S3 | M | `sh2-me-refusal-device-claim` | `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed) | next me FIX |
+| M-S2a | M | `sh2-selfcheck-refusal-row` | the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap | sh2 FIX build |
 
 **Architect S3 Important** (not deferred-minor; append under this heading):
 
