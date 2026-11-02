@@ -82,7 +82,7 @@ not equal to `"$CR_CACHE/$tag"`, or does not match `"$CR_CACHE"/?*`.
 
 | spec sentence (after this fix) | row |
 |---|---|
-| S1: cache must be absolute, not `/`; exit 2 and text, in every mode, before any work | 71, 72 |
+| S1: cache must be absolute, not `/`; exit 2 and text, in every mode, before any work | 71, 72 (72 also with `--push`) |
 | S2 check (1) inside `verify_tag` (empty cache) | 73 |
 | S2 check (2): tag with `/`, `.`, `..` | 74 |
 | S2 check (3): dir exactly `<cache>/<tag>`, strictly below | 75 |
@@ -188,7 +188,7 @@ Network rows (skipped by `--offline`; need gh auth and rustup's cargo
 ````text
 exists; toolkit: local master = bare master = (b) |
 | 71 | cr_cache_root_slash | `CUT_RELEASE_CACHE=/`; `--verify ms-cli-v0.20.2`, run from `$T/none` | 2; `cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '/')`; stdout has no line starting `== verify`; `$T/gh.log` absent or empty |
-| 72 | cr_cache_root_relative | `CUT_RELEASE_CACHE=cache`; `--verify ms-cli-v0.20.2`, run from `$T/none` | 2; the same line with `'cache'`; stdout has no line starting `== verify`; `$T/none/cache` does not exist |
+| 72 | cr_cache_root_relative | `CUT_RELEASE_CACHE=cache`; `--verify ms-cli-v0.20.2`, run from `$T/none`; then F-ms ready to push, as row 36 (`cr_push_run_failed`) sets it up, `CUT_RELEASE_CACHE=cache`, `--push ms-cli-v0.20.3` | 2; the same line with `'cache'`; stdout has no line starting `== verify`; `$T/none/cache` does not exist; the push: 2, the same line, nothing changed (tree clean, HEAD and the bare remote unchanged, gh.log and pvs.log empty, no local or remote tag `ms-cli-v0.20.3`) |
 | 73 | cr_cache_root_empty | source the script, `set +e`, `CR_CACHE=''`, call `verify_tag ms-cli-v0.20.2` (the command line cannot reach this: `${CUT_RELEASE_CACHE:-...}` turns an empty variable into the default) | 2; the same line with `''`; stdout has no line starting `== verify` |
 | 74 | cr_cache_tag_slash | `$T/cache` and `$T/escape/ms-cli-v0.20.2/keep` exist. Source the script, `set +e`, call `verify_tag '../escape/ms-cli-v0.20.2'`; then `cache_guard <tag> "$CR_CACHE/<tag>"` for the tags `.`, `..` and `a/b`; then the command line `--verify 'x/ms-cli-v0.20.2'` | verify_tag: 2; `cut-release: '../escape/ms-cli-v0.20.2' cannot name a cache directory: it has a '/' or is '.' or '..'`; `$T/escape/ms-cli-v0.20.2/keep` still exists. Each cache_guard: 2 and that line for its tag. Command line: 2; `cut-release: 'x/ms-cli-v0.20.2' is not a release tag of any repo in the table` (U8; it never reaches verify_tag) |
 | 75 | cr_cache_dir_not_below | source the script, `set +e`; `cache_guard ms-cli-v0.20.2 <dir>` for <dir> = `$T/cache`, `$T/cache/other`, `$T`, `$T/cache/ms-cli-v0.20.2/x`; then `cache_guard '' $T/cache/` (an empty tag, which only check (3) catches); then `cache_guard ms-cli-v0.20.2 $T/cache/ms-cli-v0.20.2` | the first four: 2; `cut-release: refusing to delete '<dir>': it is not exactly '<T>/cache/ms-cli-v0.20.2' strictly below the cache`. The empty tag: 2; `cut-release: refusing to delete '<T>/cache/': it is not exactly '<T>/cache/' strictly below the cache`. The last: 0 and nothing on stderr |
@@ -510,6 +510,12 @@ cr_cache_root_relative() {
     x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is 'cache')"
     if grep -q '^== verify' "$OUT"; then rowfail "verify started"; fi
     [ ! -e "$T/none/cache" ] || rowfail "a relative cache directory was created"
+    fx_ms; mk_prev_ms; mk_assets ms-cli-v0.20.3; snap
+    CUT_RELEASE_CACHE=cache run_cr --push ms-cli-v0.20.3
+    x_rc 2
+    x_err "cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is 'cache')"
+    x_untouched ms-cli-v0.20.3
+    x_no_remote_tag ms-cli-v0.20.3
 }
 cr_cache_root_empty() {
     fresh
@@ -667,7 +673,7 @@ assertion, the first ones are shown.
 | row | observed pre-fix | why it fails |
 |---|---|---|
 | 71 cr_cache_root_slash | `exit 1, wanted 2 (stderr: mkdir: cannot create directory '//ms-cli-v0.20.2': Permission denied)`; `stderr lacks line: cut-release: CUT_RELEASE_CACHE must be an absolute path other than / (the cache directory is '/')`; `gh was called` | no refusal; the script goes on to `rm -rf //ms-cli-v0.20.2` and calls gh |
-| 72 cr_cache_root_relative | `exit 8, wanted 2 (stderr: )`; `stderr lacks line: ... (the cache directory is 'cache')`; `verify started`; `a relative cache directory was created` | no refusal; the verify ran and made `cache/` in the working directory |
+| 72 cr_cache_root_relative | `exit 8, wanted 2 (stderr: )`; `stderr lacks line: ... (the cache directory is 'cache')`; `verify started`; `a relative cache directory was created`; `exit 0, wanted 2 (stderr: )`; `stderr lacks line: ... (the cache directory is 'cache')`; `tree not clean`; `gh.log is not empty`; `pvs.log is not empty`; `the bare remote changed`; `HEAD moved`; `local tag ms-cli-v0.20.3 exists`; `tag ms-cli-v0.20.3 is on the bare remote` | no refusal; the verify ran and made `cache/` in the working directory, and the push ran and pushed the tag |
 | 73 cr_cache_root_empty | `exit 0, wanted 2 (stderr: mkdir: cannot create directory '/ms-cli-v0.20.2': Permission denied)`; `stderr lacks line: ... (the cache directory is '')`; `verify started` | an empty cache root is accepted; `d` becomes `/ms-cli-v0.20.2` |
 | 74 cr_cache_tag_slash | `exit 0, wanted 2 (stderr: )`; `stderr lacks line: cut-release: '../escape/ms-cli-v0.20.2' cannot name a cache directory: ...`; `verify_tag deleted a directory outside the cache`; then, for each of `.`, `..`, `a/b`, `exit 127, wanted 2 (stderr: scripts/test/cut-release.test.sh: line 1009: cache_guard: command not found)` | the delete leaves the cache: the sentinel `$T/escape/ms-cli-v0.20.2/keep` is gone; `cache_guard` does not exist yet. The final command-line step (U8) passes before and after |
 | 75 cr_cache_dir_not_below | for each of the four bad directories, `exit 127, wanted 2 (stderr: scripts/test/cut-release.test.sh: line 1024: cache_guard: command not found)` and `stderr lacks line: cut-release: refusing to delete '$T/cache': it is not exactly '$T/cache/ms-cli-v0.20.2' strictly below the cache`; for the empty tag and for the good path `exit 127` (wanted 2 and 0) | `cache_guard` does not exist yet |
