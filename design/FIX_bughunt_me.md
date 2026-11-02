@@ -156,7 +156,7 @@ the measurements are below.
 | L5 | `design/SPEC_encrypted_payload_delivery.md` §5, new paragraph after line 487 (`... confirmed empirically in §3.1.`), before `## 6.` | (none) | `` `to_uf2` refuses (panics on) a blob longer than the 64 KiB region; the CLI never passes one. `` |
 | #1 | `design/SPEC_me_preview_hardening.md:106` | `` `.write(true).create(true).truncate(true)` `` | `` `.write(true).create(true)` `` (derived: R5 drops `truncate(true)`, so this text would otherwise be false) |
 | #1 | `design/SPEC_me_preview_hardening.md:108` | `` **`truncate(true)` is load-bearing (R0 I2):** `` | `` Truncation is load-bearing (R0 I2) and happens after the mode is set (`set_len(0)` after `set_permissions`), so a refused chmod leaves the existing file unchanged. `` The rest of the bullet (`` `fs::write` truncates; without it a shrinking overwrite ...``) is kept. |
-| #1 | `design/SPEC_me_preview_hardening.md:118-119` | `**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3)` and the residual that follows | `` `.mode(0o600)` binds only on create, so on Unix `write_private` also calls `set_permissions(0o600)` on the open file (F-244): an overwrite of a pre-existing file ends at 0o600, and a refused chmod fails the write before any byte of the old file is touched (R0 L3, superseded). `` |
+| #1 | `design/SPEC_me_preview_hardening.md:118-120` | `**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3)` and the residual that follows | `` `.mode(0o600)` binds only on create, so on Unix `write_private` also calls `set_permissions(0o600)` on the open file (F-244): an overwrite of a pre-existing file ends at 0o600, and a refused chmod fails the write before any byte of the old file is touched (R0 L3, superseded). `` |
 
 The #3 change has no spec delta (R3: SPEC_systemwide_payloads.md:151 already
 states the rule).
@@ -235,7 +235,7 @@ Gate (capture each to a file once, then grep):
 4. `cargo +1.85.0 clippy --locked --all-targets --workspace -- -D warnings`
 5. `cargo +1.85.0 nextest run --locked --workspace -E 'test(/^bughunt_me_/)'`
 
-Expected (all five items built, S3 resolved so `as_with_argv_and_in_together_is_usage` passes or is changed as ruled):
+Expected (all five items built, S3 ruled (b), so `as_with_argv_and_in_together_is_usage` passes unchanged):
 - 1: `704 tests run: 704 passed, 2 skipped` (691 base + 7 triage rows + 6
   new rows).
 - 2: exit 0 (no doctests in the workspace; each `test result:` line reads
