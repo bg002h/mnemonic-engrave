@@ -20739,3 +20739,10 @@ Nits (one line each):
 - N1 [fold; open point 2] 4a bullet 2, old `- The trap, and every exit 7, 8 or 9, ends with:` new `- The signal trap, the EXIT trap and every exit 7, 8 or 9 end with:`.
 - N2 [fold] `--help` line `7 a release run failed` no longer covers the signal and EXIT traps' exit 7: new `7 a release run failed or the script stopped after the tag push` (row 4 pins only line 1).
 - N3 [fold] The fold report says "no deviation", but the r2 fix's P23 parenthetical (`<12>` = first 12 of S; S = HEAD is the resume path) is absent from the spec. Folded into M2's fix.
+
+### F-712 — cut-release whole-diff r1: 1 Minor and 1 Nit (owning phase: none; ownerless residue)
+
+**Status:** OPEN — deferred-minor (RULES.md). Filed from `design/agent-reports/whole-diff-cut-release-r1.md` (r1, single Opus slice: 0C/0I/1M/1N on e1d25113).
+
+- **M1 Post-push peel-mismatch `exit 6` is untested (plant J survives; build deviation 12).** `scripts/cut-release.sh:1328-1333`. Reaching it needs the tag on origin moved between the atomic push and `ls-remote`. The report gives the exact row `cr_push_tag_moved_after_push` (a post-receive hook on the fixture bare repo moves the tag to `master~1`; expects exit 6 and the "peels to" line); the reviewer ran it: passes on e1d25113, fails with plant J. Applying it also needs a spec row 79 in SPEC §11.
+- N1 `CUT_RELEASE_TEST_ONLY` runs leave `~/.cache/cut-release-test/run-*` directories behind (the harness prints "kept <dir>").
