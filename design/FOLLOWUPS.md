@@ -20643,7 +20643,7 @@ primary). Fix with a test image that has two clear entries.
 ### F-709 — cut-release spec r1: 20 Minors and 5 Nits, deferred (owning phase: cut-release build)
 
 **Status:** OPEN — owning phase: cut-release build
-deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r1.md` (r1: 0C/7I/20M/5N; the 7 Importants are folded in the spec). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the r1 spec's: fold r1 added offline rows 51-68, so the network rows M1, M2, M10 and M12 call 51-55, 53, 56-58 and 58 are now 69-73, 71, 74-76 and 76 (rows 33-49 are unchanged).
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r1.md` (r1: 0C/7I/20M/5N; the 7 Importants are folded in the spec). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the r1 spec's: fold r1 added offline rows 51-68, so the network rows M1, M2, M10 and M12 call 51-55, 53, 56-58 and 58 were 69-73, 71, 74-76 and 76 after fold r1 and are now 71-75, 73, 76-78 and 78 (fold r2 added offline rows 69 and 70; rows 33-49 are unchanged).
 
 Minors (one line each):
 
@@ -20684,3 +20684,38 @@ Nits (one line each):
 - N3: P15 local-only says "if you made it by hand", but an interrupted cut-release.sh run leaves local tags too.
 - N4: Row 49's "(its refs are refs/tags/<tag>)" cannot be checked by grep when the refs are in a variable.
 - N5: Rows 35-39 and 42 omit their command and asset setup; they implicitly reuse row 34's and row 33's.
+
+### F-710 — cut-release spec r2: 15 Minors, 4 Nits and 2 design concerns, deferred (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r2.md` (r2: 0C/3I/15M/4N; the 3 Importants are folded in the spec by fold r2). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the spec's at the r2 review head (`f54464bc`): fold r2 added offline rows 69 and 70 and renumbered the network rows 69-76 to 71-78, so the network rows the lines call 71 (first design concern), 75 (M14) and 76 (M11, M14) are now 73, 77 and 78 (rows 1-68 are unchanged).
+
+Minors (one line each):
+
+- M1 [pre-existing] §7 step 2 says "`git fetch` the head": `git fetch origin <branch>` does not bring the tag (measured: tags `[]`; plain `git fetch origin` does; `git merge-base --is-ancestor "<tag>^{}" ...` then rc 128, not the exit-9 refusal). Rows 46/47 run in the checkout that created the tag, so they cannot see it. Fix: "`git fetch --quiet --tags origin`". Conditions: the builder fetches only the head branch, and `--land-pr` runs in a checkout without the tag; fails closed.
+- M2 [fold] Toolkit exit 5 after (b) landed: `follow-on.txt` is written only before the tag push and the `finish:` line only follows exits 7/8/9, so the by-hand recovery never lists the engrave-demo and reference moves; add to the second I-1 line "..., then the pins-PR line below, then the moves in <git-dir>/cut-release/follow-on.txt" and write the file with `pins-pr-body.md` before §6.3 step 1.
+- M3 [fold] For a lib-only run `<bin tags>` is empty, so the finish line prints `cut-release.sh --verify ; once it shows 0 failed ...`: bare `--verify` checks all seven CLIs, five of which fail today (V3/V4), so the condition cannot hold; omit the `--verify` clause when there is no bin tag. Conditions: lib-only run and an exit 7 (mk-codec CI) or a signal.
+- M4 [pre-existing, E4/E9 touched] §6.3 step 5's exit-9 text says "(c) is at refs/heads/release-pins-<N>" even when the `git push` (not `gh`) failed; the complete pins-PR line is printed right after it and works, so only the claim is wrong.
+- M5 [fold] §6.3 step 4's exit-9 text says "commit the fix to that branch, then gh pr create ...": `gh pr create --head` explicitly skips pushing (`gh pr create --help`), so the fix commit never reaches the PR; add "push it" after "commit the fix to that branch". Conditions: step-4 exit 9 and an operator who takes the text literally.
+- M6 [fold] Rows pin printed recovery text but run only one command (row 56's tag line): the 4a pins-PR line, the two exit-9 texts and the `finish:` line are never executed by a row (I ran the pins-PR line in `sandbox-b`: it works from both the exit-5 and the exit-7 state), row 56 does not assert that the pins-PR line follows or that local master stays at (c), and rows 43, 59, 61-64 do not assert the reset or finish line; extend row 60 to run the printed pins-PR line and assert bare `release-pins-0.105.2` = (c) and the `pr create` argv.
+- M7 [fold] No row for step 4's "origin has every tag" and "mixed" outcomes or the peel-mismatch exit 6; the mixed outcome is unreachable under `--atomic`, the other two fail closed.
+- M8 [pre-existing] `--trailer` goes "to `git commit --trailer`", but the toolkit makes two commits; say whether (c) carries it (cosmetic, no row).
+- M9 [pre-existing] Fake gh "answers exactly the calls of §5.3, §5.4, §6.3 and §7": P9's `gh auth status` is §4 and `gh release download`'s argv is nowhere fixed, so a literal fake answers 99 to every `--push`, `--verify` and `--land-pr` row; row 33's "gh.log has no `fake gh: unexpected`" is vacuous unless the fake also logs that line. Fails loudly (red harness).
+- M10 [pre-existing] "Rows 44-47 run on the F-tk state that row 42 leaves" but row 43 (`as 42 with FAKE_INSTALL_ASSETS=fail`) needs a fresh F-tk (a re-run after row 42 meets P15) and sits between them; rows 66/67 also need "row 42's state" again. Say that each row builds its own fixture directory and that rows 44-47, 66 and 67 first re-run row 42's setup.
+- M11 [pre-existing; deepens F-709 M12] §6.2's "insert right after the `[installer-ahead]` line": the real `pinned-upstream.toml` has two comment lines containing `[installer-ahead]` (lines 95, 119) before the header (line 123), so an unanchored match misplaces the key; say "the line that is exactly `[installer-ahead]`". F-tk's file has no such comment and row 76 cannot see placement; the PR's CI would reject it (fails closed).
+- M12 [fold] A Ctrl-C or crash inside the toolkit's PVS window leaves the checkout detached at (b) and no trap runs (4a starts at the tag push): P11 then P12a say "finish as cut-release.sh printed", nothing was printed, and if (b) had landed the P12a "drop it" advice discards (c) and P19 then refuses. Conditions: signal inside PVS and (b) already landed.
+- M13 [pre-existing; the fold added more] Printed commands name `cut-release.sh` bare (`--verify`, `--land-pr 77`, P15 hint), but §2 says other repos reach it by absolute path, so they are not runnable as printed from a toolkit checkout; print the script's absolute path (the banner already has it).
+- M14 [pre-existing] Network row 75 inserts `## ms-cli [Unreleased]` unconditionally; once the real CHANGELOG carries one, C2 fires and the row fails (row 76 handles the same case).
+- M15 [pre-existing] §5.4 has no FAIL text for a failed download (`gh release download` under `set -e` aborts `--verify` with exit 1 instead of a FAIL line and exit 8).
+
+Nits (one line each):
+
+- N1 [pre-existing] Tag regex accepts `ms-cli-v0.20.03`; P22 may pass it numerically and cargo rejects the manifest (`invalid leading zero in patch version number`, measured) with step 4's misleading "run 'cargo fetch'" text; reject leading zeros in the tag regex.
+- N2 [pre-existing] Row 4 pins only line 1 of `--help`; the exit-code table is unpinned.
+- N3 [pre-existing] Row 25 lists `would check <lib tag>` before `would verify <bin tag>`; §5.2 puts verify first (rows match by membership, so harmless).
+- N4 [fold] Review labels `(I-2)`, `(I-4)`, `(I-5)`, `(I-6)` remain inside rows 51, 65, 67, 68 and mean nothing to the builder.
+
+Design concerns (ungraded):
+
+- V6 runs the archive's binary even after V4/V5 FAIL or when the sums file is unsigned (rows 37, 63, 71 pin that); consider running it only when V5 passed and the sums file verified.
+- The resume path tags `HEAD` (origin tip) after PVS re-stages it; if commits sit on top of the original release commit it tags the later tip. It still has manifest N, a matching heading and CI, so not graded.
