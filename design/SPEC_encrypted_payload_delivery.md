@@ -486,6 +486,8 @@ Constraints satisfied:
 sectors it writes and does read-modify-write on partial ones. Verified in
 picotool 2.2.0 `main.cpp` and confirmed empirically in §3.1.
 
+`to_uf2` refuses (panics on) a blob longer than the 64 KiB region; the CLI never passes one.
+
 ## 6. Wire format — NORMATIVE
 
 Per the project's Rust-primary rule, this format is defined and implemented

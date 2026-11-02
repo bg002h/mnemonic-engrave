@@ -1508,13 +1508,14 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
-            let (recs, document) = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
-                Ok(r) => (r.records, r.document),
-                Err((msg, code)) => {
-                    eprintln!("me: {msg}");
-                    return code;
-                }
-            };
+            let (recs, document) =
+                match read_records(records, r#in.as_ref(), *allow_argv_secret, r#as.is_some()) {
+                    Ok(r) => (r.records, r.document),
+                    Err((msg, code)) => {
+                        eprintln!("me: {msg}");
+                        return code;
+                    }
+                };
 
             // SPEC_descriptor_input.md §5.1/§5.3/§5.4 — THE `--as` PATH.
             //
@@ -3040,8 +3041,9 @@ fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
     allow_argv_secret: bool,
+    as_present: bool,
 ) -> Result<Records, (String, i32)> {
-    if let Some(p) = in_path {
+    if let Some(p) = in_path.filter(|_| argv.is_empty()) {
         let raw = std::fs::read_to_string(p)
             .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
         // R7, and it applies to THIS channel too -- see `no_records`.
@@ -3153,6 +3155,23 @@ fn read_records(
                     EXIT_REFUSED,
                 ));
             }
+        }
+        // R1 (bug hunt #4): argv AND --in. Checked AFTER the guard above, for
+        // the pack arm's rule: a flag-shape usage error must not pre-empt a
+        // refusal about material already in the shell's history.
+        if in_path.is_some() {
+            if !as_present {
+                return Err((
+                    "pass records on argv OR via --in, not both".to_string(),
+                    EXIT_USAGE,
+                ));
+            }
+            // With `--as`, the caller's §5.1 shape check refuses this
+            // invocation in its own words. Read neither --in nor stdin.
+            return Ok(Records {
+                records: argv.to_vec(),
+                document: argv.join("\n"),
+            });
         }
         // §6b — `-` MEANS STDIN, AND IT IS IMPLEMENTED RATHER THAN MERELY
         // ACCEPTED. §6b's wording is permissive enough that an implementation
@@ -3615,7 +3634,7 @@ mod tests {
             ("leading space", format!("  {MS1}")),
             ("trailing space", format!("{MS1}  ")),
         ] {
-            let (msg, code) = super::read_records(std::slice::from_ref(&rec), None, false)
+            let (msg, code) = super::read_records(std::slice::from_ref(&rec), None, false, false)
                 .expect_err(&format!("{what} must be refused"));
             assert_eq!(
                 code,
@@ -3635,7 +3654,7 @@ mod tests {
         // The control: a record that is genuinely nothing is NOT refused here.
         // Without it, `Err` for every input would satisfy the loop above.
         assert!(
-            super::read_records(&["text:6869".to_string()], None, false).is_ok(),
+            super::read_records(&["text:6869".to_string()], None, false, false).is_ok(),
             "a legitimate text: record must pass this gate"
         );
     }
