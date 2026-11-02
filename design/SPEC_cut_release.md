@@ -77,7 +77,7 @@ release and lists the follow-on pin moves.
 --land-pr merges a pull request once every check is green.
 Exit: 0 ok, 2 usage, 3 refused before any change, 4 a local check failed,
 5 staging failed (no tag pushed), 6 tag push failed (no tag pushed),
-7 a release run failed, 8 verification failed, 9 toolkit pins or PR step failed.
+7 a release run failed or the script stopped after the tag push, 8 verification failed, 9 toolkit pins or PR step failed.
 ```
 
 `--help` prints exactly that block to stdout and exits 0. Exactly one of the
@@ -186,8 +186,10 @@ from the latest release of each prefix: every binary prints exactly
 | P19 | toolkit, X = N | `cut-release: mnemonic-toolkit is already <N> in crates/mnemonic-toolkit/Cargo.toml; the toolkit release needs its version bump in commit (b), so release it by hand or restore the previous version` | 3 |
 | P20 | toolkit, the first `mnemonic-toolkit-v[0-9.]+` in `scripts/install.sh` is not `mnemonic-toolkit-v<X>` | `cut-release: scripts/install.sh self-pins mnemonic-toolkit-v<Y> but Cargo.toml says <X>; land the previous release's pins PR first` | 3 |
 | P21 | a workspace member's path dependency on a bumped crate has a metadata `req` other than `=X`, `^X` or `*` | `cut-release: <manifest> pins <crate> at '<req>'; expected '=<X>', '^<X>' or no version (fix the pin by hand first)` | 3 |
-| P23 | `--dry-run`/`--push`: `git ls-remote origin refs/heads/ci/staging` prints a sha S, and S is not the sha of `HEAD` | `cut-release: origin has ci/staging at <12>; push-via-staging.sh cannot push a new release commit over it (an interrupted or failed staging run left it). If no staging run is in progress, delete it, then run again: git push origin --delete ci/staging` | 3 |
+| P23 | `--dry-run`/`--push`: `git ls-remote origin refs/heads/ci/staging` prints a sha S, S is not the sha of `HEAD`, and `git merge-base --is-ancestor <S> HEAD` exits non-zero (an S unknown locally counts as not an ancestor) | `cut-release: origin has ci/staging at <12>; push-via-staging.sh cannot push a new release commit over it (an interrupted or failed staging run left it). If no staging run is in progress, delete it, then run again: git push origin --delete ci/staging` | 3 |
 | C1-C7 | CHANGELOG, below | below | 3 |
+
+P23: <12> is the first 12 characters of S. S = HEAD (the resume path) and S behind HEAD (an old staging a fast-forward covers) are allowed.
 
 **Version rule (P17).** Compare the numeric triples. N is newer than X when
 triple(N) > triple(X), or when the triples are equal and X has a `-`
@@ -344,8 +346,8 @@ place of `DRY RUN`, then a third line:
 4a. **Finishing lines.**
    - Before the tag push, write the §8 block, computed from the pre-run state as a dry run prints it, to `<git-dir>/cut-release/follow-on.txt` (`<git-dir>` = `git rev-parse --absolute-git-dir`).
    - The toolkit writes the §6.3 step 5 PR body to `<git-dir>/cut-release/pins-pr-body.md` before §6.3 step 1.
-   - From the tag push on, the script traps INT, TERM and HUP, and also EXIT. The signal trap prints `cut-release: interrupted after the tag push; the tags are pushed and stay pushed: never delete or move them.` and exits 7. The EXIT trap acts only when the variable set after the tag push is set, the variable set just before the `== DONE` line is unset, and no exit 7, 8 or 9 and no signal trap has begun (a third variable they set). That case is a `set -e` abort, for example a failing `gh`, `git ls-remote` or `jq` call. It prints `cut-release: stopped after the tag push by a failing command (above); the tags are pushed and stay pushed: never delete or move them.`, then the finishing lines below (for the toolkit after the §6.3 step 6 reset), and exits 7.
-   - The trap, and every exit 7, 8 or 9, ends with:
+   - From the tag push on, the script traps INT, TERM and HUP, and also EXIT. The variable set after the tag push is set the moment git push --atomic returns 0, or when step 4 prints the "continuing" line. The signal trap prints `cut-release: interrupted after the tag push; the tags are pushed and stay pushed: never delete or move them.` and exits 7. The EXIT trap acts only when the variable set after the tag push is set, the variable set just before the `== DONE` line is unset, and no exit 6, 7, 8 or 9 and no signal trap has begun (a third variable they set; step 4's exit 6 after the push sets it too, so the EXIT trap never changes an exit 6). That case is a `set -e` abort, for example a failing `gh`, `git ls-remote` or `jq` call. It prints `cut-release: stopped after the tag push by a failing command (above); the tags are pushed and stay pushed: never delete or move them.`, then the finishing lines below (for the toolkit after the §6.3 step 6 reset), and exits 7. Neither trap prints step 6's `== follow-on pins are NOT listed` line: an abort can come after a clean verify, and the finishing lines are true in every state.
+   - The signal trap, the EXIT trap and every exit 7, 8 or 9 end with:
      `cut-release: finish: cut-release.sh --verify <bin tags>; once it shows 0 failed, make the follow-on moves in <git-dir>/cut-release/follow-on.txt`
    - For the toolkit, until §6.3 step 5 has opened the PR (and except after §6.3 step 4's exit 9), it then adds the pins-PR line:
      `cut-release: pins PR: git checkout --quiet --detach <c sha> && sh scripts/install-assets.test.sh && git checkout --quiet master && git push origin <c sha>:refs/heads/release-pins-<N> && gh pr create --repo bg002h/mnemonic-toolkit --base master --head release-pins-<N> --draft --title 'pins: installer -> mnemonic-toolkit-v<N>' --body-file <git-dir>/cut-release/pins-pr-body.md`
@@ -371,7 +373,7 @@ place of `DRY RUN`, then a third line:
 6. Verify (§5.4) each bin tag. A lib tag gets `   ok    <tag> peels to <12>`
    (already checked in step 4). Any FAIL gives
    `cut-release: <tag> did not verify (above); the tags stay pushed. STOP and report it.`
-   and exit 8. Exits 7 and 8 also print
+   and exit 8. Exits 7 and 8 from steps 5 and 6 (not the traps' exit 7) also print
    `== follow-on pins are NOT listed: the release is not verified` and skip §8; they end with the step 4a finishing lines.
 7. The §8 follow-on block, then `== DONE: <tags> published and verified`,
    exit 0.
@@ -492,7 +494,7 @@ plus 4 installer lines. This is exactly precedent `b0801244`/`1402d547`.
    then `== DONE: <T> published and verified`, exit 0. Just before the `== DONE` line it runs `git checkout --quiet master && git reset --quiet --keep <b>`: local master
    equals origin/master, and (c) stays reachable from the tag and
    `release-pins-<N>`. Every exit after the tag push (7, 8, 9, a trapped
-   signal, or the EXIT trap) does the same reset first.
+   signal, or the EXIT trap) does the same reset first. A failing reset is ignored: its git error shows, and the exit code and the finishing lines are unchanged.
 
 A toolkit dry run prints these lines, in place of §5.2's:
 
@@ -724,8 +726,7 @@ default). Every fixture change is committed and pushed (helper
   `git merge --no-ff` of the head in a scratch clone of the bare remote,
   then pushes. `FAKE_GH_KILL=TERM`: on the first `run list` call, runs
   `kill -TERM "$CUT_RELEASE_TEST_PID"`. `FAKE_GH_DRAFT=1`: `release view`
-  answers `isDraft: true`. `FAKE_GH_FAIL=1`: on its first `run list` call fake gh
-  prints `fake gh: simulated failure` to stderr and exits 1.
+  answers `isDraft: true`. `FAKE_GH_FAIL=1`: on every `run list` call fake gh prints `fake gh: simulated failure` to stderr and exits 1 (the script makes no `run list` call before the tag push).
   `FAKE_PR_MERGE_STATE=<s>`: `pr view` answers that
   merge state (default CLEAN). `FAKE_PR_BRANCH_MOVES=1`: after merging,
   `pr merge` pushes one more commit to the head branch. `mk_assets` env
@@ -806,7 +807,7 @@ code and what it shows:
 | 66 | cr_land_pr_not_clean | row 42's state; PR ready, checks pass, `FAKE_PR_MERGE_STATE=BLOCKED`; `--land-pr 77` | 9; `cut-release: PR #77 merge state is BLOCKED, not CLEAN`; no `pr merge` in gh.log |
 | 67 | cr_land_pr_branch_moved | as row 46, with `FAKE_PR_BRANCH_MOVES=1` | 0; `== merged PR #77 (<url>) as a merge commit; release-pins-0.105.2 left in place (origin's release-pins-0.105.2 is <12>, not the merged <12>)`; the bare branch still exists (I-5) |
 | 68 | cr_follow_on_engrave_demo | `CUT_RELEASE_SIBLINGS=$T/sib`, holding an engrave clone whose two demo files are engrave master's ms lines, copied byte-exact as for F-tk, plus a modified tracked `README.md`; `--dry-run ms-cli-v0.20.3`; then, in `$T/sib/mnemonic-engrave`, run the printed (a) `sed` and `git commit` lines | 0; the commit changes exactly the two demo files, 7 lines; `README.md` is still modified and uncommitted; `grep -c 'ms-cli-v0.20.2'` is 0 in both files (I-6) |
-| 69 | cr_stale_staging | a second clone pushes an unrelated commit to `refs/heads/ci/staging` of the bare remote; `--push ms-cli-v0.20.3`, then `--dry-run ms-cli-v0.20.3` | 3 both times; `cut-release: origin has ci/staging at <12>; push-via-staging.sh cannot push a new release commit over it (an interrupted or failed staging run left it). If no staging run is in progress, delete it, then run again: git push origin --delete ci/staging` (`<12>` = the unrelated commit); no tag on the bare remote; bare master unchanged; HEAD unchanged; tree clean; `$T/pvs.log` absent or empty |
+| 69 | cr_stale_staging | a second clone pushes a commit that is not an ancestor of the bare master tip to `refs/heads/ci/staging` of the bare remote; `--push ms-cli-v0.20.3`, then `--dry-run ms-cli-v0.20.3` | 3 both times; `cut-release: origin has ci/staging at <12>; push-via-staging.sh cannot push a new release commit over it (an interrupted or failed staging run left it). If no staging run is in progress, delete it, then run again: git push origin --delete ci/staging` (`<12>` = the unrelated commit); no tag on the bare remote; bare master unchanged; HEAD unchanged; tree clean; `$T/pvs.log` absent or empty; then, with ci/staging set to the sha of HEAD and then to its parent, --dry-run ms-cli-v0.20.3 exits 0 both times with $T/pvs.log absent or empty |
 | 70 | cr_push_gh_fails_after_tag | `FAKE_GH_FAIL=1`; `--push ms-cli-v0.20.3`; then F-tk with `--push mnemonic-toolkit-v0.105.2` | 7 both times; stderr shows `cut-release: stopped after the tag push by a failing command (above); the tags are pushed and stay pushed: never delete or move them.` and the finish line (the toolkit run also the pins-PR line with (c)'s sha); the tag is on the bare remote; `<git-dir>/cut-release/follow-on.txt` exists; toolkit: local master = bare master = (b) |
 
 Network rows (skipped by `--offline`; need gh auth and rustup's cargo
