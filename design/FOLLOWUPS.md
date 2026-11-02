@@ -20762,3 +20762,10 @@ Nits (one line each):
 - **N1** S3 does not say that deleting another path is also refused when `T` fails the `*/cut-release-test/run-*` test (R4 from `rm_below_T`). Row 76 expects it and the R-table lists it; S3 should add "(and, first, `T` matches as above)".
 - **N2** The spec's Harness setup formula (`SPEC_cut_release.md` line 673) still reads `T=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test/run-$$`. The harness resolves the cache root with `readlink -f`, and the new R4 refusal depends on that resolved form (the author's point 6 is the consequence). S3 should name the resolved `T`.
 - Design (ungraded, for the architect): the report's Design section (line 225) suggests `t_check` use `[[ $T =~ /cut-release-test/run-[0-9]+$ ]]`, which closes M3 and plant B.
+
+### F-714 — cut-release rm-guards whole-diff: 1 Minor and 1 Nit (owning phase: none; ownerless residue)
+
+Source: `design/agent-reports/whole-diff-cut-release-rm-guards.md` (5909af53), deferred-minor.
+
+- **M1** No row exercises fake gh's `"${T:?}"/merge.?*` refusal (`scripts/test/fixtures/cut-release/fake-gh`): with it removed the offline suite still passes 77/0 (controller-planted). Fails closed: `scratch` is always `$T/merge.XXXXXX` from `mktemp -d`. Fix text (spec, replace "Rows 76 and 77 test this."): "Row 76 tests the harness deletes; row 77 checks that every recursive delete has the guarded shape (fake gh's refusal itself is not exercised)."
+- **N1** Each failed or `CUT_RELEASE_TEST_ONLY` run leaves `~/.cache/cut-release-test/run-<pid>` (kept by design); reviewer and controller plant runs left about 31.
