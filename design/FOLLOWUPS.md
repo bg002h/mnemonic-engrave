@@ -21170,7 +21170,7 @@ Nits (one line each):
 - **Status:** `deferred-minor`
 - **Tier:** v1
 
-### `sh2-selfcheck-refusal-row` — the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap (repo: **seedhammer fork**; owning phase: **sh2 FIX build**)
+### `sh2-selfcheck-refusal-row` — the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
 
 - **Surfaced:** architect S2; FIX `design/FIX_bughunt_sh2.md`.
 - **What:** the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap
@@ -21223,5 +21223,41 @@ Nits (one line each):
 - **What:** `desc.Threshold = m.Threshold` is unbounded (the UR counterpart of 6a). Ungraded; needs a RED row when wired.
 - **RED row:** none yet; one is written when `bc/*` is wired.
 - **Why deferred:** ungraded; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies the fix, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-selfcheck-fixture-comment` — fixture comment names the wrong refusal arm after fix-21 (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s1, -M-1; report `design/agent-reports/whole-diff-bughunt-sh2-s1.md`.
+- **Where:** `gui/composer_selfcheck_test.go:147-150`, comment at `:256-266`
+- **What:** the fix-21 arm (unseated slot at a non-default origin) now fires before the "two distinct fingerprints" arm; the fixture comment still names the latter. Fails closed. The missing row for that arm is `sh2-selfcheck-refusal-row`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-06c-error-type-number` — 06c error prints the multisig type as a number (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s1, N-1; report `design/agent-reports/whole-diff-bughunt-sh2-s1.md`.
+- **Where:** `bip380/bip380.go:352`
+- **What:** the message reads "does not take a 0 expression"; it matches the FIX text, cosmetic.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-bluewallet-spec-order` — spec BlueWallet amendment omits the key-count check and misnames the dropped note (repo: **mnemonic-engrave**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s1, N-2; report `design/agent-reports/whole-diff-bughunt-sh2-s1.md`.
+- **Where:** me spec, §4 S3 BlueWallet amendment
+- **What:** the refusal order leaves out the existing key-count check that runs first, and it says the "narrowed" covers note was dropped where `device_probe` was.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-21b-guard-only` — row 21b passes on base code (guard only) (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s2, N-1; report `design/agent-reports/whole-diff-bughunt-sh2-s2.md`.
+- **Where:** fork row 21b
+- **What:** the row cannot fail on base; it only catches a later regression (also in the build report).
+- **Why deferred:** graded N.
 - **Status:** `deferred-minor`
 - **Tier:** v1
