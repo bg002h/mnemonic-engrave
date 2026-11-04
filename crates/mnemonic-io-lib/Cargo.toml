@@ -1,6 +1,6 @@
 [package]
 name = "mnemonic-io-lib"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Shared IO and safety mechanism for the m-format constellation CLIs: destination classification, stdout mode measurement, record-stream shaping, refusal decisions and remedy text. Mechanism only -- it publishes no exit code and no disqualifying permission mask, because those are each binary's policy."
 license = "MIT OR Unlicense"
