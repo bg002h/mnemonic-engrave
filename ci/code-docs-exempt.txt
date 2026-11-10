@@ -21,7 +21,7 @@
 ^scripts/plan-apply-gate-go\.sh$
 ^scripts/plan-build-gate\.sh$
 ^scripts/policy-generate\.py$
-^scripts/push-master\.sh$
+^scripts/push-via-staging\.sh$
 ^scripts/release-workflows/emit\.py$
 ^scripts/spec-check\.py$
 ^scripts/test/shot-server-security-test\.py$
