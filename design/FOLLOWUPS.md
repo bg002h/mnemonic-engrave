@@ -21288,3 +21288,10 @@ Source: `design/agent-reports/review-ci-userns-me.md` (f64933de), deferred-minor
 
 - **M1** `bughunt_me_01` skips on GitHub-hosted runners (no /etc/subuid range); nothing sets `ME_REQUIRE_USERNS=1`, so the FIX #1 regression runs only locally. Fix: run it with `ME_REQUIRE_USERNS=1` on a job where /etc/subuid is provisioned.
 - **N1** The skip is an `eprintln!` only; nextest reports it as PASS (same as `ME_REQUIRE_GO`).
+
+### engrave#37 review r1 — 1 Minor and 1 Nit deferred (owning phase: none; ownerless residue)
+
+Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports/review-engrave37-checksum.md`, deferred-minor.
+
+- **engrave37-arm64-verify-path** (M3) Linux arm64 users, listed in the page's table, have no verify path: md arm64 is in `SHA256SUMS.portable`, but ms and the toolkit need `SHA256SUMS.aarch64`. Add a sentence or a block.
+- **engrave37-spine-links-unchecked** (N2) `demo/sh2/check-install-links.sh` covers only `src/index.html`, not the URLs in `demo/sh2/CLI_SPINE.md`; a wrong sums name there would not be caught (the spine's ms `SHA256SUMS.portable` URL is not in its list).

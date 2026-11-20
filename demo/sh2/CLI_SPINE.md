@@ -26,14 +26,28 @@ macOS Gatekeeper will quarantine an unsigned downloaded binary. Clear it with
 out loud if anyone downloads on the day** — it is the single most likely thing
 to make a binary look broken.
 
-Each release carries checksum files; verify before running. macOS (both tools are
-in `SHA256SUMS.portable`; on Linux x86-64 use `SHA256SUMS.x86_64` for `ms`):
+Each release carries checksum files; verify before running (`md`, `ms` and
+`mnemonic`). macOS (everything is in `SHA256SUMS.portable`):
 
 ```sh
 curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.7/SHA256SUMS.portable
 curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.portable
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/SHA256SUMS.portable
 shasum -a 256 -c md.sums --ignore-missing
 shasum -a 256 -c ms.sums --ignore-missing
+shasum -a 256 -c tk.sums --ignore-missing
+```
+
+Linux: md stays in portable; ms and mnemonic use SHA256SUMS.x86_64:
+
+```sh
+# md's linux-amd64 is in SHA256SUMS.portable; ms and mnemonic are in SHA256SUMS.x86_64
+curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.7/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.x86_64
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/SHA256SUMS.x86_64
+sha256sum -c --ignore-missing md.sums
+sha256sum -c --ignore-missing ms.sums
+sha256sum -c --ignore-missing tk.sums
 ```
 
 Only `mnemonic-engrave` is signed (minisign); the others ship checksums alone,
