@@ -71,14 +71,6 @@ chmod +x md ms</code></pre></div>
     right-click the file and choose Open. Nothing is wrong with the binary.
   </div>
 
-  <div class="note">
-    <b>Check what you downloaded.</b> Each release ships
-    <code>SHA256SUMS.portable</code>:
-    <code>shasum -a 256 -c SHA256SUMS.portable --ignore-missing</code>.
-    A checksum proves the file arrived <em>intact</em> &mdash; it does not prove
-    who made it. Of these, only <code>mnemonic-engrave</code> is signed.
-  </div>
-
   <h3 style="font-size:.95rem;margin-top:1.25rem">One more tool: <code>mnemonic</code>, the Swiss-army knife</h3>
   <p class="lead">
     The recovery searches below &mdash; and the John the Ripper pipeline &mdash;
@@ -104,6 +96,27 @@ tar -xzf mnemonic-0.106.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic<
     <span class="muted">Install the version linked above &mdash; the short-id
     behaviour in §3b below is recent. On an older binary a short
     <code>--expect-wallet-id</code> is refused outright rather than listing.</span>
+  </div>
+
+  <p><b>Check what you downloaded</b> (<code>md</code>, <code>ms</code> and
+  <code>mnemonic</code>). Each release ships checksum files. macOS (Intel or Apple Silicon):</p>
+  <div class="code"><pre><code>curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.7/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.portable
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/SHA256SUMS.portable
+shasum -a 256 -c md.sums --ignore-missing
+shasum -a 256 -c ms.sums --ignore-missing
+shasum -a 256 -c tk.sums --ignore-missing</code></pre></div>
+  <p>Linux x86-64:</p>
+  <div class="code"><pre><code><span class="c"># md's linux-amd64 is in SHA256SUMS.portable; ms and mnemonic are in SHA256SUMS.x86_64</span>
+curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.7/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.x86_64
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/SHA256SUMS.x86_64
+sha256sum -c --ignore-missing md.sums
+sha256sum -c --ignore-missing ms.sums
+sha256sum -c --ignore-missing tk.sums</code></pre></div>
+  <div class="note">
+    A checksum proves the file arrived <em>intact</em> &mdash; it does not prove
+    who made it. Of these, only <code>mnemonic-engrave</code> is signed.
   </div>
 
   <h3>1 &nbsp;Split a seed three-of-five, then prove any three is sufficient and any two isn't enough</h3>
