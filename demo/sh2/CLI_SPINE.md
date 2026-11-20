@@ -26,11 +26,14 @@ macOS Gatekeeper will quarantine an unsigned downloaded binary. Clear it with
 out loud if anyone downloads on the day** — it is the single most likely thing
 to make a binary look broken.
 
-Each release carries `SHA256SUMS.portable`; verify before running:
+Each release carries checksum files; verify before running. macOS (both tools are
+in `SHA256SUMS.portable`; on Linux x86-64 use `SHA256SUMS.x86_64` for `ms`):
 
 ```sh
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.portable
-shasum -a 256 -c SHA256SUMS.portable --ignore-missing
+curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.7/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.portable
+shasum -a 256 -c md.sums --ignore-missing
+shasum -a 256 -c ms.sums --ignore-missing
 ```
 
 Only `mnemonic-engrave` is signed (minisign); the others ship checksums alone,

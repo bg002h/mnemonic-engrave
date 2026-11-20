@@ -72,9 +72,12 @@ chmod +x md ms</code></pre></div>
   </div>
 
   <div class="note">
-    <b>Check what you downloaded.</b> Each release ships
-    <code>SHA256SUMS.portable</code>:
-    <code>shasum -a 256 -c SHA256SUMS.portable --ignore-missing</code>.
+    <b>Check what you downloaded.</b> Each release ships checksum files.
+    Linux x86-64 (on macOS use <code>SHA256SUMS.portable</code> for both):
+    <pre><code>curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.7/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.4/SHA256SUMS.x86_64
+shasum -a 256 -c md.sums --ignore-missing
+shasum -a 256 -c ms.sums --ignore-missing</code></pre>
     A checksum proves the file arrived <em>intact</em> &mdash; it does not prove
     who made it. Of these, only <code>mnemonic-engrave</code> is signed.
   </div>
