@@ -21295,3 +21295,10 @@ Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports
 
 - **engrave37-arm64-verify-path** (M3) Linux arm64 users, listed in the page's table, have no verify path: md arm64 is in `SHA256SUMS.portable`, but ms and the toolkit need `SHA256SUMS.aarch64`. Add a sentence or a block.
 - **engrave37-spine-links-unchecked** (N2) `demo/sh2/check-install-links.sh` covers only `src/index.html`, not the URLs in `demo/sh2/CLI_SPINE.md`; a wrong sums name there would not be caught (the spine's ms `SHA256SUMS.portable` URL is not in its list).
+
+### engrave#37 review r2 — 1 Minor and 1 Nit deferred (owning phase: none; ownerless residue)
+
+Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports/review-engrave37-r2.md`, deferred-minor.
+
+- **engrave37-r2-minors** (M-1) The moved note contradicts the toolkit note just above it. demo/sh2/src/index.html, the note after the Linux verify block: "Of these, only `mnemonic-engrave` is signed." The fold moved it to follow the `mnemonic` note, which says "The musl builds are signed and reproducible". The toolkit release also ships `SHA256SUMS.*.minisig` (asset list above). The sentence was already loose before the move. Now it sits two paragraphs from the opposite claim, and "Of these" lists md, ms and mnemonic, none of which is `mnemonic-engrave`. Fix wording: "A checksum proves the file arrived <em>intact</em> &mdash; it does not prove who made it. The checksum files above are not themselves signature-checked here; the releases also ship <code>.minisig</code> files for them." If the signing story is not settled, reword to "A checksum proves the file arrived intact; it does not prove who made it." and drop the "Of these" sentence.
+- **engrave37-r2-minors** (N-1) Under the verify heading, a user who skipped `mnemonic` gets a failing line. The heading says "(md, ms and mnemonic)". A user who installed only md and ms runs the tk lines, and the check prints "no file was verified" with rc=1. Fix: add "skip the `tk` lines if you did not install `mnemonic`". The spine's bare "Linux:" lead also lacks "x86-64". The arm64 case is M3, already filed.
