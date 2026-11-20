@@ -14093,7 +14093,7 @@ them would have falsified row 12's own control in the same commit.
 
 ### F-351 — `ms-shares combine` and `slip39 combine` have NO multi-record private channel, so `--share` cannot be refused without advising an impossible remedy (repo: **mnemonic-toolkit**; owning phase: **whichever phase gives `mnemonic` an `--in`**) `#argv` `#channels` `#p3`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-11-19 — resolved by mnemonic-toolkit PR #172 (branch fix/argv-secrets, commit cdff8b08, draft): `--share` on `ms-shares combine`, `slip39 combine` and `seed-xor combine` and `--ms1` on `verify-bundle` and `import-wallet` are refused by the argv guard; the channel is `--share -` (one share) plus `--share @env:VAR` per further share, `--ms1 -` / `--ms1 @env:VAR` on verify-bundle, `--ms1 @env:VAR` on import-wallet. Update the commit cite if the PR is squashed.
 **Found 2026-08-27 by P3's mnemonic branch, while building the argv refusal.**
 `--share` is one of the eleven argv-material shapes F-292 measured, and it is
 the one shape the refusal deliberately does **not** cover.
@@ -14149,7 +14149,7 @@ the exposure is positional-only.
 
 ### F-353 — `--ms1` has no private channel on `verify-bundle` or `import-wallet`, so it is not refused there (repo: **mnemonic-toolkit**; owning phase: **whichever phase adds a second stdin channel or an `--in` to those two verbs**) `#argv` `#channels` `#p3`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-11-19 — resolved by mnemonic-toolkit PR #172 (branch fix/argv-secrets, commit cdff8b08, draft): `--share` on `ms-shares combine`, `slip39 combine` and `seed-xor combine` and `--ms1` on `verify-bundle` and `import-wallet` are refused by the argv guard; the channel is `--share -` (one share) plus `--share @env:VAR` per further share, `--ms1 -` / `--ms1 @env:VAR` on verify-bundle, `--ms1 @env:VAR` on import-wallet. Update the commit cite if the PR is squashed.
 **Found 2026-08-27 by P3's mnemonic branch.** `--ms1` carries seed-equivalent
 material and is refused on `inspect`, `repair` and the three `xpub-search` verbs.
 It is exempt on the other two carriers, and the exemption is measured rather than
@@ -20274,7 +20274,7 @@ port relies on it.
 
 ### F-688 — toolkit 0.104.0 still accepts four argv secrets with only a warning (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#secret-handling`
 
-**Status:** OPEN — secret-handling class: logged, non-gating (operator ruling 2026-08-27)
+**Status:** CLOSED 2026-11-19 — resolved by mnemonic-toolkit PR #172 (branch fix/argv-secrets, commit cdff8b08, draft): `--share` on `ms-shares combine`, `slip39 combine` and `seed-xor combine` and `--ms1` on `verify-bundle` and `import-wallet` are refused by the argv guard; the channel is `--share -` (one share) plus `--share @env:VAR` per further share, `--ms1 -` / `--ms1 @env:VAR` on verify-bundle, `--ms1 @env:VAR` on import-wallet. Update the commit cite if the PR is squashed.
 Filed 2026-09-25 from the same design doc. `import-wallet --ms1`,
 `seed-xor combine --share`, `slip39 combine --share` and `ms-shares combine
 --share` run with secret material on argv without `--allow-argv-secret`,
