@@ -79,12 +79,12 @@ chmod +x md ms</code></pre></div>
     the binary is <code>mnemonic</code>.
   </p>
   <div class="code"><pre><code><span class="c"># macOS Intel (swap macos-amd64 -> macos-arm64 on Apple Silicon)</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/mnemonic-0.106.0-macos-amd64.tar.gz
-tar -xzf mnemonic-0.106.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
-<span class="c"># Windows: mnemonic-0.106.0-windows-amd64.zip from the same release</span>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/mnemonic-0.107.0-macos-amd64.tar.gz
+tar -xzf mnemonic-0.107.0-macos-amd64.tar.gz &amp;&amp; chmod +x mnemonic
+<span class="c"># Windows: mnemonic-0.107.0-windows-amd64.zip from the same release</span>
 <span class="c"># Linux x86-64 (static musl):</span>
-curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/mnemonic-0.106.0-x86_64-linux-musl.tar.gz
-tar -xzf mnemonic-0.106.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
+curl -LO https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/mnemonic-0.107.0-x86_64-linux-musl.tar.gz
+tar -xzf mnemonic-0.107.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic</code></pre></div>
   <div class="note">
     <b>One version, every platform.</b> macOS, Windows and Linux
     <code>musl</code> all ship from <b>the same release</b> &mdash; the
@@ -102,7 +102,7 @@ tar -xzf mnemonic-0.106.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic<
   <code>mnemonic</code>). Each release ships checksum files. macOS (Intel or Apple Silicon):</p>
   <div class="code"><pre><code>curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.8/SHA256SUMS.portable
 curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.5/SHA256SUMS.portable
-curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/SHA256SUMS.portable
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/SHA256SUMS.portable
 shasum -a 256 -c md.sums --ignore-missing
 shasum -a 256 -c ms.sums --ignore-missing
 shasum -a 256 -c tk.sums --ignore-missing</code></pre></div>
@@ -110,7 +110,7 @@ shasum -a 256 -c tk.sums --ignore-missing</code></pre></div>
   <div class="code"><pre><code><span class="c"># md's linux-amd64 is in SHA256SUMS.portable; ms and mnemonic are in SHA256SUMS.x86_64</span>
 curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.8/SHA256SUMS.portable
 curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.5/SHA256SUMS.x86_64
-curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.106.0/SHA256SUMS.x86_64
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/SHA256SUMS.x86_64
 sha256sum -c --ignore-missing md.sums
 sha256sum -c --ignore-missing ms.sums
 sha256sum -c --ignore-missing tk.sums</code></pre></div>
