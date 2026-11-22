@@ -1,6 +1,6 @@
 //! **Creating a file that a bearer artifact may be written into.**
 //!
-//! One function. It is here rather than in [`super::channel`] or [`super::fd`]
+//! One writing function (and `same_file`, below). It is here rather than in [`super::channel`] or [`super::fd`]
 //! because both of those declare narrower contracts than an effectful write:
 //! `channel` is *"classification ONLY"* and says in as many words that
 //! `destination` **never touches a path**, and `fd` is *"what was measured about
@@ -20,6 +20,13 @@
 //! the moment to add one — not before, and a parameter added speculatively would
 //! be the first place a caller could weaken the mode by accident.
 //!
+//! ## Is this output one of my inputs
+//!
+//! [`same_file`] answers that question for the callers that read and write in
+//! one run (`--out X` with `X` also an input, or stdin or stdout redirected to
+//! it). It is mechanism only: it returns the index of the first matching input
+//! and the caller decides the refusal.
+//!
 //! ## F-244 — the half that is easy to leave out
 //!
 //! `OpenOptions::mode()` binds **on create only**. Open an existing file with it
@@ -27,26 +34,71 @@
 //! target already at `0644` left it at `0644` — and that is the case an operator
 //! re-running a command actually hits, not an exotic one.
 //!
-//! The fix is the `set_permissions` call below, and it is deliberately made on
-//! the **open file** rather than on the path. A path-based `set_permissions`
-//! names the file a second time, and between the two calls the name can be made
-//! to point somewhere else; a handle cannot be redirected once it is open.
+//! The fix is the `set_permissions` call on the **open temp file**, made before
+//! any byte is written, and the temp is created `0o600` and renamed over the
+//! old file. A path-based `set_permissions` names the file a second time, and
+//! between the two calls the name can be made to point somewhere else; a handle
+//! cannot be redirected once it is open.
 
-/// Write `bytes` to `path`, creating or truncating it owner-only.
+use std::ffi::{OsStr, OsString};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+
+#[cfg(test)]
+use std::cell::Cell;
+
+/// The steps a test can make fail (test builds only).
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Step {
+    CreateTemp,
+    Preflight,
+    Chmod,
+    Write,
+    Sync,
+    Rename,
+    DirSync,
+}
+
+#[cfg(test)]
+thread_local! {
+    static FAULT: Cell<Option<Step>> = const { Cell::new(None) };
+}
+
+/// Return the injected error if a test asked for `step` to fail.
+#[cfg(test)]
+fn fault(step: Step) -> io::Result<()> {
+    if FAULT.with(Cell::get) == Some(step) {
+        return Err(io::Error::other(format!("injected at {step:?}")));
+    }
+    Ok(())
+}
+
+/// Write `bytes` to `path`, creating or replacing it owner-only.
 ///
-/// Truncation is load-bearing and not a stylistic echo of `std::fs::write`:
-/// without it a **shrinking** overwrite — a smaller manifest written over a
-/// larger one — leaves the tail of the old file in place, which for a JSON
-/// artifact means trailing bytes after the closing brace. It is done by
-/// `set_len(0)` after `set_permissions`, not by `truncate(true)` at open, so a
-/// refused chmod leaves the existing file unchanged.
+/// For a regular file (or an absent path) the bytes go to a sibling temp file,
+/// `<name>.<pid>.<n>.tmp`, created `0o600`, synced, and renamed over the final
+/// name, so any error leaves the old file byte-identical. A hard link is
+/// replaced at the given name only. Symlinks are resolved on the last
+/// component and the target is replaced; the link stays a link. A rename that
+/// fails (cross-device, bind mount, busy) is a refusal: there is no copy
+/// fallback. A FIFO, a device, a directory, a standard-stream alias
+/// (`/dev/stdout`, `/dev/fd/N`, `/proc/...`) or anything the library cannot
+/// classify is written directly, as before: open, `0o600` on the handle,
+/// truncate if a regular file, write.
 ///
-/// On non-Unix the mode calls compile out and the create/truncate semantics
-/// remain. The threat model is POSIX: mode bits do not mean the same thing
-/// elsewhere, and pretending otherwise would be worse than saying so.
-pub fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
+/// Errors are the `std::io::Error` of the system call that failed, unmodified.
+/// On non-Unix there are no mode calls and no directory sync.
+pub fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    match classify(path) {
+        Some((final_path, replace)) => write_atomic(&final_path, replace, bytes),
+        None => write_direct(path, bytes),
+    }
+}
+
+/// DIRECT: open in place, `0o600` on the handle, truncate a regular file, write.
+fn write_direct(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let mut opts = OpenOptions::new();
     opts.write(true).create(true);
     #[cfg(unix)]
@@ -67,6 +119,326 @@ pub fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()
         f.set_len(0)?;
     }
     f.write_all(bytes)
+}
+
+/// True when `path` as given is a standard-stream alias (Unix only).
+fn is_stdio_alias(path: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        if path == Path::new("/dev/stdin")
+            || path == Path::new("/dev/stdout")
+            || path == Path::new("/dev/stderr")
+        {
+            return true;
+        }
+        let b = path.as_os_str().as_encoded_bytes();
+        b.starts_with(b"/dev/fd/") || b.starts_with(b"/proc/")
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        false
+    }
+}
+
+#[cfg(unix)]
+fn dev_ino(m: &fs::Metadata) -> (u64, u64) {
+    use std::os::unix::fs::MetadataExt;
+    (m.dev(), m.ino())
+}
+
+/// Walk the last component's symlink chain (spec section 3 step 2). `None`
+/// means DIRECT. `NotFound` ends the walk (an absent path or a dangling link's
+/// target), which is the final name.
+fn resolve_final(path: &Path) -> Option<PathBuf> {
+    let mut p = path.to_path_buf();
+    let mut hops = 0u32;
+    loop {
+        match fs::symlink_metadata(&p) {
+            Ok(m) if m.file_type().is_symlink() => {
+                hops += 1;
+                if hops > 40 {
+                    return None;
+                }
+                let link = fs::read_link(&p).ok()?;
+                p = if link.is_absolute() {
+                    link
+                } else {
+                    p.parent()?.join(link)
+                };
+                if is_stdio_alias(&p) {
+                    return None;
+                }
+            }
+            Ok(_) => break,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => break,
+            Err(_) => return None,
+        }
+    }
+    p.file_name()?;
+    Some(p)
+}
+
+/// Steps 1 to 3. `Some((final name, replace))` is ATOMIC; `None` is DIRECT.
+fn classify(path: &Path) -> Option<(PathBuf, bool)> {
+    if is_stdio_alias(path) {
+        return None;
+    }
+    #[cfg(unix)]
+    let mut ident = None;
+    let replace = match fs::metadata(path) {
+        Ok(m) if m.is_file() => {
+            #[cfg(unix)]
+            {
+                ident = Some(dev_ino(&m));
+            }
+            true
+        }
+        Ok(_) => return None,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => false,
+        Err(_) => return None,
+    };
+    let fin = resolve_final(path)?;
+    if replace {
+        let m = fs::metadata(&fin).ok()?;
+        if !m.is_file() {
+            return None;
+        }
+        #[cfg(unix)]
+        if Some(dev_ino(&m)) != ident {
+            return None;
+        }
+    } else {
+        match fs::symlink_metadata(&fin) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+            _ => return None,
+        }
+    }
+    Some((fin, replace))
+}
+
+/// The temp name: `<name>.<pid>.<n>.tmp`, or `mnemonic-io-lib.<pid>.<n>.tmp`
+/// when `name` is over 200 bytes (a suffixed name would exceed NAME_MAX).
+fn temp_name(name: &OsStr, pid: u32, n: u32) -> OsString {
+    let base: &OsStr = if name.as_encoded_bytes().len() <= 200 {
+        name
+    } else {
+        OsStr::new("mnemonic-io-lib")
+    };
+    let mut out = base.to_os_string();
+    out.push(format!(".{pid}.{n}.tmp"));
+    out
+}
+
+/// ATOMIC (spec section 3 steps 4 to 11).
+fn write_atomic(fin: &Path, replace: bool, bytes: &[u8]) -> io::Result<()> {
+    let dir: &Path = match fin.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d,
+        _ => Path::new("."),
+    };
+    let name = fin.file_name().unwrap_or_default();
+    let pid = std::process::id();
+
+    // Step 4: create the temp.
+    #[cfg(test)]
+    fault(Step::CreateTemp)?;
+    let mut n = 0u32;
+    let (temp, mut handle) = loop {
+        let t = dir.join(temp_name(name, pid, n));
+        let mut opts = OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        match opts.open(&t) {
+            Ok(f) => break (t, f),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists && n < 99 => n += 1,
+            Err(e) => return Err(e),
+        }
+    };
+
+    // Steps 5 to 8; any error removes the temp (step 9).
+    let r = fill_and_rename(fin, replace, bytes, &temp, &mut handle);
+    drop(handle);
+    if let Err(e) = r {
+        let _ = fs::remove_file(&temp);
+        return Err(e);
+    }
+
+    // Step 10: the directory sync, whose error is ignored.
+    #[cfg(unix)]
+    {
+        let _ = (|| -> io::Result<()> {
+            #[cfg(test)]
+            fault(Step::DirSync)?;
+            File::open(dir)?.sync_all()
+        })();
+    }
+    Ok(())
+}
+
+fn fill_and_rename(
+    fin: &Path,
+    replace: bool,
+    bytes: &[u8],
+    temp: &Path,
+    handle: &mut File,
+) -> io::Result<()> {
+    // Step 5: preflight (REPLACE only).
+    if replace {
+        #[cfg(test)]
+        fault(Step::Preflight)?;
+        let f = OpenOptions::new().write(true).open(fin)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            f.set_permissions(fs::Permissions::from_mode(0o600))?;
+        }
+        drop(f);
+    }
+    // Step 6: owner-only on the temp handle.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        #[cfg(test)]
+        fault(Step::Chmod)?;
+        handle.set_permissions(fs::Permissions::from_mode(0o600))?;
+    }
+    // Step 7: write, sync.
+    #[cfg(test)]
+    fault(Step::Write)?;
+    handle.write_all(bytes)?;
+    #[cfg(test)]
+    fault(Step::Sync)?;
+    handle.sync_all()?;
+    // Step 8: rename over the final name; no copy fallback.
+    #[cfg(test)]
+    fault(Step::Rename)?;
+    fs::rename(temp, fin)
+}
+
+/// One side of a "same file" question.
+#[derive(Debug, Clone, Copy)]
+pub enum Endpoint<'a> {
+    /// A path (symlinks followed; an absent path is compared by where it
+    /// would be created).
+    Path(&'a Path),
+    /// This process's standard input.
+    Stdin,
+    /// This process's standard output.
+    Stdout,
+}
+
+/// What an endpoint reduces to.
+enum Identity {
+    #[cfg(unix)]
+    Id(u64, u64),
+    #[cfg(not(unix))]
+    Canon(PathBuf),
+    Planned(PathBuf),
+    NonRegular,
+    Unknown,
+}
+
+fn identity_matches(a: &Identity, b: &Identity) -> bool {
+    match (a, b) {
+        #[cfg(unix)]
+        (Identity::Id(d1, i1), Identity::Id(d2, i2)) => d1 == d2 && i1 == i2,
+        #[cfg(not(unix))]
+        (Identity::Canon(x), Identity::Canon(y)) => x == y,
+        (Identity::Planned(x), Identity::Planned(y)) => x == y,
+        _ => false,
+    }
+}
+
+fn path_identity(p: &Path) -> Identity {
+    match fs::metadata(p) {
+        Ok(m) if m.is_file() => {
+            #[cfg(unix)]
+            {
+                let (d, i) = dev_ino(&m);
+                Identity::Id(d, i)
+            }
+            #[cfg(not(unix))]
+            {
+                match fs::canonicalize(p) {
+                    Ok(c) => Identity::Canon(c),
+                    Err(_) => Identity::Unknown,
+                }
+            }
+        }
+        Ok(_) => Identity::NonRegular,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            let Some(fin) = resolve_final(p) else {
+                return Identity::Unknown;
+            };
+            let Some(name) = fin.file_name() else {
+                return Identity::Unknown;
+            };
+            let dir: &Path = match fin.parent() {
+                Some(d) if !d.as_os_str().is_empty() => d,
+                _ => Path::new("."),
+            };
+            match fs::canonicalize(dir) {
+                Ok(c) => Identity::Planned(c.join(name)),
+                Err(_) => Identity::Unknown,
+            }
+        }
+        Err(_) => Identity::Unknown,
+    }
+}
+
+#[cfg(unix)]
+fn fd_identity(owned: io::Result<std::os::fd::OwnedFd>) -> Identity {
+    match owned.map(File::from).and_then(|f| f.metadata()) {
+        Ok(m) if m.is_file() => {
+            let (d, i) = dev_ino(&m);
+            Identity::Id(d, i)
+        }
+        Ok(_) => Identity::NonRegular,
+        Err(_) => Identity::Unknown,
+    }
+}
+
+fn endpoint_identity(e: Endpoint<'_>) -> Identity {
+    match e {
+        Endpoint::Path(p) => path_identity(p),
+        #[cfg(unix)]
+        Endpoint::Stdin => {
+            use std::os::fd::AsFd;
+            fd_identity(io::stdin().as_fd().try_clone_to_owned())
+        }
+        #[cfg(unix)]
+        Endpoint::Stdout => {
+            use std::os::fd::AsFd;
+            fd_identity(io::stdout().as_fd().try_clone_to_owned())
+        }
+        #[cfg(not(unix))]
+        Endpoint::Stdin | Endpoint::Stdout => Identity::Unknown,
+    }
+}
+
+/// The index of the FIRST entry of `inputs` that is the same file as `out`, or
+/// `None`. Never an error: a lookup that fails matches nothing, because the
+/// write or read that follows reports it.
+///
+/// A regular file is identified by `(dev, ino)` on Unix and by its canonical
+/// path on Windows; an absent path by its canonical directory plus its final
+/// name. A pipe, tty or device (`NonRegular`) and a failed lookup (`Unknown`)
+/// never match anything, so a terminal shared by stdin and stdout is never "the
+/// same file". Limits: two absent paths that differ only in letter case on a
+/// case-insensitive filesystem do not match; on Windows a hard link and a
+/// redirected stdin or stdout are not detected (std exposes no stable file id).
+pub fn same_file(out: Endpoint<'_>, inputs: &[Endpoint<'_>]) -> Option<usize> {
+    let o = endpoint_identity(out);
+    if matches!(o, Identity::NonRegular | Identity::Unknown) {
+        return None;
+    }
+    inputs
+        .iter()
+        .position(|i| identity_matches(&o, &endpoint_identity(*i)))
 }
 
 #[cfg(test)]
@@ -469,6 +841,107 @@ mod tests {
             b"{\"a\":1}",
             "without set_len(0) the tail of the longer write survives"
         );
+    }
+
+    /// W12: the temp name is the target name or the fallback.
+    #[test]
+    fn the_temp_name_is_the_target_name_or_the_fallback() {
+        let n200 = "a".repeat(200);
+        let n201 = "a".repeat(201);
+        assert_eq!(
+            temp_name(std::ffi::OsStr::new(&n200), 7, 3),
+            std::ffi::OsString::from(format!("{n200}.7.3.tmp"))
+        );
+        assert_eq!(
+            temp_name(std::ffi::OsStr::new(&n201), 7, 3),
+            std::ffi::OsString::from("mnemonic-io-lib.7.3.tmp")
+        );
+    }
+
+    /// W13: a failure at each step removes the temp and keeps the old file.
+    #[test]
+    fn a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file() {
+        #[cfg(unix)]
+        let steps = [
+            Step::CreateTemp,
+            Step::Preflight,
+            Step::Chmod,
+            Step::Write,
+            Step::Sync,
+            Step::Rename,
+        ];
+        #[cfg(not(unix))]
+        let steps = [
+            Step::CreateTemp,
+            Step::Preflight,
+            Step::Write,
+            Step::Sync,
+            Step::Rename,
+        ];
+        for step in steps {
+            let d = tempfile::tempdir().unwrap();
+            let t = d.path().join("card.txt");
+            std::fs::write(&t, b"old").unwrap();
+            FAULT.with(|c| c.set(Some(step)));
+            let r = write_private(&t, b"new");
+            FAULT.with(|c| c.set(None));
+            let e = r.expect_err("the injected step must fail");
+            assert_eq!(e.to_string(), format!("injected at {step:?}"));
+            assert_eq!(std::fs::read(&t).unwrap(), b"old", "{step:?}");
+            assert_eq!(names(d.path()), vec!["card.txt".to_string()], "{step:?}");
+        }
+    }
+
+    /// W14: a directory-sync failure after the rename is not reported.
+    #[cfg(unix)]
+    #[test]
+    fn a_directory_sync_failure_after_the_rename_is_not_reported() {
+        let d = tempfile::tempdir().unwrap();
+        let t = d.path().join("card.txt");
+        std::fs::write(&t, b"old").unwrap();
+        FAULT.with(|c| c.set(Some(Step::DirSync)));
+        let r = write_private(&t, b"new");
+        FAULT.with(|c| c.set(None));
+        r.unwrap();
+        assert_eq!(std::fs::read(&t).unwrap(), b"new");
+        assert_eq!(names(d.path()), vec!["card.txt".to_string()]);
+    }
+
+    /// W15: a stale leftover is skipped and left alone.
+    #[cfg(unix)]
+    #[test]
+    fn a_stale_leftover_is_skipped_and_left_alone() {
+        let d = tempfile::tempdir().unwrap();
+        let t = d.path().join("card.txt");
+        std::fs::write(&t, b"old").unwrap();
+        let stale = d
+            .path()
+            .join(format!("card.txt.{}.0.tmp", std::process::id()));
+        std::fs::write(&stale, b"stale").unwrap();
+        write_private(&t, b"new").unwrap();
+        assert_eq!(std::fs::read(&t).unwrap(), b"new");
+        assert_eq!(std::fs::read(&stale).unwrap(), b"stale");
+    }
+
+    /// W16: the temp-name search stops after 100 taken names.
+    #[cfg(unix)]
+    #[test]
+    fn the_temp_name_search_stops_after_100_taken_names() {
+        let d = tempfile::tempdir().unwrap();
+        let t = d.path().join("card.txt");
+        std::fs::write(&t, b"old").unwrap();
+        let pid = std::process::id();
+        for n in 0..100 {
+            std::fs::write(d.path().join(format!("card.txt.{pid}.{n}.tmp")), b"taken").unwrap();
+        }
+        let e = write_private(&t, b"new").expect_err("100 taken names must refuse");
+        assert_eq!(e.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read(&t).unwrap(), b"old");
+        for n in 0..100 {
+            let f = d.path().join(format!("card.txt.{pid}.{n}.tmp"));
+            assert_eq!(std::fs::read(&f).unwrap(), b"taken");
+        }
+        assert_eq!(names(d.path()).len(), 101);
     }
 
     /// S1: the same path twice is the same file.
