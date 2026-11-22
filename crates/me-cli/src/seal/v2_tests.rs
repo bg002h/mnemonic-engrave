@@ -1063,7 +1063,10 @@ mod rv_rows {
         let c = chunk(0x12345, 3, 1, &[0xaa]);
         let m = mr::check_string(&c).unwrap();
         let ch = m.chunk.unwrap();
-        assert_eq!((ch.csid, ch.count, ch.index, ch.slice), (0x12345, 3, 1, vec![0xaa]));
+        assert_eq!(
+            (ch.csid, ch.count, ch.index, ch.slice),
+            (0x12345, 3, 1, vec![0xaa])
+        );
     }
 
     /// §14b check 5: every symbol of card version 7 (`u`, `a`, `7`) is reserved.
@@ -1072,7 +1075,11 @@ mod rv_rows {
         for sym in [b'u', b'a', b'7'] {
             let v = ALPHA.iter().position(|&a| a == sym).unwrap() as u8;
             let s = mr1(&[v, 0]);
-            assert_eq!(mr::check_string(&s), Err(mr::MrReason::ReservedSymbol), "{s}");
+            assert_eq!(
+                mr::check_string(&s),
+                Err(mr::MrReason::ReservedSymbol),
+                "{s}"
+            );
         }
         // The neighbours are single-string cards.
         for sym in [b'e', b'6', b'm'] {
@@ -1094,14 +1101,25 @@ mod rv_rows {
         let e = mr::check_sets(&recs).unwrap_err();
         assert_eq!(e.reason, mr::Reason::SetCount, "{e:?}");
         assert!(
-            matches!(e.detail, mr::Detail::Count { record: 2, count: 2, first_count: 3, .. }),
+            matches!(
+                e.detail,
+                mr::Detail::Count {
+                    record: 2,
+                    count: 2,
+                    first_count: 3,
+                    ..
+                }
+            ),
             "{e:?}"
         );
     }
 
     fn seal6(public: Vec<String>, words: &str, pw: u8, it: u32) -> Result<Vec<u8>, SealError> {
         seal_v2_deterministic(
-            Payload { public, secret: vec![s(A16)] },
+            Payload {
+                public,
+                secret: vec![s(A16)],
+            },
             None,
             words,
             pw,
@@ -1121,11 +1139,17 @@ mod rv_rows {
         }
         for it in [99_999u32, 2_000_001] {
             let e = seal6(vec![], ABANDON12, 0, it).unwrap_err();
-            assert!(matches!(e, SealError::Iterations(n) if n == it), "{it}: {e:?}");
+            assert!(
+                matches!(e, SealError::Iterations(n) if n == it),
+                "{it}: {e:?}"
+            );
         }
         let e = seal6(vec![s(A16)], ABANDON12, 0, 100_000).unwrap_err();
         assert!(matches!(e, SealError::SecretInPublic(0)), "{e:?}");
-        assert!(t.elapsed() < Duration::from_millis(500), "before any KDF work");
+        assert!(
+            t.elapsed() < Duration::from_millis(500),
+            "before any KDF work"
+        );
     }
 
     /// §14.4 check 3: lower-case hex, even, at least 2 digits, UTF-8.
@@ -1189,7 +1213,8 @@ mod rv_rows {
                 for k in 0..n {
                     let bit = ((v >> (n - 1 - k)) & 1) as u8;
                     let pos = at + k;
-                    bytes[pos / 8] = (bytes[pos / 8] & !(0x80 >> (pos % 8))) | (bit << (7 - pos % 8));
+                    bytes[pos / 8] =
+                        (bytes[pos / 8] & !(0x80 >> (pos % 8))) | (bit << (7 - pos % 8));
                 }
             };
             put(25, u32::from(count) - 1, 6);
@@ -1214,7 +1239,10 @@ mod rv_rows {
         let public: Vec<String> = D_PUBLIC.iter().map(|x| s(x)).collect();
         let secret: Vec<String> = (0..20).map(|_| s(A16)).collect();
         let e = seal_v2_deterministic(
-            Payload { public: public.clone(), secret: secret.clone() },
+            Payload {
+                public: public.clone(),
+                secret: secret.clone(),
+            },
             None,
             BEEF6,
             6,
@@ -1224,13 +1252,28 @@ mod rv_rows {
         )
         .unwrap_err();
         assert!(
-            matches!(e, SealError::Container(container::ContainerError::RecordCount(25))),
+            matches!(
+                e,
+                SealError::Container(container::ContainerError::RecordCount(25))
+            ),
             "{e:?}"
         );
-        let blob = raw_blob(&v("cap", 6, BEEF6, 600_000, rep([0x0b, 0xad]), rep([0x0c, 0x01]), public, secret));
+        let blob = raw_blob(&v(
+            "cap",
+            6,
+            BEEF6,
+            600_000,
+            rep([0x0b, 0xad]),
+            rep([0x0c, 0x01]),
+            public,
+            secret,
+        ));
         let e = open(&blob, BEEF6).err().unwrap();
         assert!(
-            matches!(e, OpenError::Container(container::ContainerError::RecordCount(25))),
+            matches!(
+                e,
+                OpenError::Container(container::ContainerError::RecordCount(25))
+            ),
             "{e:?}"
         );
     }
