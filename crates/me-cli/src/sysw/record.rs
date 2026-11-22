@@ -355,6 +355,8 @@ pub(crate) struct MdMkCard {
     /// `'d'` for md1, `'k'` for mk1.
     pub hrp: char,
     pub csid: Option<u32>,
+    /// The count of the group's FIRST string; the group is full at that many.
+    pub count: u8,
     /// `(index into the caller's slice, chunk index)` in the order the strings
     /// were given; a single string has chunk index 0.
     pub members: Vec<(usize, u8)>,
@@ -365,7 +367,7 @@ pub(crate) struct MdMkCard {
 
 /// `[mdmk-decode]`'s grouping, by RUNS (S1 §14d): a record joins the latest
 /// group of its (hrp, chunk-set id) while that group holds fewer strings than
-/// the string's count, and otherwise opens a new group. So two complete copies
+/// the count of the group's FIRST string (matching the fork's port; §14d is silent), and otherwise opens a new group. So two complete copies
 /// of one card are two groups, each of which confirms on its own, where the
 /// previous grouping by (hrp, chunk-set id) alone read them as one over-full
 /// group. A non-chunked string, and a string whose identity cannot be read, is
@@ -392,7 +394,7 @@ pub(crate) fn mdmk_cards(records: &[String]) -> Vec<MdMkCard> {
                 let joins = latest
                     .get(&(hrp, csid))
                     .copied()
-                    .filter(|&g| cards[g].members.len() < count as usize);
+                    .filter(|&g| cards[g].members.len() < usize::from(cards[g].count));
                 match joins {
                     Some(g) => cards[g].members.push((i, index)),
                     None => {
@@ -400,6 +402,7 @@ pub(crate) fn mdmk_cards(records: &[String]) -> Vec<MdMkCard> {
                         cards.push(MdMkCard {
                             hrp,
                             csid: Some(csid),
+                            count,
                             members: vec![(i, index)],
                             readable: true,
                         });
@@ -409,6 +412,7 @@ pub(crate) fn mdmk_cards(records: &[String]) -> Vec<MdMkCard> {
             Some((hrp, None)) => cards.push(MdMkCard {
                 hrp,
                 csid: None,
+                count: 1,
                 members: vec![(i, 0)],
                 readable: true,
             }),
@@ -424,6 +428,7 @@ pub(crate) fn mdmk_cards(records: &[String]) -> Vec<MdMkCard> {
                     'd'
                 },
                 csid: None,
+                count: 1,
                 members: vec![(i, 0)],
                 readable: false,
             }),

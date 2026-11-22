@@ -18,3 +18,5 @@
 - ^design/HARDWARE_INVENTORY\.md$
 # scripts/test/fake_picotool.py
 - ^design/agent-reports/e3a-g-facts\.md$
+# crates/me-cli/src/sysw/mr.rs and the sysw_cli, seal_cli tests read it
+- ^design/vectors/sysw_mr_v1_vectors\.json$
