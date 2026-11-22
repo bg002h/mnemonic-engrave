@@ -888,6 +888,59 @@ fn parse_atoi(s: &str) -> Option<i64> {
 // §4.4 — branch 3, `{label, descriptor}` JSON
 // ───────────────────────────────────────────────────────────────────────────
 
+/// Go `encoding/json`'s member-name fold, restricted to what can reach an ASCII
+/// field name: ASCII case, U+017F (to `s`) and U+212A KELVIN SIGN (to `k`).
+/// Every other character compares exactly.
+fn json_fold(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '\u{17f}' => 's',
+            '\u{212a}' => 'k',
+            c => c.to_ascii_lowercase(),
+        })
+        .collect()
+}
+
+/// The member names of the top-level JSON object `input`, in document order,
+/// escapes decoded (`serde_json::Value` merges exact duplicates, so it cannot
+/// be used). `None` when `input` is not an object.
+fn member_names(input: &str) -> Option<Vec<String>> {
+    use serde::de::{Deserializer, IgnoredAny, MapAccess, Visitor};
+    struct Names;
+    impl<'de> Visitor<'de> for Names {
+        type Value = Vec<String>;
+        fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            f.write_str("a JSON object")
+        }
+        fn visit_map<A: MapAccess<'de>>(self, mut m: A) -> Result<Self::Value, A::Error> {
+            let mut names = Vec::new();
+            while let Some(k) = m.next_key::<String>()? {
+                m.next_value::<IgnoredAny>()?;
+                names.push(k);
+            }
+            Ok(names)
+        }
+    }
+    serde_json::Deserializer::from_str(input)
+        .deserialize_map(Names)
+        .ok()
+}
+
+/// D1: the first colliding group — the earliest name that has a later equal
+/// (under [`json_fold`]) and every member of that group, as written, in
+/// document order. `None` when no two names collide.
+fn duplicate_member_group(input: &str) -> Option<Vec<String>> {
+    let names = member_names(input)?;
+    let folded: Vec<String> = names.iter().map(|n| json_fold(n)).collect();
+    let first = (0..names.len()).find(|&i| folded[i + 1..].contains(&folded[i]))?;
+    Some(
+        (0..names.len())
+            .filter(|&j| folded[j] == folded[first])
+            .map(|j| names[j].clone())
+            .collect(),
+    )
+}
+
 fn parse_json(input: &str) -> Result<Parsed, JsonError> {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(input) else {
         return Err(JsonError::NotClaimed);
@@ -899,6 +952,13 @@ fn parse_json(input: &str) -> Result<Parsed, JsonError> {
         serde_json::Value::Null => None,
         _ => return Err(JsonError::NotClaimed),
     };
+    // FIX_me_descriptor_input_strict (ruling T31): a top-level object that names
+    // one field twice is refused, before any field is read.
+    if obj.is_some() {
+        if let Some(names) = duplicate_member_group(input) {
+            return Err(JsonError::DuplicateMember { names });
+        }
+    }
     // §4.4, NORMATIVE: field matching is case-INSENSITIVE, because Go's
     // `encoding/json` is — exact match first, then the first case-insensitive
     // one. A host that required lowercase would refuse a file the device takes.
@@ -1145,6 +1205,12 @@ fn parse_path_element(p: &str) -> Result<u32, ()> {
         None => (p, 0),
     };
     let idx: i64 = body.parse().map_err(|_| ())?;
+    // BIP-32 / BIP-380: an index is 0..=2^31-1, hardened or not (bughunt-1119
+    // I15). The fork's `ParsePathElement` takes up to 2^32-1 and rewrites the
+    // rest as hardened; `me` refuses it.
+    if idx > i64::from(HARDENED - 1) {
+        return Err(());
+    }
     let iu32 = idx as u32;
     if i64::from(iu32) != idx || iu32.checked_add(offset).is_none() {
         return Err(());

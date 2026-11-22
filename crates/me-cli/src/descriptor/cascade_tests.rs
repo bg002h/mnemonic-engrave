@@ -258,15 +258,21 @@ fn dup_group(doc: &str) -> Vec<String> {
 fn json_duplicate_members_are_refused_exact_or_case_variant() {
     let d = FIXTURE;
     assert_eq!(
-        dup_group(&format!("{{\"descriptor\":\"{d}\",\"Descriptor\":\"{d}\"}}")),
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"Descriptor\":\"{d}\"}}"
+        )),
         ["descriptor", "Descriptor"]
     );
     assert_eq!(
-        dup_group(&format!("{{\"Descriptor\":\"{d}\",\"descriptor\":\"{d}\"}}")),
+        dup_group(&format!(
+            "{{\"Descriptor\":\"{d}\",\"descriptor\":\"{d}\"}}"
+        )),
         ["Descriptor", "descriptor"]
     );
     assert_eq!(
-        dup_group(&format!("{{\"descriptor\":\"{d}\",\"descriptor\":\"{d}\"}}")),
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"descriptor\":\"{d}\"}}"
+        )),
         ["descriptor", "descriptor"]
     );
     assert_eq!(
@@ -338,19 +344,27 @@ fn json_duplicate_check_runs_before_field_lookup() {
 #[test]
 fn json_nested_duplicates_are_not_inspected() {
     let d = FIXTURE;
-    let doc = format!(
-        "{{\"descriptor\":\"{d}\",\"devices\":[{{\"type\":\"a\",\"Type\":\"b\"}}]}}"
-    );
+    let doc = format!("{{\"descriptor\":\"{d}\",\"devices\":[{{\"type\":\"a\",\"Type\":\"b\"}}]}}");
     assert_eq!(ok(&doc).branch, Branch::Json);
 }
 
 #[test]
 fn path_element_refuses_an_index_above_2_pow_31_minus_1() {
-    for p in ["2147483648", "2147483696", "4294967295", "2147483648h", "2147483696'"] {
+    for p in [
+        "2147483648",
+        "2147483696",
+        "4294967295",
+        "2147483648h",
+        "2147483696'",
+    ] {
         assert!(parse_path_element(p).is_err(), "{p}");
     }
     // The three callers keep their own error variants.
-    let e = parse_key(None, &format!("[4bbaa801/2147483696/1h/0h/2h]{XPUB}/<0;1>/*")).unwrap_err();
+    let e = parse_key(
+        None,
+        &format!("[4bbaa801/2147483696/1h/0h/2h]{XPUB}/<0;1>/*"),
+    )
+    .unwrap_err();
     assert!(matches!(e, KeyError::InvalidOriginPath(_)), "{e:?}");
     let e = parse_key(None, &format!("[4bbaa801/84h/0h/0h]{XPUB}/2147483696/*")).unwrap_err();
     assert!(matches!(e, KeyError::InvalidChildrenPath(_)), "{e:?}");

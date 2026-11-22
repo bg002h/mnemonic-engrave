@@ -380,6 +380,7 @@ pub fn select_cause(document: &str, errs: &Errors) -> Refusal {
             Some(JsonError::MissingDescriptor { label, keys }) => {
                 refusal::json_missing_descriptor(label, keys)
             }
+            Some(JsonError::DuplicateMember { names }) => refusal::json_duplicate_member(names),
             _ => refusal::unparseable(Some((
                 Branch::Json,
                 "the document is not a `{label, descriptor}` object".to_string(),

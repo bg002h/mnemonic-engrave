@@ -1030,22 +1030,30 @@ fn item_5_the_five_case_matrix() {
 
 // ── FIX_me_descriptor_input_strict (bughunt-1119 I2, I15; ruling T31) ──────
 
-const DIS_EVIDENCE_LOWER_FIRST: &str =
-    include_str!("../../../design/evidence/fix-me-descriptor-input-strict/i2-lower-first.json");
-const DIS_EVIDENCE_ORIGIN_RANGE: &str =
-    include_str!("../../../design/evidence/fix-me-descriptor-input-strict/i15-origin-2147483696.txt");
+fn dis_lower_first() -> String {
+    let d = |k: u32| format!("wsh(sortedmulti({k},[73c5da0a/48h/1h/0h/2h]{XPUB}/<0;1>/*))");
+    format!(
+        "{{\"descriptor\":\"{}\",\"Descriptor\":\"{}\"}}",
+        d(2),
+        d(1)
+    )
+}
+
+fn dis_origin_range() -> String {
+    format!("wsh(sortedmulti(2,[73c5da0a/2147483696/1h/0h/2h]{XPUB}/<0;1>/*,[b8688df1/48h/1h/0h/2h]{XPUB2}/<0;1>/*))")
+}
 
 #[test]
 fn json_duplicate_member_gets_its_own_sentence() {
     let want = "me: the `{label, descriptor}` JSON names one field more than once: `descriptor`, `Descriptor`. A wallet export names each field once, and field names match without regard to case, so this file does not say which value is meant. Re-export from your wallet software. If you edit the file instead, keep only the member whose value is your wallet's, and check the quorum and address `me` prints next.";
     assert_row(
         "json-inner-malformed",
-        DIS_EVIDENCE_LOWER_FIRST,
+        &dis_lower_first(),
         &["--as", "descriptor"],
         3,
         want,
     );
-    let err = String::from_utf8_lossy(&run(DIS_EVIDENCE_LOWER_FIRST, &["--as", "descriptor"]).stderr)
+    let err = String::from_utf8_lossy(&run(&dis_lower_first(), &["--as", "descriptor"]).stderr)
         .to_string();
     assert!(!err.contains("not the JSON"), "{err}");
     assert!(!err.contains("carries no `descriptor` field"), "{err}");
@@ -1055,16 +1063,9 @@ fn json_duplicate_member_gets_its_own_sentence() {
 fn out_of_range_path_index_is_refused_not_rewritten() {
     let want = "the origin path is not a path: `73c5da0a/2147483696/1h/0h/2h`.";
     for mode in ["descriptor", "md1"] {
-        assert_row(
-            "unparseable",
-            DIS_EVIDENCE_ORIGIN_RANGE,
-            &["--as", mode],
-            3,
-            want,
-        );
+        assert_row("unparseable", &dis_origin_range(), &["--as", mode], 3, want);
         let err =
-            String::from_utf8_lossy(&run(DIS_EVIDENCE_ORIGIN_RANGE, &["--as", mode]).stderr)
-                .to_string();
+            String::from_utf8_lossy(&run(&dis_origin_range(), &["--as", mode]).stderr).to_string();
         assert!(!err.contains("48h"), "{err}");
     }
 }

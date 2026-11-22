@@ -134,17 +134,17 @@ stdout stays empty on every refusal. No flag, type or command is added.
 
 ## 5. RED rows
 
-The rows are `design/evidence/fix-me-descriptor-input-strict/cases.txt` (63 rows: fixture, `--as` mode, exit,
+The rows are `design/evidence/fix-me-descriptor-input-strict/cases.txt` (66 rows: fixture, `--as` mode, exit,
 expected line), run by `bash scripts/fix-me-descriptor-input-strict-gate.sh --cli`.
 
-- **On base 73db74e0 (run by the author): 44 FAIL, 20 ok.** The 44 are every I2 and I15 row: exit 0 (or 2
+- **On base 73db74e0 (run by the author): 44 FAIL, 20 ok; with the three `i2-escaped.json` rows folded in at r1, 47 FAIL, 20 ok (re-measured at the FIX head and at the build head).** The 47 are every I2 and I15 row: exit 0 (or 2
   without `--as`) where 3 is wanted; `i2-null-dup` and `i2-label-only` (`--as`) print the missing-descriptor
   sentence; `i15-usesite-2147483696` prints the hardened-use-site sentence; `i15-origin-4294967295` `--as md1`
   prints the md1 varint sentence. The 20 ok are the unchanged-behaviour controls (`base.txt`, `bw-base.txt`,
   `i2-control.json`, `i2-nested-dup.json` at 0/0/2; `i15-origin-2147483647.txt` at 0, 3 with the md1 varint
   sentence, 2; `i15-usesite-range.txt` at 3 with its existing reason; `i2-label-only.json` without `--as` at 4)
   and the container check (the 2147483647 control packs a container different from `base.txt`'s).
-- **GREEN target: 64 ok, `gate --cli: PASS`.** The author reached it on an uncommitted probe of D1-D7 (never
+- **GREEN target: 67 ok (66 rows plus the container check), `gate --cli: PASS`.** The author reached it on an uncommitted probe of D1-D7 (never
   committed; the builder writes the real change test-first), which also ran the whole workspace suite: 715 passed,
   2 skipped, 0 failed, so no existing test changes.
 
@@ -161,6 +161,7 @@ Rows at a glance (each I2/I15 fixture runs in all three modes at exit 3 unless n
 | `i2-unknown-dup.json` | T-DUP, `` `devices`, `devices` `` |
 | `i2-null-dup.json` | T-DUP, `` `descriptor`, `Descriptor` `` (D3) |
 | `i2-three.json` | T-DUP, `` `descriptor`, `Descriptor`, `DESCRIPTOR` `` |
+| `i2-escaped.json` | T-DUP, `` `descriptor`, `Descriptor` `` (the second name written `Descr\u0069ptor`) |
 | `i2-label-only.json` | `--as` both: T-DUP `` `label`, `label` ``; no `--as`: the existing record refusal, exit 4 |
 | `i15-origin-2147483696.txt` | T-ORIGIN, `` `73c5da0a/2147483696/1h/0h/2h` `` |
 | `i15-origin-2147483648.txt` | T-ORIGIN, `` `73c5da0a/2147483648/1h/0h/2h` `` |
