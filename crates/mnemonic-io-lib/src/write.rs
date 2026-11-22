@@ -348,7 +348,8 @@ fn identity_matches(a: &Identity, b: &Identity) -> bool {
         (Identity::Id(d1, i1), Identity::Id(d2, i2)) => d1 == d2 && i1 == i2,
         #[cfg(not(unix))]
         (Identity::Canon(x), Identity::Canon(y)) => x == y,
-        (Identity::Planned(x), Identity::Planned(y)) => x == y,
+        // Byte-equal, not component-equal: `Path` equality would fold `a/./x` into `a/x`.
+        (Identity::Planned(x), Identity::Planned(y)) => x.as_os_str() == y.as_os_str(),
         _ => false,
     }
 }
