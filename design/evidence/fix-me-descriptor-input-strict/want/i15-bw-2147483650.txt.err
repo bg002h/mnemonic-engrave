@@ -1,0 +1,1 @@
+me: this is not a wallet descriptor in any of the four forms `me` reads: a BlueWallet `Key: value` setup file, a plain BIP-380 descriptor, a `{"label":…,"descriptor":…}` JSON export, or a single extended key. It looks most like a BlueWallet `Key: value` setup file, which failed because: the `Derivation:` header is not a path: `m/48'/1'/0'/2147483650`.

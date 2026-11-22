@@ -1,0 +1,1 @@
+me: record 0, as given (records count from 0) is not a form this container can place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:`/`phrase:` record. Addresses are not classifiable here, and neither is a wallet descriptor `me` refuses — see sysw::classify
