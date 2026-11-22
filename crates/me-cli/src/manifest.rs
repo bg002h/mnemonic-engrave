@@ -164,6 +164,55 @@ impl Manifest {
                 if public == 1 { "" } else { "s" }
             ));
         }
+        // bh-me-C1: a policy that carries SOME xpubs is not a template, so the
+        // note above stays silent about it, yet the descriptor cannot be
+        // rebuilt without the xpubs it lacks. One line per such policy, in plate
+        // order; a key-less template (no present slot) is the note above.
+        for e in self
+            .missing_keys
+            .iter()
+            .filter(|e| !e.present_slots.is_empty())
+        {
+            let (first, last) = (e.md1_plates[0], e.md1_plates[e.md1_plates.len() - 1]);
+            let plates = if e.md1_plates.len() == 1 {
+                format!("plate {first}")
+            } else {
+                format!("plates {first}-{last}")
+            };
+            let (xpub, slot) = if e.present_slots.len() == 1 {
+                ("xpub", "slot")
+            } else {
+                ("xpubs", "slots")
+            };
+            let present: Vec<String> = e.present_slots.iter().map(|i| format!("@{i}")).collect();
+            let missing: Vec<String> = e
+                .missing_slots
+                .iter()
+                .map(|m| match &m.fingerprint {
+                    Some(f) => format!("@{} [{f}]", m.slot),
+                    None => format!("@{}", m.slot),
+                })
+                .collect();
+            let clause = if e.missing_slots.len() == 1 {
+                format!(
+                    "the xpub of key slot {}, and the wallet cannot be restored without it: \
+                     keep an mk1 card (or the seed) for it.",
+                    missing[0]
+                )
+            } else {
+                format!(
+                    "the xpubs of key slots {}, and the wallet cannot be restored without \
+                     them: keep an mk1 card (or the seed) for each of them.",
+                    missing.join(", ")
+                )
+            };
+            out.push_str(&format!(
+                "me: NOTE — the md1 policy on {plates} carries the {xpub} of key {slot} {} \
+                 only. It does NOT carry {clause} `me bundle` does not match mk1 cards to \
+                 key slots.\n",
+                present.join(", ")
+            ));
+        }
         if self.key_slots > 1 {
             out.push_str(&format!(
                 "me: NOTE — this policy declares {} key slots. `me bundle` cannot know how many \

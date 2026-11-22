@@ -3,7 +3,8 @@
 
 use crate::classify::{self, ClassifyError, Format};
 use crate::manifest::{
-    fmt_chunk_set_id, Integrity, Kind, Manifest, PlateEntry, PlateKind, SetEntry,
+    fmt_chunk_set_id, Integrity, Kind, Manifest, MissingKeys, MissingSlot, PlateEntry, PlateKind,
+    SetEntry,
 };
 use crate::validate::{self, ValidateError};
 
@@ -398,6 +399,8 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
     // card) or every seed. `me bundle` counted neither and said "backup needs
     // 2 plates".
     let mut keyless_template = false;
+    // bh-me-C1: one entry per md1 policy that lacks an xpub, in plate order.
+    let mut missing_keys: Vec<MissingKeys> = Vec::new();
     let mut sets: Vec<SetEntry> = Vec::new();
     let mut plates: Vec<PlateEntry> = Vec::new();
 
@@ -427,6 +430,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         hashlock_kinds.extend(descriptor_hash_kinds(&d));
         key_slots = key_slots.max(d.n as usize);
         keyless_template |= !d.is_wallet_policy();
+        note_missing_keys(&mut missing_keys, &d, plates.len(), 1);
         plates.push(PlateEntry {
             plate: 0,
             of: 0,
@@ -462,6 +466,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         hashlock_kinds.extend(descriptor_hash_kinds(&d));
         key_slots = key_slots.max(d.n as usize);
         keyless_template |= !d.is_wallet_policy();
+        note_missing_keys(&mut missing_keys, &d, plates.len(), chunks.len());
         let total = chunks.len() as u8;
         sets.push(SetEntry {
             kind: Kind::Md1,
@@ -579,11 +584,49 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         wallet_plates: total_plates,
         key_slots,
         keyless_template,
-        missing_keys: Vec::new(),
+        missing_keys,
         ms1_required: true,
         sets,
         plates,
     })
+}
+
+/// bh-me-C1: record the key slots of one md1 policy whose card carries no
+/// xpub for them. present = the indices in the `Pubkeys` TLV (none when the TLV
+/// is absent); missing = every slot in `0..n` not present, each with the
+/// fingerprint-record entry for THAT slot (by index, never by position) or
+/// none. `first_pos` is the 0-based position of the policy's first plate and
+/// `count` its plate count; plate numbers are position + 1 (the renumbering
+/// below assigns exactly these).
+fn note_missing_keys(
+    out: &mut Vec<MissingKeys>,
+    d: &md_codec::Descriptor,
+    first_pos: usize,
+    count: usize,
+) {
+    let present_slots: Vec<u8> = d.tlv.pubkeys.iter().flatten().map(|(i, _)| *i).collect();
+    let missing_slots: Vec<MissingSlot> = (0..d.n)
+        .filter(|i| !present_slots.contains(i))
+        .map(|i| MissingSlot {
+            slot: i,
+            fingerprint: d
+                .tlv
+                .fingerprints
+                .iter()
+                .flatten()
+                .find(|(idx, _)| *idx == i)
+                .map(|(_, fp)| fp.iter().map(|b| format!("{b:02x}")).collect()),
+        })
+        .collect();
+    if missing_slots.is_empty() {
+        return;
+    }
+    out.push(MissingKeys {
+        md1_plates: (first_pos + 1..=first_pos + count).collect(),
+        key_slots: d.n as usize,
+        present_slots,
+        missing_slots,
+    });
 }
 
 #[cfg(test)]
