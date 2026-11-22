@@ -173,7 +173,7 @@ delete sharing, which is a refusal with the old file kept. `same_file` per secti
 4. A run killed mid-write leaves `<name>.<pid>.<n>.tmp`, 0600, beside the target (new).
 5. The replaced file is a new file owned by the writer (today: the same inode, chmodded). A root run (sudo) over
    another user's file leaves it root-owned 0600, so that user can no longer read it; today the owner is kept.
-6. A target that is itself a mount point (one file bind-mounted, for example `docker run -v ./card.txt:/out/card.txt`)
+6. A target that is itself a mount point (one file bind-mounted, for example `docker run -v "$PWD/card.txt:/out/card.txt"`)
    is refused with `Device or resource busy (os error 16)`; today it is overwritten in place. The old file is kept.
    Write to a path inside a mounted directory instead.
 No wrapper text changes; the OS error inside it is new for items 3 and 6 (and an absent parent directory `x/` now
@@ -280,7 +280,7 @@ Outside the table: mnemonic-refugium (`6e2072e72`) has no `write_private` and no
    the lock, `--precise 0.1.2` fails `revspec '0.1.2' not found`); the lock must then show `version = "0.1.2"` with
    the crates.io source. ms also refreshes `vendor/`, deletes the
    `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line from
-   `ci/repro/vendor-git-sources.txt`, and passes `ci/repro/vendor-freshness.sh`. Order among them is
+   `ci/repro/vendor-git-sources.txt`, and passes `ci/repro/vendor-freshness.sh`. ms also edits `.github/workflows/man-release.yml`: delete the `pins` job and `needs: pins`; delete `git_source_url` and `git_source_rev` from the `repro` job (an empty or absent pair makes the toolkit workflow skip its fourth `[source]` stanza); in both musl build steps delete the `IO_LIB_REV` and `IO_LIB_SRC` lines and the three `--config "source.\"${IO_LIB_SRC}\"..."` lines (and the `-e IO_LIB_REV` passthrough in the aarch64 step), keeping the `source.crates-io.replace-with` and `vendored-sources` configs. `grep -n 'mnemonic-engrave\|IO_LIB\|pins' .github/workflows/*.yml` must then print no ms workflow line other than comments. Order among them is
    free; the master table order is #9 md, #10 mk, #11 ms, #12 mt, #14 tk.
 
 ## 11. Out of scope, and proposed FOLLOWUPS lines (listed, not appended)
