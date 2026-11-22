@@ -130,12 +130,17 @@ impl Header {
         if buf[..8] != MAGIC {
             return Err(WireError::BadMagic);
         }
-        if buf[8] != VERSION {
-            return Err(WireError::UnknownVersion(buf[8]));
+        // S1b §14.2: version, then (v1 only) the reserved byte. 0x00 and
+        // 0x03..=0xFF are refused alike.
+        let version = buf[8];
+        if version != VERSION && version != VERSION_V2 {
+            return Err(WireError::UnknownVersion(version));
         }
-        if buf[11] != 0 {
+        let v2 = version == VERSION_V2;
+        if !v2 && buf[11] != 0 {
             return Err(WireError::ReservedNotZero(buf[11]));
         }
+        let pw_form = if v2 { buf[11] } else { 0 };
 
         let iterations = u32::from_be_bytes(buf[12..16].try_into().unwrap());
         let pub_len = u32::from_be_bytes(buf[44..48].try_into().unwrap());
@@ -161,6 +166,18 @@ impl Header {
             if !(MIN_ITERATIONS..=MAX_ITERATIONS).contains(&iterations) {
                 return Err(WireError::Iterations(iterations));
             }
+            // v2: the password form, then the n-word floor. Both are header-stage
+            // refusals that need no key (§14.2), and they run after the range
+            // check, so `iterations = 50_000` still reads as `Iterations`.
+            if v2 {
+                let n_word = (PW_WORDS_MIN..=PW_WORDS_MAX).contains(&pw_form);
+                if pw_form != 0 && !n_word {
+                    return Err(WireError::PwForm(pw_form));
+                }
+                if n_word && iterations < MIN_ITERATIONS_NWORD {
+                    return Err(WireError::PwFormIterations(iterations));
+                }
+            }
         } else {
             // §6.2's anti-downgrade-staging rule.
             if buf[9] != 0 {
@@ -178,6 +195,10 @@ impl Header {
             if buf[32..44].iter().any(|&b| b != 0) {
                 return Err(WireError::UnsealedFieldNotZero("iv"));
             }
+            // §14.2: the anti-downgrade-staging rule, extended to the new field.
+            if v2 && pw_form != 0 {
+                return Err(WireError::UnsealedFieldNotZero("pw_form"));
+            }
         }
 
         // u64 deliberately: 32-bit arithmetic wraps for lengths near 2^32 and
@@ -194,8 +215,8 @@ impl Header {
         let mut iv = [0u8; IV_LEN];
         iv.copy_from_slice(&buf[32..44]);
         Ok(Header {
-            version: VERSION,
-            pw_form: 0,
+            version,
+            pw_form,
             iterations,
             salt,
             iv,

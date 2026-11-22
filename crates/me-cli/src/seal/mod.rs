@@ -381,42 +381,264 @@ impl std::fmt::Display for OpenError {
 }
 impl std::error::Error for OpenError {}
 
+/// §14.5's two refusals on a `pw_form` n password, before any KDF work: the word
+/// count, then each word against the BIP-39 English list (positions count from
+/// 1). Returns the normalised password.
+fn check_nword_password(
+    password: &str,
+    n: usize,
+) -> Result<Zeroizing<String>, (usize, Option<usize>)> {
+    let normalised = passphrase::normalise(password);
+    let words: Vec<&str> = if normalised.is_empty() {
+        Vec::new()
+    } else {
+        normalised.split(' ').collect()
+    };
+    if words.len() != n {
+        return Err((words.len(), None));
+    }
+    for (i, w) in words.iter().enumerate() {
+        if bip39::Language::English.find_word(w).is_none() {
+            return Err((words.len(), Some(i + 1)));
+        }
+    }
+    Ok(normalised)
+}
+
+/// The checks on an encrypted section's records, shared by [`open`] and
+/// [`seal_v2`] so that a payload `open` would refuse never leaves the writer.
+/// v1: every record is a constellation record or a mnemonic. v2: the same for
+/// every record that does not begin `text:`, then §14.4's ten checks.
+fn check_secret_section(
+    records: &[String],
+    v2: bool,
+) -> Result<Option<Vec<String>>, SecretSectionError> {
+    for (i, r) in records.iter().enumerate() {
+        if v2 && r.starts_with(titles::TITLES_PREFIX) {
+            continue;
+        }
+        record_or_mnemonic_err(r)
+            .map_err(|source| SecretSectionError::Record { index: i, source })?;
+    }
+    if v2 {
+        titles::check_titles(records).map_err(SecretSectionError::Titles)
+    } else {
+        Ok(None)
+    }
+}
+
+enum SecretSectionError {
+    Record {
+        index: usize,
+        source: record::RecordError,
+    },
+    Titles(titles::TitlesError),
+}
+
 /// Open a v1 or v2 payload (S1b §14.5, §14.7). Every refusal that needs no key
 /// runs before any KDF work: the header, the public section, the password's
-/// word count and words.
-pub fn open(_blob: &[u8], _password: &str) -> Result<Opened, OpenError> {
-    unimplemented!()
+/// word count and words. Nothing is returned on a refusal, and the decrypted
+/// section is wiped.
+pub fn open(blob: &[u8], password: &str) -> Result<Opened, OpenError> {
+    let header = Header::decode(blob).map_err(OpenError::Wire)?;
+    let pub_len = header.pub_len as usize;
+    let ct_len = header.ct_len as usize;
+    let tag = if ct_len > 0 { wire::TAG_LEN } else { 0 };
+    let end = HEADER_LEN + pub_len + ct_len + tag;
+    if blob.len() < end {
+        return Err(OpenError::Wire(wire::WireError::TooShort(blob.len())));
+    }
+    let pub_bytes = &blob[HEADER_LEN..HEADER_LEN + pub_len];
+    let public = container::decode_section(pub_bytes).map_err(OpenError::Container)?;
+    check_public(&public).map_err(OpenError::Public)?;
+    if ct_len == 0 {
+        return Ok(Opened {
+            version: header.version,
+            pw_form: header.pw_form,
+            public,
+            secret: Zeroizing::new(Vec::new()),
+            titles: None,
+        });
+    }
+    // The password, before any KDF work.
+    let normalised = if header.version == wire::VERSION_V2 && header.pw_form != 0 {
+        let want = usize::from(header.pw_form);
+        match check_nword_password(password, want) {
+            Ok(n) => n,
+            Err((got, None)) => return Err(OpenError::PasswordWordCount { got, want }),
+            Err((_, Some(pos))) => return Err(OpenError::PasswordWord(pos)),
+        }
+    } else {
+        if !passphrase::is_valid(password) {
+            return Err(OpenError::Passphrase);
+        }
+        passphrase::normalise(password)
+    };
+    // §6.1a: AAD = header ‖ public section, exactly the bytes read.
+    let aad = &blob[..HEADER_LEN + pub_len];
+    let sealed = &blob[HEADER_LEN + pub_len..end];
+    let key = crypto::derive_key(&normalised, &header.salt, header.iterations);
+    let plain =
+        crypto::open_bytes(&key, &header.iv, aad, sealed).map_err(|_| OpenError::Authentication)?;
+    let records = Zeroizing::new(container::decode_section(&plain).map_err(OpenError::Container)?);
+    let total = public.len() + records.len();
+    if total > container::MAX_RECORDS {
+        return Err(OpenError::Container(
+            container::ContainerError::RecordCount(total),
+        ));
+    }
+    let v2 = header.version == wire::VERSION_V2;
+    let titles = match check_secret_section(&records, v2) {
+        Ok(t) => t,
+        Err(SecretSectionError::Record { index, source }) => {
+            return Err(OpenError::Record { index, source })
+        }
+        Err(SecretSectionError::Titles(e)) => return Err(OpenError::Titles(e)),
+    };
+    let mut secret = Zeroizing::new(Vec::with_capacity(records.len()));
+    for r in records.iter() {
+        if v2 && r.starts_with(titles::TITLES_PREFIX) {
+            continue;
+        }
+        secret.push(r.clone());
+    }
+    Ok(Opened {
+        version: header.version,
+        pw_form: header.pw_form,
+        public,
+        secret,
+        titles,
+    })
 }
 
 /// Seal a v2 payload with fresh salt and IV (S1b §14.3). `words` is the
 /// password: twelve checksum-valid words for `pw_form` 0, n words from the
 /// BIP-39 list for `pw_form` n. `seal_v2` never generates words.
 pub fn seal_v2(
-    _payload: Payload,
-    _titles: Option<Vec<String>>,
-    _words: &str,
-    _pw_form: u8,
-    _iterations: u32,
+    payload: Payload,
+    titles: Option<Vec<String>>,
+    words: &str,
+    pw_form: u8,
+    iterations: u32,
 ) -> Result<Vec<u8>, SealError> {
-    unimplemented!()
+    let mut salt = [0u8; SALT_LEN];
+    let mut iv = [0u8; IV_LEN];
+    rand::rng().fill_bytes(&mut salt);
+    rand::rng().fill_bytes(&mut iv);
+    seal_v2_deterministic(payload, titles, words, pw_form, iterations, salt, iv)
 }
 
 /// The vectors' seam for [`seal_v2`], under §11.4's sole exemption from §7.2.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn seal_v2_deterministic(
-    _payload: Payload,
-    _titles: Option<Vec<String>>,
-    _words: &str,
-    _pw_form: u8,
-    _iterations: u32,
-    _salt: [u8; SALT_LEN],
-    _iv: [u8; IV_LEN],
+    payload: Payload,
+    titles: Option<Vec<String>>,
+    words: &str,
+    pw_form: u8,
+    iterations: u32,
+    salt: [u8; SALT_LEN],
+    iv: [u8; IV_LEN],
 ) -> Result<Vec<u8>, SealError> {
-    unimplemented!()
+    // The header's own refusals first, in the reader's order, so that a payload
+    // `open` refuses at the header is never written; all before any KDF work.
+    let n_word = (wire::PW_WORDS_MIN..=wire::PW_WORDS_MAX).contains(&pw_form);
+    if pw_form != 0 && !n_word {
+        return Err(SealError::PwForm(pw_form));
+    }
+    if !(MIN_ITERATIONS..=MAX_ITERATIONS).contains(&iterations) {
+        return Err(SealError::Iterations(iterations));
+    }
+    if n_word && iterations < wire::MIN_ITERATIONS_NWORD {
+        return Err(SealError::PwFormIterations(iterations));
+    }
+    let normalised = if n_word {
+        match check_nword_password(words, usize::from(pw_form)) {
+            Ok(n) => n,
+            Err((got, None)) => {
+                return Err(SealError::Password(format!(
+                    "the password has {got} words; this payload's password has {pw_form}"
+                )))
+            }
+            Err((_, Some(pos))) => {
+                return Err(SealError::Password(format!(
+                    "password word {pos} is not on the BIP-39 English list"
+                )))
+            }
+        }
+    } else {
+        if !passphrase::is_valid(words) {
+            return Err(SealError::Passphrase(
+                "passphrase is not a checksum-valid BIP-39 mnemonic".into(),
+            ));
+        }
+        passphrase::normalise(words)
+    };
+    check_public(&payload.public)?;
+
+    // The titles record goes last, then the reader's own checks run over the
+    // records as they will be read.
+    let mut records: Zeroizing<Vec<String>> = Zeroizing::new(payload.secret.clone());
+    if let Some(t) = &titles {
+        let refs: Vec<&str> = t.iter().map(String::as_str).collect();
+        records.push(titles::encode_titles(&refs).map_err(SealError::Titles)?);
+    }
+    if records.is_empty() {
+        return Err(SealError::Empty);
+    }
+    check_secret_section(&records, true).map_err(|e| match e {
+        SecretSectionError::Record { index, source } => SealError::RecordAt {
+            section: "secret",
+            index,
+            source,
+        },
+        SecretSectionError::Titles(e) => SealError::Titles(e),
+    })?;
+
+    let pubsec: Zeroizing<String> = if payload.public.is_empty() {
+        Zeroizing::new(String::new())
+    } else {
+        container::encode_section(&payload.public).map_err(SealError::Container)?
+    };
+    let secsec = container::encode_section(&records).map_err(SealError::Container)?;
+    let (pb, sb) = (pubsec.as_bytes(), secsec.as_bytes());
+    for n in [pb.len(), sb.len()] {
+        if n > MAX_SECTION_LEN as usize {
+            return Err(SealError::TooLarge(n));
+        }
+    }
+    if payload.public.len() + records.len() > container::MAX_RECORDS {
+        return Err(SealError::Container(
+            container::ContainerError::RecordCount(payload.public.len() + records.len()),
+        ));
+    }
+    let header = Header {
+        version: wire::VERSION_V2,
+        pw_form,
+        iterations,
+        salt,
+        iv,
+        pub_len: pb.len() as u32,
+        ct_len: sb.len() as u32,
+    };
+    // §6.1a: AAD = header ‖ public section.
+    let mut aad = Vec::with_capacity(HEADER_LEN + pb.len());
+    aad.extend_from_slice(&header.encode());
+    aad.extend_from_slice(pb);
+    let key = crypto::derive_key(&normalised, &salt, iterations);
+    let sealed = crypto::seal_bytes(&key, &iv, &aad, sb).map_err(SealError::Crypto)?;
+    let mut blob = aad;
+    blob.extend_from_slice(&sealed);
+    Ok(blob)
 }
 
 /// A secret-section record is a constellation record OR a BIP-39 mnemonic.
 fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
+    record_or_mnemonic_err(s).map_err(SealError::Record)
+}
+
+/// [`record_or_mnemonic`] with the bare [`record::RecordError`], which is what
+/// [`open`] reports (`OpenError::Record`).
+fn record_or_mnemonic_err(s: &str) -> Result<(), record::RecordError> {
     // Keep the RecordError. It carries the "re-run with --group-size 0"
     // guidance, which is the remedy for the round-3 Critical — and the SECRET
     // section is the DEFAULT path, i.e. exactly where an operator pasting
@@ -437,7 +659,7 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
         .find(|(_, c)| c.is_uppercase())
         .map(|(i, _)| i)
     {
-        return Err(SealError::Record(record::RecordError::NotLowercase(pos)));
+        return Err(record::RecordError::NotLowercase(pos));
     }
     // The WHITESPACE half of the argument the uppercase guard above makes.
     // `normalise` does two things — it lowercases AND it collapses whitespace
@@ -451,14 +673,12 @@ fn record_or_mnemonic(s: &str) -> Result<(), SealError> {
     // tampering. §6.4 requires that a bundle the device will reject never leave
     // the host, so this belongs on this side.
     if let Some(pos) = non_canonical_separator(s) {
-        return Err(SealError::Record(record::RecordError::NonCanonicalSpace(
-            pos,
-        )));
+        return Err(record::RecordError::NonCanonicalSpace(pos));
     }
     if passphrase::is_valid(s) {
         return Ok(());
     }
-    Err(SealError::Record(record_err))
+    Err(record_err)
 }
 
 /// Byte offset of the first separator the device's parser could not split on,

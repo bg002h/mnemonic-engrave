@@ -779,22 +779,27 @@ fn v2_titles_refusals() {
     ];
     for (name, display) in t1 {
         let e = refusal(name, BEEF6);
-        let ok = match (name, &e) {
-            (
-                "N-count",
-                OpenError::Titles(titles::TitlesError::Count {
+        use titles::TitlesError as T;
+        let got = match &e {
+            OpenError::Titles(t) => t,
+            other => panic!("{name}: {other:?}"),
+        };
+        let ok = match name {
+            "N-count" => matches!(
+                got,
+                T::Count {
                     titles: 1,
-                    secrets: 2,
-                }),
-            ) => true,
-            ("N-magic", OpenError::Titles(titles::TitlesError::Magic)) => true,
-            ("N-two", OpenError::Titles(titles::TitlesError::Duplicate)) => true,
-            ("N-not-last", OpenError::Titles(titles::TitlesError::NotLast)) => true,
-            ("N-no-final-lf", OpenError::Titles(titles::TitlesError::NoFinalLf)) => true,
-            ("N-empty", OpenError::Titles(titles::TitlesError::Empty)) => true,
-            ("N-not-hex", OpenError::Titles(titles::TitlesError::NotHex)) => true,
-            ("N-mnemonic", OpenError::Titles(titles::TitlesError::NonMs1Secret(0))) => true,
-            ("N-title-set", OpenError::Titles(titles::TitlesError::Line(2))) => true,
+                    secrets: 2
+                }
+            ),
+            "N-magic" => matches!(got, T::Magic),
+            "N-two" => matches!(got, T::Duplicate),
+            "N-not-last" => matches!(got, T::NotLast),
+            "N-no-final-lf" => matches!(got, T::NoFinalLf),
+            "N-empty" => matches!(got, T::Empty),
+            "N-not-hex" => matches!(got, T::NotHex),
+            "N-mnemonic" => matches!(got, T::NonMs1Secret(0)),
+            "N-title-set" => matches!(got, T::Line(2)),
             _ => false,
         };
         assert!(ok, "{name}: {e:?}");
