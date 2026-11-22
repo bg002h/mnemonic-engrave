@@ -65,11 +65,16 @@ PHASE G-REL — the F-124 / F-123 release gate (not a build; §9).
 
 Order: ME-1 ∥ ME-2. SH-1 after ME-1; SH-2 after SH-1. SH-3 after ME-2; SH-4 after SH-3. SH-5 after SH-2 and
 SH-4. SH-6 after SH-5. Each phase: RED commit (its rows written, run, seen failing as the row's RED cell
-says), GREEN commit(s), the gate's `counts --built` for that phase, then the repo's full CI locally
-(`cargo nextest run --locked` plus every CI job for `me`; for the fork `go vet ./...`, `gofmt -l` against the
-five-file baseline, `scripts/gui-shard-test.sh ./gui 24`, the other packages' `go test ./...`, the tagged run
-`scripts/refugium-tagged-test.sh`, `scripts/refugium-elf-check.sh`, and `GOOS=js GOARCH=wasm go vet -tags
-refugium ./cmd/emu/`).
+says), GREEN commit(s), the gate's `counts --built <phases so far, comma-separated>` (e.g. `counts --built
+ME-1,SH-1`), then the repo's full CI locally (`cargo nextest run --locked` plus every CI job for `me`; for the
+fork, every `run:` step of `.github/workflows/test.yml` at the phase head: `CGO_ENABLED=0 go test -timeout 20m
+./...` (the `gui` package may run as `/scratch/code/shibboleth/mnemonic-engrave/scripts/gui-shard-test.sh ./gui
+24` from the fork root), `CGO_ENABLED=0 go test -tags oraclelive -run '^$' ./oracle/ ./gui/ ./sysw/
+./cmd/emu/`, `./scripts/test-32bit.sh`, `GOOS=js GOARCH=wasm go vet ./cmd/emu/` and the same with `-tags
+refugium`, `./scripts/refugium-tagged-test.sh`, the two `nix develop --command tinygo build ...` lines as written
+there, then `./scripts/refugium-elf-check.sh default.elf refugium.elf`; and `gofmt -l .` lists exactly the five
+baseline files (gui/transaction.go, gui/transaction_golden_test.go, gui/transaction_txrecord_test.go, mt/mt.go,
+mt/mt_test.go). No `go vet ./...` (10 pre-existing findings, test.yml:94).)
 
 ### ME-1 steps
 1. RED: write rows `sysw_mr_string_vectors`, `sysw_mr_set_vectors`, `sysw_mr_kit_vectors`, `sysw_pack_prints_mr_sentences`,
@@ -79,7 +84,7 @@ refugium ./cmd/emu/`).
 2. GREEN: `sysw/record.rs` `Class::Mr` (not secret, not bearer); `sysw/mr.rs` (§14b-§14d, loads the vector file);
    `sysw/mod.rs` classify arm after the mt1 arm and the §14b `UnknownReason`s; `main.rs` sentences, pack steps,
    `class_name` "mr1 string", the `show` line; `mdmk_unconfirmed_why` groups by runs; `sysw/coverage.rs` places
-   tests 24-32, `HIGHEST` 32.
+   tests 24-32, `HIGHEST` 32 (the entries are in §8's CHANGE line).
 3. Toolkit manual lockstep (S1 §14i): `mnemonic-toolkit` `docs/manual/src/30-workflows/3B-payload-unlock-refusals.md`
    "Which records get refused" gains the §14g mr1 rows and the new `Unrecognised` sentence, in a toolkit PR merged
    with this phase; toolkit CI (manual lint and `ci/doc-flag-lint.test.sh`) green on its head.
@@ -114,6 +119,9 @@ refugium ./cmd/emu/`).
    (the door at `bundleFlow`'s entry; `kitCards`, the one function that reads the session's `ClassMr` and
    `ClassMDMK` records; `kitListFlow`, `kitRun`, marks "CARD k/N" / "PLATE p/q" through
    `bundlePlateMark`'s slots, the pause, end and does-not-fit screens; no ms1 reminder).
+3. After the fork SH-2 PR merges, an `me` PR (branch `build/kit-me-coverage-device`) flips tests 28-32 in
+   `sysw/coverage.rs` to `Where::Device`, each with a comment naming its fork test (TestAdmitMrAtBundleOnly,
+   TestKitMenuOffersEngraveKit, TestKitDoorRun, TestRefugiumSecretWarningLine, TestKitLeadPlatesEqualCuts); full `me` CI.
 
 ### SH-3 steps
 1. Vendor `seal_v2_vectors.json` into `seal/testdata/` with a provenance entry (`me` merge commit, SHA-256).
@@ -234,8 +242,13 @@ ROW v2_titles_refusals | ME-2 | me | me-cli | - | now=0 | built=1
 ROW v1_open_treats_text_records_as_records | ME-2 | me | me-cli | - | now=0 | built=1
 - Rule as §14.10. RED: absent. Mutant: titles parsing applied to v1.
 ROW seal_v2_refuses_what_open_refuses | ME-2 | me | me-cli | - | now=0 | built=1
-- Rule as §14.10 (N-count, N-letter, N-hot-letter, and N-not-hex, N-mnemonic by this plan's leg). RED: absent.
+- Rule as §14.10 (N-count, N-letter, N-hot-letter, and N-mnemonic by this plan's leg; N-not-hex is reader-only:
+  `seal_v2` builds the titles record through `encode_titles` and cannot emit non-hex). RED: absent.
   Mutant: a writer that skips checks 8-10.
+ROW encode_titles_refuses_empty_and_unknown_titles | ME-2 | me | me-cli | - | now=0 | built=1
+- Rule: `encode_titles(&[])` is `Err(Empty)`; `encode_titles(&["SEED A", "SEED Q"])` is `Err(Line(3))`;
+  `encode_titles(&["SEED A"])` is `text:726566756769756d2d706c6174657320320a7469746c65205345454420410a` (the
+  generator's `titles_record(["title SEED A"])`). RED: absent. Mutant: `Line(i + 1)`.
 ROW me_seal_still_writes_version_1 | ME-2 | me | me-cli | - | now=0 | built=1
 - Rule as §14.10 (UF2 payload byte 8 = `0x01`, byte 11 = `0x00`). GUARD: green today. Mutant: `me seal` switched to v2.
 
@@ -317,9 +330,9 @@ ROW TestKitSentencesDevice | SH-2 | sh | ./gui/ | - | now=0 | built=1
 ROW TestRefugiumSecretWarningLine | SH-2 | sh | ./gui/ | refugium | now=0 | built=1
 - Rule (S1 test 31): plaintext payload with a secret: the line "Refugium build: secrets travel only in the Sealed
   Payload, never in this one. Unload this payload unless you mean to engrave its secret now." directly after "A
-  SECRET is stored unencrypted in flash."; sealed with a secret: the last line (alone with no flag); KEEP / UNLOAD
-  follow; an unconfirmed md1/mk1 alone: no line. RED: absent. Mutant: line keyed on `IsSecret` (an unconfirmed
-  md1/mk1 would raise it).
+  SECRET is stored unencrypted in flash."; sealed with a secret (S-D): the last line (alone with no flag); sealed with F2 raised (S-E): F2's line,
+  then the §14f line as the screen's last line; KEEP / UNLOAD follow; an unconfirmed md1/mk1 alone: no line. RED:
+  absent. Mutant: line keyed on `IsSecret` (an unconfirmed md1/mk1 would raise it); the line placed before F2's.
 ROW TestDefaultBuildNoRefugiumWarning | SH-2 | sh | ./gui/ | - | now=0 | built=1
 - Rule: the untagged build never shows the §14f line for the same payloads. GUARD: green today. Mutant: line not
   profile-gated.
@@ -487,7 +500,9 @@ marks live in the session (`syswSession`), cleared by LOAD AGAIN and UNLOAD; not
 - Payloads: menu, door and list rows load a session with the existing `sessionWith(records...)` helper over the
   vendored kit vectors' records; load-time rows (`TestKitRefusedAfterWarnings`, `TestRefugiumSecretWarningLine`,
   `TestDefaultBuildNoRefugiumWarning`) read `me sysw pack` blobs from `gui/testdata/chain/chain_payloads.json`,
-  to which `scripts/gen-chain-fixtures.sh` adds `kit-2of3`, `kit-with-ms1` and a sealed `kit-with-ms1` in SH-2;
+  to which `scripts/gen-chain-fixtures.sh` adds `kit-2of3` and `kit-with-ms1` (both unsealed; the generator pins only unsealed payloads) in SH-2; the sealed cases of
+  `TestRefugiumSecretWarningLine` load `syswRegionFor(t, "S-D")` (the line alone, no flag) and `syswRegionFor(t, "S-E")`
+  (F2's line, then the §14f line last) from the vendored `sysw/testdata/sysw_vectors.json`;
   v2 blobs reach `unlockPayloadFlow` through the existing `payloadReaderFor` / `payloadReaderFrom` seam
   (`gui/unlock_program_test.go`), built by the `sealVector(…).blob` pattern from the vendored
   `seal_v2_vectors.json`. No test reads flash or the network.
@@ -508,7 +523,7 @@ marks live in the session (`syswSession`), cleared by LOAD AGAIN and UNLOAD; not
 ## 8. Existing tests that change (rule: rewrite in the RED commit of the phase that changes it; delete only when a named new test replaces it)
 
 CHANGE rejects_bad_magic_version_reserved_kdf_and_aead | ME-2 | me | me-cli | - | its `(8, 0x02, "version")` case becomes `(8, 0x03, "version")`
-CHANGE assert_every_named_test_is_placed | ME-1 | me | me-cli | - | `HIGHEST` 23 → 32; tests 24-27 placed as `Vector`/`Cli`, 28-32 as `DeviceUnbuilt` until SH-2, then `Device`
+CHANGE assert_every_named_test_is_placed | ME-1 | me | me-cli | - | `HIGHEST` 23 → 32; entries `(24, Where::Unit("sysw_mr_string_vectors"))`, `(25, Where::Unit("sysw_mr_set_vectors"))`, `(26, Where::Unit("sysw_mr_kit_vectors"))`, `(27, Where::Cli)`, and 28-32 as `Where::DeviceUnbuilt("<S1 § and the fork phase>")` (flipped to `Where::Device` by SH-2 step 3)
 CHANGE a_valid_bip93_string_is_told_it_is_bip93_and_not_a_constellation_ms1 | ME-1 | me | me-cli | - | `not an md1/mk1/ms1/mt1 string` → `not an md1/mk1/mr1/ms1/mt1 string`
 CHANGE a_record_of_no_class_at_all_still_names_the_classifier | ME-1 | me | me-cli | - | the same text change
 CHANGE TestRejectsBadMagicVersionReservedKDFAndAEAD | SH-3 | sh | ./seal/ | - | its `{8, 0x02, ErrUnknownVersion}` case becomes `{8, 0x03, ErrUnknownVersion}`
@@ -524,7 +539,10 @@ so they stay green), and the ten test files pinning "SECRET seed material" (`gui
 
 No release other than an alpha, of a fork build carrying this plan's SH-3/SH-4 code, is tagged while this repo's
 FOLLOWUPS F-124 or F-123 is OPEN. `scripts/plan-gate-fork-refugium-kit.sh release` exits 1 and prints "G-REL:
-F-124 OPEN" / "G-REL: F-123 OPEN" while either is; the release ritual runs it. F-123's fix (README security
+F-124 OPEN" / "G-REL: F-123 OPEN" while either is; the release ritual runs it. It fails closed: a missing FOLLOWUPS file exits 2, and only a `**Status:** CLOSED`
+entry clears an id (a renamed heading prints "G-REL: <id> not found", exit 1). SH-4's GREEN commit adds to the fork's
+CLAUDE.md a "Release" hazard line: before tagging any fork release other than an alpha, run `ME_WT=<mnemonic-engrave
+master checkout> <that checkout>/scripts/plan-gate-fork-refugium-kit.sh release`; exit non-zero blocks the tag. F-123's fix (README security
 section, EPD §2.2 item 12, sysw spec §11 say the classes differ in behaviour, not in whether funds are safe if
 the machine is taken; S1b §14.11 already folds EPD §2.3) is docs. What remedies F-124 on the kit path is STOP-1.
 
@@ -533,9 +551,9 @@ the machine is taken; S1b §14.11 already folds EPD §2.3) is docs. What remedie
 `scripts/plan-gate-fork-refugium-kit.sh` modes: `static` (no code fence in this plan; ROW/CHANGE/WALK/HW lines
 unique and in a listed PHASE; every coverage-map quote occurs in its spec at the pinned revision; every owner cell
 names a row of this plan or reads "not this plan's: …"; the two owed vectors recomputed with the S1b generator
-equal §3's values), `counts` (each ROW and CHANGE's `now` count at the baselines; `--built` checks `built`),
-`probes` (the three RED probes against a clean fork checkout), `selftest` (the gate shown RED on three broken
-copies), `release` (§9). It does not cover: whether a Rule cell is the right behaviour, the rows' RED/GREEN runs
+equal §3's values), `counts` (each ROW and CHANGE's `now` count at the baselines; `--built [PHASES]` checks `built`, for the comma-separated phases only when given),
+`probes` (the three RED probes against a clean fork checkout), `selftest` (the gate shown RED on four broken
+copies, on a missing and a renamed FOLLOWUPS entry for `release`, and on `counts --built ME-1`), `release` (§9, fail-closed). It does not cover: whether a Rule cell is the right behaviour, the rows' RED/GREEN runs
 after the baseline (the phase builds run them), the emulator walks, hardware rows, and any spec sentence outside
 S1 §14b-§14g and S1b §14.2-§14.8.
 

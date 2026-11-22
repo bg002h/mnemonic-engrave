@@ -148,3 +148,4 @@ S1b	14.8	so `ParseHeader` must accept v2 for a v2 blob to	TestBoundBlobReadsV2
 S1b	14.8	The titles block is decoded	TestV2TitlesRefusals
 S1b	14.8	The firmware still never writes flash (§4.1).	not this plan's: S3 (mr-sitting erases the region)
 S1b	14.8	**Hardware row H-v2**	HW H-v2
+S1b	14.7	refuses an empty list as `Empty` and a title outside the 33 as `Line(i + 2)`	encode_titles_refuses_empty_and_unknown_titles

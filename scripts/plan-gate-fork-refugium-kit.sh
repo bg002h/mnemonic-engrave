@@ -3,18 +3,19 @@
 #
 # Modes:
 #   static             (default) plan and coverage-map checks; needs ME_REPO (a clone holding the S1/S1b spec commits)
-#   counts [--built]   each ROW / CHANGE line's count: `now=` at the baselines, or `built=` (and CHANGE present) with --built;
+#   counts [--built [PHASES]]  each ROW / CHANGE line's count: `now=` at the baselines, or `built=` (and CHANGE present) with
+#                      --built; PHASES (comma-separated, e.g. ME-1,SH-1) limits the check to those phases' lines;
 #                      needs FORK (a seedhammer checkout) and ME_WT (a mnemonic-engrave checkout); Go from GO_BIN
 #   probes             the plan's RED probes against FORK (must be a clean checkout at the fork baseline)
 #   selftest           shows this gate going RED: runs `static` on broken copies of the plan and the map
-#   release            the G-REL gate (plan §9): exit 1 while F-124 or F-123 is OPEN in ME_WT's design/FOLLOWUPS.md
+#   release            the G-REL gate (plan §9): fail-closed: exit 1 unless F-124 and F-123 are both CLOSED in ME_WT's design/FOLLOWUPS.md (exit 2 if the file is missing)
 #
 # Env: PLAN, COV (default: this repo's plan and map), ME_REPO (default /scratch/code/shibboleth/mnemonic-engrave),
 #      FORK, ME_WT, GO_BIN (default /home/bcg/.local/go/bin), CARGO_TARGET_DIR (counts: set your own).
 #
 # NOT COVERED: whether a Rule cell is the right behaviour; the rows' RED/GREEN runs after the baseline (each phase's
 # build runs them); the emulator walks (WALK lines) and hardware rows (HW lines), which are run by hand; any spec
-# sentence outside S1 §14b-§14g and S1b §14.2-§14.8; spec sentences the map does not quote.
+# sentence outside S1 §14b-§14g and S1b §14.2-§14.8 (plus the one §14.7 map line; the §14.10 row names are not machine-checked); spec sentences the map does not quote.
 set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 PLAN="${PLAN:-$here/design/IMPLEMENTATION_PLAN_fork_refugium_kit.md}"
@@ -104,7 +105,7 @@ PY
 }
 
 counts() {
-	local built="${1:-}" field=now
+	local built="${1:-}" field=now phases="${2:-}"
 	[ "$built" = "--built" ] && field=built
 	: "${FORK:?set FORK to a seedhammer checkout}" "${ME_WT:?set ME_WT to a mnemonic-engrave checkout}"
 	: "${CARGO_TARGET_DIR:?set CARGO_TARGET_DIR (your own)}"
@@ -121,10 +122,11 @@ counts() {
 		done
 	done
 	local rc=0
-	PLAN="$PLAN" FIELD="$field" TMP="$tmp" python3 -I - <<'PY' || rc=$?
+	PLAN="$PLAN" FIELD="$field" TMP="$tmp" PHASES="$phases" python3 -I - <<'PY' || rc=$?
 import os, re, sys
 plan = open(os.environ["PLAN"], encoding="utf-8").read()
 tmp, field = os.environ["TMP"], os.environ["FIELD"]
+phases = set(filter(None, os.environ["PHASES"].split(",")))
 me = [l.split()[-1].split("::")[-1] for l in open(f"{tmp}/me.txt") if l.strip()]
 def golist(pkg, tags):
     p = f"{tmp}/go" + re.sub(r"[^a-z0-9]", "_", pkg + tags) + ".txt"
@@ -135,6 +137,8 @@ def golist(pkg, tags):
 errs = 0; n = 0
 for name, phase, repo, target, tags, now, built in re.findall(
         r"^ROW (\S+) \| (\S+) \| (me|sh) \| (\S+) \| (\S+) \| now=(\d+) \| built=(\d+)$", plan, re.M):
+    if phases and phase not in phases:
+        continue
     got = me.count(name) if repo == "me" else golist(target, tags).count(name)
     want = int(now if field == "now" else built)
     n += 1
@@ -142,6 +146,8 @@ for name, phase, repo, target, tags, now, built in re.findall(
         errs += 1; print(f"FAIL ROW {name} ({repo} {target} {tags}): {got}, want {field}={want}")
 for name, phase, repo, target, tags in re.findall(
         r"^CHANGE (\S+) \| (\S+) \| (me|sh) \| (\S+) \| (\S+) \|", plan, re.M):
+    if phases and phase not in phases:
+        continue
     got = me.count(name) if repo == "me" else golist(target, tags).count(name)
     deleted = "deleted;" in re.search(rf"^CHANGE {name} \|.*$", plan, re.M).group(0)
     want = 1 if field == "now" else (0 if deleted else 1)
@@ -201,17 +207,37 @@ selftest() {
 	sed '2s/TestSyswMrStringVectors$/TestNoSuchRow/' "$COV" >"$tmp/c.tsv"
 	PLAN="$PLAN" COV="$tmp/c.tsv" "$0" static >"$tmp/4.log" 2>&1 && rc=0 || rc=$?
 	[ $rc -ne 0 ] && grep -q "owner 'TestNoSuchRow'" "$tmp/4.log" && echo "selftest 4 (bad owner): RED as required, rc=$rc" || { echo "selftest 4: gate did not fail"; fails=1; }
+	# 5. a missing FOLLOWUPS file: release must fail closed with rc 2
+	mkdir -p "$tmp/empty/design"
+	ME_WT="$tmp/empty" "$0" release >"$tmp/5.log" 2>&1 && rc=0 || rc=$?
+	[ $rc -eq 2 ] && grep -q 'G-REL: no ' "$tmp/5.log" && echo "selftest 5 (missing FOLLOWUPS): RED as required, rc=$rc" || { echo "selftest 5: gate did not fail"; fails=1; }
+	# 6. F-124's heading renamed: release must say not found, rc 1
+	mkdir -p "$tmp/ren/design"
+	printf '### F-124: x\n**Status:** CLOSED\n### F-123 x\n**Status:** CLOSED\n' >"$tmp/ren/design/FOLLOWUPS.md"
+	ME_WT="$tmp/ren" "$0" release >"$tmp/6.log" 2>&1 && rc=0 || rc=$?
+	[ $rc -eq 1 ] && grep -q 'G-REL: F-124 not found' "$tmp/6.log" && echo "selftest 6 (renamed heading): RED as required, rc=$rc" || { echo "selftest 6: gate did not fail"; fails=1; }
+	# 7. counts --built ME-1 at the baselines reports exactly the 7 ME-1 ROW failures (needs FORK, ME_WT, CARGO_TARGET_DIR)
+	if [ -n "${FORK:-}" ] && [ -n "${ME_WT:-}" ] && [ -n "${CARGO_TARGET_DIR:-}" ]; then
+		"$0" counts --built ME-1 >"$tmp/7.log" 2>&1 && rc=0 || rc=$?
+		[ $rc -ne 0 ] && grep -q 'counts (built): 10 lines, 7 failures' "$tmp/7.log" && echo "selftest 7 (counts --built ME-1): RED as required, rc=$rc" || { echo "selftest 7: unexpected counts"; fails=1; }
+	else
+		echo "selftest 7 skipped: set FORK, ME_WT, CARGO_TARGET_DIR"
+	fi
 	rm -r -- "$tmp"
 	return $fails
 }
 
 release() {
 	: "${ME_WT:?set ME_WT to a mnemonic-engrave checkout at the release head}"
-	local f="$ME_WT/design/FOLLOWUPS.md" blocked=0 id
+	local f="$ME_WT/design/FOLLOWUPS.md" blocked=0 id st
+	[ -f "$f" ] || { echo "G-REL: no $f"; return 2; }
 	for id in F-124 F-123; do
-		if awk -v h="### $id " 'index($0,h)==1{f=1;next} f&&/^### /{exit} f&&/^\*\*Status:\*\* OPEN/{print; exit}' "$f" | grep -q OPEN; then
-			echo "G-REL: $id OPEN"; blocked=1
-		fi
+		st="$(awk -v h="### $id " 'index($0,h)==1{f=1;next} f&&/^### /{exit} f&&/^\*\*Status:\*\*/{print; exit}' "$f")"
+		case "$st" in
+		'**Status:** CLOSED'*) ;;
+		'') echo "G-REL: $id not found"; blocked=1 ;;
+		*) echo "G-REL: $id OPEN"; blocked=1 ;;
+		esac
 	done
 	[ $blocked -eq 0 ] && echo "G-REL: clear"
 	return $blocked
@@ -219,9 +245,9 @@ release() {
 
 case "$mode" in
 static) static ;;
-counts) counts "${2:-}" ;;
+counts) counts "${2:-}" "${3:-}" ;;
 probes) probes ;;
 selftest) selftest ;;
 release) release ;;
-*) echo "usage: $0 static|counts [--built]|probes|selftest|release" >&2; exit 2 ;;
+*) echo "usage: $0 static|counts [--built [PHASES]]|probes|selftest|release" >&2; exit 2 ;;
 esac
