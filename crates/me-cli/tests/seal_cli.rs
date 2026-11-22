@@ -522,3 +522,56 @@ fn me_hash_reproduces_both_shapes() {
             "a26e d22b b747 dfd0 2367 06ad 14c1 9679",
         ));
 }
+
+/// S1 test 28, sealed half (§14d): the Sealed Payload container still refuses an
+/// mr1 record. GUARD: green before `ClassMr` exists, and it must stay green.
+#[test]
+fn seal_still_refuses_mr1() {
+    let raw = std::fs::read("../../design/vectors/sysw_mr_v1_vectors.json").unwrap();
+    let d: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    let single = d["string_vectors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "single-card")
+        .unwrap()["record"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    let a = me()
+        .args(["seal", "--plaintext", &single, "--out"])
+        .arg(&out)
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(
+        err.contains("unrecognized HRP 'mr' (expected md, mk, ms, or mt)"),
+        "{err}"
+    );
+    assert!(!out.exists(), "a refused run must write nothing");
+}
+
+/// S1b §14.10: `me seal` is unchanged and still writes version 1. GUARD: green
+/// before the v2 library exists, and it must stay green.
+#[test]
+fn me_seal_still_writes_version_1() {
+    let dir = tempfile::tempdir().unwrap();
+    let inp = dir.path().join("secret.txt");
+    // A16, S1b §14.9's 16-byte ms1, and a newline.
+    std::fs::write(&inp, "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f\n").unwrap();
+    let out = dir.path().join("p.uf2");
+    me().args(["seal", "--seal-secret", "--in"])
+        .arg(&inp)
+        .arg("--out")
+        .arg(&out)
+        .assert()
+        .success();
+    let uf2 = std::fs::read(&out).unwrap();
+    // The first block's payload starts at byte 32 of the block.
+    let payload = &uf2[32..];
+    assert_eq!(&payload[..8], b"MNEMBLOB");
+    assert_eq!(payload[8], 0x01, "version");
+    assert_eq!(payload[11], 0x00, "the reserved byte");
+}

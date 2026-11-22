@@ -7,6 +7,17 @@
 //! 10 words rather than letting the user pick.
 //!
 //! Used ONLY as a passphrase: never seed entropy, never derives a wallet.
+//!
+//! WHERE THAT HOLDS (F-125; SPEC_encrypted_payload_delivery §14.11). "Generated,
+//! never user-supplied" binds `me seal`, the Sealed Payload program, and the v2
+//! `pw_form` 0 password. It does not bind the systemwide container, whose
+//! passphrase mode restores a user-supplied passphrase
+//! (`SPEC_systemwide_payloads` §8): there the 25-35 bit figure above is still
+//! correct, and it is why `[cliff]` places every user-supplied passphrase below
+//! the threshold. A v2 `pw_form` n password (6 to 12 words, `seal::open` and
+//! `seal::seal_v2`) is not user-chosen either: the sitting that writes the
+//! payload draws it from the OS CSPRNG, so the argument against a human-chosen
+//! passphrase does not apply to it.
 
 use bip39::{Language, Mnemonic};
 use rand::RngCore;
