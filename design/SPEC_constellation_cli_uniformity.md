@@ -711,10 +711,16 @@ Measured stdout, per verb:
   encode`, `md descriptor --emit md1` and `mk encode`; `--separator` stays
   whitespace-only (§6c) and defaults to `space`. `--out FILE` receives exactly
   the bytes stdout would have carried, grouped or not, as `mt encode --out`
-  does. `--json` ignores both flags. No string is repeated on stderr.
-  Out of scope, unchanged: `ms split` (prints each share once, grouped on stdout
-  by default — F-284) and `ms hashlock` (its stderr card carries the preimage,
-  which stdout never does, so it is the only copy, not a second one).
+  does. `--json` ignores both flags (`ms encode --json --out FILE`: FILE is the
+  artifact and follows `--group-size`; the JSON report stays unbroken). No
+  string is repeated on stderr. Out of scope, unchanged: `ms split` (prints
+  each share once, grouped on stdout by default — F-284). `ms hashlock` also
+  prints its preimage ms1 once (coordinator ruling 2026-11-22, applying Brian's
+  "print once"): in text mode without `--out` its stderr card keeps the grouped
+  string, which is then the only copy (stdout never carries it); under `--out
+  FILE` the card line reads `preimage (ms1):  written to FILE`, and under
+  `--json` it reads `preimage (ms1):  in the JSON (preimage_ms1)`. `--out`
+  together with `--json` is not yet decided (FIX_ms_single_print.md Q1).
 - **`--json` is UNCHANGED and explicitly OUT OF SCOPE this cycle.**
 
 **On `--json`, correcting a false premise (I-8).** An earlier draft excluded
