@@ -152,8 +152,10 @@ publish is a separate command.
 
 ## Phase 3: one pin-bump step per consumer (each is the FIRST commit of that repo's bughunt FIX PR)
 
-The consumer's FIX plan owns everything else in its PR; this plan owns only the pin commit. Order among them
-is free (spec section 10 step 4); the master table order is md, mk, ms, mt, tk. All start after R4. The
+The consumer's FIX plan owns everything else in its PR; this plan owns only the pin commit. Order among C1-C4
+is free (spec section 10 step 4); the master table order is md, mk, ms, mt, tk. C1-C4 start after R4. C5 starts
+only after C1, C2, C3 and C4 have all merged: the toolkit-manual lines it edits describe behaviour each of those
+consumers ships, so C5 lands last. The
 toolkit-manual lines of spec section 9 (`42-md.md:30` and `:219`, `43-ms.md:44-45`, `44-mk-cli.md:42`) exist only in
 mnemonic-toolkit: the C5 tk PR edits all of them, for md, mk, ms, mt and tk. C1-C3 edit no toolkit-manual line (they
 have none), and say so in their descriptions. The source comments of spec section 9 stay with their repo: md-cli
@@ -177,7 +179,7 @@ have none), and say so in their descriptions. The source comments of spec sectio
   `.github/` edit for mt; if mt's workflows reference the git source, that is a STOP for the mt builder.
   Unblocks #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`).
 - [C5] tk (`mnemonic-toolkit`): `"0.1.2"`; `cargo update -p mnemonic-io-lib --precise 0.1.2`; refresh `vendor/` (`cargo vendor --locked vendor/`);
-  pass `ci/repro/vendor-freshness.sh`. Unblocks #14 FIX-tk-secret-file-writes (tk-I3, tk-C1). The two tk tests
+  pass `ci/repro/vendor-freshness.sh`. Start only after C1-C4 have merged (see above). Unblocks #14 FIX-tk-secret-file-writes (tk-I3, tk-C1). The two tk tests
   `crates/mnemonic-toolkit/tests/p3_declined_crate_items.rs` and `crates/mnemonic-toolkit/tests/p3_io_lib_pin.rs` change with #14 (spec section 9), and the
   tk pin PR must keep them green or change them in the same PR: that choice is the tk builder's STOP if the
   tests refuse `0.1.2`.
