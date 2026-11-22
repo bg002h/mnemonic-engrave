@@ -12,11 +12,11 @@
 | What | Where | Revision |
 |---|---|---|
 | Spec S1 (kit door, `ClassMr`, Refugium warning) | this repo `design/SPEC_systemwide_payloads.md` §14 (branch `spec/sysw-class-mr`) | `c4737e8b` (GREEN) |
-| Spec S1b (MNEMBLOB v2) | this repo `design/SPEC_encrypted_payload_delivery.md` §14 (branch `spec/mnemblob-v2`) | `f7c98cbf` (GREEN) |
+| Spec S1b (MNEMBLOB v2) | this repo `design/SPEC_encrypted_payload_delivery.md` §14 (branch `spec/mnemblob-v2`) | `8451c344` (GREEN; f7c98cbf plus the I-3 sentence) |
 | This repo | `master` | `c9c4c54b` |
 | Fork | `bg002h/seedhammer` `origin/main` | `25abe8e` |
 | S1 vectors | `design/vectors/sysw_mr_v1_vectors.json` at `c4737e8b` (13 string, 12 set, 10 kit) | `c4737e8b` |
-| S1b vectors | `scripts/gen-mnemblob-v2-vectors.py` at `f7c98cbf` (16 vectors, `--check` run 2026-11-22: "checked 16 vectors, 0 missing"; this plan adds 2, row `v2_titles_refusals`) | `f7c98cbf` |
+| S1b vectors | `scripts/gen-mnemblob-v2-vectors.py` at `8451c344` (16 vectors, `--check` run 2026-11-22: "checked 16 vectors, 0 missing"; this plan adds 2, row `v2_titles_refusals`) | `8451c344` |
 | Go | 1.26.4 (`/home/bcg/.local/go/bin`); the flake's Go for TinyGo and `nix run .#build-firmware` | measured 2026-11-22 |
 | Rust | `cargo nextest run --locked`, own `CARGO_TARGET_DIR`, never `--release` | 715 tests listed at `c9c4c54b` |
 
@@ -425,7 +425,10 @@ ROW TestRefugiumSealedMS1TextOnlyFallback | SH-4 | sh | ./gui/ | refugium | now=
 - Rule: a v1 payload holding the N-share string or a plain BIP-93 seed → `EngraveSeedStringTextOnly` titled with
   its id; a titled v2 payload holding A20 = `ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqke34pjrgn5p6k` (`ms encode
   --hex -` of 20 zero bytes, ms 0.20.4) titled `SEED A` → text only titled "SEED A"; no plate holds a QR of an ms1
-  string. RED: absent. Mutant: SeedQR for 20-byte entropy.
+  string; also `ms12entraqqqqqqqqqqqqqqqqqqqqqqqqqqqqmzgn0vnkuflf8` (2-of-n share, prefix 0x00) titled by its id `entr` and
+  `ms10testsqqqqqqqqqqqqqqqqqqqqqqqqqqqqpep4hndkvqa6p` titled `test`, both text only with no QR and never "This record does
+  not fit any plate size.". RED: absent. Mutant: SeedQR for 20-byte entropy; no `ParsePrefix` gate (both strings
+  reach `EngraveSeedStringSeedQR` and show "does not fit").
 ROW TestRefugiumSealedMS1WipePoints | SH-4 | sh | ./gui/ | refugium | now=0 | built=1
 - Rule (§5): the entropy slice and the `bip39.Mnemonic` handed to the §7 hooks are all zero before the engrave
   screen's job starts; `rec` is zero as today. RED: absent. Mutant: `clear(m)` after `Engrave` (resident through
@@ -467,7 +470,10 @@ HW H-size | SH-6 | the firmware size recipe (this repo's CLAUDE.md) with `-tags 
 
 ## 5. Wipe points (S1b §14.6 "Spec S2 names the functions"; secret rows kitsealx-*, s1b-*)
 
-- `unlockEngraveCodex32(rec)` (Refugium build) calls a new `unlockCodex32SeedQRPlan(params, s, title)`:
+- `unlockEngraveCodex32(rec)` (Refugium build) first gates on `codex32.ParsePrefix`: a string that is not an unshared
+  `entr` string (threshold `0`, share index `s`, id `entr`; S1b §14.6, S1b head 8451c344, Brian ruling A 2026-11-22) goes
+  straight to `engraveSeedStringPlate` -> `EngraveSeedStringTextOnly`, titled by `<T>` or the codex32 id, never
+  "does not fit". Otherwise it calls a new `unlockCodex32SeedQRPlan(params, s, title)`:
   `codex32.DecodeMS1` → entropy (a view into `s.Seed()`'s fresh slice) → `bip39.New(entropy)` → `m`;
   `backup.EngraveSeedStringSeedQR(params, {Title, Seed, Font, MasterFingerprint 0}, m)`. **ZEROED** before the
   plan returns: `entropy` (and with it the decoded seed bytes after the prefix byte) and `m`; **ZEROED** before

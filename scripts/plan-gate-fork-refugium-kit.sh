@@ -23,7 +23,7 @@ COV="${COV:-$here/design/IMPLEMENTATION_PLAN_fork_refugium_kit-coverage.tsv}"
 ME_REPO="${ME_REPO:-/scratch/code/shibboleth/mnemonic-engrave}"
 GO_BIN="${GO_BIN:-/home/bcg/.local/go/bin}"
 S1_SHA=c4737e8b
-S1B_SHA=f7c98cbf
+S1B_SHA=8451c344
 mode="${1:-static}"
 
 static() {

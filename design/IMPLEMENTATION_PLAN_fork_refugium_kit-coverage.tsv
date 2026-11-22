@@ -136,7 +136,7 @@ S1b	14.5	capacity 128, never regrown) and zeroed on every exit	TestUnlockNWordPa
 S1b	14.6	is cut with `backup.EngraveSeedStringSeedQR` unless the next paragraph's exception applies	TestRefugiumSealedMS1SeedQR
 S1b	14.6	The default build is unchanged (`EngraveSeedString`, text + QR of the string).	TestDefaultBuildSealedMS1Unchanged
 S1b	14.6	today's `This record does not fit any plate size.` is shown and nothing is cut	not this plan's: existing behaviour, unchanged (unlockEngraveCodex32's error path at 25abe8e)
-S1b	14.6	or its entropy is not 16 or 32 bytes, the plate is cut exactly as today in this	TestRefugiumSealedMS1TextOnlyFallback
+S1b	14.6	or the string is not an unshared `entr` string (threshold `0`, share index `s`, id `entr`; `codex32.ParsePrefix`), the plate is cut	TestRefugiumSealedMS1TextOnlyFallback
 S1b	14.6	12-word (16-byte) and 24-word (32-byte) entropies both get the SeedQR.	TestRefugiumSealedMS1SeedQR
 S1b	14.6	The plate carries no fingerprint row	TestRefugiumSealedMS1SeedQR
 S1b	14.6	the `bip39.Mnemonic` built from the entropy for the SeedQR is cleared beside them	TestRefugiumSealedMS1WipePoints
@@ -149,3 +149,4 @@ S1b	14.8	The titles block is decoded	TestV2TitlesRefusals
 S1b	14.8	The firmware still never writes flash (§4.1).	not this plan's: S3 (mr-sitting erases the region)
 S1b	14.8	**Hardware row H-v2**	HW H-v2
 S1b	14.7	refuses an empty list as `Empty` and a title outside the 33 as `Line(i + 2)`	encode_titles_refuses_empty_and_unknown_titles
+S1b	14.6	or its entropy is not 16 or 32 bytes, or the string is not an unshared	TestRefugiumSealedMS1TextOnlyFallback
