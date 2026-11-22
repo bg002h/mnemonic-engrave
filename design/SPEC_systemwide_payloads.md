@@ -1615,6 +1615,10 @@ the primary Rust crate; `md.Reassemble` and its `mk` sibling in the Go port.
 unconfirmed record counts as SECRET.** Nothing is refused: admission (§3.3.2)
 and consumption are untouched.
 
+The set a record belongs to is found by runs (§14d): a record joins the latest
+group of its (hrp, chunk-set id) that holds fewer strings than its count; otherwise it
+opens a new group.
+
 Added 2026-08-12, demoting §5.3.2's refusal — §13 D6 records what it was and
 what the change cost. Host and device compute it identically for the reason
 `[cliff]` is a pure function: it depends only on the record bytes, never on a
@@ -1655,7 +1659,7 @@ that can actually be consumed.
 | D11 (2026-08-12) | §3.2: every screen consuming a payload record names its source | the OFFER screen naming the source satisfies it where the operator picks — Engrave Text and BIP-39 Password render a separate F3 acceptance screen; the `syswOffer` sites do not, and need not | consistent with §3.2 as D5 already scoped it to the entry screen. Recorded so the asymmetry is a reading, not an oversight |
 | D12 (2026-08-12) | §7's every-word verify inherits the seed keyboard's checksum gate | **`checksumGate` is OFF for §7 verification** | a checksum-masked keyboard hides a wrong LAST word, which is exactly the defect a mis-cut plate produces and §7 exists to hunt. The implementer's reasoning beat the plan's; absorbed here so it is not re-litigated |
 | D13 (2026-08-12) | §12.2 `[compared]`: declining the digest comparison leaves the payload loaded-but-unconfirmed, and `take()` refuses it later | **declining UNLOADS it immediately.** `ctx.sysw = nil`, and the operator is told "Not Loaded — Digest not compared. Nothing was loaded." | operator ruling. A payload the machine holds but will not use is a state with no operator meaning: every later screen has to explain why the source it can see is refused. Unloading collapses that to one honest outcome at the moment the operator makes the decision. It costs nothing — the payload is still in flash and the loader can be re-entered — because per D10 the firmware never writes flash. **Implemented in fork `0d2801c`; CONFIRMED ON THE MACHINE 2026-08-13 at `v0.0.0-g20e99a6`** |
-| D14 (2026-11-22, S1) | an mr1 string is `ClassUnknown` and `me sysw pack` refuses it as unrecognised (F-699) | `ClassMr` (§14b); **a broken, incomplete, duplicated, split or mixed mr1 card is REFUSED** at `pack` (exit 4) and at the kit door, never flagged | like D4 it ADDS refusals, against this section's direction, and earns them the same way: an mr1 record has one consumer, the kit door, whose product is a recovery card on steel. A partial card there is a backup that cannot be read, and no legitimate payload carries one (unlike D6's single md1 card of a set, which `bundleFlow` seeds with). The load itself still refuses nothing (§14e). Basis: Brian 2026-11-22, Q6 (kit door in Engrave Bundle) and "rest per synthesis" (the synthesis's mr1 refusal list and chunk-set rule) |
+| D14 (2026-11-22, S1) | an mr1 string is `ClassUnknown` and `me sysw pack` refuses it as unrecognised (F-699) | `ClassMr` (§14b); **a broken, incomplete, with a chunk repeated inside one copy, split or mixed mr1 card is REFUSED** at `pack` (exit 4) and at the kit door, never flagged | like D4 it ADDS refusals, against this section's direction, and earns them the same way: an mr1 record has one consumer, the kit door, whose product is a recovery card on steel. A partial card there is a backup that cannot be read, and no legitimate payload carries one (unlike D6's single md1 card of a set, which `bundleFlow` seeds with). The load itself still refuses nothing (§14e). Basis: Brian 2026-11-22, Q6 (kit door in Engrave Bundle) and "rest per synthesis" (the synthesis's mr1 refusal list and chunk-set rule) |
 
 **What was NOT demoted**, because none of it refuses anything: F2 still warns
 that a payload was weakly protected; F1 still warns that a secret sits
@@ -1761,9 +1765,8 @@ index (6 bits). The bytes after the header are the chunk's **slice**.
 
 The rule runs over every `ClassMr` chunk of a payload, after every candidate
 has passed §14b. Chunks are grouped into **sets** in payload order: a
-chunk joins the set most recently opened when that set has the chunk's
-chunk-set id and holds fewer chunks than its first chunk's count; otherwise it
-opens a new set. Two sets with one chunk-set id are two copies of a card, each
+chunk joins the latest set with its chunk-set id when that set holds fewer
+chunks than its first chunk's count; otherwise it opens a new set. Two sets with one chunk-set id are two copies of a card, each
 its own card in the kit list (S4 E6-14 item 2). Sets are taken in the order of
 their first record in the payload, and the first set that breaks a rule is
 refused with that rule, checked in this order:
@@ -1811,11 +1814,10 @@ the first failure is its reason:
 | 4 | `KIT_UNCONFIRMED_MDMK` | a `ClassMDMK` record, in payload order, is unconfirmed under `[mdmk-decode]` (§12.6) |
 | 5 | `CARD_SPLIT` | an md1 or mk1 card (one `[mdmk-decode]` group; a single-string md1 is a card alone) has a record of another card between its first and last record |
 
-For a payload that offers a kit, `[mdmk-decode]` (§12.6) groups md1/mk1
-records by the same run rule (a record joins the latest group of its (hrp,
-chunk-set id) while that group holds fewer strings than its count), on host
-and device alike, so two complete copies of one mk1 card each confirm; F1, F2
-and F4 read the same grouping.
+`[mdmk-decode]` (§12.6) groups md1/mk1 records, in every payload, by the same run rule
+(a record joins the latest group of its (hrp, chunk-set id) while that group holds fewer
+strings than its count), on host and device alike, so two complete copies of one mk1
+card each confirm; F1, F2 and F4 read the same grouping.
 
 An eligible kit is a list of **cards** in the order of their first record: an
 mr1 card (a single string or one set), an mk1 card or an md1 card. Each card
@@ -1844,7 +1846,6 @@ plate against a worst-case title AND footer of 18 of the font's widest glyph
 (`bundlePlateFitMark`, `backup.MaxTitleLen`), so marking a plate changes no
 plate count. Plate p of q of card k of N carries the title "CARD k/N" and the
 footer "PLATE p/q" (STOP-3, RULED 2026-11-22). M is the total number of plates of the N cards.
-The packer's port in mr-gui (contract S5) uses the same geometry.
 
 **The payload menu (Load Payload, and at boot).** After a payload loads (the
 digest was compared, §12.2), when the payload offers a kit:
@@ -1958,8 +1959,8 @@ of the set's or card's first record in payload order; `{k}` is the card's kind;
 | `MR_CHUNK_PADDING` | {R} is an mr1 chunk that does not end the way mr ends a chunk (0 to 4 zero bits after its last byte). |
 | `SET_COUNT` | The mr1 card that begins {B} disagrees with itself: {r} says the card has {c} chunks, but its first chunk says {c0}. |
 | `SET_INDEX` | The mr1 card that begins {B} has {c} chunks, numbered 0 to {cm1}, but {r} is numbered {i}. |
-| `SET_DUPLICATE` | The mr1 card that begins {B} holds chunk {i} twice: {rr}. Each chunk goes in the payload once. |
-| `SET_MISSING` | The mr1 card that begins {B} is incomplete: chunk {i} of its {c} chunks is missing (chunks are numbered from 0). |
+| `SET_DUPLICATE` | The mr1 card that begins {B} holds chunk {i} twice: {rr}. Each copy of a card holds each chunk once, and a copy must be complete before the next copy starts. |
+| `SET_MISSING` | The mr1 card that begins {B} is incomplete: chunk {i} of its {c} chunks is missing (chunks are numbered from 0), or a chunk repeated after a complete copy began a second, incomplete copy. |
 | `SET_SLICES` | The mr1 card that begins {B} is not divided into chunks the way mr divides a card, so mr did not write it. |
 | `SET_ID` | The mr1 card that begins {B} does not match its own chunk-set id: its chunks come from different cards, or one was altered. |
 | `CARD_SPLIT` | The {k} card that begins {B} is split: {r} sits between its strings but is not part of it. Keep each card's strings together. |
@@ -2068,7 +2069,7 @@ their construction in `why`. Counts: 13 string, 12 set and 10 kit vectors.
 - mr (S3) and mr-gui (S4): the kit payload writer must satisfy §14c and
   §14d, and mr-gui's rows use the kit list's card order and its begins/ends.
 
-### 14j. STOPs — open product questions, with recommendations
+### 14j. STOPs — product questions, all ruled 2026-11-22
 
 - **STOP-1. Does any implementation decode an mr1 card before engraving it?**
   RULED (a), Brian 2026-11-22.
@@ -2083,8 +2084,7 @@ their construction in `why`. Counts: 13 string, 12 set and 10 kit vectors.
 - **STOP-2. Does the §14f line also appear for a SEALED systemwide payload
   holding a secret, in the Refugium build?** RULED (a), Brian 2026-11-22. Q3 named the plaintext case. (a)
   Yes, the same line, since the Refugium rule is about the container that
-  carries secrets, not about encryption; (b) no, plaintext only (the text
-  above). **Recommended: (a).**
+  carries secrets, not about encryption; (b) no, plaintext only. **Recommended: (a).**
 - **STOP-3. The engraved marks.** RULED (a), 2026-11-22 (decided by the
   coordinator, to WORDING_REVIEW). The recommended "Card k/N · Plate p/q"
   cannot be cut as written: "·" is not in the engraving font (only printable

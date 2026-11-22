@@ -182,15 +182,16 @@ def set_problem(records):
     """First (code, detail) of the mr1 chunk-set rule over a payload, or None.
 
     Assumes every mr1 candidate already passed the string rule."""
-    # Sets are RUNS (§14c): a chunk joins the set most recently opened when that set has
-    # the chunk's chunk-set id and holds fewer chunks than its first chunk's count;
-    # otherwise it opens a new set. Two sets with one id are two copies of a card.
+    # Sets are RUNS (§14c): a chunk joins the latest set with its chunk-set id when
+    # that set holds fewer chunks than its first chunk's count; otherwise it opens a
+    # new set. Two sets with one id are two copies of a card.
     sets = []  # (csid, [record indices])
     for i, r in enumerate(records):
         if is_candidate(r) and is_chunk(r):
             h = chunk(r)
-            if sets and sets[-1][0] == h[0] and len(sets[-1][1]) < chunk(records[sets[-1][1][0]])[1]:
-                sets[-1][1].append(i)
+            lat = [s for s in sets if s[0] == h[0]]
+            if lat and len(lat[-1][1]) < chunk(records[lat[-1][1][0]])[1]:
+                lat[-1][1].append(i)
             else:
                 sets.append((h[0], [i]))
     for csid, idx in sets:
