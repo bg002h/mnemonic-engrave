@@ -23,7 +23,7 @@ people); the correctness of the wording of any test name (the names come from th
 ## Step order (phase 1: mnemonic-engrave)
 
 Base and branch: the coordinator names them in the build brief. Worktree not under `/tmp`; `$HOME/.cargo/bin`
-first in PATH; `cargo --version` must say 1.85.0 (the repo's CI pin; `scripts/lint-gate.sh` uses +1.85.0);
+first in PATH; `export RUSTUP_TOOLCHAIN=1.85.0` (the rustup default here is nightly; the gate exports it for its own steps only) so that `cargo --version` says 1.85.0 for every other cargo call, mutant runs included (the repo's CI pin; `scripts/lint-gate.sh` uses +1.85.0);
 every cargo call `--locked`; nextest `--build-jobs 6 -j 6`; never `--release`; a private `CARGO_TARGET_DIR`.
 
 - [T1] Read `CLAUDE.md` and `AGENTS.md` of the repo. Run `gate red1` BEFORE writing anything: it must fail with
@@ -167,7 +167,7 @@ have none), and say so in their descriptions. The source comments of spec sectio
 - [C3] ms (`mnemonic-secret`): replace the git dependency by `"0.1.2"`; `cargo update -p mnemonic-io-lib` with
   no `--precise`; the lock shows `version = "0.1.2"` with the crates.io source; refresh `vendor/` (`cargo vendor --locked vendor/`); delete the
   `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line of
-  `ci/repro/vendor-git-sources.txt`; pass `ci/repro/vendor-freshness.sh`; edit `.github/workflows/man-release.yml`
+  `ci/repro/vendor-git-sources.txt`; pass `ci/repro/vendor-freshness.sh`; then `git add -A vendor/ ci/repro/vendor-git-sources.txt` (the vendored crate gains a new untracked `Cargo.lock`; commit it, a clean checkout fails freshness without it) and run `bash ci/repro/vendor-freshness.sh` once more from a fresh clone of the branch; edit `.github/workflows/man-release.yml`
   as spec section 10 step 4 lists (delete the `pins` job and `needs: pins`; delete `git_source_url` and
   `git_source_rev`; in both musl steps delete the `IO_LIB_REV` and `IO_LIB_SRC` lines and the three
   `--config "source...` lines, and the `-e IO_LIB_REV="$IO_LIB_REV" \` line in the x86_64 `docker run` step).
