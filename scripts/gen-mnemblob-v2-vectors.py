@@ -37,6 +37,8 @@ MS1 = {
     "G": "ms10entrsqpnxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxvenxv9jwqcdg9hrrgt",
     "P": "ms10entrsqrllllllllllllllllllllllllllllllllllllllllllllllllll7ydtcvhdp9ycqe",
 }
+# A BIP-93 K-of-N share (not an entr string): N-share's record 0 (S1b review r1 I-2).
+SHARE = "ms13casha320zyxwvutsrqpnmlkjhgfedca2a8d0zehn8a0t"
 # Vector D's public cards and ms1 (crates/me-cli/testdata/seal_vectors.json).
 D_PUBLIC = [
     "mk1qpz63tpqqsq3dg4m5wdx5fvqqvzg3vs7mpf0rz2j43zpzpxk0rtjkqkhwreqp6hm7qnp3a8wdvtz6t2k4uxu6ykwxcp9vqugfjyx733cf59g",
@@ -72,8 +74,12 @@ def ms1_payload(s):
 
 
 def ms1_letter(s):
+    """None unless s is an unshared entr ms1 (k '0', payload prefix 0x00, 16 to 32 entropy bytes)."""
+    if not s.startswith("ms10"):
+        return None
     p = ms1_payload(s)
-    assert p[0] == 0x00, "ms1 reserved-prefix byte"
+    if p[0] != 0x00 or not 16 <= len(p) - 1 <= 32:
+        return None
     return chr(ord("A") + (p[1] >> 4))
 
 
@@ -175,6 +181,9 @@ def vectors():
         # The accepted side at exactly 600,000 with byte 11 = 6 is V2-A; byte 11 = 0 at 100,000 is V2-C.
         build("N-floor-599999", 6, BEEF6, 599_999, rep("0bee", 8), rep("0c0c", 6), [],
               [MS1["A16"], MS1["P"], titles_record(["title SEED A", "title KEEP; DO NOT LOAD"])]),
+        # S1b review r1 I-2: a BIP-93 share is an ms1 but has no entr letter (device NonMs1Secret(0), T-1).
+        build("N-share", 6, BEEF6, 600_000, neg_salt, rep("0c0d", 6), [],
+              [SHARE, MS1["P"], titles_record(["title SEED A", "title KEEP; DO NOT LOAD"])]),
         build("N-v1-text", 0, BEEF12, 100_000, neg_salt, rep("0c0b", 6), [],
               [MS1["A16"], titles_record(["title SEED A"])], version=1),
     ]
