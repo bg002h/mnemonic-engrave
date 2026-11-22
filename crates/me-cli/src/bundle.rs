@@ -615,7 +615,7 @@ fn note_missing_keys(
                 .iter()
                 .flatten()
                 .find(|(idx, _)| *idx == i)
-                .map(|(_, fp)| fp.iter().map(|b| format!("{b:02x}")).collect()),
+                .map(|(_, fp)| format!("{:02x}{:02x}{:02x}{:02x}", fp[0], fp[1], fp[2], fp[3])),
         })
         .collect();
     if missing_slots.is_empty() {

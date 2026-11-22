@@ -64,11 +64,12 @@ fn expected(case: &str) -> (Vec<String>, serde_json::Value) {
 /// manifest's `missing_keys` equals the case's `.missing.json` (`null` =
 /// absent). Returns stderr.
 fn run_case(case: &str, inputs: &[&[&str]]) -> String {
-    let stdin: String = inputs
+    let stdin = inputs
         .iter()
         .flat_map(|f| f.iter())
-        .map(|l| format!("{l}\n"))
-        .collect();
+        .copied()
+        .collect::<Vec<_>>()
+        .join("\n");
     let out = Command::cargo_bin("me")
         .unwrap()
         .arg("bundle")
