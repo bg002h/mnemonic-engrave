@@ -62,7 +62,7 @@ check_plan() {
       grep -qF "[$id]" "$PLAN" || bad "plan lacks row id $id"
     fi
   done < <(rows_from_spec)
-  [ "$total" -eq 29 ] && ok "29 spec rows (17 W + 10 S + 2 existing)" || bad "spec rows found: $total (expected 29)"
+  [ "$total" -eq 32 ] && ok "32 spec rows (19 W + 11 S + 2 existing)" || bad "spec rows found: $total (expected 32)"
   # coverage map
   local lines=0 missing=0 noowner=0 line owner quote
   while IFS=$'\t' read -r _ _ quote owner; do
@@ -126,10 +126,6 @@ mode_green() {
   while read -r id name; do
     grep -qE "PASS .*write::tests::$name\$" "$OUT/green-io.txt" || bad "row $id $name did not PASS"
   done < <(rows_from_spec)
-  # W19 and S11 are named by the me#41 review s2 fold, not by a spec section-8 row
-  for name in dev_fd_1_on_a_regular_file_is_written_directly stdin_redirected_from_the_output_file_is_the_same_file; do
-    grep -qE "PASS .*write::tests::$name\$" "$OUT/green-io.txt" || bad "row $name did not PASS"
-  done
   nextest green-ws --workspace --all-targets
   grep -E 'Summary' "$OUT/green-ws.txt" | tail -1
   grep -qE 'Summary .* 0 failed|Summary .* [0-9]+ passed(, [0-9]+ skipped)?$' "$OUT/green-ws.txt" && ! grep -qE '^ +(FAIL|TIMEOUT|SIGABRT) ' "$OUT/green-ws.txt" \

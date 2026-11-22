@@ -92,6 +92,7 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [W14] | GREEN | propagate the directory-sync error |
 | [W15] | GREEN | open the temp with truncate instead of `create_new`, overwriting a stale leftover |
 | [W16] | GREEN | loop 101 times, or return `NotFound` after the last name |
+| [W18] | GREEN | no fallback on 45 (the plain `fsync` is never called); or fall back on any error; or fall back on every platform, not Apple only; or ignore the 45 instead of calling the plain `fsync` |
 | [S1] | RED-2 compile error | always `None` |
 | [S2] | RED-2 compile error | compare canonical paths only (misses a hard link) |
 | [S3] | RED-2 compile error | `symlink_metadata` instead of `metadata` |
@@ -106,7 +107,7 @@ code that the row must turn red; the build report pastes each mutant's failing r
 
 A mutant that no row turns red is a STOP: paste it and report.
 
-Counts the gate checks: 17 W rows + 10 S rows + 2 existing rows + `child` = 30 tests in `write::tests::` at
+Counts the gate checks: 17 W rows + 10 S rows + 2 existing rows + `child` = 33 tests in `write::tests::` at
 GREEN; 15 at RED-1 (W1-W11, W17, the 2 existing, `child`), 4 failing.
 
 ## Existing tests and files that change (rule per file)

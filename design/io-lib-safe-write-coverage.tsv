@@ -40,7 +40,7 @@
 40	4	| hard-linked target | ATOMIC | replaced at the given name only	W3
 41	4	| directory without write permission, writable file in it | step 4 fails |	W4
 42	4	| ENOSPC / quota / EFBIG during the write | step 7 fails |	W1
-43	4	| failure at fsync of the data | step 7 fails | same |	W13
+43	4	| failure at fsync of the data | step 7 fails | same (on Apple, ENOTSUP from `F_FULLFSYNC` first retries with a plain `fsync`; only that one's failure refuses) |	W13
 44	4	| run killed mid-write | none | old kept;	W2
 45	4	| rename refused (bind-mounted target, cross-device, busy, Windows sharing) | step 8 fails |	W13
 46	4	| directory fsync fails after the rename | step 10 | ignored; `Ok` |	W14
@@ -77,7 +77,7 @@
 77	8	attribute becomes `#[cfg(test)]` (today `#[cfg(all(test, unix))]`)	T2
 78	8	RED-1 adds W1-W4 and the GREEN guards W5-W11 and W17	T2
 79	8	RED-2 adds S1-S10: the build fails with E0425 on `same_file`; record that output.	T3
-80	8	W12-W16 land in the GREEN commit, with the seam and the temp-name function they call.	T4
+80	8	W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name function they call.	T4
 81	8	a `#[cfg(test)]` thread-local `Cell<Option<Step>>`	W13
 82	8	No row writes to `/dev/null` or any device	S9
 83	8	Windows and macOS run no row of this spec	T4
@@ -102,3 +102,5 @@
 102	3	A hop whose path is a stdio alias (step 1) gives	CODE
 103	3	any other `Err`: DIRECT (the open then reports its own error, as today).	CODE
 104	2	**The library authors no error text**	CODE
+105	3	On Apple targets a `sync_all` error with `raw_os_error() == Some(45)` (ENOTSUP) is followed by a plain `fsync(2)`, whose result is step 7's result (section 6, macOS).	W18
+106	2	`Stdin` covers `--out X < X`	S11

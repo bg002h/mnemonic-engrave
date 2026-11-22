@@ -220,6 +220,7 @@ W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name functi
 | W10 `dev_stdout_on_a_pipe_is_written_directly` (unix) | GREEN guard | child with piped stdout calls `write_private("/dev/stdout", b"via-dev-stdout")` | child stdout contains `via-dev-stdout`; child reports `child-result: Ok` | GREEN |
 | W11 `a_250_byte_file_name_is_written` | GREEN guard | target name of 250 `a` bytes | `Ok`; bytes; dir holds only the target | GREEN |
 | W17 `dev_stdout_on_a_regular_file_is_written_directly` (unix) | GREEN guard | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/stdout", b"via")` | `f` keeps its inode number, starts with `via` (not equal: libtest's own stdout lines may precede), mode 0600; dir holds only `f` | GREEN |
+| W19 `dev_fd_1_on_a_regular_file_is_written_directly` (unix) | new | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/fd/1", b"via")` | `f` keeps its inode number and starts with `via`; the child reports `child-result: Ok` | n/a |
 | W12 `the_temp_name_is_the_target_name_or_the_fallback` | new | calls the private temp-name function | 200-byte name -> `<name>.7.3.tmp` for pid 7, n 3; 201-byte name -> `mnemonic-io-lib.7.3.tmp` | n/a (new function) |
 | W13 `a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file` | new | old `card.txt` = `old`; for each step of the platform (unix: `CreateTemp`, `Preflight`, `Chmod`, `Write`, `Sync`, `Rename`; other: `CreateTemp`, `Preflight`, `Write`, `Sync`, `Rename`) inject an error | `Err` whose `Display` is `injected at <Step>`; bytes `old`; dir holds only the target | n/a (new branch) |
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |
@@ -236,6 +237,7 @@ W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name functi
 | S8 `stdin_and_stdout_on_pipes_never_match` (unix) | RED (compile) | child with piped stdin and stdout | child reports `child-result: None` for `same_file(Stdout, [Stdin])` | E0425 |
 | S9 `a_non_regular_path_never_matches` (unix) | RED (compile) | `/dev/null` vs `[/dev/null]` (metadata only, never written) | `None` | E0425 |
 | S10 `an_unreadable_lookup_never_matches` (unix) | RED (compile) | `d/x` with `d` at mode 0 vs `[d/x]`; same root precondition as W4 | `None` | E0425 |
+| S11 `stdin_redirected_from_the_output_file_is_the_same_file` (unix) | new | child with stdin = `File` opened on `f` | child reports `child-result: Some(0)` for `same_file(Path(f), [Stdin])` | n/a |
 
 Fault seam (test-only, **PROPOSED**): a `#[cfg(test)]` thread-local `Cell<Option<Step>>`, with a private
 `enum Step { CreateTemp, Preflight, Chmod, Write, Sync, Rename, DirSync }` (`Chmod` is step 6, the temp's chmod); at the start of each step, if the cell names it,
