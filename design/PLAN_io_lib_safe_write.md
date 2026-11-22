@@ -37,14 +37,17 @@ every cargo call `--locked`; nextest `--build-jobs 6 -j 6`; never `--release`; a
 - [T3] **RED-2 commit.** Add S1-S10. `gate red2` must show the unit-test build failing with `E0425` naming
   `same_file`; paste the whole compiler output in the commit message (the spec says "record that output";
   the spec's r3 nit N2 notes an `E0433` on `Endpoint::` may appear too: record it, it is not a STOP).
+  S1-S10 reach the new names through `use super::*;`, added to `mod tests` in this commit (not
+  `use super::{same_file, Endpoint}`: that gives E0432 only and fails gate `red2`).
 - [T4] **GREEN commit.** Add the private `Step` enum, the thread-local seam, the temp-name function and rows
   W12-W16; implement `write_private` (spec section 3, steps 1 to 11), `Endpoint` and `same_file` (sections 2
   and 5, Windows differences per section 6); make the doc edits of spec section 2 item 5 (module doc, the
   sentence at `lib.rs:73`, `channel.rs` lines that say "tightening the OPEN file"). `crates/mnemonic-io-lib/Cargo.toml` `[dependencies]` stays
-  empty. Gate `green` must pass (30 rows in `write::tests::`, all pass; whole workspace nextest; doctests;
+  empty. Gate `IOLIB_PRE_BUMP=1 scripts/io-lib-safe-write-gate.sh green` must pass (it skips only the two
+  version checks; 30 rows in `write::tests::`, all pass; whole workspace nextest; doctests;
   lint-gate; Windows and macOS compile checks). The mutant table is then run by hand.
 - [T5] **Version commit** (separate, last; plan decision, the spec only says the PR carries it):
-  `crates/mnemonic-io-lib/Cargo.toml` 0.1.1 to 0.1.2 and the one `Cargo.lock` entry. Gate `green` again.
+  `crates/mnemonic-io-lib/Cargo.toml` 0.1.1 to 0.1.2 and the one `Cargo.lock` entry. Gate plain `green` (no `IOLIB_PRE_BUMP`) again.
 - [T6] The PR (full track through `ci/staging`, coordinator lands it). FOLLOWUPS lines are listed in the
   build report, not added in the PR.
 
@@ -74,8 +77,8 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [W3] | RED-1 fails, both names new | keep DIRECT (open in place) for any existing file; or `fs::copy` over the final name |
 | [W4] | RED-1 fails, `Ok` | on a failed temp create fall back to DIRECT |
 | [W5] | RED-1 passes (guard) | leave the temp behind after success |
-| [EX1] `an_existing_world_readable_target_is_tightened_not_inherited` | passes (guard) | temp created 0644 |
-| [EX2] `a_shrinking_overwrite_leaves_no_stale_tail` | passes (guard) | open the existing file without truncation |
+| [EX1] `an_existing_world_readable_target_is_tightened_not_inherited` | passes (guard) | temp created 0644 and step 6's chmod deleted |
+| [EX2] `a_shrinking_overwrite_leaves_no_stale_tail` | passes (guard) | REPLACE sent to DIRECT, and DIRECT's `set_len(0)` deleted |
 | [W6] | RED-1 passes (guard) | skip the preflight, so the rename silently replaces a read-only file |
 | [W7] | RED-1 passes (guard) | rename over the link name, replacing the link by a file |
 | [W8] | RED-1 passes (guard) | create the absent target at the link name |
@@ -98,6 +101,8 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [S8] | RED-2 compile error | let `NonRegular` match `NonRegular` (two pipes would match) |
 | [S9] | RED-2 compile error | compare by path for non-regular files (`/dev/null` matches itself) |
 | [S10] | RED-2 compile error | let `Unknown` match, or panic on a lookup error |
+
+A mutant that no row turns red is a STOP: paste it and report.
 
 Counts the gate checks: 17 W rows + 10 S rows + 2 existing rows + `child` = 30 tests in `write::tests::` at
 GREEN; 15 at RED-1 (W1-W11, W17, the 2 existing, `child`), 4 failing.
@@ -139,20 +144,26 @@ publish is a separate command.
 - [R3] `cargo publish --locked -p mnemonic-io-lib --dry-run`, then `cargo publish --locked -p
   mnemonic-io-lib` (irreversible; the registry token stays in the operator's environment and is written to no
   file). Tag first, publish second, so the published crate matches a tag.
-- [R4] Check the registry carries 0.1.2 (`cargo info mnemonic-io-lib@0.1.2` or the crates.io API) and that
-  0.1.1 stays unpublished (the spec: "0.1.1 is skipped on crates.io; 0.1.2 carries it").
+- [R4] From a directory outside any Cargo workspace (for example `cd /scratch/cache`):
+  `cargo info mnemonic-io-lib@0.1.2` prints `version: 0.1.2` with no `(from ./...)` suffix, and
+  `cargo info mnemonic-io-lib@0.1.1` refuses `could not find`; and
+  `curl -sf -A 'crate-version-check' https://crates.io/api/v1/crates/mnemonic-io-lib | jq -r '.versions[].num'`
+  prints `0.1.2` and `0.1.0` and no `0.1.1` (the spec: "0.1.1 is skipped on crates.io; 0.1.2 carries it").
 
 ## Phase 3: one pin-bump step per consumer (each is the FIRST commit of that repo's bughunt FIX PR)
 
 The consumer's FIX plan owns everything else in its PR; this plan owns only the pin commit. Order among them
-is free (spec section 10 step 4); the master table order is md, mk, ms, mt, tk. All start after R4. Every
-pin-bump PR also updates the toolkit-manual lines and source comments listed in spec section 9 (lockstep).
+is free (spec section 10 step 4); the master table order is md, mk, ms, mt, tk. All start after R4. The
+toolkit-manual lines of spec section 9 (`42-md.md:30` and `:219`, `43-ms.md:44-45`, `44-mk-cli.md:42`) exist only in
+mnemonic-toolkit: the C5 tk PR edits all of them, for md, mk, ms, mt and tk. C1-C3 edit no toolkit-manual line (they
+have none), and say so in their descriptions. The source comments of spec section 9 stay with their repo: md-cli
+`cmd/mod.rs:105-108` in C1, mt-cli `main.rs:844-847` in C4.
 
 - [C1] md (`descriptor-mnemonic`): `mnemonic-io-lib = "0.1.2"`; `cargo update -p mnemonic-io-lib --precise
-  0.1.2`; refresh `vendor/`; pass `ci/repro/vendor-freshness.sh`. Unblocks #9 FIX_bh1119_md_out_writes (md-C4).
-- [C2] mk (`mnemonic-key`): same recipe. Unblocks #10 F-B output writes (mk-I1; mk-I6 through `same_file`).
+  0.1.2`; refresh `vendor/` (`cargo vendor --locked vendor/`); pass `ci/repro/vendor-freshness.sh`. Unblocks #9 FIX_bh1119_md_out_writes (md-C4).
+- [C2] mk (`mnemonic-key`): same recipe (including `cargo vendor --locked vendor/`). Unblocks #10 F-B output writes (mk-I1; mk-I6 through `same_file`).
 - [C3] ms (`mnemonic-secret`): replace the git dependency by `"0.1.2"`; `cargo update -p mnemonic-io-lib` with
-  no `--precise`; the lock shows `version = "0.1.2"` with the crates.io source; refresh `vendor/`; delete the
+  no `--precise`; the lock shows `version = "0.1.2"` with the crates.io source; refresh `vendor/` (`cargo vendor --locked vendor/`); delete the
   `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line of
   `ci/repro/vendor-git-sources.txt`; pass `ci/repro/vendor-freshness.sh`; edit `.github/workflows/man-release.yml`
   as spec section 10 step 4 lists (delete the `pins` job and `needs: pins`; delete `git_source_url` and
@@ -165,9 +176,9 @@ pin-bump PR also updates the toolkit-manual lines and source comments listed in 
   mnemonic-io-lib`; the lock shows `0.1.2` from crates.io; mt is not vendored. The spec lists no
   `.github/` edit for mt; if mt's workflows reference the git source, that is a STOP for the mt builder.
   Unblocks #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`).
-- [C5] tk (`mnemonic-toolkit`): `"0.1.2"`; `cargo update -p mnemonic-io-lib --precise 0.1.2`; refresh `vendor/`;
+- [C5] tk (`mnemonic-toolkit`): `"0.1.2"`; `cargo update -p mnemonic-io-lib --precise 0.1.2`; refresh `vendor/` (`cargo vendor --locked vendor/`);
   pass `ci/repro/vendor-freshness.sh`. Unblocks #14 FIX-tk-secret-file-writes (tk-I3, tk-C1). The two tk tests
-  `tests/p3_declined_crate_items.rs` and `tests/p3_io_lib_pin.rs` change with #14 (spec section 9), and the
+  `crates/mnemonic-toolkit/tests/p3_declined_crate_items.rs` and `crates/mnemonic-toolkit/tests/p3_io_lib_pin.rs` change with #14 (spec section 9), and the
   tk pin PR must keep them green or change them in the same PR: that choice is the tk builder's STOP if the
   tests refuse `0.1.2`.
 - #13 FIX-me-output-integrity (me-I10 through `same_file`): the me path dependency needs no bump and no
@@ -177,7 +188,9 @@ pin-bump PR also updates the toolkit-manual lines and source comments listed in 
 
 Spec section 3 steps 2 and 3 (the 40-hop limit, the race re-check), step 5's "Operation not permitted" for a
 file owned by another user, step 10's skip of directory fsync on Windows, and the section 5 Windows
-identities have no TRACE row. The coverage map marks them `CODE`. They are not given plan legs (no TRACE row
+identities have no TRACE row; neither do step 1's
+stdio-alias list other than `/dev/stdout` and its `/dev/fd/` and `/proc/` prefixes, step 1's other-`Err` DIRECT,
+step 2's stdio-alias hop, and section 2's no-library-error-text rule. The coverage map marks them `CODE`. They are not given plan legs (no TRACE row
 quotes them). Proposed FOLLOWUPS (Minor) are in the report.
 
 ## Coverage map

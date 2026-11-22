@@ -130,9 +130,9 @@ mode_green() {
   cargo test --locked --doc > "$OUT/green-doc.txt" 2>&1 && ok "doctests" || bad "doctests"
   # lint-gate.sh = fmt + clippy 1.85.0 (CI's) + clippy nightly (not a CI job). The nightly step is red on the
   # base tree (cloned_ref_to_slice_refs in me-cli tests, measured 2026-11-22), so it is a WARN unless the
-  # nightly log names mnemonic-io-lib; fmt and clippy 1.85.0 are hard.
+  # nightly section carries a mnemonic-io-lib diagnostic (`--> crates/mnemonic-io-lib/`); fmt and clippy 1.85.0 are hard.
   if bash scripts/lint-gate.sh > "$OUT/green-lint.txt" 2>&1; then ok "lint-gate"
-  elif grep -q '^== clippy (nightly)' "$OUT/green-lint.txt" && ! sed -n '/^== clippy (nightly)/,$p' "$OUT/green-lint.txt" | grep -q 'mnemonic-io-lib' \
+  elif grep -q '^== clippy (nightly)' "$OUT/green-lint.txt" && ! sed -n '/^== clippy (nightly)/,$p' "$OUT/green-lint.txt" | grep -qE -- '--> crates/mnemonic-io-lib/|could not compile .mnemonic-io-lib.' \
     && ! sed -n '1,/^== clippy (nightly)/p' "$OUT/green-lint.txt" | grep -qE '^(error|Diff in)'; then
     echo "WARN lint-gate: only the nightly step is red, and not in mnemonic-io-lib (base-tree baseline red)"
   else bad "lint-gate (see $OUT/green-lint.txt)"; fi
@@ -141,8 +141,10 @@ mode_green() {
     cargo check --locked -p mnemonic-io-lib --tests --target "$t" > "$OUT/green-check-$t.txt" 2>&1 \
       && ok "cargo check --tests $t" || bad "cargo check --tests $t"
   done
-  grep -qE '^version = "0\.1\.2"' crates/mnemonic-io-lib/Cargo.toml && ok "crate version 0.1.2" || bad "crate version is not 0.1.2"
-  awk '/name = "mnemonic-io-lib"/{getline; print}' Cargo.lock | grep -q '"0.1.2"' && ok "Cargo.lock 0.1.2" || bad "Cargo.lock not 0.1.2"
+  if [ "${IOLIB_PRE_BUMP:-0}" != 1 ]; then
+    grep -qE '^version = "0\.1\.2"' crates/mnemonic-io-lib/Cargo.toml && ok "crate version 0.1.2" || bad "crate version is not 0.1.2"
+    awk '/name = "mnemonic-io-lib"/{getline; print}' Cargo.lock | grep -q '"0.1.2"' && ok "Cargo.lock 0.1.2" || bad "Cargo.lock not 0.1.2"
+  fi
   cargo metadata --locked --format-version 1 --no-deps 2> /dev/null \
     | python3 -c 'import json,sys; m=json.load(sys.stdin); p=[x for x in m["packages"] if x["name"]=="mnemonic-io-lib"][0]; sys.exit(1 if [d for d in p["dependencies"] if d["kind"] is None] else 0)' \
     && ok "[dependencies] empty" || bad "[dependencies] not empty"
