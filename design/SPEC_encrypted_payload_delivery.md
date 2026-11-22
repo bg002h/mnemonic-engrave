@@ -2515,7 +2515,7 @@ titles record), and the **Standard SeedQR of the BIP-39 words of its entropy**, 
 §4.4, D15). The default build is unchanged (`EngraveSeedString`, text + QR of the string). If the plate does not fit,
 today's `This record does not fit any plate size.` is shown and nothing is cut. The Refugium caller decodes the ms1 with `codex32.DecodeMS1`. If that
 fails, or its prefix is not `0x00` (entr), or its entropy is not 16 or 32 bytes, the plate is cut exactly as today in this
-build, text only (`engraveSeedStringPlate` -> `backup.EngraveSeedStringTextOnly`), and never with a QR of the ms1
+build, text only (`engraveSeedStringPlate` -> `backup.EngraveSeedStringTextOnly`) and titled exactly as the SeedQR plate would be (`<T>` of §14.4 when the payload has a titles record, otherwise the codex32 id), and never with a QR of the ms1
 string. 12-word (16-byte) and 24-word (32-byte) entropies both get the SeedQR. The plate carries no fingerprint row
 (`MasterFingerprint` 0), so no BIP-39 seed or BIP-32 key is derived for it.
 
@@ -2724,7 +2724,7 @@ TRACE rows: the Rule cell is binding. Every row names the plausible wrong implem
 | `seal_v2_refuses_what_open_refuses` | ME `seal/mod.rs` | `seal_v2` with N-count's, N-letter's and N-hot-letter's inputs: `SealError::Titles(..)` with the same inner variant; nothing returned | a writer that emits a payload the reader refuses | RED (absent) |
 | `me_seal_still_writes_version_1` | ME `tests/` (CLI) | `me seal --seal-secret --in <file holding A16 and a newline> --out <tmp>.uf2` exits 0; the first UF2 block's payload (block bytes 32..) has byte 8 = `0x01`, byte 11 = `0x00` | `me seal` switched to v2 | GREEN today; must stay |
 | Go parity rows | fork `seal/` | the Go port (`errors.Is(err, ErrIterations)` for N-floor-599999 included) passes every vector and refusal above from the vendored `seal_v2_vectors.json` with a provenance pin (ME commit) | Go leading Rust | planned in S2 |
-| Device rows | fork `gui/` | §14.4's T-1/T-2 texts and lead line, §14.5's notice, entry, first KDF frame and retry body, §14.6's plate (Refugium build) and default-build plate, and one row per §14.6 input (a share or plain BIP-93 seed in a v1 payload -> text only, no QR of the ms1; `A16` -> 12-word SeedQR; no fingerprint row), `Payload unreadable.` for a version-3 header | — | planned in S2 |
+| Device rows | fork `gui/` | §14.4's T-1/T-2 texts and lead line, §14.5's notice, entry, first KDF frame and retry body, §14.6's plate (Refugium build) and default-build plate, and one row per §14.6 input (a share or plain BIP-93 seed in a v1 payload -> text only, no QR of the ms1; `A16` -> 12-word SeedQR; no fingerprint row), `Payload unreadable.` for a version-3 header, a titled v2 payload holding a 20-byte ms1 -> text-only plate titled with its `<T>`, no QR | — | planned in S2 |
 | Hardware H-v2 | fork, bench | §14.8 | — | planned in S2 (phase P2) |
 
 Test values chosen to fail plausible mutants: V2-B's password is not checksum-valid (kills a checksum applied to
