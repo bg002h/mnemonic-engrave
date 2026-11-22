@@ -60,18 +60,20 @@ create on Unix, `set_permissions(0600)` on the open handle on Unix, `set_len(0)`
 `write_all`).
 
 1. **Classify** with `std::fs::metadata(path)` (follows symlinks):
+   - **Stdio alias (Unix).** If `path` as given is `/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes
+     (`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: DIRECT.
    - `Err` of kind `NotFound`: mode ABSENT.
    - any other `Err`: DIRECT (the open then reports its own error, as today).
    - `Ok` and not `is_file()` (FIFO, char or block device, socket, directory, a pipe or tty behind `/dev/stdout`):
      DIRECT.
    - `Ok` and `is_file()`: mode REPLACE.
 2. **Resolve the final name** by walking the last component's symlink chain: while `symlink_metadata(p)` says
-   symlink, `p = read_link(p)` if absolute, else `parent(p).join(read_link(p))`. At most 40 hops; a 41st hop, or an
-   error from `read_link`, gives DIRECT. Directory components are not canonicalised: the temp goes in the directory
+   symlink, `p = read_link(p)` if absolute, else `parent(p).join(read_link(p))`. At most 40 hops; a 41st hop, an
+   error from `read_link` or from `symlink_metadata`, gives DIRECT. A hop whose path is a stdio alias (step 1) gives
+   DIRECT. Directory components are not canonicalised: the temp goes in the directory
    that holds the final name. If the final name has no `file_name()` (for example `x/..`): DIRECT.
 3. **Check the final name still matches the classification.** REPLACE: `metadata(final)` must be `Ok`, a regular
-   file, and on Unix have the same `(dev, ino)` as step 1; otherwise DIRECT (this is what sends `/dev/stdout` to a
-   deleted file, and any race, to today's path). ABSENT: `symlink_metadata(final)` must be `NotFound`; otherwise
+   file, and on Unix have the same `(dev, ino)` as step 1; otherwise DIRECT (this sends any race to today's path). ABSENT: `symlink_metadata(final)` must be `NotFound`; otherwise
    DIRECT.
 4. **Create the temp** in `dir = final.parent()` (`.` when empty) named `<name>.<pid>.<n>.tmp`, where `<name>` is
    the final file name when it is at most 200 bytes long (`as_encoded_bytes().len()`), else the literal
@@ -122,13 +124,13 @@ tightening already intends); no `sync_all` in DIRECT (today has none).
 | ENOSPC / quota / EFBIG during the write | step 7 fails | the OS error; temp removed; old kept (the fix) |
 | failure at fsync of the data | step 7 fails | same |
 | run killed mid-write | none | old kept; one 0600 leftover `<name>.<pid>.<n>.tmp` beside it (new, named) |
-| rename refused (bind mount, cross-device, busy, Windows sharing) | step 8 fails | the OS error; temp removed; old kept |
+| rename refused (bind-mounted target, cross-device, busy, Windows sharing) | step 8 fails | the OS error (a bind-mounted target: `Device or resource busy (os error 16)`, measured); temp removed; old kept |
 | directory fsync fails after the rename | step 10 | ignored; `Ok` |
 | FIFO | DIRECT | written through, as today |
 | char device (`/dev/null`, a tty) | DIRECT | as today: `/dev/null` as non-root refuses with `Operation not permitted (os error 1)` (measured); see section 11 |
 | `/dev/stdout` when stdout is a pipe or tty | DIRECT | written through, as today |
-| `/dev/stdout` when stdout is a regular file | ATOMIC on the file the link names | that file is replaced with the bytes. **PROPOSED**; the ruling's "/dev/stdout keeps the direct write" read as the pipe and tty cases |
-| `/dev/stdout` when stdout is a deleted file | step 3 mismatch | DIRECT, as today |
+| `/dev/stdout` (or `/dev/fd/N`, `/proc/...`, or a link to one) when stdout is a regular file | DIRECT | written through, as today: same inode, truncated, 0600 |
+| `/dev/stdout` when stdout is a deleted file | DIRECT (stdio alias) | as today |
 | the path `-` | ATOMIC on a file named `-` | the library gives `-` no meaning; callers route `-` to stdout before calling (consumer FIX rows check theirs) |
 | file name over 200 bytes | ATOMIC, temp named `mnemonic-io-lib.<pid>.<n>.tmp` | written (a suffixed temp name would exceed NAME_MAX 255) |
 | 100 taken temp names | step 4 fails | `File exists (os error 17)`; old kept |
@@ -169,25 +171,40 @@ delete sharing, which is a refusal with the old file kept. `same_file` per secti
 2. A hard-linked `--out` target is replaced at that name only (ruled).
 3. An existing file in a directory the holder cannot write is now refused, `Permission denied` (ruled).
 4. A run killed mid-write leaves `<name>.<pid>.<n>.tmp`, 0600, beside the target (new).
-5. The replaced file is a new file owned by the writer (today: the same inode, chmodded).
-No consumer's printed text changes because of this crate: the library authors no text and the wrappers are untouched.
+5. The replaced file is a new file owned by the writer (today: the same inode, chmodded). A root run (sudo) over
+   another user's file leaves it root-owned 0600, so that user can no longer read it; today the owner is kept.
+6. A target that is itself a mount point (one file bind-mounted, for example `docker run -v ./card.txt:/out/card.txt`)
+   is refused with `Device or resource busy (os error 16)`; today it is overwritten in place. The old file is kept.
+   Write to a path inside a mounted directory instead.
+No wrapper text changes; the OS error inside it is new for items 3 and 6 (and an absent parent directory `x/` now
+reads `Not a directory (os error 20)` where today it reads `Is a directory (os error 21)`).
 Exit codes are unchanged.
 
 ## 8. Test rows (TRACE)
 
-All rows live in `crates/mnemonic-io-lib/src/write.rs` `mod tests` (the fault seam is private). Rows marked (unix)
-are `#[cfg(unix)]`; the rest run on every platform. Child rows re-execute the test binary
-(`std::env::current_exe()`, args `--exact write::tests::<child name> --nocapture`) with the target passed in an
-environment variable, and give the child piped stdin, stdout and stderr: a child whose stderr is a regular file
-over the size limit dies writing its own harness output (measured, exit 101). The ulimit is applied through
+All rows live in `crates/mnemonic-io-lib/src/write.rs` `mod tests` (the fault seam is private). The module
+attribute becomes `#[cfg(test)]` (today `#[cfg(all(test, unix))]`); `use std::os::unix::fs::PermissionsExt`, `mode_of`
+and the two existing rows get `#[cfg(unix)]`. Rows marked (unix) are `#[cfg(unix)]`; the rest compile on every
+platform. Child rows re-execute the test binary
+(`std::env::current_exe()`, args `--exact write::tests::child --nocapture`) with `MNEMONIC_IO_LIB_CHILD=<row id>`
+(`W1`, `W2`, `W10`, `W17`, `S7`, `S8`) and `MNEMONIC_IO_LIB_TARGET=<path>` (unused by S8). `fn child()` is a `#[test]`
+that returns at once when `MNEMONIC_IO_LIB_CHILD` is unset. The child reports on STDERR one line
+`child-result: <value>`, where `<value>` is `Ok`, `Some(<i>)`, `None` or `Err raw_os_error=<n>`; after an `Err` it
+calls `std::process::exit(3)`. The parent gives the child piped stdin and stderr, and the stdout the row names (piped
+unless the row says otherwise; W17 and S7 give a `File`). A pipe is not subject to RLIMIT_FSIZE, so W1's report
+survives the limit (a child whose stderr is a regular file over the size limit dies writing its own harness output,
+measured, exit 101). The ulimit is applied through
 `sh -c` (`trap '' XFSZ; ulimit -f 1; exec "$0" ...` for W1, the same without the trap for W2); the child writes 4096
 bytes of `N` over a 15-byte old file `OLD-VALID-CARD\n`.
 
-RED rows: run against today's code (the RED commit adds the rows only); measured results on `7caf903a` are given.
+RED is two commits. RED-1 adds W1-W4 and the GREEN guards W5-W11 (all compile against 7caf903a): W1-W4 fail as
+"measured today", W5-W11 pass. RED-2 adds S1-S10: the build fails with E0425 on `same_file`; record that output.
+W12-W16 and W17 land in the GREEN commit, with the seam and the temp-name function they call. Measured results on
+`7caf903a` are given.
 
 | row | kind | setup | expected after the fix | measured today |
 | --- | --- | --- | --- | --- |
-| W1 `a_failed_write_leaves_the_old_file_byte_identical` (unix) | RED | EFBIG child | child exits 3 after printing an error whose `raw_os_error()` is 27; target bytes are the old 15; directory holds only the target | 512 bytes of `N`; RED |
+| W1 `a_failed_write_leaves_the_old_file_byte_identical` (unix) | RED | EFBIG child | child exits 3 after reporting `child-result: Err raw_os_error=27`; target bytes are the old 15; directory holds only the target | 512 bytes of `N`; RED |
 | W2 `a_killed_run_leaves_the_old_file_and_a_named_owner_only_leftover` (unix) | RED | SIGXFSZ child | child killed by signal 25; target bytes are the old 15; exactly one other entry, matching `card.txt.<digits>.<digits>.tmp`, mode 0600, 512 bytes, all `N` | target 512 bytes of `N`, no other entry; RED |
 | W3 `a_hard_linked_target_is_replaced_at_that_name_only` (unix) | RED | `a` = `old`, `b` hard link to `a`; write `new` to `a` | `a` = `new`, `b` = `old`, nlink of each 1 | both `new`, nlink 2; RED |
 | W4 `an_unwritable_directory_fails_closed_before_the_old_file_is_touched` (unix) | RED | dir 0500 holding `card.txt` 0644 `old`; precondition: creating a probe file in the dir fails, else the row panics `precondition: the directory is still writable (running as root?)` | `Err` with `raw_os_error()` 13; bytes `old`; mode still 0644; dir entries unchanged; dir restored to 0700 at the end | `Ok`, bytes `new`; RED |
@@ -198,8 +215,9 @@ RED rows: run against today's code (the RED commit adds the rows only); measured
 | W7 `a_symlink_is_written_through_and_stays_a_link` (unix) | GREEN guard | dir A: `link` -> `../B/real` (relative); dir B: `real` = `old` | `real` = `new`, mode 0600; `link` still a symlink with the same text; A holds only `link`, B only `real` | GREEN |
 | W8 `a_dangling_symlink_creates_its_target_owner_only` (unix) | GREEN guard | `link` -> `missing` | `Ok`; `missing` exists, 0600, bytes; `link` still a symlink; dir holds `link` and `missing` only | GREEN |
 | W9 `a_fifo_target_is_written_directly` (unix) | GREEN guard | `mkfifo` (std has none; `std::process::Command::new("mkfifo")`), reader thread | reader receives exactly the bytes; dir holds only the FIFO | GREEN |
-| W10 `dev_stdout_on_a_pipe_is_written_directly` (unix) | GREEN guard | child with piped stdout calls `write_private("/dev/stdout", b"via-dev-stdout")` | child stdout contains `via-dev-stdout`; child reports `Ok` | GREEN |
+| W10 `dev_stdout_on_a_pipe_is_written_directly` (unix) | GREEN guard | child with piped stdout calls `write_private("/dev/stdout", b"via-dev-stdout")` | child stdout contains `via-dev-stdout`; child reports `child-result: Ok` | GREEN |
 | W11 `a_250_byte_file_name_is_written` | GREEN guard | target name of 250 `a` bytes | `Ok`; bytes; dir holds only the target | GREEN |
+| W17 `dev_stdout_on_a_regular_file_is_written_directly` (unix) | GREEN guard (lands in the GREEN commit) | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/stdout", b"via")` | `f` keeps its inode number, starts with `via` (not equal: libtest's own stdout lines may precede), mode 0600; dir holds only `f` | GREEN |
 | W12 `the_temp_name_is_the_target_name_or_the_fallback` | new | calls the private temp-name function | 200-byte name -> `<name>.7.3.tmp` for pid 7, n 3; 201-byte name -> `mnemonic-io-lib.7.3.tmp` | n/a (new function) |
 | W13 `a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file` | new | old `card.txt` = `old`; for each step of the platform (unix: `CreateTemp`, `Preflight`, `Chmod`, `Write`, `Sync`, `Rename`; other: `CreateTemp`, `Preflight`, `Write`, `Sync`, `Rename`) inject an error | `Err` whose `Display` is `injected at <Step>`; bytes `old`; dir holds only the target | n/a (new branch) |
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |
@@ -211,8 +229,8 @@ RED rows: run against today's code (the RED commit adds the rows only); measured
 | S4 `two_files_with_equal_bytes_are_not_the_same` | RED (compile) | two files, same bytes | `None` | E0425 |
 | S5 `an_absent_output_matches_an_absent_input_at_the_same_resolved_path` | RED (compile) | `dir/./x` vs `[dir/y, dir/x]` | `Some(1)`; vs `[dir/y]` `None` | E0425 |
 | S6 `the_first_matching_input_is_reported` | RED (compile) | inputs `[other, alias1, alias2]` of out | `Some(1)` | E0425 |
-| S7 `stdout_redirected_to_the_output_file_is_the_same_file` (unix) | RED (compile) | child with stdout = `File` of `f` | child reports `Some(0)` for `same_file(Path(f), [Stdout])` | E0425 |
-| S8 `stdin_and_stdout_on_pipes_never_match` (unix) | RED (compile) | child with piped stdin and stdout | `same_file(Stdout, [Stdin])` = `None` | E0425 |
+| S7 `stdout_redirected_to_the_output_file_is_the_same_file` (unix) | RED (compile) | child with stdout = `File` of `f` | child reports `child-result: Some(0)` for `same_file(Path(f), [Stdout])` | E0425 |
+| S8 `stdin_and_stdout_on_pipes_never_match` (unix) | RED (compile) | child with piped stdin and stdout | child reports `child-result: None` for `same_file(Stdout, [Stdin])` | E0425 |
 | S9 `a_non_regular_path_never_matches` (unix) | RED (compile) | `/dev/null` vs `[/dev/null]` (metadata only, never written) | `None` | E0425 |
 | S10 `an_unreadable_lookup_never_matches` (unix) | RED (compile) | `d/x` with `d` at mode 0 vs `[d/x]`; same root precondition as W4 | `None` | E0425 |
 
@@ -224,8 +242,8 @@ it.
 No row writes to `/dev/null` or any device: a root run would chmod it (today's DIRECT does).
 
 Gate (me repo): `cargo nextest run --locked -p mnemonic-io-lib` plus the full me CI test job and
-`scripts/lint-gate.sh`; Windows is compile-only in me CI, and runs through md and mk's Windows test legs after
-their pin bump.
+`scripts/lint-gate.sh`; Windows and macOS run no row of this spec (io-lib's unit tests run only in me's ubuntu job); md's and mk's
+Windows/macOS legs exercise `write_private` only through their own `--out` CLI tests, after their pin bump.
 
 ## 9. Consumer table
 
@@ -235,10 +253,11 @@ their pin bump.
 | md | `descriptor-mnemonic` `crates/md-cli/src/cmd/mod.rs:109-112` `write_artifact` | `--out <path>: <e>` (`CliError::BadArg`) | `"0.1.2"` | #9 FIX_bh1119_md_out_writes (md-C4; I1, I7 are T6/T7). md adopts `write_private` only; `tests/cli_p3_decline.rs` needs no change |
 | mk | `mnemonic-key` `crates/mk-cli/src/cmd/encode.rs:436` | `--out <path>: <e>` (`CliError::UsageError`) | `"0.1.2"` | #10 F-B output writes (mk-I1; mk-I6 through `same_file`) |
 | ms | `mnemonic-secret` `crates/ms-cli/src/out.rs:85-88` `write_artifact` (callers `crates/ms-cli/src/cmd/encode.rs:273`, `crates/ms-cli/src/cmd/hashlock.rs:426`, `crates/ms-cli/src/cmd/repair.rs:170`) | `failed to write --out <path>: <e>` (`CliError::BadInput`) | git rev -> registry `"0.1.2"` (ruling T25) | #11 FIX_bughunt1119_ms_out_writes (ms-I13; ms-I1 through `same_file`). `write_artifact_create_new` (`crates/ms-cli/src/out.rs:46`) is ms's own and not touched |
-| mt | `mnemonic-transaction` `crates/mt-cli/src/main.rs:848` | refusal `cannot write <path>` / `The file could not be created or written: <e>. Nothing was engraved and nothing was left behind.` | git rev -> registry `"0.1.2"` | #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`; mt-C2 is T6). Its "nothing was left behind" becomes true for every reported error |
+| mt | `mnemonic-transaction` `crates/mt-cli/src/main.rs:848` | refusal `cannot write <path>` / `The file could not be created or written: <e>. Nothing was engraved and nothing was left behind.` | git rev -> registry `"0.1.2"` | #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`; mt-C2 is T6). Its "nothing was left behind" becomes true for every reported error. #12 revisits the remedy ("Check the directory exists and is writable, then re-run.", `crates/mt-cli/src/main.rs:859-860`): it names the directory only, and is wrong for item 6 of section 7 |
 | tk | none today (`argv_guard.rs` uses `remedy` only); bare `std::fs::write` at `crates/mnemonic-toolkit/src/cmd/seedqr.rs:309,337` and the other sites listed on line 18 of `coordinator/agent-reports/bughunt-1119/grade-tk.md` | n/a | `"0.1.2"` | #14 FIX-tk-secret-file-writes (tk-I3, tk-C1 per T38) adopts `write::write_private`; `tests/p3_declined_crate_items.rs` and `tests/p3_io_lib_pin.rs` change with it |
 
-Toolkit-manual sentences that describe the old mechanism, for the consumer FIX rows to revisit (lockstep rule):
+Toolkit-manual sentences that describe the old mechanism, each pin-bump PR updates these lines in the same PR (lockstep rule), as well as `42-md.md:219` and the source comments
+that describe the open-file chmod and truncate (md-cli `cmd/mod.rs:105-108`, mt-cli `main.rs:844-847`):
 `docs/manual/src/40-cli-reference/42-md.md:30` ("Overwrites an existing file and tightens its mode"),
 `docs/manual/src/40-cli-reference/43-ms.md:44-45` ("set on the open file ... it overwrites and truncates"), `docs/manual/src/40-cli-reference/44-mk-cli.md:42` ("overwrites an
 existing file"). This spec changes no manual text itself (no printed text changes).
@@ -257,7 +276,11 @@ Outside the table: mnemonic-refugium (`6e2072e72`) has no `write_private` and no
    (**PROPOSED**: one PR per repo, not a separate bump PR): md, mk, tk set `mnemonic-io-lib = "0.1.2"` (the
    requirement must name 0.1.2 so a lock cannot fall back to 0.1.0), `cargo update -p mnemonic-io-lib --precise
    0.1.2`, refresh `vendor/` and pass `ci/repro/vendor-freshness.sh`; ms and mt replace the git dependency with
-   `"0.1.2"` (ms also refreshes `vendor/` and drops io-lib from any git-source tolerance list). Order among them is
+   `mnemonic-io-lib = "0.1.2"` and run `cargo update -p mnemonic-io-lib` (no `--precise`: with the git entry still in
+   the lock, `--precise 0.1.2` fails `revspec '0.1.2' not found`); the lock must then show `version = "0.1.2"` with
+   the crates.io source. ms also refreshes `vendor/`, deletes the
+   `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line from
+   `ci/repro/vendor-git-sources.txt`, and passes `ci/repro/vendor-freshness.sh`. Order among them is
    free; the master table order is #9 md, #10 mk, #11 ms, #12 mt, #14 tk.
 
 ## 11. Out of scope, and proposed FOLLOWUPS lines (listed, not appended)
