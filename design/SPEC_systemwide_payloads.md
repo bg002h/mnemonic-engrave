@@ -33,6 +33,12 @@ several overrule a documented prior decision and are marked where they do.
 1. **Sealed Payload is frozen.** It keeps its wipes, idle timer and KDF exactly
    as shipped. Its security failures are acknowledged and will be remedied at a
    future date — see the two follow-ups filed with this spec.
+   *Amended 2026-11-22 (Brian, goal 2 kit engraving): a narrow unfreeze. Sealed
+   Payload gains format v2 (`SPEC_encrypted_payload_delivery.md` §14: version
+   `0x02`, an n-word password form, a titles record) so a Refugium sitting's seed
+   plates ride the wiping container; its wipes, idle timer and KDF are unchanged.
+   F-124's remedy is now a release gate on that path (EPD §2.2 item 16). Nothing
+   in this document's systemwide container changes.*
 2. **The other programs abandon that security model.** No secret-residency
    wipes, no idle wipe, no EPD§10.2.4 clock. This does not overrule EPD§2.2 item 12;
    it *extends* it. That item already says "the machine offers two classes of
@@ -2064,8 +2070,12 @@ their construction in `why`. Counts: 13 string, 12 set and 10 kit vectors.
   given twice; `scripts/check-sysw-mr-vectors.sh` prints it as `RED
   kit-two-copies-mk1` until the build flips that arm.
 - Toolkit manual: `docs/manual/src/30-workflows/3B-payload-unlock-refusals.md`
-  "Which records get refused" gains the mr1 rows of §14g, in lockstep with
-  the me build.
+  "Which records get refused" (the Sealed Payload's unlock refusal, which
+  still refuses an mr1 record, §14d) gains one row for an mr1 string naming
+  where it belongs (a `sysw` payload), in lockstep with the me build. The §14g
+  sentences are not transcribed there: `me` prints its own (§14h), and the
+  device's "Kit Refused" screen is not on that page. The plan's ME-1 step 3
+  wording, on its own branch, is superseded by this ruling.
 - mr (S3) and mr-gui (S4): the kit payload writer must satisfy §14c and
   §14d, and mr-gui's rows use the kit list's card order and its begins/ends.
 

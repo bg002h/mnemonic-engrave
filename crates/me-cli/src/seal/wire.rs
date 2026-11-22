@@ -48,6 +48,12 @@ pub struct Header {
 #[derive(Debug, PartialEq, Eq)]
 pub enum WireError {
     TooShort(usize),
+    /// The header is whole but the blob ends before the sections and tag it
+    /// declares (`open`, S1b §14.7).
+    Truncated {
+        got: usize,
+        need: usize,
+    },
     BadMagic,
     UnknownVersion(u8),
     UnknownKdf(u8),
@@ -69,6 +75,9 @@ impl std::fmt::Display for WireError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WireError::TooShort(n) => write!(f, "blob too short: {n} bytes, need at least 52"),
+            WireError::Truncated { got, need } => {
+                write!(f, "blob too short: {got} bytes, its header declares {need}")
+            }
             WireError::BadMagic => write!(f, "not a sealed payload (bad magic)"),
             WireError::UnknownVersion(v) => write!(f, "unsupported format version {v}"),
             WireError::UnknownKdf(k) => write!(f, "unsupported kdf id {k}"),

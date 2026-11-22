@@ -446,7 +446,10 @@ pub fn open(blob: &[u8], password: &str) -> Result<Opened, OpenError> {
     let tag = if ct_len > 0 { wire::TAG_LEN } else { 0 };
     let end = HEADER_LEN + pub_len + ct_len + tag;
     if blob.len() < end {
-        return Err(OpenError::Wire(wire::WireError::TooShort(blob.len())));
+        return Err(OpenError::Wire(wire::WireError::Truncated {
+            got: blob.len(),
+            need: end,
+        }));
     }
     let pub_bytes = &blob[HEADER_LEN..HEADER_LEN + pub_len];
     let public = container::decode_section(pub_bytes).map_err(OpenError::Container)?;

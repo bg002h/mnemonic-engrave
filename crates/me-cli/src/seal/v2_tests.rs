@@ -944,3 +944,67 @@ fn seal_v2_refuses_what_open_refuses() {
         "{e:?}"
     );
 }
+
+/// S1b §10.2 steps 2 then 5-6, §14.7: the public section is refused before the
+/// password is looked at, so a bad public section with a bad password is Public.
+#[test]
+fn open_checks_the_public_section_before_the_password() {
+    let e = refusal("N-public-titles", "beef beef beef beef beef");
+    assert!(matches!(e, OpenError::Public(_)), "{e:?}");
+    let e = refusal("N-public-titles", "beef beef beef beef beef beff");
+    assert!(matches!(e, OpenError::Public(_)), "{e:?}");
+}
+
+/// Architect ruling (kit S2 Q3): nothing to encrypt is Empty; titles naming
+/// plates with no seed record behind them is the titles rule's Count.
+#[test]
+fn seal_v2_refuses_an_empty_section_and_titles_without_seeds() {
+    let seal = |secret: Vec<String>, titles: Option<Vec<String>>| {
+        seal_v2_deterministic(
+            Payload {
+                public: vec![],
+                secret,
+            },
+            titles,
+            BEEF6,
+            6,
+            600_000,
+            rep([0x0b, 0xad]),
+            rep([0x0c, 0x01]),
+        )
+    };
+    let e = seal(vec![], None).unwrap_err();
+    assert!(matches!(e, SealError::Empty), "{e:?}");
+    let e = seal(vec![], Some(vec![s("SEED A")])).unwrap_err();
+    assert!(
+        matches!(
+            e,
+            SealError::Titles(titles::TitlesError::Count {
+                titles: 1,
+                secrets: 0
+            })
+        ),
+        "{e:?}"
+    );
+}
+
+/// Architect ruling (kit S2 Q4): a blob shorter than its header declares names
+/// both lengths; "need at least 52" is false for a whole header.
+#[test]
+fn open_names_the_declared_length_of_a_truncated_blob() {
+    let b = blob_of("V2-A");
+    let e = open(&b[..60], BEEF6).err().unwrap();
+    assert!(
+        matches!(e, OpenError::Wire(wire::WireError::Truncated { got: 60, need }) if need == b.len()),
+        "{e:?}"
+    );
+    assert_eq!(
+        e.to_string(),
+        format!("blob too short: 60 bytes, its header declares {}", b.len())
+    );
+    let e = open(&b[..40], BEEF6).err().unwrap();
+    assert!(
+        matches!(e, OpenError::Wire(wire::WireError::TooShort(40))),
+        "{e:?}"
+    );
+}
