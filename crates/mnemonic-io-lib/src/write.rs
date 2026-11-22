@@ -71,7 +71,7 @@ pub fn write_private(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::write_private;
+    use super::*;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
@@ -120,6 +120,13 @@ mod tests {
         cmd.output().unwrap()
     }
 
+    fn show(r: Option<usize>) -> String {
+        match r {
+            Some(i) => format!("Some({i})"),
+            None => "None".to_string(),
+        }
+    }
+
     /// Not a row: the body of the child processes the rows above start. It
     /// returns at once when `MNEMONIC_IO_LIB_CHILD` is unset.
     #[test]
@@ -133,6 +140,11 @@ mod tests {
             "W10" => write_private(Path::new("/dev/stdout"), b"via-dev-stdout")
                 .map(|()| "Ok".to_string()),
             "W17" => write_private(Path::new("/dev/stdout"), b"via").map(|()| "Ok".to_string()),
+            "S7" => Ok(show(same_file(
+                Endpoint::Path(&target),
+                &[Endpoint::Stdout],
+            ))),
+            "S8" => Ok(show(same_file(Endpoint::Stdout, &[Endpoint::Stdin]))),
             other => panic!("unknown child row {other}"),
         };
         match r {
@@ -457,5 +469,150 @@ mod tests {
             b"{\"a\":1}",
             "without set_len(0) the tail of the longer write survives"
         );
+    }
+
+    /// S1: the same path twice is the same file.
+    #[test]
+    fn the_same_path_twice_is_the_same_file() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("f");
+        std::fs::write(&p, b"x").unwrap();
+        assert_eq!(
+            same_file(Endpoint::Path(&p), &[Endpoint::Path(&p)]),
+            Some(0)
+        );
+    }
+
+    /// S2: a hard link is the same file.
+    #[cfg(unix)]
+    #[test]
+    fn a_hard_link_is_the_same_file() {
+        let d = tempfile::tempdir().unwrap();
+        let a = d.path().join("a");
+        let b = d.path().join("b");
+        std::fs::write(&a, b"x").unwrap();
+        std::fs::hard_link(&a, &b).unwrap();
+        assert_eq!(
+            same_file(Endpoint::Path(&a), &[Endpoint::Path(&b)]),
+            Some(0)
+        );
+    }
+
+    /// S3: a symlink is the same file as its target.
+    #[test]
+    fn a_symlink_is_the_same_file() {
+        let d = tempfile::tempdir().unwrap();
+        let real = d.path().join("real");
+        std::fs::write(&real, b"x").unwrap();
+        #[cfg(unix)]
+        {
+            let link = d.path().join("link");
+            std::os::unix::fs::symlink("real", &link).unwrap();
+            assert_eq!(
+                same_file(Endpoint::Path(&link), &[Endpoint::Path(&real)]),
+                Some(0)
+            );
+        }
+    }
+
+    /// S4: two files with equal bytes are not the same file.
+    #[test]
+    fn two_files_with_equal_bytes_are_not_the_same() {
+        let d = tempfile::tempdir().unwrap();
+        let a = d.path().join("a");
+        let b = d.path().join("b");
+        std::fs::write(&a, b"same").unwrap();
+        std::fs::write(&b, b"same").unwrap();
+        assert_eq!(same_file(Endpoint::Path(&a), &[Endpoint::Path(&b)]), None);
+    }
+
+    /// S5: an absent output matches an absent input at the same resolved path.
+    #[test]
+    fn an_absent_output_matches_an_absent_input_at_the_same_resolved_path() {
+        let d = tempfile::tempdir().unwrap();
+        let dir = d.path().join("dir");
+        std::fs::create_dir(&dir).unwrap();
+        let out = dir.join(".").join("x");
+        let y = dir.join("y");
+        let x = dir.join("x");
+        assert_eq!(
+            same_file(
+                Endpoint::Path(&out),
+                &[Endpoint::Path(&y), Endpoint::Path(&x)]
+            ),
+            Some(1)
+        );
+        assert_eq!(same_file(Endpoint::Path(&out), &[Endpoint::Path(&y)]), None);
+    }
+
+    /// S6: the first matching input is reported.
+    #[test]
+    fn the_first_matching_input_is_reported() {
+        let d = tempfile::tempdir().unwrap();
+        let out = d.path().join("out");
+        let other = d.path().join("other");
+        std::fs::write(&out, b"x").unwrap();
+        std::fs::write(&other, b"y").unwrap();
+        assert_eq!(
+            same_file(
+                Endpoint::Path(&out),
+                &[
+                    Endpoint::Path(&other),
+                    Endpoint::Path(&out),
+                    Endpoint::Path(&out)
+                ]
+            ),
+            Some(1)
+        );
+    }
+
+    /// S7: stdout redirected to the output file is the same file.
+    #[cfg(unix)]
+    #[test]
+    fn stdout_redirected_to_the_output_file_is_the_same_file() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, b"x").unwrap();
+        let sf = std::fs::OpenOptions::new().write(true).open(&f).unwrap();
+        let out = run_child("S7", &f, Stdio::from(sf), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Some(0)"), "child stderr: {se}");
+    }
+
+    /// S8: stdin and stdout on pipes never match.
+    #[cfg(unix)]
+    #[test]
+    fn stdin_and_stdout_on_pipes_never_match() {
+        let d = tempfile::tempdir().unwrap();
+        let out = run_child("S8", d.path(), Stdio::piped(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: None"), "child stderr: {se}");
+    }
+
+    /// S9: a non-regular path never matches (metadata only, never written).
+    #[cfg(unix)]
+    #[test]
+    fn a_non_regular_path_never_matches() {
+        let n = Path::new("/dev/null");
+        assert_eq!(same_file(Endpoint::Path(n), &[Endpoint::Path(n)]), None);
+    }
+
+    /// S10: an unreadable lookup never matches.
+    #[cfg(unix)]
+    #[test]
+    fn an_unreadable_lookup_never_matches() {
+        let d = tempfile::tempdir().unwrap();
+        let dir = d.path().join("d");
+        std::fs::create_dir(&dir).unwrap();
+        let x = dir.join("x");
+        std::fs::write(&x, b"x").unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o000)).unwrap();
+        if std::fs::metadata(&x).is_ok() {
+            std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+            panic!("precondition: the directory is still readable (running as root?)");
+        }
+        let r = same_file(Endpoint::Path(&x), &[Endpoint::Path(&x)]);
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(r, None);
     }
 }
