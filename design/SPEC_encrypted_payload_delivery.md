@@ -2428,7 +2428,7 @@ the refusal is shown, and no plate is offered:
 | 5 | Line 1 is exactly `refugium-plates 2`. | `Magic`: `the titles block must start with the line refugium-plates 2` | T-1 |
 | 6 | Every later line is `title ` and one of the 33 titles. | `Line(n)`: `titles block line <n> is not title SEED <A-P>, title HOT SEED <A-P> or title KEEP; DO NOT LOAD` (n counts from 1, the magic line being 1) | T-1 |
 | 7 | There is at least one title line. | `Empty`: `the titles block names no plate` | T-1 |
-| 8 | Every seed record is an ms1 whose codex32 payload begins `0x00` (ms-codec's entr form: an unshared string, `codex32.DecodeMS1` prefix `0x00`, 16 to 32 entropy bytes). | `NonMs1Secret(i)`: `titles apply only to ms1 entr records; secret record <i> (records count from 0) is not one` | T-1 |
+| 8 | Every seed record is an ms1 whose codex32 payload begins `0x00` (ms-codec's entr form: an unshared string, `codex32.DecodeMS1` prefix `0x00`, 16, 20, 24, 28 or 32 entropy bytes). unshared means threshold digit `0` (`ms10...`, share index `s`); test it before calling `DecodeMS1`. | `NonMs1Secret(i)`: `titles apply only to ms1 entr records; secret record <i> (records count from 0) is not one` | T-1 |
 | 9 | The number of title lines equals the number of seed records. | `Count { titles, secrets }`: `the titles block names <titles> plates but the encrypted section holds <secrets> seed records` | T-1 |
 | 10 | For each i, if title i is lettered, its letter equals the letter of seed record i. `KEEP; DO NOT LOAD` is not checked. | `Letter { index, title, letter }`: `secret record <index> (records count from 0) is titled <title> but its seed letter is <letter>` | T-2 |
 
@@ -2510,7 +2510,7 @@ same texts); it never generates words (the writer that generates them is mr-sitt
 ### 14.6 The Refugium build's ms1 plate (F5) — NORMATIVE for that build
 
 In the Refugium build, every ms1 seed record the Sealed Payload program cuts (v1 or v2, titled or not; STOP-3, RULED Brian 2026-11-22) is cut
-with `backup.EngraveSeedStringSeedQR`: the ms1 string as text, the title (§14.4, or the codex32 id when there is no
+with `backup.EngraveSeedStringSeedQR` unless the next paragraph's exception applies: the ms1 string as text, the title (§14.4, or the codex32 id when there is no
 titles record), and the **Standard SeedQR of the BIP-39 words of its entropy**, never a QR of the ms1 string (UI spec
 §4.4, D15). The default build is unchanged (`EngraveSeedString`, text + QR of the string). If the plate does not fit,
 today's `This record does not fit any plate size.` is shown and nothing is cut. The Refugium caller decodes the ms1 with `codex32.DecodeMS1`. If that
@@ -2524,8 +2524,7 @@ cleared before `Engrave` as today; the `bip39.Mnemonic` built from the entropy f
 any buffer holding the entropy is zeroed before `Engrave`. The SeedQR encoder's internal buffers and `qr.Code.Bitmap`
 are LIVE (the F-88 class) and are listed as such in the code's HONEST CAVEAT block. Spec S2 names the functions.
 
-The letter check (§14.4 check 10) reads only the first entropy byte; the implementation must not materialise more of
-the entropy than that for it, and zeroes what it decoded.
+The letter check (§14.4 checks 8 and 10) calls `codex32.DecodeMS1` (check 8 needs its prefix and length); it keeps only `entropy[0] >> 4` and zeroes the returned entropy slice and any copy of the codex32 seed bytes before the next record is examined or any refusal is shown.
 
 ### 14.7 ME library surface (v2) — the names tests use
 
@@ -2546,7 +2545,7 @@ the entropy than that for it, and zeroes what it decoded.
   Vec<String>, secret: Zeroizing<Vec<String>>, titles: Option<Vec<String>> }`; `secret` excludes the titles record.
   `OpenError` variants and Display: `Wire(WireError)` (its Display); `Public(SealError)` (its Display: the public
   section's §6.3/§6.4 refusals as `seal` reports them); `PasswordWordCount`, `PasswordWord`, `Passphrase`,
-  `Authentication` (texts in §14.5); `Container(ContainerError)` (its Display); `Record { index, source }` (`record
+  `Authentication` (texts in §14.5); `Container(ContainerError)` (its Display); `Record { index, source }` (`source` is `RecordError`, the same Display `me seal` prints) (`record
   <index> (records count from 0) in the secret section: <source>`); `Titles(TitlesError)` (its Display). For a v1
   payload `open` never consults `titles` and treats a `text:` record as a `Record` refusal.
 

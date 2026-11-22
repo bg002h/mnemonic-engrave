@@ -74,11 +74,11 @@ def ms1_payload(s):
 
 
 def ms1_letter(s):
-    """None unless s is an unshared entr ms1 (k '0', payload prefix 0x00, 16 to 32 entropy bytes)."""
+    """None unless s is an unshared entr ms1 (k '0', payload prefix 0x00, 16, 20, 24, 28 or 32 entropy bytes)."""
     if not s.startswith("ms10"):
         return None
     p = ms1_payload(s)
-    if p[0] != 0x00 or not 16 <= len(p) - 1 <= 32:
+    if p[0] != 0x00 or len(p) - 1 not in (16, 20, 24, 28, 32):
         return None
     return chr(ord("A") + (p[1] >> 4))
 
