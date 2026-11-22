@@ -521,6 +521,10 @@ pub enum JsonError {
     /// refusal blaming a descriptor string that does not exist — measured
     /// sending operators to inspect the one place the problem is not.
     MissingDescriptor { label: String, keys: String },
+    /// Two member names of the top-level object are equal under Go
+    /// `encoding/json`'s fold (FIX_me_descriptor_input_strict, ruling T31).
+    /// `names` is the first colliding group, as written, in document order.
+    DuplicateMember { names: Vec<String> },
 }
 
 #[derive(Clone, Debug)]
