@@ -14,8 +14,8 @@
 #   3. The md1/mk1 strings of every kit vector are packed with `me sysw pack` and
 #      read back with `me sysw show`, and their confirmation states must be the
 #      ones the vector's verdict relies on.
-#      The `kit-two-copies-mk1` vector is a standing RED row: it must show
-#      "unconfirmed" on today's me (§14d's run grouping is not built).
+#      `kit-two-copies-mk1` is two complete copies of one mk1 card: §14d's run
+#      grouping (built in ME-1) makes each copy confirm, so it is checked like the rest.
 #   4. RED (optional, ME_RED=1): the `me` named by ME_BIN (default: me on PATH)
 #      is run on the single-card vector; before §14 is built it must refuse it
 #      with exit 4 and "not a form this container can place" — the behaviour
@@ -79,12 +79,6 @@ for f in "$work"/kit-*.txt; do
   unconf=$(printf '%s\n' "$show" | grep -c 'md1/mk1 — unconfirmed')
   case "$name" in
     kit-mk1-alone) [ "$unconf" -ge 1 ] || bad "$name: the lone mk1 string confirmed; KIT_UNCONFIRMED_MDMK would not fire" ;;
-    kit-two-copies-mk1)
-      # RED until the §14i build: today's me reads the two copies as one over-full group
-      # (unconfirmed). §14d says each copy confirms; flip this arm to the default one
-      # (unconf == 0) in the build commit that lands the run grouping.
-      echo "RED $name: $unconf md1/mk1 string(s) unconfirmed (me today; §14d wants 0)"
-      [ "$unconf" -ge 1 ] || echo "NOTE $name now confirms: delete this RED arm" ;;
     *)         [ "$unconf" -eq 0 ] || bad "$name: $unconf md1/mk1 string(s) unconfirmed; the vector relies on all confirming" ;;
   esac
 done

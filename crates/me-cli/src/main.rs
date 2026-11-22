@@ -180,7 +180,7 @@ enum SyswCmd {
     /// one line that told them where they were. Being first is the fix; the
     /// short/long split itself is a sound convention and was not the defect.
     ///
-    /// A record is a BIP-39 mnemonic, an md1/mk1/ms1/mt1 string, or one of the
+    /// A record is a BIP-39 mnemonic, an md1/mk1/mr1/ms1/mt1 string, or one of the
     /// prefixed forms — which carry their bodies as LOWERCASE HEX.
     ///
     /// `text:<hex of the UTF-8 bytes>` is free text.
@@ -1881,7 +1881,12 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // act on. Nothing here refuses: §13 D6 demoted the refusal, and a
             // single card of a chunked set is exactly what `me bundle`
             // legitimately produces.
-            report_unconfirmed(&recs);
+            let unconfirmed = report_unconfirmed(&recs);
+            // S1 §14h: a payload holding an mr1 record is checked against the
+            // kit rule (checks 2, 4 and 5; 1 and 3 were refused above), and a
+            // failure is one warning line. The pack goes on: the device
+            // engraves such a payload through its other doors.
+            report_kit(&recs, &unconfirmed);
 
             let blob = match sysw::pack_with(recs, passphrase.as_deref(), *iterations, admission) {
                 Ok(b) => b,
@@ -2129,8 +2134,9 @@ fn print_digest(blob: &[u8]) {
 /// show` numbers the PUBLIC SECTION instead, and on a sealed payload the two
 /// diverge: secrets move out of the public section, so argv record 3 can be
 /// public record 1. Renumbering either would be worse than naming both.
-fn report_unconfirmed(records: &[String]) {
-    for (i, why) in mnemonic_engrave::sysw::record::mdmk_unconfirmed_why(records) {
+fn report_unconfirmed(records: &[String]) -> Vec<usize> {
+    let walk = mnemonic_engrave::sysw::record::mdmk_unconfirmed_why(records);
+    for &(i, why) in &walk {
         match why.version_note() {
             // F-449 stage 4a (SPEC §6a): name the version, and do not claim the
             // plate is broken -- a newer `me`, or newer firmware, may read it.
@@ -2167,6 +2173,21 @@ fn report_unconfirmed(records: &[String]) {
              The device will REPLACE your plate legend with a re-encode warning, and \n      \
              QR plates will be unavailable: a set that does not reassemble has no \n      \
              transaction bytes to encode."
+        );
+    }
+    walk.into_iter().map(|(i, _)| i).collect()
+}
+
+/// S1 §14h: the kit warning. One line on stderr, once, when the payload holds
+/// an mr1 record and the kit rule's checks 2, 4 or 5 fail. `unconfirmed` is the
+/// as-given indices `report_unconfirmed` already walked, so the `[mdmk-decode]`
+/// walk (and its chunk-set-id side effect) runs once.
+fn report_kit(records: &[String], unconfirmed: &[usize]) {
+    use mnemonic_engrave::sysw::mr;
+    if let mr::Kit::Refused(r) = mr::kit(records, unconfirmed) {
+        eprintln!(
+            "me: this payload is not a kit the device will engrave: {}",
+            mr_sentence(r.reason, &r.detail, records)
         );
     }
 }
@@ -3314,6 +3335,156 @@ fn emit(
     }
 }
 
+/// `{R}`, `{r}` of S1 §14g on the `me` surface: the record by its position in
+/// the list as given.
+fn mr_record(i: usize) -> String {
+    format!("record {i}, as given (records count from 0)")
+}
+
+/// S1 §14g's sentences for the §14b reasons, `me` form. `len` is `{n}` and
+/// `prefix` is `{p}`.
+fn mr_string_sentence(
+    reason: mnemonic_engrave::sysw::mr::MrReason,
+    i: usize,
+    len: usize,
+    prefix: &str,
+) -> String {
+    use mnemonic_engrave::sysw::mr::MrReason as M;
+    let r = mr_record(i);
+    match reason {
+        M::Case => format!(
+            "{r} is an mr1 string with capital letters; the mr1 strings of a kit are all \
+             lowercase, as mr prints them."
+        ),
+        M::Character => format!("{r} begins mr1 but holds a character no mr1 string uses."),
+        M::Length => format!(
+            "{r} begins mr1 but is {len} characters long; an mr1 string is 17 to 96 characters \
+             long."
+        ),
+        M::Checksum => format!(
+            "{r} is an mr1 string whose checksum does not match: at least one character is \
+             wrong."
+        ),
+        M::ReservedSymbol => {
+            format!("{r} begins {prefix}, which no mr1 card or chunk begins with.")
+        }
+        M::ChunkShort => format!("{r} is an mr1 chunk too short to hold its chunk header."),
+        M::ChunkPadding => format!(
+            "{r} is an mr1 chunk that does not end the way mr ends a chunk (0 to 4 zero bits \
+             after its last byte)."
+        ),
+    }
+}
+
+/// S1 §14g's sentence for one reason, `me` form. `records` is the list as
+/// given, read only for the §14b reasons' `{n}` and `{p}` inside a kit.
+fn mr_sentence(
+    reason: mnemonic_engrave::sysw::mr::Reason,
+    detail: &mnemonic_engrave::sysw::mr::Detail,
+    records: &[String],
+) -> String {
+    use mnemonic_engrave::sysw::mr::{Detail as D, Reason as R};
+    match (reason, detail) {
+        (R::Mr(m), D::Record(i)) => {
+            let t = records.get(*i).map(|r| r.trim()).unwrap_or("");
+            mr_string_sentence(
+                m,
+                *i,
+                t.chars().count(),
+                &t.chars().take(4).collect::<String>(),
+            )
+        }
+        (
+            R::SetCount,
+            D::Count {
+                begins,
+                record,
+                count,
+                first_count,
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} disagrees with itself: {} says the card has \
+             {count} chunks, but its first chunk says {first_count}.",
+            mr_record(*record)
+        ),
+        (
+            R::SetIndex,
+            D::Index {
+                begins,
+                record,
+                index,
+                count,
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} has {count} chunks, numbered 0 to {}, but {} is \
+             numbered {index}.",
+            count - 1,
+            mr_record(*record)
+        ),
+        (
+            R::SetDuplicate,
+            D::Duplicate {
+                begins,
+                index,
+                records: [a, b],
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} holds chunk {index} twice: records {a} and {b}, \
+             as given (records count from 0). Each copy of a card holds each chunk once, and a \
+             copy must be complete before the next copy starts."
+        ),
+        (
+            R::SetMissing,
+            D::Missing {
+                begins,
+                index,
+                count,
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} is incomplete: chunk {index} of its {count} \
+             chunks is missing (chunks are numbered from 0), or a chunk repeated after a \
+             complete copy began a second, incomplete copy."
+        ),
+        (R::SetSlices, D::Begins(begins)) => format!(
+            "The mr1 card that begins {begins} is not divided into chunks the way mr divides a \
+             card, so mr did not write it."
+        ),
+        (R::SetId, D::Begins(begins)) => format!(
+            "The mr1 card that begins {begins} does not match its own chunk-set id: its chunks \
+             come from different cards, or one was altered."
+        ),
+        (
+            R::CardSplit,
+            D::Split {
+                kind,
+                begins,
+                record,
+            },
+        ) => format!(
+            "The {} card that begins {begins} is split: {} sits between its strings but is not \
+             part of it. Keep each card's strings together.",
+            kind.name(),
+            mr_record(*record)
+        ),
+        (R::KitOtherRecord, D::Other { record, class }) => format!(
+            "{} is not an md1, mk1 or mr1 string (it is: {}), so this payload is not a kit.",
+            mr_record(*record),
+            class_name(*class)
+        ),
+        (R::KitUnconfirmedMdmk, D::Record(i)) => format!(
+            "{} is an md1 or mk1 string whose card does not decode: it is incomplete or \
+             damaged.",
+            mr_record(*i)
+        ),
+        // The reason and its detail come from one `Refusal`, so a mismatch is a
+        // skew between two modules, not an input: say so rather than panic.
+        (r, _) => format!(
+            "an mr1 refusal ({}) with a detail that does not fit it",
+            r.name()
+        ),
+    }
+}
+
 fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
     use mnemonic_engrave::sysw::SyswError as E;
     match e {
@@ -3494,9 +3665,10 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                     ms_codec::consts::VALID_STR_LENGTHS,
                     ms_codec::consts::VALID_MNEM_STR_LENGTHS,
                 ),
+                U::Mr(f) => mr_string_sentence(f.reason, *i, f.len, &f.prefix),
                 U::Unrecognised => format!(
                     "record {i}, as given (records count from 0) is not a form this container can \
-                     place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
+                     place: not a BIP-39 mnemonic, not an md1/mk1/mr1/ms1/mt1 string, and not \
                      a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:`/`phrase:` record. Addresses are not \
                      classifiable here, \
                      and neither is a wallet descriptor `me` refuses — see sysw::classify"
@@ -3548,6 +3720,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
             .into(),
         E::Crypto => "the passphrase did not open this payload".into(),
         E::NotUtf8 => "the records are not valid UTF-8".into(),
+        E::MrSet(r) => mr_sentence(r.reason, &r.detail, &[]),
         E::Wire(w) => format!("malformed container: {w:?}"),
     }
 }
