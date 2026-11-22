@@ -6,6 +6,7 @@ pub mod crypto;
 pub mod passphrase;
 pub mod pubhash;
 pub mod record;
+pub mod titles;
 pub mod uf2;
 pub mod wire;
 
@@ -83,6 +84,14 @@ pub enum SealError {
     SecretInPublic(usize),
     Empty,
     TooLarge(usize),
+    /// v2 (S1b §14.4): the titles record or its agreement with the seed records.
+    Titles(titles::TitlesError),
+    /// v2 (S1b §14.5): the n-word password's word count or a word off the list.
+    Password(String),
+    /// v2: `pw_form` is neither 0 nor 6 to 12.
+    PwForm(u8),
+    /// v2: `pw_form` 6 to 12 with fewer than 600,000 iterations.
+    PwFormIterations(u32),
 }
 
 impl std::fmt::Display for SealError {
@@ -112,6 +121,14 @@ impl std::fmt::Display for SealError {
             SealError::Empty => write!(f, "payload is empty"),
             SealError::TooLarge(n) => {
                 write!(f, "section is {n} bytes; the cap is {MAX_SECTION_LEN}")
+            }
+            SealError::Titles(e) => write!(f, "{e}"),
+            SealError::Password(e) => write!(f, "{e}"),
+            SealError::PwForm(b) => {
+                write!(f, "{}", wire::WireError::PwForm(*b))
+            }
+            SealError::PwFormIterations(n) => {
+                write!(f, "{}", wire::WireError::PwFormIterations(*n))
             }
         }
     }
@@ -208,6 +225,8 @@ pub fn seal_public_only(public: Vec<String>) -> Result<Vec<u8>, SealError> {
         return Err(SealError::TooLarge(bytes.len()));
     }
     let header = Header {
+        version: wire::VERSION,
+        pw_form: 0,
         iterations: 0,
         salt: [0; SALT_LEN],
         iv: [0; IV_LEN],
@@ -275,6 +294,8 @@ pub(crate) fn seal_deterministic(
     }
 
     let header = Header {
+        version: wire::VERSION,
+        pw_form: 0,
         iterations,
         salt,
         iv,
@@ -292,6 +313,106 @@ pub(crate) fn seal_deterministic(
     let mut blob = aad;
     blob.extend_from_slice(&sealed);
     Ok(blob)
+}
+
+/// What [`open`] returns for a payload it opened (S1b §14.7).
+pub struct Opened {
+    pub version: u8,
+    pub pw_form: u8,
+    pub public: Vec<String>,
+    /// The seed records, the titles record excluded.
+    pub secret: Zeroizing<Vec<String>>,
+    /// The titles of a v2 payload that carries a titles record.
+    pub titles: Option<Vec<String>>,
+}
+
+/// Why [`open`] refused (S1b §14.5, §14.7). The first check that fails is the
+/// variant; none returns any record.
+#[derive(Debug)]
+pub enum OpenError {
+    Wire(wire::WireError),
+    /// The public section's refusals as `seal` reports them, before any KDF work.
+    Public(SealError),
+    /// The password's word count is not the header's `pw_form`.
+    PasswordWordCount {
+        got: usize,
+        want: usize,
+    },
+    /// A password word is not on the BIP-39 English list; the position counts
+    /// from 1.
+    PasswordWord(usize),
+    /// `pw_form` 0 and v1: not a checksum-valid BIP-39 mnemonic.
+    Passphrase,
+    Authentication,
+    Container(container::ContainerError),
+    Record {
+        index: usize,
+        source: record::RecordError,
+    },
+    Titles(titles::TitlesError),
+}
+
+impl std::fmt::Display for OpenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OpenError::Wire(e) => write!(f, "{e}"),
+            OpenError::Public(e) => write!(f, "{e}"),
+            OpenError::PasswordWordCount { got, want } => write!(
+                f,
+                "the password has {got} words; this payload's password has {want}"
+            ),
+            OpenError::PasswordWord(p) => {
+                write!(f, "password word {p} is not on the BIP-39 English list")
+            }
+            OpenError::Passphrase => {
+                write!(f, "passphrase is not a checksum-valid BIP-39 mnemonic")
+            }
+            OpenError::Authentication => {
+                write!(f, "wrong password, or this payload has been altered")
+            }
+            OpenError::Container(e) => write!(f, "{e}"),
+            OpenError::Record { index, source } => write!(
+                f,
+                "record {index} (records count from 0) in the secret section: {source}"
+            ),
+            OpenError::Titles(e) => write!(f, "{e}"),
+        }
+    }
+}
+impl std::error::Error for OpenError {}
+
+/// Open a v1 or v2 payload (S1b §14.5, §14.7). Every refusal that needs no key
+/// runs before any KDF work: the header, the public section, the password's
+/// word count and words.
+pub fn open(_blob: &[u8], _password: &str) -> Result<Opened, OpenError> {
+    unimplemented!()
+}
+
+/// Seal a v2 payload with fresh salt and IV (S1b §14.3). `words` is the
+/// password: twelve checksum-valid words for `pw_form` 0, n words from the
+/// BIP-39 list for `pw_form` n. `seal_v2` never generates words.
+pub fn seal_v2(
+    _payload: Payload,
+    _titles: Option<Vec<String>>,
+    _words: &str,
+    _pw_form: u8,
+    _iterations: u32,
+) -> Result<Vec<u8>, SealError> {
+    unimplemented!()
+}
+
+/// The vectors' seam for [`seal_v2`], under §11.4's sole exemption from §7.2.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn seal_v2_deterministic(
+    _payload: Payload,
+    _titles: Option<Vec<String>>,
+    _words: &str,
+    _pw_form: u8,
+    _iterations: u32,
+    _salt: [u8; SALT_LEN],
+    _iv: [u8; IV_LEN],
+) -> Result<Vec<u8>, SealError> {
+    unimplemented!()
 }
 
 /// A secret-section record is a constellation record OR a BIP-39 mnemonic.
@@ -362,6 +483,9 @@ fn non_canonical_separator(s: &str) -> Option<usize> {
     }
     s.find("  ")
 }
+
+#[cfg(test)]
+mod v2_tests;
 
 #[cfg(test)]
 mod tests {
@@ -677,6 +801,8 @@ mod tests {
                 container::encode_section(&secret).expect("secret section must encode")
             };
             let header = Header {
+                version: wire::VERSION,
+                pw_form: 0,
                 iterations,
                 salt: s,
                 iv: i,

@@ -552,3 +552,26 @@ fn seal_still_refuses_mr1() {
     );
     assert!(!out.exists(), "a refused run must write nothing");
 }
+
+/// S1b §14.10: `me seal` is unchanged and still writes version 1. GUARD: green
+/// before the v2 library exists, and it must stay green.
+#[test]
+fn me_seal_still_writes_version_1() {
+    let dir = tempfile::tempdir().unwrap();
+    let inp = dir.path().join("secret.txt");
+    // A16, S1b §14.9's 16-byte ms1, and a newline.
+    std::fs::write(&inp, "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f\n").unwrap();
+    let out = dir.path().join("p.uf2");
+    me().args(["seal", "--seal-secret", "--in"])
+        .arg(&inp)
+        .arg("--out")
+        .arg(&out)
+        .assert()
+        .success();
+    let uf2 = std::fs::read(&out).unwrap();
+    // The first block's payload starts at byte 32 of the block.
+    let payload = &uf2[32..];
+    assert_eq!(&payload[..8], b"MNEMBLOB");
+    assert_eq!(payload[8], 0x01, "version");
+    assert_eq!(payload[11], 0x00, "the reserved byte");
+}
