@@ -182,17 +182,18 @@ def set_problem(records):
     """First (code, detail) of the mr1 chunk-set rule over a payload, or None.
 
     Assumes every mr1 candidate already passed the string rule."""
-    groups = {}
-    order = []
+    # Sets are RUNS (§14c): a chunk joins the set most recently opened when that set has
+    # the chunk's chunk-set id and holds fewer chunks than its first chunk's count;
+    # otherwise it opens a new set. Two sets with one id are two copies of a card.
+    sets = []  # (csid, [record indices])
     for i, r in enumerate(records):
         if is_candidate(r) and is_chunk(r):
-            csid = chunk(r)[0]
-            if csid not in groups:
-                groups[csid] = []
-                order.append(csid)
-            groups[csid].append(i)
-    for csid in order:
-        idx = groups[csid]
+            h = chunk(r)
+            if sets and sets[-1][0] == h[0] and len(sets[-1][1]) < chunk(records[sets[-1][1][0]])[1]:
+                sets[-1][1].append(i)
+            else:
+                sets.append((h[0], [i]))
+    for csid, idx in sets:
         first = records[idx[0]][:8]
         heads = [chunk(records[i]) for i in idx]
         c1 = heads[0][1]
@@ -376,6 +377,18 @@ def vectors():
         "the card in upper case: the string rule runs first")
     kit("kit-missing", [c0] + mk_all, "refused", "SET_MISSING",
         {"begins": c0[:8], "index": 1, "count": 2}, None, "the card's chunk 1 left out")
+    two = [c0, c1] + MK[0] + [c0, c1] + MK[1]
+    assert set_problem(two) is None, set_problem(two)
+    kit("kit-two-copies", two, "eligible", None, None,
+        [card("mr1", A2), card("mk1", MK[0]), card("mr1", A2), card("mk1", MK[1])],
+        "S4's owner-heir payload: the card, mk1 plate 0, the card again, mk1 plate 1; two complete "
+        "copies of a card are two cards (§14c runs)")
+    two_mk = [c0, c1] + MK[0] + [c0, c1] + MK[0]
+    assert set_problem(two_mk) is None, set_problem(two_mk)
+    kit("kit-two-copies-mk1", two_mk, "eligible", None, None,
+        [card("mr1", A2), card("mk1", MK[0]), card("mr1", A2), card("mk1", MK[0])],
+        "the same seat's mk1 plate in two kits: the md1/mk1 groups are runs too (§14d), so both copies "
+        "confirm (me 0.13.0 does not yet: it reads one over-full group, unconfirmed)")
     kit("no-mr1", mk_all, "none", None, None, None, "no mr1 record: no kit door, Engrave Bundle as today")
     return out
 

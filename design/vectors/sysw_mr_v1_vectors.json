@@ -630,6 +630,92 @@
    "why": "the card's chunk 1 left out"
   },
   {
+   "name": "kit-two-copies",
+   "records": [
+    "mr1lg2c0qsqzsppz7g65xyqps0rl40veqpqcgqpsfs6pz9qu2fc4ycmcsxm3ajxhutn",
+    "mr1lg2c0qstf0dsqyeeuqxygz5xmtjgsmyjsm2v8fxf6wfzvyeaqpj52ckkns06uf",
+    "mk1qppc9xpqqsqm3vrdep2rd4eylcpue0vssqygrqyqsqygpqyqsqyqgdv8eag9v5c296qfpc56e6xc4ed689t8w76l8hpsgymuz8nr44036mz6",
+    "mk1qppc9xpplucp0dtenpf4xrp3mw9xprqrg9euqv046sd377nklhzwuf0rsq04pxqr0ncmucqczcdwnac6uekquzn8cc0xlmt426fyx0uvz",
+    "mr1lg2c0qsqzsppz7g65xyqps0rl40veqpqcgqpsfs6pz9qu2fc4ycmcsxm3ajxhutn",
+    "mr1lg2c0qstf0dsqyeeuqxygz5xmtjgsmyjsm2v8fxf6wfzvyeaqpj52ckkns06uf",
+    "mk1qpk4mtpqqsqm3vrdeqxey5x6lcpue0vssqygrqyqsqygrqyqsqyqgdv8eaq3fjne26pjwjyhtpdpu2pnuy2qjvpakcqrgxn4qsa8a092r3u5",
+    "mk1qpk4mtppmtf325qnac9cxy99x2zqgdszpve25uz55thheer40jw8rn9ask8xpnkvscsvj3hf7g5ws29nmyqt2a43l5uzaxkxagmr8mjvg"
+   ],
+   "kit": "eligible",
+   "reason": null,
+   "detail": null,
+   "cards": [
+    {
+     "kind": "mr1",
+     "strings": 2,
+     "begins": "mr1lg2c0",
+     "ends": "06uf"
+    },
+    {
+     "kind": "mk1",
+     "strings": 2,
+     "begins": "mk1qppc9",
+     "ends": "0uvz"
+    },
+    {
+     "kind": "mr1",
+     "strings": 2,
+     "begins": "mr1lg2c0",
+     "ends": "06uf"
+    },
+    {
+     "kind": "mk1",
+     "strings": 2,
+     "begins": "mk1qpk4m",
+     "ends": "mjvg"
+    }
+   ],
+   "why": "S4's owner-heir payload: the card, mk1 plate 0, the card again, mk1 plate 1; two complete copies of a card are two cards (\u00a714c runs)"
+  },
+  {
+   "name": "kit-two-copies-mk1",
+   "records": [
+    "mr1lg2c0qsqzsppz7g65xyqps0rl40veqpqcgqpsfs6pz9qu2fc4ycmcsxm3ajxhutn",
+    "mr1lg2c0qstf0dsqyeeuqxygz5xmtjgsmyjsm2v8fxf6wfzvyeaqpj52ckkns06uf",
+    "mk1qppc9xpqqsqm3vrdep2rd4eylcpue0vssqygrqyqsqygpqyqsqyqgdv8eag9v5c296qfpc56e6xc4ed689t8w76l8hpsgymuz8nr44036mz6",
+    "mk1qppc9xpplucp0dtenpf4xrp3mw9xprqrg9euqv046sd377nklhzwuf0rsq04pxqr0ncmucqczcdwnac6uekquzn8cc0xlmt426fyx0uvz",
+    "mr1lg2c0qsqzsppz7g65xyqps0rl40veqpqcgqpsfs6pz9qu2fc4ycmcsxm3ajxhutn",
+    "mr1lg2c0qstf0dsqyeeuqxygz5xmtjgsmyjsm2v8fxf6wfzvyeaqpj52ckkns06uf",
+    "mk1qppc9xpqqsqm3vrdep2rd4eylcpue0vssqygrqyqsqygpqyqsqyqgdv8eag9v5c296qfpc56e6xc4ed689t8w76l8hpsgymuz8nr44036mz6",
+    "mk1qppc9xpplucp0dtenpf4xrp3mw9xprqrg9euqv046sd377nklhzwuf0rsq04pxqr0ncmucqczcdwnac6uekquzn8cc0xlmt426fyx0uvz"
+   ],
+   "kit": "eligible",
+   "reason": null,
+   "detail": null,
+   "cards": [
+    {
+     "kind": "mr1",
+     "strings": 2,
+     "begins": "mr1lg2c0",
+     "ends": "06uf"
+    },
+    {
+     "kind": "mk1",
+     "strings": 2,
+     "begins": "mk1qppc9",
+     "ends": "0uvz"
+    },
+    {
+     "kind": "mr1",
+     "strings": 2,
+     "begins": "mr1lg2c0",
+     "ends": "06uf"
+    },
+    {
+     "kind": "mk1",
+     "strings": 2,
+     "begins": "mk1qppc9",
+     "ends": "0uvz"
+    }
+   ],
+   "why": "the same seat's mk1 plate in two kits: the md1/mk1 groups are runs too (\u00a714d), so both copies confirm (me 0.13.0 does not yet: it reads one over-full group, unconfirmed)"
+  },
+  {
    "name": "no-mr1",
    "records": [
     "mk1qppc9xpqqsqm3vrdep2rd4eylcpue0vssqygrqyqsqygpqyqsqyqgdv8eag9v5c296qfpc56e6xc4ed689t8w76l8hpsgymuz8nr44036mz6",
