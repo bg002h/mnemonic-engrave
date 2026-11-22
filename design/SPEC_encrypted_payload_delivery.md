@@ -3,6 +3,10 @@
 Status: **DRAFT, pre-R0.** No code until this passes an architect R0 review at
 0 Critical / 0 Important.
 
+**Amended 2026-11-22 by §14 (MNEMBLOB v2, spec S1b, pre-R0).** A payload with
+`version == 0x02` is governed by §14 where §14 says so; a v1 payload is governed by
+§1-§13 unchanged.
+
 Risk classification: **full risk set** — funds/seed material, a new normative
 wire format, and work spanning both `mnemonic-engrave` (Rust) and the
 `bg002h/seedhammer` fork (Go/TinyGo).
@@ -51,7 +55,11 @@ This list is normative and belongs in operator documentation, not only here.
    *passphrase entropy + ~20 bits* from the KDF. A human-chosen passphrase is
    worth 25–35 bits and falls to a single rented GPU in minutes. §7 therefore
    mandates a generated passphrase, and the CLI MUST NOT accept a user-supplied
-   one.
+   one. *(Scope, 2026-11-22: this binds `me seal` and the generated password form,
+   `pw_form` 0. A v2 `pw_form` n payload (§14.5) carries 6 to 12 words drawn by
+   mr-sitting from the OS CSPRNG, also never user-chosen; see §14.11. The
+   systemwide container's user-supplied mode is governed by
+   `SPEC_systemwide_payloads.md` §8, not here (F-125).)*
 2. **Anyone who steals the machine obtaining the ciphertext.** Confirmed
    empirically on this device (§3): `debug enable: 1`, `secure debug enable: 1`,
    and BOOTSEL is not disabled, so `picotool save -a` extracts all of flash over
@@ -297,6 +305,12 @@ This list is normative and belongs in operator documentation, not only here.
     All of the above is scheduled to the **post-merge polish and hardening**
     phase, and every deferred item goes to the post-release whole-Phase-2 review.
 
+    **Release gate (Brian 2026-11-22, goal 2).** The wipe gaps F-124 lists (F-110,
+    F-88 / F-90 / F-104 item 2b, F-109, and this item's own incompleteness) are
+    fixed **on the kit path** — the v2 secret session of §14 that engraves a
+    Refugium sitting's seed plates — **before any non-alpha release**. Until then
+    no holder-facing text may say the machine wipes the seed (F-123).
+
     **Where the gap came from**, since a threat-model item that does not say
     this invites the same gap again. §10.2.4's timer was designed in a single
     fable-tier consult (`design/CONSULT_b2b_idle_timer_design.md`, 2026-08-09)
@@ -324,6 +338,10 @@ expertise — the honest statement is:
 > offline-attackable ciphertext of your seed. Its entire defence is the 128-bit
 > generated passphrase and the ~20 bits the KDF adds. Nothing else stands
 > behind it.
+
+*(v2, 2026-11-22: for a `pw_form` n payload the defence is n × 11 bits plus about
+19 KDF bits at 600,000 iterations — about 85 bits for six words — accepted because
+that payload exists only from its write to its erase inside one sitting; §14.11.)*
 
 **The "powered down" qualifier is load-bearing and was missing from an earlier
 draft.** See §2.2 item 9: during an open bundle session the plaintext is in
@@ -354,7 +372,11 @@ cut is ~21 minutes of physical-custody-only. Do not start one you will walk away
 from.
 
 And, per §2.2 item 12: **the machine offers two classes of program, and only one
-of them wipes.** Use **Sealed Payload** for anything you intend to protect. The
+of them wipes.** Use **Sealed Payload** for anything you intend to protect —
+and read that as a difference in *behaviour*, not a promise: the two classes
+differ in what they try to clear, not in whether your funds are safe if the
+machine is taken; §2.2 item 16 says what Sealed Payload's wipe still misses, and
+physical custody is the control either way (F-123, 2026-11-22). The
 legacy programs — NFC scan, manual word entry, BIP-85, account xpub, SeedXOR,
 SLIP-39, free text — leave seed material resident with no timer behind them, so
 with those the operating rule is the older one: do not walk away from a powered
@@ -501,10 +523,10 @@ A payload carries a **public section**, an **encrypted section**, or both.
 | Offset | Size | Field | Value / constraint |
 | --- | --- | --- | --- |
 | 0 | 8 | `magic` | ASCII `MNEMBLOB` |
-| 8 | 1 | `version` | `0x01` |
+| 8 | 1 | `version` | `0x01`; `0x02` is v2 (§14) |
 | 9 | 1 | `kdf_id` | `0x01` = PBKDF2-HMAC-SHA256; **`0x00` when nothing is encrypted** |
 | 10 | 1 | `aead_id` | `0x01` = AES-256-GCM; **`0x00` when nothing is encrypted** |
-| 11 | 1 | `reserved` | `0x00` |
+| 11 | 1 | `reserved` | `0x00`; in v2 this byte is `pw_form` (§14.2) |
 | 12 | 4 | `iterations` | u32; **`0` when nothing is encrypted** |
 | 16 | 16 | `salt` | fresh CSPRNG bytes per encryption; **all-zero when nothing is encrypted** |
 | 32 | 12 | `iv` | fresh CSPRNG bytes per encryption; **all-zero when nothing is encrypted** |
@@ -554,8 +576,8 @@ This firmware runs with **no active watchdog** (`rp.WATCHDOG` appears only in
 not an error message. Every field below is validated first, and any violation
 fails closed with "payload unreadable":
 
-- `version == 0x01`
-- `reserved == 0x00`
+- `version == 0x01`, or `0x02` with §14.2's rules (amended 2026-11-22)
+- `reserved == 0x00` (v1; in v2 offset 11 is `pw_form`, checked per §14.2)
 - **If `ct_len > 0`** (something is encrypted):
   `kdf_id == 0x01`, `aead_id == 0x01`, `100_000 <= iterations <= 2_000_000`,
   `0 < ct_len <= 8191`.
@@ -591,7 +613,8 @@ length and MUST NOT infer length from region contents.
 
 An earlier draft carried a `payload_kind` byte describing the whole payload.
 That stopped working the moment one blob could hold both public and encrypted
-content, so the byte is gone (offset 11 is now `reserved`). **Section placement
+content, so the byte is gone (offset 11 is now `reserved`; v2 reuses it as
+`pw_form`, §14.2, which describes the password, not the payload). **Section placement
 carries the meaning instead, and it does so more strongly.**
 
 The rule is one line:
@@ -1146,6 +1169,9 @@ encryption would first require a driver for the unused hardware TRNG at
 ## 8. The passphrase
 
 **A 12-word BIP-39 mnemonic, generated by the host. 128 bits of entropy.**
+
+*(Scope, 2026-11-22: this section governs v1 and v2 `pw_form` 0. A v2 `pw_form`
+n password is §14.5's; `me seal` writes v1 only and is unchanged.)*
 
 - The CLI generates it from the OS CSPRNG. It **MUST NOT** accept a
   user-supplied passphrase — see §2.2 item 1.
@@ -2201,7 +2227,8 @@ the consumer that will parse it.
    The accepted consequence, recorded in §2.2a: **the machine's flash holds
    encrypted seed material, and a stolen machine yields an offline-attackable
    ciphertext of the seed.** Its whole defence is the generated 128-bit
-   passphrase plus ~20 KDF bits. This makes §8's prohibition on user-chosen
+   passphrase plus ~20 KDF bits (v1 and `pw_form` 0; a v2 `pw_form` n payload's
+   is §14.11's, by Brian's 2026-11-22 ruling). This makes §8's prohibition on user-chosen
    passphrases load-bearing rather than advisory.
 
    The kind/content cross-check (§10.2.1) survives this decision but changes
@@ -2235,3 +2262,450 @@ the consumer that will parse it.
 - Any device-side rate limiting, PIN counter, or lockout — §2.2 item 3 explains
   why these would be theatre.
 - Replacing NFC ingest. This is an additional path, not a substitute.
+
+## 14. MNEMBLOB v2 — NORMATIVE amendment (spec S1b, 2026-11-22)
+
+Status: **DRAFT, pre-R0.** Authored by Claude Opus 5.5 (claude-opus-5-5) for goal 2 (engrave whole Refugium kits).
+Binding inputs: the architect report `kit-engrave-arch-sealed-extend.md` §2-§4 and §6a (coordinator
+`agent-reports/`), and Brian's rulings of 2026-11-22 (coordinator `memory/kit-engraving-rulings-2026-11-22.md`, both
+rounds). Where this section and §1-§13 disagree, this section governs **for a v2 payload**; a v1 payload is governed
+by §1-§13 exactly as before, byte for byte. Revisions read: this repo `aa1bc2db`, the fork `25abe8e`,
+mnemonic-refugium `2941f216e`.
+
+### 14.0 Rulings this section carries (each one line; spec text each affects)
+
+| # | Ruling (Brian 2026-11-22) | Spec text affected |
+| --- | --- | --- |
+| R-1 | Secrets for a kit ride the WIPING container, Sealed Payload, extended (Q1). | §1 decision "frozen" in `SPEC_systemwide_payloads.md` decision 1: amended (narrow unfreeze, v2 only). |
+| R-2 | Architect Ruling 1 stands: version 0x02, header byte 11 = password form, titles record, caps unchanged, mr1/mk1 stay out of Sealed Payload in v1. | §6 table, §6.2, §6.3's "offset 11 is now reserved": amended in place, pointing here. |
+| R-3 | One sealed payload per sitting holding all of its seed plates (Q5, architect Ruling 2). | None here; it binds the writer (spec S3). §14.3's record cap note follows from it. |
+| R-4 | Plates password 6 to 12 words, default 6, 600,000 iterations (Q13, architect Ruling 3). | §2.2 item 1, §2.2a, §8, §12 item 6: scoped to the generated form (`pw_form` 0). |
+| R-5 | The mr-sitting session stays open until its seed plates are cut, read back and the region erased. | None here; binds spec S3. §14.8 records why v2 has no on-device erase. |
+| R-6 | Sealed Payload's wipe gaps (F-124) are fixed on the kit path before any non-alpha release; F-123's over-claim is corrected. | §2.2 item 16 gains the gate line; §2.3's "use Sealed Payload for anything you intend to protect" is qualified. |
+
+### 14.1 What changes, and what does not
+
+Changes, and nothing else:
+
+1. `version` (offset 8) may be `0x02`. A payload with `version == 0x02` is a **v2 payload**.
+2. In a v2 payload, offset 11 is `pw_form` (§14.2), not `reserved`.
+3. A v2 payload's **encrypted** section may carry one **titles record** (§14.4).
+4. The device, on a v2 payload, takes an n-word password when `pw_form` says so (§14.5), applies the titles rule
+   (§14.4), shows the title before a seed plate is cut, and in the Refugium build cuts the ms1 plate with a Standard
+   SeedQR (§14.6).
+
+Unchanged for v2 as for v1: the 52-byte layout and every other field; PBKDF2-HMAC-SHA256 and AES-256-GCM; the AAD
+(§6.1a); the iteration bounds `100_000 ..= 2_000_000` (§6.2); `MaxRecords` 24 (both sections together, the titles
+record included), `MaxRecordLen` 512, `MaxSectionLen` 8191; the public-section allow-list (`md1`/`mk1` only, decoded
+as card sets); the §6.6 hash and its label `MNEMBLOB/pub/v1` (it covers the public records and the `sealed` byte, not
+the version, so a v2 payload's hash equals the v1 hash of the same public records and shape; vector V2-C pins it at
+`a26e d22b b747 dfd0 2367 06ad 14c1 9679`, vector D's value); the §10.2.2 session, its per-plate wipe and the
+§10.2.4 idle wipe; the 64 KiB region at `0x10E00000`; UF2 emission (§9.1).
+
+**`me seal` is unchanged.** It writes v1 with twelve generated checksum words, exactly as §9 says. It gains no flag
+and no printed text, so the toolkit manual does not change. `me hash` is unchanged (§6.6 is unchanged). No `me`
+command reads a payload file today, and none is added.
+
+**Firmware that predates v2 refuses a v2 payload fail-closed**: `seal.ParseHeader` returns `seal: unsupported format
+version 2` (`seal/wire.go:135@25abe8e`, run 2026-11-22) and the program shows `Payload unreadable.`
+(`gui/unlock_flow.go:77`). Nothing is decrypted.
+
+### 14.2 Header offset 11 in v2: `pw_form` — NORMATIVE
+
+| `version` | `ct_len` | offset 11 | meaning |
+| --- | --- | --- | --- |
+| `0x01` | any | `0x00` | `reserved`, as §6.2. Any other value: `reserved byte must be 0, got <b>`. |
+| `0x02` | `> 0` | `0x00` | `pw_form` 0: the password is §8's twelve generated words with a valid BIP-39 checksum. |
+| `0x02` | `> 0` | `6 ..= 12` | `pw_form` n: the password is n words from the BIP-39 English list, **no checksum** (§14.5). |
+| `0x02` | `> 0` | anything else | refused: `password form byte must be 0 or 6 to 12, got <b>`. |
+| `0x02` | `0` | `0x00` | public-only v2 payload; no password. |
+| `0x02` | `0` | anything else | refused: `pw_form must be zero when nothing is encrypted` (§6.2's anti-downgrade-staging rule, extended to the new field). |
+| other | any | any | refused: `unsupported format version <v>` (`0x00` and `0x03 ..= 0xFF` alike). |
+
+Check order (normative; the Rust `Header::decode` and the Go `ParseHeader` both follow it, so the same blob gets the
+same refusal): length, magic, version; **v1 only:** reserved; read the integers; section caps; empty; then the
+sealed branch (`kdf_id`, `aead_id`, `iterations`, **v2:** `pw_form`) or the unsealed branch (`kdf_id`, `aead_id`,
+`iterations`, `salt`, `iv`, **v2:** `pw_form`); then region fit.
+
+The Rust messages above are `WireError`'s `Display` (two new variants: `PwForm(u8)` and the existing
+`UnsealedFieldNotZero("pw_form")`). The Go port carries one new sentinel, `ErrPwForm = errors.New("seal: password form
+byte must be 0 or 6 to 12")`, wrapped as `"%w, got %d"`, and reuses `ErrUnsealedFieldNotZero` wrapped as
+`"%w: pw_form"`. On the device every header refusal, these included, still reads `Payload unreadable.` (§6.2).
+
+The Rust `Header` gains two fields, `version: u8` and `pw_form: u8`; `encode` writes both. For a v1 header `pw_form`
+is 0 and encodes as the reserved byte, so every v1 vector (A-G) encodes byte-identically.
+
+### 14.3 Who writes v2, and the record budget
+
+- **ME (Rust, primary).** The `seal` module reads and writes v2 first, with the vectors of §14.9, before any port
+  (the Rust-primary rule). New items, all in `crates/me-cli/src/seal/`: `seal_v2` (production: salt and IV from the
+  OS CSPRNG, as `seal`), `pub(crate) seal_v2_deterministic` (the vectors' seam, under §11.4's sole exemption from
+  §7.2), `open` (reads v1 and v2), and the module `titles.rs` (§14.4). No `me` subcommand calls `seal_v2` or `open`.
+- **mnemonic-refugium (Rust).** mr-codec ports v2, pinned to this repo's `seal_v2_vectors.json`, and replaces the
+  MNEMSYSW plates container (`crates/mr-codec/src/sitting/sealed.rs`); mr-sitting writes one v2 payload per sitting at
+  `0x10E00000` and erases the region before the sitting ends. That is spec S3; this section binds only its bytes.
+- **The fork (Go).** A behaviour-faithful port of §14.2-§14.6, bound to the same vectors with a provenance pin.
+
+**Record budget.** The titles record is a record: it counts toward the 24 and must be at most 512 bytes. So a v2
+payload holds at most **23 seed records**, and its titles block (§14.4) at most **253 bytes** (5 for `text:`, 2 hex
+digits per byte). A block costs `18 + Σ (7 + len(T))` bytes, so at most 18 plates titled `SEED <L>` fit (252 bytes;
+19 would be 265), 13 titled `HOT SEED <L>` (239; 14 would be 256), or 9 titled `KEEP; DO NOT LOAD` (234; 10 would be
+258); mixed titles add up line by line. The writer splits a sitting
+whose plates do not fit into more than one payload (spec S3 decides how); the device and `open` refuse an oversize
+record exactly as today (§6.4).
+
+### 14.4 The titles record — NORMATIVE
+
+**Shape.** One record of the **encrypted** section of a v2 payload: the five characters `text:` followed by the
+lower-case hexadecimal of the UTF-8 bytes of a **titles block**. Hex keeps the record inside §6.4's container rules
+(lower case, no space, no hyphen, no CR, at most 512 bytes) and is the encoding the systemwide container's `text:`
+records already use.
+
+**Titles block grammar.**
+
+```
+refugium-plates 2 LF
+title <T> LF            (one line per seed record, in section order; at least one)
+```
+
+- Every line, the last included, ends with exactly one LF (`0x0A`); there are no other lines, no blank line, no CR,
+  and no space other than the single space after `refugium-plates`, after `title`, and inside `<T>`.
+- `<T>` is exactly one of these 33 strings: `SEED A` … `SEED P`, `HOT SEED A` … `HOT SEED P`, `KEEP; DO NOT LOAD`.
+  These are the only titles mr-sitting makes (`crates/mr-sitting/src/session.rs:33,880,891@2941f216e`); each is at
+  most 18 characters and is returned unchanged by the fork's `backup.TitleString(constant.Font, T)` (all 33 run at
+  `25abe8e` on 2026-11-22: 0 changed). A lettered
+  title is one of the 32 `SEED <L>` / `HOT SEED <L>` forms; its letter is `<L>`.
+- In a v1 payload, and in the public section of any payload, a `text:` record is not a titles record: it is refused
+  as today (v1 encrypted section: §10.2.1's allow-list; public section: `unrecognised record: unrecognized HRP
+  '<the record's opening characters>' (expected md, mk, ms, or mt)` (the exact text for N-public-titles is in §14.9), measured with `seal_public_only` at `aa1bc2db`).
+
+**Seed records and their letters.** The *seed records* of a v2 encrypted section are its records that classify as a
+secret (a `codex32` secret `ms1` or a BIP-39 mnemonic), in section order; the titles record is not one, and neither is
+an `md1`/`mk1` record. The **letter of an ms1** is `A` + the top four bits of its first entropy byte, where the
+entropy is the codex32 payload after its `0x00` reserved-prefix byte (`ent[0] >> 4`, as
+`crates/mr-codec/src/bip85.rs:231@2941f216e`; 0 is `A`, 15 is `P`).
+
+**The titles rule.** In a v2 payload's encrypted section, a record beginning `text:` is exempt from §10.2.1's
+allow-list and goes to this rule instead; every other record passes §10.2.1 (and §10.2.1a) as in v1. After the tag
+verifies and that per-record pass succeeds, the following run in this order, and the first that fails refuses the **whole payload**; every record of both sections is wiped before
+the refusal is shown, and no plate is offered:
+
+| # | Check | Rust `TitlesError` and its `Display` | Device text |
+| --- | --- | --- | --- |
+| 1 | At most one record of the encrypted section begins `text:`. | `Duplicate`: `the encrypted section holds more than one titles record` | T-1 |
+| 2 | That record is the last record of the encrypted section. | `NotLast`: `the titles record must be the last record of the encrypted section` | T-1 |
+| 3 | After `text:` there is an even number (at least 2) of characters, each `0-9` or `a-f`, decoding to UTF-8. | `NotHex`: `the titles record is not text: followed by lower-case hex of UTF-8` | T-1 |
+| 4 | The block ends with LF. | `NoFinalLf`: `the titles block must end with a line feed` | T-1 |
+| 5 | Line 1 is exactly `refugium-plates 2`. | `Magic`: `the titles block must start with the line refugium-plates 2` | T-1 |
+| 6 | Every later line is `title ` and one of the 33 titles. | `Line(n)`: `titles block line <n> is not title SEED <A-P>, title HOT SEED <A-P> or title KEEP; DO NOT LOAD` (n counts from 1, the magic line being 1) | T-1 |
+| 7 | There is at least one title line. | `Empty`: `the titles block names no plate` | T-1 |
+| 8 | Every seed record is an ms1. | `NonMs1Secret(i)`: `titles apply only to ms1 records; secret record <i> (records count from 0) is a BIP-39 mnemonic` | T-1 |
+| 9 | The number of title lines equals the number of seed records. | `Count { titles, secrets }`: `the titles block names <titles> plates but the encrypted section holds <secrets> seed records` | T-1 |
+| 10 | For each i, if title i is lettered, its letter equals the letter of seed record i. `KEEP; DO NOT LOAD` is not checked. | `Letter { index, title, letter }`: `secret record <index> (records count from 0) is titled <title> but its seed letter is <letter>` | T-2 |
+
+`<i>` and `<index>` count the seed records from 0 (the titles record and `md1`/`mk1` records are not counted).
+
+**Absence.** A v2 payload with no titles record is legal (STOP-1, recommended answer): each ms1 plate is titled with
+its codex32 id as in v1 (`ENTR` for every ms1 mr makes), and the Refugium build still cuts it with a Standard SeedQR
+(§14.6). The writer of a Refugium sitting (spec S3) always writes the record.
+
+**Why refuse rather than fall back to the id** (architect Ruling 1.3): a wrong letter on steel places a seed in the
+wrong seat at recovery, a funds-safety error; a payload whose titles cannot be trusted is not cut at all. The titles
+are authenticated (they sit in the encrypted section), so a refusal here is a writer defect, never tampering, and the
+text must not read as tampering (§6.4's argument).
+
+**Device texts** (PROVISIONAL, per Brian's 2026-11-18 ruling that fork texts on this path are provisional; logged
+for wording review):
+
+- **T-1:** `This payload's plate titles do not match its seed records. Nothing was opened.`
+- **T-2:** `This payload titles a plate <title>, but that seed's letter is <letter>. Nothing was opened.`
+  (e.g. `This payload titles a plate SEED C, but that seed's letter is B. Nothing was opened.`)
+
+Both are shown with the program's title `Sealed Payload`, after which the program returns to the menu, as the
+§10.2.1a refusal does. The letter is public by design (it is on the plate and the card), so naming it leaks nothing.
+
+**Title on the seed plate screen.** When a titles record is present, the secret plate screen of §10.2.2 (today
+`ms1 <i>/<n>` over `SECRET seed material`, with `Cut this plate` / `Skip`) gains a first lead line
+`title <T>` (Brian 2026-11-18, titles Q1 (a)): the lead reads `title SEED C` then `SECRET seed material`. The screen's
+title stays the classified label `ms1 <i>/<n>` (§10.2.2: labels are never sealer-asserted); `<n>` counts seed
+records only. With no titles record the screen is unchanged.
+
+**Title on the steel.** The plate's title is `<T>` (in place of the codex32 id that `unlockCodex32Plan` uses today).
+
+### 14.5 The n-word password (`pw_form` 6 to 12) — NORMATIVE
+
+**Normalisation (pinned to mr-codec `plates_key`).** The PBKDF2 password is the words, lower-cased, joined by exactly
+one space (`0x20`), with no leading or trailing space, as UTF-8 bytes. That is byte-for-byte what mr-codec's
+`plates_key` (`crates/mr-codec/src/sitting/sealed.rs`, `normalise`: split on whitespace, `to_lowercase`, join by one
+space) feeds PBKDF2, and it equals §8.1's form for twelve words. Run 2026-11-22: `plates_key("beef beef beef beef beef
+beef", feed×8, 600000)` and `plates_key("  BEEF\tbeef beef  Beef beef\nbeef ", …)` both give
+`1fd820f0f39f26c95fb3f37da90a0d7229211fdab999b398ec993a6bba2e8293`, vector V2-A's key from the independent generator.
+
+**Host `open` (ME).** Given a password string for a `pw_form` n payload, `open` normalises it as above and refuses,
+**before any KDF work**, in this order:
+
+- word count not n: `OpenError::PasswordWordCount { got, want }`, `the password has <got> words; this payload's
+  password has <want>`;
+- a word not on the BIP-39 English list: `OpenError::PasswordWord(position)`, `password word <position> is not on the
+  BIP-39 English list` (position counts from 1, the first bad word).
+
+No checksum is computed for `pw_form` n. For `pw_form` 0 (and v1), `open` applies §8 exactly: the twelve words must be
+a checksum-valid mnemonic, else `OpenError::Passphrase`, `passphrase is not a checksum-valid BIP-39 mnemonic` (the
+text `seal_deterministic` uses today), before any KDF work. A tag failure is `OpenError::Authentication`, `wrong
+password, or this payload has been altered`. The full `OpenError` list is in §14.7.
+
+**Writer.** `seal_v2` takes the words as an argument and applies the same two refusals (as `SealError::Password`,
+same texts); it never generates words (the writer that generates them is mr-sitting, from the OS CSPRNG, per W1T
+§T9.2). `seal_v2` with `pw_form` 0 requires a checksum-valid twelve-word mnemonic, as `seal`.
+
+**Device unlock, `pw_form` n.** Replaces §10.2 steps 5-6 for that form only; steps 1-4 and 7-10 are unchanged:
+
+1. The notice, once per session, before entry, reads (n from the header):
+   `Enter the <n>-word plates password for this payload.` then a blank line, then `These words are the payload's
+   password. They are NOT a seed and no wallet is derived from them.` (STOP-2 on the word "password".)
+2. Entry is the existing word keyboard (`inputWordsFlow`) over exactly n slots, every word restricted to the BIP-39
+   English list as typed, **no checksum gate** and no `done` terminator: entry ends when slot n is filled. Back with
+   fewer than n words leaves the program with no KDF and no error, as §10.2 step 5 does today. There is no separate
+   count confirmation: the count is fixed by the header and shown in the notice, so a short entry cannot reach the KDF.
+3. The KDF runs (§10.2 step 7). Its first frame, before a rate is measured, reads `Unlocking. This takes about <S>
+   seconds.` with `S = 10 × ceil(iterations / 75,000)` (600,000 gives 80, from the measured 40.2 s wall at 300,000 on
+   the SeedHammer II; 100,000 gives 20); later frames keep today's measured countdown. A v1 or `pw_form` 0 payload
+   keeps today's first frame, `Unlocking. This takes about 30 seconds.`
+4. A tag failure shows today's §10.2 step 8 body with `passphrase` replaced by `password`: `Wrong password, or this
+   payload has been altered.` then, with a public section, the hash lines unchanged; without one, `Check the words and
+   try again.` Then entry again (the notice is not repeated).
+5. The password buffer is built into a fixed-capacity buffer (n ≤ 12 words of at most 8 letters plus 11 spaces is at
+   most 107 bytes; capacity 128, never regrown) and zeroed on every exit, as `passphraseBytes` does today; the in-flight
+   bracket of §10.2.4 row 4 covers this entry exactly as it covers the twelve words.
+
+### 14.6 The Refugium build's ms1 plate (F5) — NORMATIVE for that build
+
+In the Refugium build, every ms1 seed record the Sealed Payload program cuts (v1 or v2, titled or not; STOP-3) is cut
+with `backup.EngraveSeedStringSeedQR`: the ms1 string as text, the title (§14.4, or the codex32 id when there is no
+titles record), and the **Standard SeedQR of the BIP-39 words of its entropy**, never a QR of the ms1 string (UI spec
+§4.4, D15). The default build is unchanged (`EngraveSeedString`, text + QR of the string). If the plate does not fit,
+today's `This record does not fit any plate size.` is shown and nothing is cut.
+
+Wipe points (inventory, per §2.2 item 16's rule that a wipe requirement carries its inventory): the record bytes are
+cleared before `Engrave` as today; the `bip39.Mnemonic` built from the entropy for the SeedQR is cleared beside them;
+any buffer holding the entropy is zeroed before `Engrave`. The SeedQR encoder's internal buffers and `qr.Code.Bitmap`
+are LIVE (the F-88 class) and are listed as such in the code's HONEST CAVEAT block. Spec S2 names the functions.
+
+The letter check (§14.4 check 10) reads only the first entropy byte; the implementation must not materialise more of
+the entropy than that for it, and zeroes what it decoded.
+
+### 14.7 ME library surface (v2) — the names tests use
+
+- `wire::VERSION_V2: u8 = 0x02`, `wire::PW_WORDS_MIN: u8 = 6`, `wire::PW_WORDS_MAX: u8 = 12`; `wire::VERSION` stays
+  `0x01`.
+- `WireError::PwForm(u8)`, Display `password form byte must be 0 or 6 to 12, got <b>`.
+- `seal::titles`: `pub const TITLES_PREFIX: &str = "text:"`, `pub const TITLES_MAGIC: &str = "refugium-plates 2"`,
+  `pub fn encode_titles(titles: &[&str]) -> Result<String, TitlesError>` (refuses an empty list as `Empty` and a title
+  outside the 33 as `Line(i + 2)`), `pub fn ms1_letter(ms1: &str) -> Option<char>`, `pub enum TitlesError` (the ten
+  variants of §14.4).
+- `seal::seal_v2(payload: Payload, titles: Option<Vec<String>>, words: &str, pw_form: u8, iterations: u32) ->
+  Result<Vec<u8>, SealError>`: appends the titles record last, then runs §14.4's checks 8-10 and every §9 check on the
+  records; a payload `open` would refuse never leaves it. New `SealError` variants: `Titles(TitlesError)`,
+  `Password(String)`, `PwForm(u8)`.
+- `seal::open(blob: &[u8], password: &str) -> Result<Opened, OpenError>`; `Opened { version: u8, pw_form: u8, public:
+  Vec<String>, secret: Zeroizing<Vec<String>>, titles: Option<Vec<String>> }`; `secret` excludes the titles record.
+  `OpenError` variants and Display: `Wire(WireError)` (its Display); `Public(SealError)` (its Display: the public
+  section's §6.3/§6.4 refusals as `seal` reports them); `PasswordWordCount`, `PasswordWord`, `Passphrase`,
+  `Authentication` (texts in §14.5); `Container(ContainerError)` (its Display); `Record { index, source }` (`record
+  <index> (records count from 0) in the secret section: <source>`); `Titles(TitlesError)` (its Display). For a v1
+  payload `open` never consults `titles` and treats a `text:` record as a `Record` refusal.
+
+### 14.8 Memory and the hardware row — NORMATIVE
+
+- No allocation in `seal/` or in the n-word unlock is sized by `RegionLen`. The region read copies only the blob its
+  header declares (F-79 fix C: `seal/read.go` `boundBlob` runs `ParseHeader` on the first 52 bytes and bounds the copy
+  by `52 + pub_len + ct_len + 16`, at most 16,450 bytes, `@25abe8e`), so `ParseHeader` must accept v2 for a v2 blob to
+  be read at all; that copy is cleared and dropped before the secret session, as today. The titles block is decoded
+  into a buffer of at most 253 bytes.
+- The firmware still never writes flash (§4.1). Erasing the region after a sitting is the host's job (`picotool
+  erase -r 0x10E00000 0x10E10000`, §9), which is why ruling R-5 binds mr-sitting, not the device.
+- **Hardware row H-v2** (phase P2, SeedHammer II, signet test material, key 846aa289 build): load vector V2-B at
+  `0x10E00000` and a systemwide kit payload at `0x10D00000` in the same power cycle; boot on PD power; unlock V2-B with
+  `zoo` × 12; cut plate 1 (`SEED A`) to completion; leave the plate-done screen until the 3:00 warning and the 3:30
+  wipe; re-unlock; Skip to plate 2 and cut it. **Pass:** both unlocks succeed with an 80 ± 10 s wall KDF (record the
+  measured figure: it replaces the extrapolated 80 s in the architect report), the idle wipe fires at 3:30 and returns
+  to the menu, the second unlock offers `ms1 1/7` first again, both plates cut with their titles and a Standard SeedQR,
+  the free heap before and after each unlock is logged, and nothing restarts. This is the configuration F-79 says
+  was never driven.
+
+### 14.9 Vectors — NORMATIVE
+
+Generated by the independent Python script `scripts/gen-mnemblob-v2-vectors.py` (no shared code with the Rust it
+pins; `--check design/SPEC_encrypted_payload_delivery.md` exits 1 unless every value below occurs here). The Rust
+`seal_v2_deterministic` MUST reproduce every byte; the generated file is `crates/me-cli/testdata/seal_v2_vectors.json`
+(new; `seal_vectors.json` is byte-unchanged), emitted and drift-checked exactly as `emit_vectors` does for v1, with
+each object's fields as v1's plus `pw_form`, `password`, `titles` (the title strings or `null`) and `letters` (the
+letter of each seed record, `null` for a mnemonic). The fixed salts and IVs fall under §11.4's sole exemption.
+
+Inputs. The ms1 strings are `ms encode --hex -` (ms 0.20.4) of test entropies: `A16` = 16 bytes of `0x00`; `A` … `G`
+= 32 bytes of `0x00`, `0x11` … `0x66`; `P` = 32 bytes of `0xff`. Their letters are A, A … G and P.
+
+| vector | password (`pw_form`) | public | encrypted section, in order | refused with |
+| --- | --- | --- | --- | --- |
+| V2-A | `beef` × 6 (6) | — | `A16`, `P`, titles `SEED A`, `KEEP; DO NOT LOAD` | opens |
+| V2-B | `zoo` × 12 (12; not checksum-valid, which proves no checksum is applied) | — | `A` … `G`, titles `SEED A` … `SEED F`, `HOT SEED G` | opens |
+| V2-C | `beef` × 12 (0) | vector D's five | vector D's ms1; no titles record | opens |
+| N-count | `beef` × 6 (6) | — | `A16`, `P`, titles `SEED A` | `Count { titles: 1, secrets: 2 }`, T-1 |
+| N-letter | `beef` × 6 (6) | — | `B`, titles `SEED C` | `Letter { index: 0, title: "SEED C", letter: 'B' }`, T-2 |
+| N-hot-letter | `beef` × 6 (6) | — | `G`, titles `HOT SEED F` | `Letter { index: 0, title: "HOT SEED F", letter: 'G' }`, T-2 |
+| N-magic | `beef` × 6 (6) | — | `A16`, titles block headed `refugium-plates 1` | `Magic`, T-1 |
+| N-two | `beef` × 6 (6) | — | `A16`, titles `SEED A`, titles `SEED A` | `Duplicate`, T-1 |
+| N-not-last | `beef` × 6 (6) | — | titles `SEED A`, `A16` | `NotLast`, T-1 |
+| N-title-set | `beef` × 6 (6) | — | `A16`, titles `SEED Q` | `Line(2)`, T-1 |
+| N-no-final-lf | `beef` × 6 (6) | — | `A16`, titles `SEED A` without the final LF | `NoFinalLf`, T-1 |
+| N-empty | `beef` × 6 (6) | — | `A16`, titles block of the magic line only | `Empty`, T-1 |
+| N-v1-text | `beef` × 12 (v1) | — | `A16`, titles `SEED A` | `Record { index: 1, .. }` (a v1 `text:` record is a record, §14.4) |
+| N-public-titles | `beef` × 6 (6) | titles `SEED A` | `A16` | `Public(..)`, before any KDF: `record 0 (records count from 0) in the public section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; device `Payload unreadable.` |
+
+Salts and IVs: V2-A `feed`×8 / `face`×6; V2-B `deaf`×8 / `fade`×6; V2-C `dead`×8 / `beef`×6; every N vector salt
+`0bad`×8, IV `0c01`×6 … `0c0b`×6 in the order of the shape table below. N-v1-text is a **v1** payload (offset 8 `0x01`; its `pw_form` cell
+is the reserved byte), the only vector here that is not v2. Titles records as encoded:
+
+```
+V2-A   text:726566756769756d2d706c6174657320320a7469746c65205345454420410a7469746c65204b4545503b20444f204e4f54204c4f41440a
+V2-B   text:726566756769756d2d706c6174657320320a7469746c65205345454420410a7469746c65205345454420420a7469746c65205345454420430a7469746c65205345454420440a7469746c65205345454420450a7469746c65205345454420460a7469746c6520484f54205345454420470a
+N-letter text:726566756769756d2d706c6174657320320a7469746c65205345454420430a
+N-hot-letter text:726566756769756d2d706c6174657320320a7469746c6520484f54205345454420460a
+N-magic text:726566756769756d2d706c6174657320310a7469746c65205345454420410a
+N-title-set text:726566756769756d2d706c6174657320320a7469746c65205345454420510a
+N-no-final-lf text:726566756769756d2d706c6174657320320a7469746c6520534545442041
+N-empty text:726566756769756d2d706c6174657320320a
+(N-count, N-two, N-not-last, N-public-titles, N-v1-text: text:726566756769756d2d706c6174657320320a7469746c65205345454420410a)
+```
+
+| vector | pw_form | iterations | pub_len | ct_len | records | blob length |
+| --- | --- | --- | --- | --- | --- | --- |
+| V2-A | 6 | 600000 | 0 | 242 | 3 | 310 |
+| V2-B | 12 | 600000 | 0 | 763 | 8 | 831 |
+| V2-C | 0 | 100000 | 396 | 75 | 6 | 539 |
+| N-count | 6 | 100000 | 0 | 194 | 3 | 262 |
+| N-letter | 6 | 100000 | 0 | 143 | 2 | 211 |
+| N-hot-letter | 6 | 100000 | 0 | 151 | 2 | 219 |
+| N-magic | 6 | 100000 | 0 | 118 | 2 | 186 |
+| N-two | 6 | 100000 | 0 | 186 | 3 | 254 |
+| N-not-last | 6 | 100000 | 0 | 118 | 2 | 186 |
+| N-title-set | 6 | 100000 | 0 | 118 | 2 | 186 |
+| N-no-final-lf | 6 | 100000 | 0 | 116 | 2 | 184 |
+| N-empty | 6 | 100000 | 0 | 92 | 2 | 160 |
+| N-public-titles | 6 | 100000 | 67 | 50 | 2 | 185 |
+| N-v1-text | 0 | 100000 | 0 | 118 | 2 | 186 |
+
+| vector | derived key | tag | blob sha256 |
+| --- | --- | --- | --- |
+| V2-A | `1fd820f0f39f26c95fb3f37da90a0d7229211fdab999b398ec993a6bba2e8293` | `feba7555940c2450f55e3094b7126290` | `0e0dc8706b48d1522aaca3a90af983954e6d287284035977181029f94cbac8b2` |
+| V2-B | `f3ff490ac8de9211170403cbfa23f0f3e65f2c941b135afcd1acda721e301243` | `2c8eece9d4799a365066c03a1d46e2c9` | `9b060a4492ce7df8c22db42b9e5c62e66564b0222825b118d47a61399fe6f4ca` |
+| V2-C | `bf2f469f1a0ecb1550956cbcc6074f40801644080d37cd167eb1aec3d6e51c2f` | `253073b0d7b44e98b3ed18065f8ed03b` | `40c57d694562bff204f3f75e703a73018f08fb6c9a81cfa7b9acc68a88ee9b8b` |
+| N-count | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `d128ecfb16984308eca6ef4f12783668` | `29474a156bb25c13a7e8cb354df9d2f6bed57cbf4d1918d34e261044cafd0e7c` |
+| N-letter | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `8ba2a4e6ab7a400a3c70db2b1249b1c1` | `a5e11064e09d7ba527e082e62d83b9cb6bbcea216cb3286a46322d9ae2ab21fa` |
+| N-hot-letter | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `aea017b268ab85a28ca6ace669103f94` | `1e36a68b336bff1e98070dff6d25ec18f83465c93cdd8e5e8856f21e8a1ca84a` |
+| N-magic | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `385e237b58161542415078794cfa3e5d` | `766de605885b19b6cd97408a45cfa2a0c1fdc158c180ecd34eaaed1205950785` |
+| N-two | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `b25ef437fdf9d8932f86620eb7cdb2cc` | `1be1428a63aecfd3905d38783d41b19c309c2c10ca35d191d1d3366481f96a82` |
+| N-not-last | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `9933be555d4cbb03ecc772637ff21a1c` | `fbc669493cdd054078f5e0b9e10ce63aa343fea428c1310cfcffa12d0b43124a` |
+| N-title-set | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `51655338e61088d9299e8d404fcf5a4b` | `95a28a9eff0fab5e1b33582f1f159ecaed9df01070411991038a3e13b150598e` |
+| N-no-final-lf | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `00772a7b070b183fc4f9c10d17130181` | `5535f086e675ed70ee70894367f870c3de6b97b1b732bfabb9f12dff861afd29` |
+| N-empty | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `85a64e2cc8dd3714f8d4c8929a86523e` | `9c5d8bfcfc28518da892d3d8e033237d5f337076467d42105c9e5596c17b9917` |
+| N-public-titles | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `d7ec58953d74975a069d9a20fe6f71d1` | `fd3b5c16d604f000cae3dbf53385d1619564e4fd8ec43e5a063e26d16ebd3181` |
+| N-v1-text | `f9d64e3768933e7640594111d09cd7292a79ad67087e2793b910e5c8a172fede` | `7084c887b52f7df2e780d2aca5e508f2` | `40d0921bb243e842518d4dbf3d7cc7e7f06bf7a75e7a181b2b54836ae244a35c` |
+
+```
+V2-A            4d4e454d424c4f4202010106000927c0feedfeedfeedfeedfeedfeedfeedfeed
+                facefacefacefacefaceface00000000000000f2
+V2-B            4d4e454d424c4f420201010c000927c0deafdeafdeafdeafdeafdeafdeafdeaf
+                fadefadefadefadefadefade00000000000002fb
+V2-C            4d4e454d424c4f4202010100000186a0deaddeaddeaddeaddeaddeaddeaddead
+                beefbeefbeefbeefbeefbeef0000018c0000004b
+N-count         4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c010c010c010c010c010c0100000000000000c2
+N-letter        4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c020c020c020c020c020c02000000000000008f
+N-hot-letter    4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c030c030c030c030c030c030000000000000097
+N-magic         4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c040c040c040c040c040c040000000000000076
+N-two           4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c050c050c050c050c050c0500000000000000ba
+N-not-last      4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c060c060c060c060c060c060000000000000076
+N-title-set     4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c070c070c070c070c070c070000000000000076
+N-no-final-lf   4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c080c080c080c080c080c080000000000000074
+N-empty         4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c090c090c090c090c090c09000000000000005c
+N-public-titles 4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c0a0c0a0c0a0c0a0c0a0c0a0000004300000032
+N-v1-text       4d4e454d424c4f4201010100000186a00bad0bad0bad0bad0bad0bad0bad0bad
+                0c0b0c0b0c0b0c0b0c0b0c0b0000000000000076
+```
+
+Header refusals (no crypto; edit V2-A's header bytes, every other byte unchanged): offset 11 to `0x01`, `0x05`,
+`0x0d`, `0x80`, `0xff` → `PwForm(b)`; offset 8 to `0x00` or `0x03` → `UnknownVersion`; offset 8 to `0x01` (a v1
+header carrying 6) → `ReservedNotZero(6)`, `reserved byte must be 0, got 6` (run at `aa1bc2db` 2026-11-22: today's
+text); a v2 public-only header (vector E's header with offset 8 set to `0x02`) with offset 11 set to `0x06` →
+`UnsealedFieldNotZero("pw_form")`.
+
+### 14.10 Test rows — the tests that must exist (ME first, then the ports)
+
+TRACE rows: the Rule cell is binding. Every row names the plausible wrong implementation it catches.
+
+| Row (test function) | Repo, file | Rule (expected output) | Catches | State today |
+| --- | --- | --- | --- | --- |
+| `v2_header_round_trips_each_password_form` | ME `seal/wire.rs` | `pw_form` 0, 6, 12 headers encode then decode equal; V2-A's header hex decodes to `version 2, pw_form 6, iterations 600000, pub_len 0, ct_len 242` | a decoder that still pins `version == 1` | RED, run: `Err(UnknownVersion(2))`, `unsupported format version 2` |
+| `v2_refuses_pw_form_outside_0_and_6_to_12` | ME `seal/wire.rs` | each §14.9 offset-11 edit gives `PwForm(b)` and its text | a range check written `<= 12` only, or `!= 0` only | RED (no variant) |
+| `v2_public_only_refuses_nonzero_pw_form` | ME `seal/wire.rs` | `UnsealedFieldNotZero("pw_form")`, `pw_form must be zero when nothing is encrypted` | the unsealed branch skipping offset 11 | RED |
+| `v1_still_refuses_a_nonzero_reserved_byte` | ME `seal/wire.rs` | v1 header with offset 11 = 6: `ReservedNotZero(6)`, `reserved byte must be 0, got 6` | v2 parsing leaking into v1 | GREEN today, run; must stay |
+| `rejects_bad_magic_version_reserved_kdf_and_aead` (changed) | ME `seal/wire.rs` | its `(8, 0x02, "version")` case becomes `(8, 0x03, "version")`; all other cases unchanged | — | changes in the v2 RED commit |
+| `ms1_letter_is_the_top_nibble_of_the_entropy` | ME `seal/titles.rs` | `A16`→A, `A`…`G`→A…G, `P`→P; a non-ms1 → `None` | reading the prefix byte instead of entropy byte 0 (every letter A) | RED (absent) |
+| `v2_vectors_match_the_independent_generator` | ME `seal/mod.rs` | every §14.9 shape and digest row literal, and `seal_v2_vectors.json` drift check | any byte of layout, KDF input or AAD wrong | RED (absent) |
+| `v2_open_round_trips_each_positive_vector` | ME `seal/mod.rs` | V2-A: secret `[A16, P]`, titles `["SEED A", "KEEP; DO NOT LOAD"]`; V2-B: 7 secrets, titles as §14.9; V2-C: 5 public, 1 secret, titles `None`, §6.6 sealed hash `a26ed22bb747dfd0236706ad14c19679` | titles record left in `secret`; hash computed over the version | RED (absent) |
+| `v2_password_normalises_like_plates_key` | ME `seal/mod.rs` | `open(V2-A, "  BEEF\tbeef beef  Beef beef\nbeef ")` opens | a byte-exact password compare | RED (absent) |
+| `v2_refuses_a_wrong_word_count_before_the_kdf` | ME `seal/mod.rs` | V2-A with iterations set to 2,000,000 in the header, password `beef` × 5: `PasswordWordCount { got: 5, want: 6 }` in under 200 ms | a KDF run before the count check | RED (absent) |
+| `v2_refuses_a_word_off_the_list_before_the_kdf` | ME `seal/mod.rs` | same blob, `beef beef beef beef beef beff`: `PasswordWord(6)` in under 200 ms | no list check | RED (absent) |
+| `v2_pw_form_0_keeps_the_checksum` | ME `seal/mod.rs` | `open(V2-C, "zoo" × 12)`: `Passphrase` before any KDF; `open(V2-B, "zoo" × 12)` opens | checksum applied by version, not by `pw_form` | RED (absent) |
+| `v2_wrong_password_fails_authentication` | ME `seal/mod.rs` | `open(V2-A, "beef beef beef beef beef bacon")`: `Authentication`, `wrong password, or this payload has been altered` | partial plaintext on failure | RED (absent) |
+| `v2_titles_refusals` | ME `seal/mod.rs` | each N vector: the variant and Display of §14.9's last column, and `Opened` never returned | dropping any one of checks 1-10 (one mutant per check; each N vector kills one) | RED (absent) |
+| `v1_open_treats_text_records_as_records` | ME `seal/mod.rs` | `open(N-v1-text, "beef" × 12)`: `Record { index: 1, .. }`, `record 1 (records count from 0) in the secret section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; `open(C, "beef" × 12)` opens with `titles: None` | titles parsing applied to v1 | RED (absent) |
+| `seal_v2_refuses_what_open_refuses` | ME `seal/mod.rs` | `seal_v2` with N-count's, N-letter's and N-hot-letter's inputs: `SealError::Titles(..)` with the same inner variant; nothing returned | a writer that emits a payload the reader refuses | RED (absent) |
+| `me_seal_still_writes_version_1` | ME `tests/` (CLI) | `me seal --seal-secret <A16> --out <tmp>.uf2`, first UF2 block's payload: byte 8 = `0x01`, byte 11 = `0x00` | `me seal` switched to v2 | GREEN today; must stay |
+| Go parity rows | fork `seal/` | the Go port passes every vector and refusal above from the vendored `seal_v2_vectors.json` with a provenance pin (ME commit) | Go leading Rust | planned in S2 |
+| Device rows | fork `gui/` | §14.4's T-1/T-2 texts and lead line, §14.5's notice, entry, first KDF frame and retry body, §14.6's plate (Refugium build) and default-build plate, `Payload unreadable.` for a version-3 header | — | planned in S2 |
+| Hardware H-v2 | fork, bench | §14.8 | — | planned in S2 (phase P2) |
+
+Test values chosen to fail plausible mutants: V2-B's password is not checksum-valid (kills a checksum applied to
+`pw_form` 12); V2-A mixes a 16-byte and a 32-byte ms1 and a root title (kills a letter check applied to
+`KEEP; DO NOT LOAD`: `P`'s letter is P, the title has none); N-letter's off-by-one letter (C for B) kills a check
+comparing against the next record; N-hot-letter kills a check that matches only `SEED <L>` and ignores `HOT SEED <L>`.
+
+### 14.11 Reversals and scope changes (architect §6a, this repo)
+
+- `SPEC_systemwide_payloads.md` decision 1 "Sealed Payload is frozen": amended to a narrow unfreeze for v2 only
+  (this section); its wipes, idle timer and KDF are unchanged.
+- §2.2 item 1 and §8 ("the CLI MUST NOT accept a user-supplied passphrase"): scoped to `me seal` and `pw_form` 0. A
+  `pw_form` n password is not user-chosen either: mr-sitting draws it from the OS CSPRNG (W1T §T9.2). With F-125, the
+  overrule is now marked in the documents overruled (F-125's edit 1 for this document; its `passphrase.rs` doc edit
+  is the builder's, in the ME v2 commit).
+- §2.2a and §12 item 6 ("the 128-bit generated passphrase"): a v2 `pw_form` n payload's defence is n × 11 bits plus
+  ~19 KDF bits at 600,000 iterations (6 words: about 85 bits); accepted by Brian's 2026-11-22 ruling because the
+  payload lives only from its write to its erase inside one sitting (R-5).
+- §2.3 and §2.2 item 12 (F-123): "use Sealed Payload for anything you intend to protect" now says the two classes
+  differ in behaviour, not in whether funds are safe if the machine is taken.
+- §2.2 item 16 gains the F-124 release gate (R-6).
+
+### 14.12 Open STOPs (product points this spec does not decide; spec text follows the recommendation)
+
+- **STOP-1 — a v2 payload holding ms1 with no titles record.** (a) Legal; plates titled with the codex32 id (`ENTR`)
+  — **recommended**: the record is authenticated, so its absence is a writer choice, and the id title is today's
+  behaviour; (b) refused in the Refugium build. 
+- **STOP-2 — the word on the device for the n-word form.** (a) `plates password` / `password` — **recommended**: it
+  is what mr-sitting tells the holder to write down (ST-PW-01); (b) `passphrase`, as the v1 screens say.
+- **STOP-3 — which ms1 plates get the F5 SeedQR in the Refugium build.** (a) Every ms1 the Sealed Payload program
+  cuts, v1 or v2 — **recommended**: one plate shape per build, matching D15; (b) only titled v2 plates.
+- **STOP-4 — an iteration floor for the n-word form.** (a) Keep §6.2's 100,000 floor for every form —
+  **recommended**: the architect ruled the crypto unchanged, and the writer fixes 600,000 (W1T §T19.6); (b) refuse a
+  `pw_form` n payload below 600,000 (device and `open`), which makes a weaker writer impossible at the cost of a
+  second floor.

@@ -26,6 +26,12 @@ several overrule a documented prior decision and are marked where they do.
 1. **Sealed Payload is frozen.** It keeps its wipes, idle timer and KDF exactly
    as shipped. Its security failures are acknowledged and will be remedied at a
    future date — see the two follow-ups filed with this spec.
+   *Amended 2026-11-22 (Brian, goal 2 kit engraving): a narrow unfreeze. Sealed
+   Payload gains format v2 (`SPEC_encrypted_payload_delivery.md` §14: version
+   `0x02`, an n-word password form, a titles record) so a Refugium sitting's seed
+   plates ride the wiping container; its wipes, idle timer and KDF are unchanged.
+   F-124's remedy is now a release gate on that path (EPD §2.2 item 16). Nothing
+   in this document's systemwide container changes.*
 2. **The other programs abandon that security model.** No secret-residency
    wipes, no idle wipe, no EPD§10.2.4 clock. This does not overrule EPD§2.2 item 12;
    it *extends* it. That item already says "the machine offers two classes of
