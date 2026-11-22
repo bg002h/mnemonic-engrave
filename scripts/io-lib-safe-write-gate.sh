@@ -14,6 +14,9 @@
 #
 # NOT covered: (1) whether a mutant of the plan's mutant table fails its row (run by hand, pasted
 # in the build report); (2) any row RUNNING on Windows or macOS (only `cargo check --tests` there);
+# (6) WHY W1-W4 fail at red1 (the gate reads names and counts, not the failure reason: read
+# the failure lines in $OUT/red1.txt against the spec's "measured today" cells); (7) the Go
+# oracles that nextest skips without ME_REQUIRE_GO, and ci/code-docs-check.sh (run by hand);
 # (3) the nightly clippy step of lint-gate.sh (WARN only, red on the base tree); the release steps R1-R4 and consumer steps C1-C5; (4) the BEHAVIOUR of the code against the
 # spec beyond what the spec's own rows assert; (5) quote checks use single-line fragments, so a
 # spec sentence that wraps is matched by a fragment within one line.
@@ -82,7 +85,7 @@ check_plan() {
 
 nextest() { # nextest <step> <args...>   captured once
   local step=$1; shift
-  cargo nextest run --locked --build-jobs 6 -j 6 --no-fail-fast "$@" > "$OUT/$step.txt" 2>&1
+  timeout 1800 cargo nextest run --locked --build-jobs 6 -j 6 --no-fail-fast "$@" > "$OUT/$step.txt" 2>&1
   return $?
 }
 
@@ -149,6 +152,7 @@ mode_green() {
     | python3 -c 'import json,sys; m=json.load(sys.stdin); p=[x for x in m["packages"] if x["name"]=="mnemonic-io-lib"][0]; sys.exit(1 if [d for d in p["dependencies"] if d["kind"] is None] else 0)' \
     && ok "[dependencies] empty" || bad "[dependencies] not empty"
   grep -q 'inputs' crates/mnemonic-io-lib/src/lib.rs && ok "lib.rs doc mentions inputs" || bad "lib.rs doc lacks the same_file sentence"
+  grep -q 'one of my inputs' crates/mnemonic-io-lib/src/write.rs && ok "write.rs module doc has the same_file sentence" || bad "write.rs module doc lacks the same_file sentence"
   ! grep -q 'tightening the OPEN file' crates/mnemonic-io-lib/src/channel.rs && ok "channel.rs old wording gone" || bad "channel.rs still says tightening the OPEN file"
 }
 

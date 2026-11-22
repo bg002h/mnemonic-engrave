@@ -27,7 +27,7 @@ first in PATH; `export RUSTUP_TOOLCHAIN=1.85.0` (the rustup default here is nigh
 every cargo call `--locked`; nextest `--build-jobs 6 -j 6`; never `--release`; a private `CARGO_TARGET_DIR`.
 
 - [T1] Read `CLAUDE.md` and `AGENTS.md` of the repo. Run `gate red1` BEFORE writing anything: it must fail with
-  zero rows found (this is the gate going RED on a tree without the rows).
+  none of W1-W4 found (it runs only the 2 existing rows, so the summary line and the failing-set check FAIL; this is the gate going RED on a tree without the rows).
 - [T2] **RED-1 commit.** In `crates/mnemonic-io-lib/src/write.rs` `mod tests` only: the module attribute
   becomes `#[cfg(test)]`; `use std::os::unix::fs::PermissionsExt`, `mode_of` and the two existing rows get
   `#[cfg(unix)]`; add the `child()` harness and rows W1-W4, W5-W11 and W17 exactly as spec section 8 names
