@@ -719,8 +719,7 @@ Measured stdout, per verb:
   "print once"): in text mode without `--out` its stderr card keeps the grouped
   string, which is then the only copy (stdout never carries it); under `--out
   FILE` the card line reads `preimage (ms1):  written to FILE`, and under
-  `--json` it reads `preimage (ms1):  in the JSON (preimage_ms1)`. `--out`
-  together with `--json` is not yet decided (FIX_ms_single_print.md Q1).
+  `--json` it reads `preimage (ms1):  in the JSON (preimage_ms1)`. With both `--out FILE` and `--json` it reads `preimage (ms1):  written to FILE and in the JSON (preimage_ms1)`, and the JSON keeps `preimage_ms1` (architect ruling 2026-11-22, FIX_ms_single_print.md Q1). Under `--out FILE` or `--json` the card prints no form of the preimage (its hex and, under `--json`, its phrase record name where they are) and its first line says where the preimage is; text mode without `--out` is unchanged (architect ruling 2026-11-22).
 - **`--json` is UNCHANGED and explicitly OUT OF SCOPE this cycle.**
 
 **On `--json`, correcting a false premise (I-8).** An earlier draft excluded
