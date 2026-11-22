@@ -136,7 +136,8 @@ S1b	14.5	capacity 128, never regrown) and zeroed on every exit	TestUnlockNWordPa
 S1b	14.6	is cut with `backup.EngraveSeedStringSeedQR` unless the next paragraph's exception applies	TestRefugiumSealedMS1SeedQR
 S1b	14.6	The default build is unchanged (`EngraveSeedString`, text + QR of the string).	TestDefaultBuildSealedMS1Unchanged
 S1b	14.6	today's `This record does not fit any plate size.` is shown and nothing is cut	not this plan's: existing behaviour, unchanged (unlockEngraveCodex32's error path at 25abe8e)
-S1b	14.6	or the string is not an unshared `entr` string (threshold `0`, share index `s`, id `entr`; `codex32.ParsePrefix`), the plate is cut	TestRefugiumSealedMS1TextOnlyFallback
+S1b	14.6	or the string is not an unshared `entr` string (threshold `0`, share index `s`, id `entr`, the id compared case-insensitively; `codex32.ParsePrefix`), the plate is cut as text only	TestRefugiumSealedMS1TextOnlyFallback
+S1b	14.6	if that returns any error (for example its re-encode check, which refuses a checksum-valid string that is not `codex32.EncodeMS1` of its own entropy, in either case), the plate is likewise cut as text only	TestRefugiumSealedMS1TextOnlyFallback
 S1b	14.6	12-word (16-byte) and 24-word (32-byte) entropies both get the SeedQR.	TestRefugiumSealedMS1SeedQR
 S1b	14.6	The plate carries no fingerprint row	TestRefugiumSealedMS1SeedQR
 S1b	14.6	the `bip39.Mnemonic` built from the entropy for the SeedQR is cleared beside them	TestRefugiumSealedMS1WipePoints

@@ -12,11 +12,11 @@
 | What | Where | Revision |
 |---|---|---|
 | Spec S1 (kit door, `ClassMr`, Refugium warning) | this repo `design/SPEC_systemwide_payloads.md` §14 (branch `spec/sysw-class-mr`) | `c4737e8b` (GREEN) |
-| Spec S1b (MNEMBLOB v2) | this repo `design/SPEC_encrypted_payload_delivery.md` §14 (branch `spec/mnemblob-v2`) | `8451c344` (GREEN; f7c98cbf plus the I-3 sentence) |
+| Spec S1b (MNEMBLOB v2) | this repo `design/SPEC_encrypted_payload_delivery.md` §14 (branch `spec/mnemblob-v2`) | `844572cd` (GREEN; f7c98cbf plus the I-3 sentence) |
 | This repo | `master` | `c9c4c54b` |
 | Fork | `bg002h/seedhammer` `origin/main` | `25abe8e` |
 | S1 vectors | `design/vectors/sysw_mr_v1_vectors.json` at `c4737e8b` (13 string, 12 set, 10 kit) | `c4737e8b` |
-| S1b vectors | `scripts/gen-mnemblob-v2-vectors.py` at `8451c344` (16 vectors, `--check` run 2026-11-22: "checked 16 vectors, 0 missing"; this plan adds 2, row `v2_titles_refusals`) | `8451c344` |
+| S1b vectors | `scripts/gen-mnemblob-v2-vectors.py` at `844572cd` (16 vectors, `--check` run 2026-11-22: "checked 16 vectors, 0 missing"; this plan adds 2, row `v2_titles_refusals`) | `844572cd` |
 | Go | 1.26.4 (`/home/bcg/.local/go/bin`); the flake's Go for TinyGo and `nix run .#build-firmware` | measured 2026-11-22 |
 | Rust | `cargo nextest run --locked`, own `CARGO_TARGET_DIR`, never `--release` | 715 tests listed at `c9c4c54b` |
 
@@ -430,9 +430,10 @@ ROW TestRefugiumSealedMS1TextOnlyFallback | SH-4 | sh | ./gui/ | refugium | now=
   not fit any plate size."; also `ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqppf5cx6yeww5we` (A16 with the low padding bit of its last payload character set, checksum recomputed:
   checksum-valid, `DecodeMS1` ok with 16 bytes, `ParsePrefix` unshared `entr`, but not equal to `codex32.EncodeMS1` of its
   entropy, which `EngraveSeedStringSeedQR` refuses with `errSeedQRDisagree`) titled `entr`, and its upper-case form, each text
-  only with no QR and never "does not fit". RED: absent. Mutant: SeedQR for 20-byte entropy; no `ParsePrefix` gate (the share
+  only with no QR and never "does not fit"; also the 24-byte `entr` string `ms10entrsqqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccruln67vrlr6dg`
+  (entropy bytes 0x01..0x18, `codex32.EncodeMS1`; `DecodeMS1` prefix 0, 24 bytes; `ParsePrefix` unshared `entr`) titled `entr`, text only, no QR (a 24-byte entropy would otherwise reach an 18-word SeedQR). RED: absent. Mutant: SeedQR for 20-byte entropy; no `ParsePrefix` gate (the share
   and `test` strings reach `EngraveSeedStringSeedQR` and show "does not fit"); "ParsePrefix gate only" (no handling of
-  `errSeedQRDisagree`: the padding-bit string shows "does not fit").
+  `errSeedQRDisagree`: the padding-bit string shows "does not fit"); no length gate: 24 bytes gets an 18-word SeedQR.
 ROW TestRefugiumSealedMS1WipePoints | SH-4 | sh | ./gui/ | refugium | now=0 | built=1
 - Rule (§5): the entropy slice and the `bip39.Mnemonic` handed to the §7 hooks are all zero before the engrave
   screen's job starts; `rec` is zero as today. RED: absent. Mutant: `clear(m)` after `Engrave` (resident through
@@ -475,14 +476,17 @@ HW H-size | SH-6 | the firmware size recipe (this repo's CLAUDE.md) with `-tags 
 ## 5. Wipe points (S1b §14.6 "Spec S2 names the functions"; secret rows kitsealx-*, s1b-*)
 
 - `unlockEngraveCodex32(rec)` (Refugium build) routes on the SeedQR outcome, not on `codex32.ParsePrefix` alone (Brian ruling A
-  2026-11-22: "DecodeMS1-ok but SeedQR-refused ms1 strings cut as text only"). A string that is not an unshared `entr`
-  string (threshold `0`, share index `s`, id `entr`, the id compared case-insensitively: mixed case is already refused by
-  `ParsePrefix`; S1b §14.6, S1b head 8451c344), and any `DecodeMS1`-ok string that the SeedQR path refuses for any reason
-  (including `errSeedQRDisagree`, the re-encode check: bytes not equal to `codex32.EncodeMS1` of the entropy, either case),
-  goes to `engraveSeedStringPlate` -> `EngraveSeedStringTextOnly`, titled by `<T>` or the codex32 id, never
-  "does not fit". Otherwise it calls a new `unlockCodex32SeedQRPlan(params, s, title)`:
+  2026-11-22: "DecodeMS1-ok but SeedQR-refused ms1 strings cut as text only"). A string that is not an unshared `entr` string (threshold `0`, share index `s`, id `entr`, the id compared case-insensitively:
+  mixed case is already refused by `ParsePrefix`; S1b §14.6, S1b head 844572cd), a string whose `DecodeMS1` fails, whose prefix
+  is not `0x00` or whose entropy is not 16 or 32 bytes (a 20-byte entropy would otherwise reach a 15-word SeedQR), goes to
+  `engraveSeedStringPlate` -> `EngraveSeedStringTextOnly`, titled by `<T>` or the codex32 id, never "does not fit". Otherwise it calls a new `unlockCodex32SeedQRPlan(params, s, title)`:
   `codex32.DecodeMS1` → entropy (a view into `s.Seed()`'s fresh slice) → `bip39.New(entropy)` → `m`;
-  `backup.EngraveSeedStringSeedQR(params, {Title, Seed, Font, MasterFingerprint 0}, m)`. **ZEROED** before the
+  `backup.EngraveSeedStringSeedQR(params, {Title, Seed, Font, MasterFingerprint 0}, m)`.
+  Any string for which `backup.EngraveSeedStringSeedQR` returns a non-nil error, whatever the error (no sentinel is named or
+  exported; this includes the re-encode check, bytes not equal to `codex32.EncodeMS1` of the entropy in either case), also goes
+  to text only: on that error the plan zeroes `entropy` and `m`, then calls `engraveSeedStringPlate`; if that also fails the
+  screen shows today's `This record does not fit any plate size.` (text-only layout failure). A SeedQR refusal itself is never
+  reported as 'does not fit'. **ZEROED** before the
   plan returns: `entropy` (and with it the decoded seed bytes after the prefix byte) and `m`; **ZEROED** before
   `Engrave` as today: `rec`. **LIVE**, listed in the HONEST CAVEAT block: the `codex32.String` and `s.String()` /
   `SeedString.Seed` Go strings (the existing caveat), `bip39.New`'s checksum hash state, the SeedQR digit string
