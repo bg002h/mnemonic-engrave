@@ -53,7 +53,7 @@ while IFS='|' read -r fx mode want_rc key; do
     [ "$mode" = descriptor ] && [ "$rc" = 0 ] && cp "$LOG/out.bin" "$LOG/$fx.bin"
     echo "ok   $tag"
 done <"$E/cases.txt"
-[ "$n" = 63 ] || bad "A: cases.txt has $n rows, want 63"
+[ "$n" = 66 ] || bad "A: cases.txt has $n rows, want 66"
 if [ -f "$LOG/base.txt.bin" ] && [ -f "$LOG/i15-origin-2147483647.txt.bin" ]; then
     cmp -s "$LOG/base.txt.bin" "$LOG/i15-origin-2147483647.txt.bin" \
         && bad "A: unhardened 2147483647 packed the same container as /48h/" || echo "ok   2147483647 container differs from base"

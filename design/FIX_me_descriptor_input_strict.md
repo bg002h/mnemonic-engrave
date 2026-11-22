@@ -111,20 +111,19 @@ restoring wallet uses to find the key.
 
 ## 3. Spec delta (`design/SPEC_descriptor_input.md`)
 
-- **§4.3**, the table "Shapes the Go parser **accepts and should not**" (after the `wpkh(sortedmulti…)` row, before
-  the AMENDED note), add the row:
+- **§4.3**, the table "Shapes the Go parser **accepts and should not**": insert the row directly after the `` `wsh(sortedmulti(2, 21 keys))` `` row and before the `` `sh(wpkh(sortedmulti(2,…)))` `` row, so the AMENDED note's "last three rows" still names the three rows the device now refuses:
   `| an unhardened path index of 2^31 or more — `[fp/2147483696/…]`, `Derivation: m/…/2147483650`, `…/2147483696/*` | ACCEPT, read as the hardened index 48 (2) | BIP-32 reserves 0 to 2^31-1 for normal children and BIP-380 lists `…/2147483648` as invalid; the backup would record a path the holder did not write. `me` refuses it (§6 row 1, the branch's "is not a path" reason) — FIX_me_descriptor_input_strict D7. |`
 - **§4.4**, after the paragraph ending "…is still a needless divergence.", add:
   `**AMENDED (FIX_me_descriptor_input_strict, bughunt-1119 I2, ruling T31): a member named twice is REFUSED.** Go's `encoding/json` lets the LAST matching member win and folds case with Unicode simple folding (beyond ASCII, U+017F `ſ` ≡ `s` and U+212A KELVIN SIGN ≡ `k`); `me`'s lookup took the exact-case member first. With two members for one field the two sides read different wallets (measured: host 2-of-3, device 1-of-3). No reading is safe to pick, so `me` refuses a top-level object in which two member names are equal under that fold, exact repeats included, whatever the field. Nested values are not inspected. The check runs before field lookup. §6 row 5 carries the text.`
 - **§6 row 5** (`a wrapper whose inner descriptor is malformed — or absent`), append inside the cell, after the
   F-438 amendment:
-  `*(AMENDED, FIX_me_descriptor_input_strict: a member named twice gets its own sentence — "…names one field more than once: `descriptor`, `Descriptor`. A wallet export names each field once, and field names match without regard to case, so this file does not say which value is meant. Re-export from your wallet software, or delete the extra field so each name appears once." Same row, `EXIT_REFUSED` (3).)*`
+  `*(AMENDED, FIX_me_descriptor_input_strict: a member named twice gets its own sentence — "…names one field more than once: `descriptor`, `Descriptor`. A wallet export names each field once, and field names match without regard to case, so this file does not say which value is meant. Re-export from your wallet software. If you edit the file instead, keep only the member whose value is your wallet's, and check the quorum and address `me` prints next." Same row, `EXIT_REFUSED` (3).)*`
 
 ## 4. Printed texts and exit codes
 
 | id | trigger | stderr line (exact) | exit |
 | --- | --- | --- | --- |
-| **T-DUP** (new, PROPOSED) | D1 | ``me: the `{label, descriptor}` JSON names one field more than once: <names>. A wallet export names each field once, and field names match without regard to case, so this file does not say which value is meant. Re-export from your wallet software, or delete the extra field so each name appears once.`` | 3 |
+| **T-DUP** (new, PROPOSED) | D1 | ``me: the `{label, descriptor}` JSON names one field more than once: <names>. A wallet export names each field once, and field names match without regard to case, so this file does not say which value is meant. Re-export from your wallet software. If you edit the file instead, keep only the member whose value is your wallet's, and check the quorum and address `me` prints next.`` | 3 |
 | T-ORIGIN (existing) | D7, key origin | `me: this is not a wallet descriptor in any of the four forms … It looks most like a plain BIP-380 descriptor, which failed because: the origin path is not a path: `<fp/path as written>`.` | 3 |
 | T-USESITE (existing) | D7, use-site | same frame, reason ``the use-site path is not a path: `<tail as written>` `` | 3 |
 | T-DERIV (existing) | D7, BlueWallet | same frame, "looks most like a BlueWallet `Key: value` setup file", reason ``the `Derivation:` header is not a path: `<value>` `` | 3 |

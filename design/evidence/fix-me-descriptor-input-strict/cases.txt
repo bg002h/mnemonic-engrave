@@ -62,3 +62,6 @@ i2-nested-dup.json|none|2|-
 i15-origin-2147483647.txt|descriptor|0|-
 i15-origin-2147483647.txt|md1|3|i15-origin-2147483647.txt.md1
 i15-origin-2147483647.txt|none|2|-
+i2-escaped.json|descriptor|3|i2-escaped.json
+i2-escaped.json|md1|3|i2-escaped.json
+i2-escaped.json|none|3|i2-escaped.json
