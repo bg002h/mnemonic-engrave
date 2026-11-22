@@ -2506,7 +2506,7 @@ fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::recor
         C::Mnemonic | C::Codex32Secret | C::Passphrase | C::Preimage => {
             println!("secret record {i}: {} — not shown", class_name(class));
         }
-        C::FreeText | C::Tx | C::Address | C::Unknown => {
+        C::FreeText | C::Mr | C::Tx | C::Address | C::Unknown => {
             println!("public record {i}: {}", class_name(class));
         }
     }
@@ -2969,24 +2969,7 @@ fn report_sealed_preimage(records: &[String]) {
 
 /// A record CLASS, for an operator. Names the class, never the record.
 fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
-    use mnemonic_engrave::sysw::record::Class as C;
-    match c {
-        C::Mnemonic => "BIP-39 mnemonic",
-        C::Codex32Secret => "codex32 secret",
-        C::Passphrase => "passphrase",
-        C::FreeText => "free text",
-        C::Descriptor => "descriptor",
-        C::MdMk => "md1/mk1 card",
-        C::Mt => "mt1 chunk",
-        C::Tx => "raw transaction",
-        C::Address => "address",
-        C::Key => "cosigner key (key:)",
-        C::Hash => "sha256 hashlock (hash:)",
-        C::Now => "pack time (now:)",
-        C::Preimage => "hashlock preimage plate",
-        C::Phrase => "hashlock phrase (phrase:)",
-        C::Unknown => "unrecognised record",
-    }
+    c.name()
 }
 
 fn report_strength(passphrase: Option<&str>, records: &[String]) {

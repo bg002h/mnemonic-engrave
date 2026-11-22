@@ -522,3 +522,33 @@ fn me_hash_reproduces_both_shapes() {
             "a26e d22b b747 dfd0 2367 06ad 14c1 9679",
         ));
 }
+
+/// S1 test 28, sealed half (§14d): the Sealed Payload container still refuses an
+/// mr1 record. GUARD: green before `ClassMr` exists, and it must stay green.
+#[test]
+fn seal_still_refuses_mr1() {
+    let raw = std::fs::read("../../design/vectors/sysw_mr_v1_vectors.json").unwrap();
+    let d: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    let single = d["string_vectors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "single-card")
+        .unwrap()["record"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.uf2");
+    let a = me()
+        .args(["seal", "--plaintext", &single, "--out"])
+        .arg(&out)
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&a.get_output().stderr).to_string();
+    assert!(
+        err.contains("unrecognized HRP 'mr' (expected md, mk, ms, or mt)"),
+        "{err}"
+    );
+    assert!(!out.exists(), "a refused run must write nothing");
+}

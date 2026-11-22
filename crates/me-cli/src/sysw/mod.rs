@@ -17,6 +17,7 @@ pub mod coverage;
 /// operator believes it holds.
 pub mod expect;
 pub mod identity;
+pub mod mr;
 pub mod mt;
 pub mod overwrite;
 pub mod passphrase;

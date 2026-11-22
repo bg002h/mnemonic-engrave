@@ -59,6 +59,9 @@ pub enum Class {
     /// through `[mt-decode]` (`sysw::mt::mt_unconfirmed`), mirroring
     /// `[mdmk-decode]`.
     Mt,
+    /// One `mr1` string: a single-string card or one chunk of a card, lowercase
+    /// (S1 §14b). Not secret and not bearer; it has no confirmation walk.
+    Mr,
     /// A `tx:`-prefixed raw signed transaction, for QR plates. Same secrecy
     /// reasoning as [`Class::Mt`]; classification already proved it parses,
     /// so no confirmation walk exists for it.
@@ -82,6 +85,29 @@ pub enum Class {
 }
 
 impl Class {
+    /// The record class named for an operator. Names the class, never the
+    /// record. `me`'s `class_name` is this.
+    pub fn name(self) -> &'static str {
+        match self {
+            Class::Mnemonic => "BIP-39 mnemonic",
+            Class::Codex32Secret => "codex32 secret",
+            Class::Passphrase => "passphrase",
+            Class::FreeText => "free text",
+            Class::Descriptor => "descriptor",
+            Class::MdMk => "md1/mk1 card",
+            Class::Mt => "mt1 chunk",
+            Class::Mr => "mr1 string",
+            Class::Tx => "raw transaction",
+            Class::Address => "address",
+            Class::Key => "cosigner key (key:)",
+            Class::Hash => "sha256 hashlock (hash:)",
+            Class::Now => "pack time (now:)",
+            Class::Preimage => "hashlock preimage plate",
+            Class::Phrase => "hashlock phrase (phrase:)",
+            Class::Unknown => "unrecognised record",
+        }
+    }
+
     /// §3.3.1. Extends the shipped predicate (`seal/session.go:17`, which is
     /// `ClassCodex32Secret || ClassMnemonic`) with [`Class::Passphrase`].
     ///

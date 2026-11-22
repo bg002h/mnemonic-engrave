@@ -228,7 +228,7 @@ mod tests {
     /// build, which is the only reason this file is worth its weight.
     #[test]
     fn assert_every_named_test_is_placed() {
-        const HIGHEST: u32 = 23;
+        const HIGHEST: u32 = 32;
         for id in 1..=HIGHEST {
             assert!(
                 COVERAGE.iter().any(|(n, _)| *n == id),
