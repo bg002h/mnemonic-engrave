@@ -1,0 +1,150 @@
+spec	section	quote	owner
+S1	14b	the record holds any ASCII capital letter (all upper and mixed case alike)	TestSyswMrStringVectors
+S1	14b	a character after `mr1` is not in `qpzry9x8gf2tvdw0s3jn54khce6mua7l`	TestSyswMrStringVectors
+S1	14b	`L` is under 14 or over 93 (the whole record under 17 or over 96 characters)	TestSyswMrStringVectors
+S1	14b	is not `0x085d21404aee15059`	TestValidMR
+S1	14b	the first symbol after `mr1` is `u`, `a` or `7`	TestSyswMrStringVectors
+S1	14b	it has fewer than 8 symbols before its 13-symbol checksum	TestSyswMrStringVectors
+S1	14b	the bits after its 37-bit header are not whole bytes followed by 0 to 4 zero bits	TestSyswMrStringVectors
+S1	14b	`MR_CHECKSUM` is exact validity: no correction is ever applied	TestSyswMrStringVectors
+S1	14b	**Upper case is refused**, where mr reads an all-upper card	sysw_mr_string_vectors
+S1	14b	**the record is not stripped of spaces or hyphens**	sysw_mr_string_vectors
+S1	14b	`ClassMr` is **not secret and not bearer**	TestRefugiumSecretWarningLine
+S1	14b	The classify arm sits directly after the mt1 arm in both implementations	TestSyswMrStringVectors
+S1	14c	Two sets with one chunk-set id are two copies of a card	TestSyswMrKitVectors
+S1	14c	a chunk's count differs from the count of the set's first record (in payload order)	TestSyswMrSetVectors
+S1	14c	a chunk's index is not below that count	TestSyswMrSetVectors
+S1	14c	an index occurs twice, whether or not the two strings are the same	TestSyswMrSetVectors
+S1	14c	an index from 0 to count − 1 is absent	TestSyswMrSetVectors
+S1	14c	or a slice is not ⌈len / count⌉ bytes (the last: the rest)	TestSyswMrSetVectors
+S1	14c	the top 20 bits of SHA-256(`"mr1/chunks"` ‖ the slices in index order) are not the set's chunk-set id	TestSyswMrSetVectors
+S1	14c	a record that is not in the set sits between the set's first and last record	TestSyswMrSetVectors
+S1	14c	The order of chunks **inside** a set is free	TestSyswMrSetVectors
+S1	14c	for `SET_MISSING`, the lowest absent index	TestKitSentencesDevice
+S1	14c	**Not checked, on purpose: whether the reassembled bytes are a card**	TestSyswMrSetVectors
+S1	14d	A payload with no mr1 candidate offers none, and Engrave Bundle and the payload menu behave exactly as before this section.	TestKitMenuNoMr1Unchanged
+S1	14d	run in this order over all its records (public section, then secret section)	TestSyswMrKitVectors
+S1	14d	a record, in payload order, is neither `ClassMDMK` nor `ClassMr`	TestSyswMrKitVectors
+S1	14d	is unconfirmed under `[mdmk-decode]` (§12.6)	TestSyswMrKitVectors
+S1	14d	has a record of another card between its first and last record	TestSyswMrKitVectors
+S1	14d	so two complete copies of one mk1 card each confirm; F1, F2 and F4 read the same grouping.	TestSyswMDMKGroupsByRuns
+S1	14d	**begins**, the first 8 characters of its index-0 string	TestKitListEntries
+S1	14d	**ends**, the last 4 characters of its highest-index string	TestKitListEntries
+S1	14d	`ClassMr` is admitted at Engrave Bundle and nowhere else	TestAdmitMrAtBundleOnly
+S1	14d	the gather flow, which takes md1 and mk1 cards, never offers an mr1 record	TestKitBundleDoor
+S1	14d	`seal`'s allow-list still refuses an mr1 record	TestAdmitMrAtBundleOnly
+S1	14e	Both builds carry this; nothing here is profile-gated.	WALK kit-refugium
+S1	14e	by the fork's existing first-fit packer (`bundlePlatePlan`, `bundleCardPlates`), never across cards	TestKitLeadPlatesEqualCuts
+S1	14e	Plate p of q of card k of N carries the title "CARD k/N" and the footer "PLATE p/q"	TestKitDoorRun
+S1	14e	the menu's lead is "Engrave kit now (N cards, M plates)?" and its choices are ENGRAVE KIT, LOAD AGAIN, UNLOAD, in that order.	TestKitMenuOffersEngraveKit
+S1	14e	A card or plate count of 1 is written "1 card" or "1 plate"	TestKitMenuOffersEngraveKit
+S1	14e	a screen titled "Kit Refused" shows the reason's sentence (§14g), a blank line, and "Nothing from this payload can be engraved as a kit. Write the kit payload again."	TestKitMenuRefusedShowsReasonThenMenu
+S1	14e	Its only way on is to dismiss it; then the menu shows exactly as it does today.	TestKitMenuRefusedShowsReasonThenMenu
+S1	14e	at boot, after Load Payload and from the carousel	TestKitMenuOffersEngraveKit
+S1	14e	"Kit Refused" comes after the Payload Warnings screen and its KEEP / UNLOAD, and is not shown when the holder chose UNLOAD.	TestKitRefusedAfterWarnings
+S1	14e	A payload that offers no kit shows today's menu unchanged.	TestKitMenuNoMr1Unchanged
+S1	14e	eligible opens the kit list at once (no gather, no "Cards from where?")	TestKitBundleDoor
+S1	14e	not eligible shows the "Kit Refused" screen above and then returns to the carousel	TestKitBundleDoor
+S1	14e	With no payload, or a payload that offers no kit, Engrave Bundle is unchanged.	TestKitBundleDoor
+S1	14e	Its first line is "N cards, M plates. Start at:"	TestKitListEntries
+S1	14e	each entry reads "Card k of N: <kind>, begins <begins>, ends <ends>"	TestKitListEntries
+S1	14e	with " (cut)" appended when every plate of that card has been cut since this payload was loaded	TestKitListEntries
+S1	14e	after a run stops by Back, it opens on the card the run stopped in	TestKitListEntries
+S1	14e	OK starts the run at the highlighted card; Back returns to the carousel.	TestKitListEntries
+S1	14e	**The run** cuts the cards from the chosen card k to card N, in list order.	TestKitDoorRun
+S1	14e	"Choose engraving", offers one choice, TEXT ONLY	TestKitDoorRun
+S1	14e	An engrave that does not complete shows the same choice screen again.	TestKitDoorRun
+S1	14e	returns to the kit list, with no other screen	TestKitDoorRun
+S1	14e	To finish this card, choose card k in the list again: it starts again at its plate 1."	TestKitDoorRun
+S1	14e	says "Cards s to N of this kit are cut."	TestKitDoorRun
+S1	14e	("Card N of this kit is cut." when s = N)	TestKitDoorRun
+S1	14e	The ms1 reminder that ends Engrave Bundle's gather flow is not shown	TestKitDoorRun
+S1	14e	this kit cannot be engraved on this machine." and returns to the kit list.	TestKitDoorPlateDoesNotFit
+S1	14e	Nothing is written to flash and nothing survives a power cut	TestKitListEntries
+S1	14e	Starting the run at a card again also cuts a further copy (Q7).	TestKitDoorRun
+S1	14f	"Refugium build: secrets travel only in the Sealed Payload, never in this one. Unload this payload unless you mean to engrave its secret now."	TestRefugiumSecretWarningLine
+S1	14f	in a plaintext payload directly after the line "A SECRET is stored unencrypted in flash."	TestRefugiumSecretWarningLine
+S1	14f	and the screen shows for this line alone when no flag is raised	TestRefugiumSecretWarningLine
+S1	14f	The KEEP / UNLOAD choice follows the screen whenever this line is on it, and nothing is refused (Q3).	TestRefugiumSecretWarningLine
+S1	14f	does not raise this line; its own F1 line is unchanged	TestRefugiumSecretWarningLine
+S1	14f	The default build never shows it.	TestDefaultBuildNoRefugiumWarning
+S1	14g	One sentence per reason, on both surfaces.	TestKitSentencesDevice
+S1	14g	`<n>` is the position in the loaded payload, from 1, public section first	TestKitSentencesDevice
+S1	14g	{R} is an mr1 string with capital letters; the mr1 strings of a kit are all lowercase, as mr prints them.	TestKitMenuRefusedShowsReasonThenMenu
+S1	14g	{R} is not an md1, mk1 or mr1 string (it is: {class}), so this payload is not a kit.	TestKitMenuRefusedShowsReasonThenMenu
+S1	14g	The {k} card that begins {B} is split: {r} sits between its strings but is not part of it. Keep each card's strings together.	TestKitMenuRefusedShowsReasonThenMenu
+S1	14g	{R} is an md1 or mk1 string whose card does not decode: it is incomplete or damaged.	TestKitSentencesDevice
+S1	14g	The mr1 card that begins {B} holds chunk {i} twice: {rr}.	TestKitSentencesDevice
+S1	14g	The mr1 card that begins {B} does not match its own chunk-set id	TestKitSentencesDevice
+S1	14h	`class_name` names the class "mr1 string"	sysw_show_names_mr1_string
+S1	14h	a refusal prints "me: " and its sentence and exits 4	sysw_pack_prints_mr_sentences
+S1	14h	"me: this payload is not a kit the device will engrave: " followed by its sentence, once, on stderr, and the pack goes on (exit 0)	sysw_pack_prints_mr_sentences
+S1	14h	"not an md1/mk1/mr1/ms1/mt1 string" and "an md1/mk1/mr1/ms1/mt1 string"	sysw_show_names_mr1_string
+S1	14h	No flag is added or changed. `me seal` and `me bundle` are unchanged.	seal_still_refuses_mr1
+S1	14i	Every `string_vectors` row of	sysw_mr_string_vectors
+S1	14i	(`kit-two-copies-mk1`) given twice	sysw_mdmk_groups_by_runs
+S1	14i	"Which records get refused" gains the mr1 rows of §14g, in lockstep with	TASK ME-1 step 3
+S1	14i	M in the lead equals the number of plates the kit door cuts	TestKitLeadPlatesEqualCuts
+S1b	14.1	**`me seal` is unchanged.**	me_seal_still_writes_version_1
+S1b	14.1	**Firmware that predates v2 refuses a v2 payload fail-closed**	not this plan's: S1b §14.1 (behaviour of firmware already shipped)
+S1b	14.2	`password form byte must be 0 or 6 to 12, got <b>`	TestV2RefusesPwFormOutside0And6To12
+S1b	14.2	refused: `pw_form must be zero when nothing is encrypted`	TestV2PublicOnlyRefusesNonzeroPwForm
+S1b	14.2	refused: `unsupported format version <v>`	TestV2RefusesPwFormOutside0And6To12
+S1b	14.2	length, magic, version; **v1 only:** reserved; read the integers	TestV2HeaderRoundTripsEachPasswordForm
+S1b	14.2	The Go port carries one new sentinel, `ErrPwForm = errors.New("seal: password form	TestV2RefusesPwFormOutside0And6To12
+S1b	14.2	On the device every header refusal, these included, still reads `Payload unreadable.`	TestUnlockHeaderRefusalsUnreadable
+S1b	14.2	so a payload with `iterations = 50_000` still reads as §6.2's range refusal	v2_refuses_n_word_payload_below_600000_iterations
+S1b	14.2	`seal.MinIterationsNWord = 600_000`	TestV2RefusesNWordPayloadBelow600000Iterations
+S1b	14.2	so `errors.Is(err, ErrIterations)` holds for it as for §6.2's range refusal	TestV2RefusesNWordPayloadBelow600000Iterations
+S1b	14.2	For a v1 header `pw_form` is 0 and encodes as the reserved byte	v2_header_round_trips_each_password_form
+S1b	14.3	So a v2 payload holds at most **23 seed records**	TestV2RecordBudget
+S1b	14.3	so at most 18 plates titled `SEED <L>` fit (252 bytes;	TestV2RecordBudget
+S1b	14.3	the device and `open` refuse an oversize record exactly as today (§6.4)	TestV2RecordBudget
+S1b	14.3	**The fork (Go).** A behaviour-faithful port of §14.2-§14.6, bound to the same vectors with a provenance pin.	TestV2VectorsMatchTheIndependentGenerator
+S1b	14.4	the five characters `text:` followed by the lower-case hexadecimal of the UTF-8 bytes of a **titles block**	TestV2OpenRoundTripsEachPositiveVector
+S1b	14.4	`<T>` is exactly one of these 33 strings	TestV2TitlesRefusals
+S1b	14.4	In a v1 payload, and in the public section of any payload, a `text:` record is not a titles record	TestV1OpenTreatsTextRecordsAsRecords
+S1b	14.4	is `A` + the top four bits of its first entropy byte	TestMS1LetterIsTheTopNibbleOfTheEntropy
+S1b	14.4	the first that fails refuses the **whole payload**; every record of both sections is wiped before	TestV2TitlesRefusals
+S1b	14.4	At most one record of the encrypted section begins `text:`.	TestV2TitlesRefusals
+S1b	14.4	That record is the last record of the encrypted section.	TestV2TitlesRefusals
+S1b	14.4	The block ends with LF.	TestV2TitlesRefusals
+S1b	14.4	Line 1 is exactly `refugium-plates 2`.	TestV2TitlesRefusals
+S1b	14.4	There is at least one title line.	TestV2TitlesRefusals
+S1b	14.4	test it before calling `DecodeMS1`.	TestMS1LetterIsTheTopNibbleOfTheEntropy
+S1b	14.4	The number of title lines equals the number of seed records.	TestV2TitlesRefusals
+S1b	14.4	`KEEP; DO NOT LOAD` is not checked.	TestV2OpenRoundTripsEachPositiveVector
+S1b	14.4	A v2 payload with no titles record is legal	TestUnlockV2TitleOnSteel
+S1b	14.4	**T-1:** `This payload's plate titles do not match its seed records. Nothing was opened.`	TestUnlockV2TitlesRefusalT1
+S1b	14.4	**T-2:** `This payload titles a plate <title>, but that seed's letter is <letter>. Nothing was opened.`	TestUnlockV2TitlesRefusalT2
+S1b	14.4	Both are shown with the program's title `Sealed Payload`, after which the program returns to the menu	TestUnlockV2TitlesRefusalT1
+S1b	14.4	the lead reads `title SEED C` then `SECRET seed material`	TestUnlockV2TitleLeadLine
+S1b	14.4	The screen's title stays the classified label `ms1 <i>/<n>`	TestUnlockV2TitleLeadLine
+S1b	14.4	With no titles record the screen is unchanged.	TestUnlockV2TitleLeadLine
+S1b	14.4	The plate's title is `<T>` (in place of the codex32 id that `unlockCodex32Plan` uses today).	TestUnlockV2TitleOnSteel
+S1b	14.5	The PBKDF2 password is the words, lower-cased, joined by exactly one space	TestV2PasswordNormalisesLikePlatesKey
+S1b	14.5	refuses, **before any KDF work**, in this order	v2_refuses_a_wrong_word_count_before_the_kdf
+S1b	14.5	`Enter the <n>-word plates password for this payload.`	TestUnlockNWordNotice
+S1b	14.5	They are NOT a seed and no wallet is derived from them.`	TestUnlockNWordNotice
+S1b	14.5	**no checksum gate** and no `done` terminator: entry ends when slot n is filled	TestUnlockNWordEntry
+S1b	14.5	Back with fewer than n words leaves the program with no KDF and no error	TestUnlockNWordEntry
+S1b	14.5	`Unlocking. This takes about <S> seconds.`	TestUnlockNWordFirstFrame
+S1b	14.5	`Unlocking. This takes about 30 seconds.`	TestUnlockNWordFirstFrame
+S1b	14.5	`Wrong password, or this payload has been altered.`	TestUnlockNWordWrongPasswordBody
+S1b	14.5	Then entry again (the notice is not repeated).	TestUnlockNWordWrongPasswordBody
+S1b	14.5	capacity 128, never regrown) and zeroed on every exit	TestUnlockNWordPasswordBufferZeroed
+S1b	14.6	is cut with `backup.EngraveSeedStringSeedQR` unless the next paragraph's exception applies	TestRefugiumSealedMS1SeedQR
+S1b	14.6	The default build is unchanged (`EngraveSeedString`, text + QR of the string).	TestDefaultBuildSealedMS1Unchanged
+S1b	14.6	today's `This record does not fit any plate size.` is shown and nothing is cut	not this plan's: existing behaviour, unchanged (unlockEngraveCodex32's error path at 25abe8e)
+S1b	14.6	or its entropy is not 16 or 32 bytes, the plate is cut exactly as today in this	TestRefugiumSealedMS1TextOnlyFallback
+S1b	14.6	12-word (16-byte) and 24-word (32-byte) entropies both get the SeedQR.	TestRefugiumSealedMS1SeedQR
+S1b	14.6	The plate carries no fingerprint row	TestRefugiumSealedMS1SeedQR
+S1b	14.6	the `bip39.Mnemonic` built from the entropy for the SeedQR is cleared beside them	TestRefugiumSealedMS1WipePoints
+S1b	14.6	any buffer holding the entropy is zeroed before `Engrave`	TestRefugiumSealedMS1WipePoints
+S1b	14.6	are LIVE (the F-88 class) and are listed as such in the code's HONEST CAVEAT block	TASK SH-4 step 2
+S1b	14.6	it keeps only `entropy[0] >> 4` and zeroes the returned entropy slice	TestMS1LetterIsTheTopNibbleOfTheEntropy
+S1b	14.8	No allocation in `seal/` or in the n-word unlock is sized by `RegionLen`.	TestBoundBlobReadsV2
+S1b	14.8	so `ParseHeader` must accept v2 for a v2 blob to	TestBoundBlobReadsV2
+S1b	14.8	The titles block is decoded	TestV2TitlesRefusals
+S1b	14.8	The firmware still never writes flash (§4.1).	not this plan's: S3 (mr-sitting erases the region)
+S1b	14.8	**Hardware row H-v2**	HW H-v2
