@@ -17,6 +17,7 @@ pub mod coverage;
 /// operator believes it holds.
 pub mod expect;
 pub mod identity;
+pub mod mr;
 pub mod mt;
 pub mod overwrite;
 pub mod passphrase;
@@ -94,6 +95,8 @@ pub enum SyswError {
     /// Normalised passphrase longer than `[passphrase-bounds]` (§12.5) allows.
     PassphraseTooLong(usize),
     NotUtf8,
+    /// An mr1 set that breaks S1 §14c (or an mr1 card split by another record).
+    MrSet(mr::Refusal),
     /// A record that classifies `Preimage` or `Phrase` in a payload that did
     /// not pass `--pack-preimage` (H6 §3.2 item 2, §8.1.1).
     ///
@@ -208,10 +211,37 @@ pub enum UnknownReason {
     /// One of the composer's three prefixes with a body that fails §6a; the
     /// error carries which class and, for `key:`, the detail.
     Composer(composer_records::ComposerRecordError),
+    /// An `mr1` candidate that failed S1 §14b, with the facts its sentence
+    /// names (§14g: `{n}` and `{p}`). An mr1 string is public, so carrying its
+    /// first four characters leaks nothing.
+    Mr(MrFailure),
+}
+
+/// Which §14b check an mr1 candidate failed, and the two facts a sentence reads
+/// off the record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MrFailure {
+    pub reason: mr::MrReason,
+    /// The record's length in characters (`{n}`).
+    pub len: usize,
+    /// The record's first 4 characters (`{p}`).
+    pub prefix: String,
 }
 
 /// Which reason applies, decided where the record is still in hand.
 fn unknown_reason(record: &str) -> UnknownReason {
+    // S1 §14b: an mr1 candidate that failed the string rule is `Unknown` with
+    // that rule's reason. No other arm below can claim an `mr1` record.
+    if mr::is_candidate(record) {
+        if let Err(reason) = mr::check_string(record) {
+            let t = record.trim();
+            return UnknownReason::Mr(MrFailure {
+                reason,
+                len: t.chars().count(),
+                prefix: t.chars().take(4).collect(),
+            });
+        }
+    }
     if record.starts_with(record::TX_PREFIX) {
         return match record::decode_body(record) {
             Err(_) => UnknownReason::NonHexBody(record::TX_PREFIX),
@@ -366,6 +396,16 @@ pub fn classify_with(record: &str, adm: Admission) -> record::Class {
     // the strict check is self-contained.
     if mt::valid_mt(record) {
         return Class::Mt;
+    }
+    // S1 §14b: directly after the mt1 arm. No earlier arm can match an mr1
+    // string, so no record changes class. A candidate that fails the rule is
+    // `Unknown` with its reason (`unknown_reason`), never `Unrecognised`.
+    if mr::is_candidate(record) {
+        return if mr::check_string(record).is_ok() {
+            Class::Mr
+        } else {
+            Class::Unknown
+        };
     }
     // H6 §3.2 item 1: CLASSIFICATION IS UNCONDITIONAL. A preimage plate is a
     // preimage plate whatever the admission, exactly as a `key:` record is a
@@ -579,6 +619,11 @@ pub fn admit_check(records: &[String], adm: Admission) -> Result<(), SyswError> 
                 }
             }
         }
+    }
+    // S1 §14c: after every record is placed, the mr1 chunk-set rule over the
+    // payload. Only the strings that passed §14b reach it.
+    if records.iter().any(|r| mr::is_candidate(r)) {
+        mr::check_sets(records).map_err(SyswError::MrSet)?;
     }
     Ok(())
 }

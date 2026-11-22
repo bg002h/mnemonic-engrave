@@ -2536,7 +2536,7 @@ fn a_valid_bip93_string_is_told_it_is_bip93_and_not_a_constellation_ms1() {
     }
     // The sentence that was false about this input, gone.
     assert!(
-        !err.contains("not an md1/mk1/ms1/mt1 string"),
+        !err.contains("not an md1/mk1/mr1/ms1/mt1 string"),
         "the classifier sentence is false for a BIP-93 string: {err}"
     );
     assert!(!err.contains(BIP93_SECRET), "the record is echoed: {err}");
@@ -2556,7 +2556,7 @@ fn a_valid_bip93_string_is_told_it_is_bip93_and_not_a_constellation_ms1() {
 fn a_record_of_no_class_at_all_still_names_the_classifier() {
     let err = refuse_one_record("this is not a record of any class");
     assert!(
-        err.contains("not an md1/mk1/ms1/mt1 string"),
+        err.contains("not an md1/mk1/mr1/ms1/mt1 string"),
         "the general refusal must survive: {err}"
     );
     assert!(
@@ -2928,4 +2928,187 @@ fn hex_of(s: &str) -> String {
         let _ = write!(acc, "{b:02x}");
         acc
     })
+}
+
+// ── S1 §14: mr1 records, the kit rule and the pack sentences ────────────────
+
+const MR_VECTORS: &str = "../../design/vectors/sysw_mr_v1_vectors.json";
+
+/// The records of the vector `name` in `section` (`string_vectors` rows hold
+/// one `record`; the others hold `records`).
+fn mr_vector(section: &str, name: &str) -> Vec<String> {
+    let raw = std::fs::read(MR_VECTORS).unwrap();
+    let d: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    let v = d[section]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == name)
+        .unwrap_or_else(|| panic!("no vector {name} in {section}"));
+    match v["record"].as_str() {
+        Some(r) => vec![r.to_string()],
+        None => v["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r.as_str().unwrap().to_string())
+            .collect(),
+    }
+}
+
+/// `me sysw pack --no-passphrase --in` over `records`: exit code and stderr.
+fn pack_in(records: &[String]) -> (i32, String) {
+    let dir = tempfile::tempdir().unwrap();
+    let inp = dir.path().join("r.txt");
+    std::fs::write(&inp, records.join("\n") + "\n").unwrap();
+    let out = dir.path().join("p.bin");
+    let a = me()
+        .args(["sysw", "pack", "--no-passphrase", "--in"])
+        .arg(&inp)
+        .arg("--out")
+        .arg(&out)
+        .assert();
+    let o = a.get_output();
+    (
+        o.status.code().unwrap(),
+        String::from_utf8_lossy(&o.stderr).to_string(),
+    )
+}
+
+const KIT_WARNING: &str = "me: this payload is not a kit the device will engrave: ";
+
+/// S1 test 27 (§14g, §14h): each sentence in `me`'s record form; exit 4 for
+/// every string and set refusal; the kit warning once, exit 0, for each
+/// kit-only reason; neither for a payload with no mr1; a set around a secret
+/// record packs.
+#[test]
+fn sysw_pack_prints_mr_sentences() {
+    const R: &str = "(records count from 0)";
+    // (section, vector, the whole sentence after "me: ")
+    let refused: Vec<(&str, &str, String)> = vec![
+        ("string_vectors", "upper", format!("record 0, as given {R} is an mr1 string with capital letters; the mr1 strings of a kit are all lowercase, as mr prints them.")),
+        ("string_vectors", "mixed", format!("record 0, as given {R} is an mr1 string with capital letters; the mr1 strings of a kit are all lowercase, as mr prints them.")),
+        ("string_vectors", "character-b", format!("record 0, as given {R} begins mr1 but holds a character no mr1 string uses.")),
+        ("string_vectors", "too-long", format!("record 0, as given {R} begins mr1 but is 97 characters long; an mr1 string is 17 to 96 characters long.")),
+        ("string_vectors", "too-short", format!("record 0, as given {R} begins mr1 but is 16 characters long; an mr1 string is 17 to 96 characters long.")),
+        ("string_vectors", "checksum", format!("record 0, as given {R} is an mr1 string whose checksum does not match: at least one character is wrong.")),
+        ("string_vectors", "reserved-u", format!("record 0, as given {R} begins mr1u, which no mr1 card or chunk begins with.")),
+        ("string_vectors", "chunk-short", format!("record 0, as given {R} is an mr1 chunk too short to hold its chunk header.")),
+        ("string_vectors", "chunk-pad-long", format!("record 0, as given {R} is an mr1 chunk that does not end the way mr ends a chunk (0 to 4 zero bits after its last byte).")),
+        ("set_vectors", "count", format!("The mr1 card that begins mr1lg2c0 disagrees with itself: record 1, as given {R} says the card has 3 chunks, but its first chunk says 2.")),
+        ("set_vectors", "index", format!("The mr1 card that begins mr1lg2c0 has 2 chunks, numbered 0 to 1, but record 1, as given {R} is numbered 2.")),
+        ("set_vectors", "duplicate", format!("The mr1 card that begins mr1lg2c0 holds chunk 0 twice: records 0 and 1, as given {R}. Each copy of a card holds each chunk once, and a copy must be complete before the next copy starts.")),
+        ("set_vectors", "missing", "The mr1 card that begins mr1lg2c0 is incomplete: chunk 1 of its 2 chunks is missing (chunks are numbered from 0), or a chunk repeated after a complete copy began a second, incomplete copy.".to_string()),
+        ("set_vectors", "slices", "The mr1 card that begins mr1luxgm is not divided into chunks the way mr divides a card, so mr did not write it.".to_string()),
+        ("set_vectors", "id", "The mr1 card that begins mr1lg2c0 does not match its own chunk-set id: its chunks come from different cards, or one was altered.".to_string()),
+        ("set_vectors", "split", format!("The mr1 card that begins mr1lg2c0 is split: record 1, as given {R} sits between its strings but is not part of it. Keep each card's strings together.")),
+    ];
+    for (section, name, sentence) in &refused {
+        let (code, err) = pack_in(&mr_vector(section, name));
+        assert_eq!(code, 4, "{name}: {err}");
+        assert!(
+            err.contains(&format!("me: {sentence}")),
+            "{name}: wanted {sentence:?} in {err}"
+        );
+        assert!(!err.contains(KIT_WARNING), "{name}: {err}");
+    }
+
+    // Kit-only reasons: the warning, once, and the pack goes on.
+    let warned: Vec<(&str, String)> = vec![
+        ("kit-text", format!("record 2, as given {R} is not an md1, mk1 or mr1 string (it is: free text), so this payload is not a kit.")),
+        ("kit-mk1-alone", format!("record 2, as given {R} is an md1 or mk1 string whose card does not decode: it is incomplete or damaged.")),
+        ("kit-mk1-split", format!("The mk1 card that begins mk1qppc9 is split: record 3, as given {R} sits between its strings but is not part of it. Keep each card's strings together.")),
+    ];
+    for (name, sentence) in &warned {
+        let (code, err) = pack_in(&mr_vector("kit_vectors", name));
+        assert_eq!(code, 0, "{name}: {err}");
+        assert_eq!(err.matches(KIT_WARNING).count(), 1, "{name}: {err}");
+        assert!(
+            err.contains(&format!("{KIT_WARNING}{sentence}")),
+            "{name}: wanted {sentence:?} in {err}"
+        );
+    }
+
+    // An eligible kit and a payload with no mr1 print neither.
+    for name in ["kit-2of3", "kit-single", "kit-two-copies", "no-mr1"] {
+        let (code, err) = pack_in(&mr_vector("kit_vectors", name));
+        assert_eq!(code, 0, "{name}: {err}");
+        assert!(!err.contains(KIT_WARNING), "{name}: {err}");
+        assert!(!err.contains("The mr1 card"), "{name}: {err}");
+    }
+
+    // A set given around a secret record packs: they are adjacent in payload
+    // order. The secret makes the payload no kit, so the warning names it.
+    let set = mr_vector("set_vectors", "complete");
+    let around = vec![set[0].clone(), SEED.to_string(), set[1].clone()];
+    let (code, err) = pack_in(&around);
+    assert_eq!(code, 0, "{err}");
+    assert!(
+        err.contains(&format!("{KIT_WARNING}record 1, as given {R} is not an md1, mk1 or mr1 string (it is: BIP-39 mnemonic), so this payload is not a kit.")),
+        "{err}"
+    );
+    assert!(!err.contains("The mr1 card"), "{err}");
+}
+
+/// S1 §14d, §14i: `kit-two-copies-mk1`'s first mk1 card given twice. Each copy
+/// is its own card and confirms: no record is unconfirmed and none is read as
+/// a SECRET.
+#[test]
+fn sysw_mdmk_groups_by_runs() {
+    let kit = mr_vector("kit_vectors", "kit-two-copies-mk1");
+    let first_mk1: Vec<String> = kit
+        .iter()
+        .filter(|r| r.starts_with("mk1"))
+        .take(2)
+        .cloned()
+        .collect();
+    assert_eq!(first_mk1.len(), 2);
+    let twice = [first_mk1.clone(), first_mk1].concat();
+    let dir = tempfile::tempdir().unwrap();
+    let inp = dir.path().join("dupmk.txt");
+    std::fs::write(&inp, twice.join("\n") + "\n").unwrap();
+    let blob = dir.path().join("dupmk.bin");
+    let pack = me()
+        .args(["sysw", "pack", "--no-passphrase", "--in"])
+        .arg(&inp)
+        .arg("--out")
+        .arg(&blob)
+        .assert()
+        .success();
+    let perr = String::from_utf8_lossy(&pack.get_output().stderr).to_string();
+    let show = me().args(["sysw", "show"]).arg(&blob).assert().success();
+    let so = show.get_output();
+    let all = format!(
+        "{perr}{}{}",
+        String::from_utf8_lossy(&so.stdout),
+        String::from_utf8_lossy(&so.stderr)
+    );
+    assert!(!all.contains("md1/mk1 — unconfirmed"), "{all}");
+    assert!(!all.contains("SECRET"), "{all}");
+    assert_eq!(all.matches("md1/mk1 — confirmed").count(), 4, "{all}");
+}
+
+/// S1 §14h: the class is named; the classifier sentence and `pack --help`
+/// name mr1.
+#[test]
+fn sysw_show_names_mr1_string() {
+    let single = mr_vector("string_vectors", "single-card");
+    let dir = tempfile::tempdir().unwrap();
+    let blob = dir.path().join("one.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "--out"])
+        .arg(&blob)
+        .arg(&single[0])
+        .assert()
+        .success();
+    me().args(["sysw", "show"])
+        .arg(&blob)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("public record 0: mr1 string"));
+    let err = refuse_one_record("this is not a record of any class");
+    assert!(err.contains("not an md1/mk1/mr1/ms1/mt1 string"), "{err}");
+    me().args(["sysw", "pack", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("an md1/mk1/mr1/ms1/mt1 string"));
 }

@@ -59,6 +59,9 @@ pub enum Class {
     /// through `[mt-decode]` (`sysw::mt::mt_unconfirmed`), mirroring
     /// `[mdmk-decode]`.
     Mt,
+    /// One `mr1` string: a single-string card or one chunk of a card, lowercase
+    /// (S1 §14b). Not secret and not bearer; it has no confirmation walk.
+    Mr,
     /// A `tx:`-prefixed raw signed transaction, for QR plates. Same secrecy
     /// reasoning as [`Class::Mt`]; classification already proved it parses,
     /// so no confirmation walk exists for it.
@@ -82,6 +85,29 @@ pub enum Class {
 }
 
 impl Class {
+    /// The record class named for an operator. Names the class, never the
+    /// record. `me`'s `class_name` is this.
+    pub fn name(self) -> &'static str {
+        match self {
+            Class::Mnemonic => "BIP-39 mnemonic",
+            Class::Codex32Secret => "codex32 secret",
+            Class::Passphrase => "passphrase",
+            Class::FreeText => "free text",
+            Class::Descriptor => "descriptor",
+            Class::MdMk => "md1/mk1 card",
+            Class::Mt => "mt1 chunk",
+            Class::Mr => "mr1 string",
+            Class::Tx => "raw transaction",
+            Class::Address => "address",
+            Class::Key => "cosigner key (key:)",
+            Class::Hash => "sha256 hashlock (hash:)",
+            Class::Now => "pack time (now:)",
+            Class::Preimage => "hashlock preimage plate",
+            Class::Phrase => "hashlock phrase (phrase:)",
+            Class::Unknown => "unrecognised record",
+        }
+    }
+
     /// §3.3.1. Extends the shipped predicate (`seal/session.go:17`, which is
     /// `ClassCodex32Secret || ClassMnemonic`) with [`Class::Passphrase`].
     ///
@@ -267,27 +293,15 @@ fn md_verdict<T>(r: Result<T, md_codec::Error>) -> Option<Unconfirmed> {
 /// through `check` and once through `report_unconfirmed`, when every
 /// expectation is met.
 pub fn mdmk_unconfirmed_why(records: &[String]) -> Vec<(usize, Unconfirmed)> {
-    use std::collections::BTreeMap;
-
-    // key: (hrp, chunk_set_id, uniq) -> the ORIGINAL indices in that card set.
-    // `uniq` distinguishes non-chunked records, which are each their own card;
-    // giving them all one key would let the first one to decode vouch for the
-    // rest, which is precisely how smuggled entropy would slip through.
-    let mut groups: BTreeMap<(char, Option<u32>, usize), Vec<usize>> = BTreeMap::new();
     let mut out: Vec<(usize, Unconfirmed)> = Vec::new();
-
-    for (i, r) in records.iter().enumerate() {
-        if super::classify(r) != Class::MdMk {
-            continue;
-        }
-        match crate::seal::record::validate_record(r)
-            .ok()
-            .and_then(|kind| chunk_key(r, kind))
-        {
-            Some((hrp, csid)) => {
-                let uniq = if csid.is_some() { 0 } else { i + 1 };
-                groups.entry((hrp, csid, uniq)).or_default().push(i);
-            }
+    let mut groups: Vec<(char, Option<u32>, Vec<usize>)> = Vec::new();
+    for card in mdmk_cards(records) {
+        match card.readable {
+            true => groups.push((
+                card.hrp,
+                card.csid,
+                card.members.iter().map(|&(i, _)| i).collect(),
+            )),
             // Fail CLOSED. A record whose card identity cannot be read cannot be
             // grouped, so nothing could ever confirm it.
             //
@@ -298,11 +312,11 @@ pub fn mdmk_unconfirmed_why(records: &[String]) -> Vec<(usize, Unconfirmed)> {
             // md1". `decode_public_set` has the same asymmetry and the same
             // answer, which is why the two walks still agree.
             // See `a_record_whose_card_identity_cannot_be_read_is_unconfirmed`.
-            None => out.push((i, Unconfirmed::Undecodable)),
+            false => out.push((card.members[0].0, Unconfirmed::Undecodable)),
         }
     }
 
-    for ((hrp, csid, _), idxs) in groups {
+    for (hrp, csid, idxs) in groups {
         let set: Vec<&str> = idxs.iter().map(|&i| records[i].as_str()).collect();
         // The real decoders are the arbiter — semantics-bound, per §12.6. A
         // BCH verifier is not one: that is the whole point of the rule.
@@ -333,6 +347,94 @@ pub fn mdmk_unconfirmed_why(records: &[String]) -> Vec<(usize, Unconfirmed)> {
 
     out.sort_unstable_by_key(|&(i, _)| i);
     out
+}
+
+/// One md1 or mk1 card as `[mdmk-decode]` groups it (S1 §14d).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MdMkCard {
+    /// `'d'` for md1, `'k'` for mk1.
+    pub hrp: char,
+    pub csid: Option<u32>,
+    /// The count of the group's FIRST string; the group is full at that many.
+    pub count: u8,
+    /// `(index into the caller's slice, chunk index)` in the order the strings
+    /// were given; a single string has chunk index 0.
+    pub members: Vec<(usize, u8)>,
+    /// False for a record whose card identity cannot be read: it is its own
+    /// card and nothing confirms it.
+    pub readable: bool,
+}
+
+/// `[mdmk-decode]`'s grouping, by RUNS (S1 §14d): a record joins the latest
+/// group of its (hrp, chunk-set id) while that group holds fewer strings than
+/// the count of the group's FIRST string (matching the fork's port; §14d is silent), and otherwise opens a new group. So two complete copies
+/// of one card are two groups, each of which confirms on its own, where the
+/// previous grouping by (hrp, chunk-set id) alone read them as one over-full
+/// group. A non-chunked string, and a string whose identity cannot be read, is
+/// a card alone. The cards are returned in the order of their first record.
+///
+/// This is the one grouping: `mdmk_unconfirmed_why`, the kit rule and F1, F2
+/// and F4 all read it.
+pub(crate) fn mdmk_cards(records: &[String]) -> Vec<MdMkCard> {
+    use std::collections::HashMap;
+    let mut cards: Vec<MdMkCard> = Vec::new();
+    // (hrp, csid) -> the latest group, as an index into `cards`.
+    let mut latest: HashMap<(char, u32), usize> = HashMap::new();
+    for (i, r) in records.iter().enumerate() {
+        if super::classify(r) != Class::MdMk {
+            continue;
+        }
+        let kind = crate::seal::record::validate_record(r).ok();
+        let header = kind.and_then(|k| match k {
+            crate::seal::record::RecordKind::Ms => None,
+            _ => crate::seal::record::chunk_header(r, k).ok(),
+        });
+        match header {
+            Some((hrp, Some((csid, count, index)))) => {
+                let joins = latest
+                    .get(&(hrp, csid))
+                    .copied()
+                    .filter(|&g| cards[g].members.len() < usize::from(cards[g].count));
+                match joins {
+                    Some(g) => cards[g].members.push((i, index)),
+                    None => {
+                        latest.insert((hrp, csid), cards.len());
+                        cards.push(MdMkCard {
+                            hrp,
+                            csid: Some(csid),
+                            count,
+                            members: vec![(i, index)],
+                            readable: true,
+                        });
+                    }
+                }
+            }
+            Some((hrp, None)) => cards.push(MdMkCard {
+                hrp,
+                csid: None,
+                count: 1,
+                members: vec![(i, 0)],
+                readable: true,
+            }),
+            None => cards.push(MdMkCard {
+                hrp: if r
+                    .trim()
+                    .as_bytes()
+                    .get(1)
+                    .is_some_and(|b| b.eq_ignore_ascii_case(&b'k'))
+                {
+                    'k'
+                } else {
+                    'd'
+                },
+                csid: None,
+                count: 1,
+                members: vec![(i, 0)],
+                readable: false,
+            }),
+        }
+    }
+    cards
 }
 
 /// Card identity: the HRP discriminant plus the 20-bit chunk-set id, or `None`

@@ -5,6 +5,13 @@ operator. No code has been written and none may be until this passes the R0
 gate at 0 Critical / 0 Important (project rule: risk-set work, and this is
 squarely in it — secrets, admission behaviour, eight programs as ruled in 2026-08 and a ninth since 2026-09-02, two repos).
 
+**Amendment S1, 2026-11-22 (DRAFT, pre-R0; no code until it is GREEN).** §14
+adds the `mr1` record class (`ClassMr`), the mr1 chunk-set rule, the **kit
+door** in Engrave Bundle with its boot routing, and the Refugium build's warning
+for a loaded payload that holds a secret. Pointers to it sit in §3.3.1,
+§3.3.2, §3.3.3, §8.3 (tests 24 to 32), §11 and §13 (D14). Its three product
+questions, STOP-1 to STOP-3 in §14j, are RULED (2026-11-22); nothing in it is open.
+
 **Reference convention:** `EPD§` means a section of `SPEC_encrypted_payload_delivery.md`; a bare `§` means a section of THIS
 document. The two specs both have a §2.2, a §5.5 and an §8.1, and an
 unqualified number would send a reader to the wrong one.
@@ -26,6 +33,12 @@ several overrule a documented prior decision and are marked where they do.
 1. **Sealed Payload is frozen.** It keeps its wipes, idle timer and KDF exactly
    as shipped. Its security failures are acknowledged and will be remedied at a
    future date — see the two follow-ups filed with this spec.
+   *Amended 2026-11-22 (Brian, goal 2 kit engraving): a narrow unfreeze. Sealed
+   Payload gains format v2 (`SPEC_encrypted_payload_delivery.md` §14: version
+   `0x02`, an n-word password form, a titles record) so a Refugium sitting's seed
+   plates ride the wiping container; its wipes, idle timer and KDF are unchanged.
+   F-124's remedy is now a release gate on that path (EPD §2.2 item 16). Nothing
+   in this document's systemwide container changes.*
 2. **The other programs abandon that security model.** No secret-residency
    wipes, no idle wipe, no EPD§10.2.4 clock. This does not overrule EPD§2.2 item 12;
    it *extends* it. That item already says "the machine offers two classes of
@@ -337,6 +350,7 @@ whether a **flag** is raised. So:
 | `ClassKey` | no | **NEW** (§5.3; composer spec §6a): `key:<hex of "[fingerprint/path]xpub">`, a cosigner key for seating |
 | `ClassHash` | no | **NEW** (§5.3; composer spec §6a): `hash:<64 lowercase hex>`, a 32-byte sha256 digest for a hashlock |
 | `ClassNow` | no | **NEW** (§5.3; composer spec §6a): `now:<hex of "<seconds>[,<height>]">`, the pack time |
+| `ClassMr` | no | **NEW 2026-11-22** (§14b): one `mr1` string, a single-string card or one chunk of a card, lowercase |
 
 **The three composer classes are NOT secret** (added 2026-09-02, composer Stage
 1): a cosigner's extended public key, a digest and a timestamp are public by
@@ -359,18 +373,18 @@ same over-claim F-123 was filed against.
 
 `•` = admitted. Blank = refused with a named reason.
 
-| program | Mnem | Cdx32 | Passph | FreeText | Descr | MDMK | Addr | Key | Hash | Now |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| Backup Wallet | • | • | | | | | | | | |
-| BIP-39 Password | | | • | | | | | | | |
-| Engrave Text | | | | • | | | | | | |
-| Account Xpub | • | • | • | | | | | | | |
-| Engrave Bundle | | | | | • | • | | | | |
-| Engrave Single-Sig | • | • | • | | | • | | | | |
-| Engrave Multisig | • | • | • | | • | • | | | | |
-| Wallet Policy | • | • | • | | • | • | | • | • | • |
-| BIP-85 Child Seed | • | • | • | | | | | | | |
-| *Sealed Payload* | — | — | — | — | — | — | — | — | — | — |
+| program | Mnem | Cdx32 | Passph | FreeText | Descr | MDMK | Addr | Key | Hash | Now | Mr |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| Backup Wallet | • | • | | | | | | | | | |
+| BIP-39 Password | | | • | | | | | | | | |
+| Engrave Text | | | | • | | | | | | | |
+| Account Xpub | • | • | • | | | | | | | | |
+| Engrave Bundle | | | | | • | • | | | | | • |
+| Engrave Single-Sig | • | • | • | | | • | | | | | |
+| Engrave Multisig | • | • | • | | • | • | | | | | |
+| Wallet Policy | • | • | • | | • | • | | • | • | • | |
+| BIP-85 Child Seed | • | • | • | | | | | | | | |
+| *Sealed Payload* | — | — | — | — | — | — | — | — | — | — | — |
 
 Rows that need their reason recorded, because a reviewer will otherwise have to
 reconstruct it:
@@ -408,6 +422,10 @@ reconstruct it:
   secret). Noted 2026-09-02 while creating the Wallet Policy row; F-415's
   remaining half. Filed as mnemonic-engrave F-450 with the payload spec's next
   cycle as owner; not created by this fold.
+- **`ClassMr` is admitted at Engrave Bundle alone (column added 2026-11-22,
+  §14d)**, and only through the kit door: an mr1 record is engraved as part
+  of a whole kit or not at all, never gathered as a loose card. The column is
+  added without the `Mt`/`Tx` columns F-450 still owes; that gap is unchanged.
 - **Sealed Payload is dashes, not blanks** — it is out of scope entirely
   (decision 1), not a program whose every cell happens to be refused.
 
@@ -509,6 +527,11 @@ intended condition, so the row now cites it (the code was right, the row was
 stale). And **secrecy in F1, F2 and F4 reads through `[mdmk-decode]` (§12.6)**:
 an unconfirmed `ClassMDMK` record counts as secret — added with the §13 D6
 demotion.
+
+A third amendment, 2026-11-22 (§14f): **in the Refugium build, a loaded payload (plaintext or sealed) holding a genuinely secret class
+gets one more warning line**, which names the Sealed
+Payload as the only way secrets travel in that build. It warns and does not
+refuse (Brian's Q3 ruling). `ClassMr` is not secret and raises no flag but F3.
 
 ## 4. The flash region
 
@@ -1377,6 +1400,45 @@ rather than only on hardware.
     **whatever the passphrase** — the demoted rule, asserted so it cannot creep
     back. An earlier spec refused this case, and R0 round 5 measured that it
     made `--passphrase-ask` over secret-only records permanently unconsumable.
+24. **(§14b, added 2026-11-22)** Every `string_vectors` row of
+    `design/vectors/sysw_mr_v1_vectors.json` classifies as its `class`, and an
+    `Unknown` row reports its `reason`, in me's Rust and in the fork's Go port.
+    The `upper` row is the one where the container and `mr` disagree on purpose.
+25. **(§14c)** Every `set_vectors` row gets its `pack` verdict, `reason` and
+    `detail`, in Rust and in Go. `complete-reversed` passes: order inside a
+    card is free. `framing-only` passes: the container does not decode a card
+    (STOP-1).
+26. **(§14d)** Every `kit_vectors` row gets its `kit` verdict, `reason`,
+    `detail` and, when eligible, its `cards` (kind, string count, begins,
+    ends) in order, in Rust and in Go.
+27. **(§14h)** `me sysw pack` prints each §14g sentence with me's record
+    form and exits 4 for every string and set refusal; it prints the kit
+    warning line and exits 0 for each kit-only reason; a payload holding no
+    mr1 string prints neither. A set whose chunks are given around a secret
+    record packs (they are adjacent in payload order).
+28. **(§14d)** Admission: Engrave Bundle admits `ClassMr` and no other
+    program does; the oracle test of §3.3.2 reconciles the new column. The
+    Sealed Payload container still refuses an mr1 record.
+29. **(§14e)** The payload menu offers ENGRAVE KIT, with the lead
+    "Engrave kit now (N cards, M plates)?", exactly when the kit rule passes;
+    a payload whose kit rule fails shows "Kit Refused" with the reason
+    sentence and today's menu; a payload with no mr1 string shows today's menu
+    unchanged, on a second opening of the menu too. Each case is asserted, so
+    the offer is tested both met and violated.
+30. **(§14e)** The kit door: starting at card k cuts cards k to N in order,
+    every plate TEXT ONLY with its two marks; Back at a plate before the
+    card's plate 1 is cut returns to the list with no modal; Back after it
+    shows the paused text; a card all of whose plates were cut is marked
+    " (cut)" for the rest of the session and after a reload is not.
+31. **(§14f)** The Refugium build adds its warning line exactly when a
+    loaded payload, plaintext or sealed, holds a genuinely secret class:
+    plaintext, directly after the F1 line; sealed, as the last line (alone on
+    a strong-passphrase payload), each followed by KEEP / UNLOAD; an
+    unconfirmed md1/mk1 alone does not raise it; the default build never
+    shows it.
+32. **(§14e)** M in the lead equals the number of plates the kit door cuts
+    when started at card 1 and run to the end: the planner and the engraving
+    use one geometry, marks included.
 
 ## 9. Open items
 
@@ -1418,6 +1480,11 @@ rather than only on hardware.
   than refusing it. An operator who dismisses that warning has stored
   undeclared seed entropy in cleartext flash. The claim here is the warning,
   never protection.
+- **An mr1 record is checked for its framing, never decoded as a card**
+  (§14b, §14c; STOP-1, RULED: Brian 2026-11-22). A writer other than `mr` can put up to 50
+  bytes of anything, seed entropy included, in a BCH-valid mr1 string, and it
+  loads as `ClassMr`: not secret, no flag beyond F3. The kit door refuses a
+  broken or mixed card; it does not prove a card is a card.
 - It does not claim the operator-compared hash detects tampering unless the
   operator actually compares it.
 - It does not change what protects the operator, which remains **physical
@@ -1554,6 +1621,10 @@ the primary Rust crate; `md.Reassemble` and its `mk` sibling in the Go port.
 unconfirmed record counts as SECRET.** Nothing is refused: admission (§3.3.2)
 and consumption are untouched.
 
+The set a record belongs to is found by runs (§14d): a record joins the latest
+group of its (hrp, chunk-set id) that holds fewer strings than its count; otherwise it
+opens a new group.
+
 Added 2026-08-12, demoting §5.3.2's refusal — §13 D6 records what it was and
 what the change cost. Host and device compute it identically for the reason
 `[cliff]` is a pure function: it depends only on the record bytes, never on a
@@ -1594,6 +1665,7 @@ that can actually be consumed.
 | D11 (2026-08-12) | §3.2: every screen consuming a payload record names its source | the OFFER screen naming the source satisfies it where the operator picks — Engrave Text and BIP-39 Password render a separate F3 acceptance screen; the `syswOffer` sites do not, and need not | consistent with §3.2 as D5 already scoped it to the entry screen. Recorded so the asymmetry is a reading, not an oversight |
 | D12 (2026-08-12) | §7's every-word verify inherits the seed keyboard's checksum gate | **`checksumGate` is OFF for §7 verification** | a checksum-masked keyboard hides a wrong LAST word, which is exactly the defect a mis-cut plate produces and §7 exists to hunt. The implementer's reasoning beat the plan's; absorbed here so it is not re-litigated |
 | D13 (2026-08-12) | §12.2 `[compared]`: declining the digest comparison leaves the payload loaded-but-unconfirmed, and `take()` refuses it later | **declining UNLOADS it immediately.** `ctx.sysw = nil`, and the operator is told "Not Loaded — Digest not compared. Nothing was loaded." | operator ruling. A payload the machine holds but will not use is a state with no operator meaning: every later screen has to explain why the source it can see is refused. Unloading collapses that to one honest outcome at the moment the operator makes the decision. It costs nothing — the payload is still in flash and the loader can be re-entered — because per D10 the firmware never writes flash. **Implemented in fork `0d2801c`; CONFIRMED ON THE MACHINE 2026-08-13 at `v0.0.0-g20e99a6`** |
+| D14 (2026-11-22, S1) | an mr1 string is `ClassUnknown` and `me sysw pack` refuses it as unrecognised (F-699) | `ClassMr` (§14b); **a broken, incomplete, with a chunk repeated inside one copy, split or mixed mr1 card is REFUSED** at `pack` (exit 4) and at the kit door, never flagged | like D4 it ADDS refusals, against this section's direction, and earns them the same way: an mr1 record has one consumer, the kit door, whose product is a recovery card on steel. A partial card there is a backup that cannot be read, and no legitimate payload carries one (unlike D6's single md1 card of a set, which `bundleFlow` seeds with). The load itself still refuses nothing (§14e). Basis: Brian 2026-11-22, Q6 (kit door in Engrave Bundle) and "rest per synthesis" (the synthesis's mr1 refusal list and chunk-set rule) |
 
 **What was NOT demoted**, because none of it refuses anything: F2 still warns
 that a payload was weakly protected; F1 still warns that a secret sits
@@ -1606,3 +1678,437 @@ an artefact unusable, and §2.2 item 8's obstacle table are the defects every R0
 round from 1 to 5 actually found, and they remain blocking. The demotions above
 are the opposite class: mechanisms that worked exactly as designed and were not
 worth what they cost.
+
+## 14. mr1 records, the kit door and the Refugium warning — amendment S1, 2026-11-22
+
+Goal 2 (Brian 2026-11-22): the SeedHammer engraves a whole Refugium backup kit
+from a payload, with no retyping. Secrets do not travel here: they ride the
+extended Sealed Payload (MNEMBLOB v2, `SPEC_encrypted_payload_delivery.md`,
+amendment S1b). This section carries the PUBLIC part of a kit (mr1 cards, mk1
+plates and the optional md1 card) in this container, and adds one warning for a
+secret that arrives here anyway. Who writes the kit payload (`mr-sitting`, spec
+S3) and what mr-gui shows (spec S4) are not decided here; what they must agree
+with is: the string, set and kit rules (§14b to §14d), the sentences (§14g)
+and the vectors (§14i).
+
+### 14a. The rulings this section rests on
+
+Each line: the ruling, then the spec text it touches.
+
+- Q6 (Brian 2026-11-22): a kit door in Engrave Bundle, no new carousel
+  program in v1. §3.3.2 gains the `Mr` column at Engrave Bundle only; §14e.
+- Q4: public strings unsealed by default, sealed allowed. No spec text
+  changes: the kit door reads a loaded session, and both variants load one.
+- Q3: the Refugium build WARNS on a loaded payload holding a secret, plaintext or
+  sealed (STOP-2, RULED (a): Brian 2026-11-22), and does not refuse it. Decision 6 is unchanged; §3.3.3 and §14f add the
+  warning line.
+- Q7: one card copy per kit that holds it. A payload may carry a card more
+  than once (S4: one copy per kit that holds it); each copy is its own card k.
+  Starting the run at a card again also cuts a further copy (§14c, §14e).
+- Q9: public plates grouped by kit, after the seed plates. The payload's
+  record order is the producer's order; the device keeps it and never sorts.
+- Q10: public plates packed text-only. The kit door offers TEXT ONLY.
+- Q16: numbers-only marks on public plates. §14e marks; the literal text is
+  STOP-3 (RULED 2026-11-22, §14j), because the recommended "Card k/N · Plate p/q" cannot be engraved
+  as written.
+- Round 2 (Brian 2026-11-22): mr1 and mk1 stay out of the Sealed Payload in
+  v1. No spec text changes: the Sealed Payload row of §3.3.2 stays dashes.
+- "Rest per synthesis": the synthesis's mr1 refusal list (upper or mixed case,
+  incomplete set, duplicate index), its chunk-set rule (complete, contiguous,
+  chunk-set id recomputed, no duplicate) and its boot routing ("Engrave kit now
+  (N cards, M plates)"). §14b to §14e, and §13 D14 for the refusals.
+
+F-699 asked for the mr1 validator to be injected into the library so that
+`mnemonic_engrave` takes no `mr-codec` dependency. This section meets the same
+end differently: the string and framing rules are a BCH residue, a 37-bit
+header and one SHA-256, so the library implements them itself (as it does for
+mt1) and needs neither `mr-codec` nor an injected validator. That is a code
+choice, recorded so the F-699 entry can be closed against it.
+
+### 14b. `ClassMr`: the string rule — NORMATIVE, Rust first
+
+An **mr1 candidate** is a record whose trimmed form (the trim every
+constellation arm of `classify` applies, §5.3.1's order) begins with `mr1` in
+any case. A candidate is `ClassMr` when it passes every check below, run in
+this order; otherwise it is `ClassUnknown`, and the first check it fails is its
+reason. `L` is the number of characters after `mr1`.
+
+| order | reason | the check fails when |
+| --- | --- | --- |
+| 1 | `MR_CASE` | the record holds any ASCII capital letter (all upper and mixed case alike) |
+| 2 | `MR_CHARACTER` | a character after `mr1` is not in `qpzry9x8gf2tvdw0s3jn54khce6mua7l` |
+| 3 | `MR_LENGTH` | `L` is under 14 or over 93 (the whole record under 17 or over 96 characters) |
+| 4 | `MR_CHECKSUM` | BIP 93's `ms32_polymod`, from init `0x23181b3`, over `hrp_expand("mr")` and the `L` symbols, is not `0x085d21404aee15059` |
+| 5 | `MR_RESERVED_SYMBOL` | the first symbol after `mr1` is `u`, `a` or `7` (card version 7, which mr reserves and never writes) |
+| 6 | `MR_CHUNK_SHORT` | the first symbol is `l` (a chunk) and it has fewer than 8 symbols before its 13-symbol checksum |
+| 7 | `MR_CHUNK_PADDING` | the first symbol is `l` and the bits after its 37-bit header are not whole bytes followed by 0 to 4 zero bits |
+
+What the rule rests on: mnemonic-refugium `design/SPEC_refugium_mr1.md` §3,
+"String layer and checksum" and "Chunked form", and `crates/mr-codec/src/bch.rs`
+(the length is counted over the symbols after `mr1`, as md1 counts it, not by
+BIP 93's expanded rule). `MR_CHECKSUM` is exact validity: no correction is ever
+applied, for §5.3.1's reason (a record is engraved verbatim).
+
+Two departures from `mr`, both deliberate. **Upper case is refused**, where mr
+reads an all-upper card: a payload is not a keyboard, the device engraves the
+record verbatim, and the kit's strings are the lowercase ones mr prints, so an
+upper-case record is a string that was retyped or converted on the way. And
+**the record is not stripped of spaces or hyphens**, where mr strips them:
+§5.3.1's canonical unbroken form binds every record.
+
+`ClassMr` is **not secret and not bearer** (§3.3.1): it may sit on argv, it
+raises no F1, F2 or F4, and it has no confirmation walk (§11, STOP-1). The
+classify arm sits directly after the mt1 arm in both implementations; no
+earlier arm can match an mr1 string, so no record changes class.
+
+A string whose first symbol is not `l` is a **single-string card**; a string
+whose first symbol is `l` is a **chunk**, and its 37-bit header reads, MSB
+first: chunk version (4 bits, 15) and chunked flag (1 bit, 1), which the
+symbol `l` already fixes; the chunk-set id (20 bits); count − 1 (6 bits); the
+index (6 bits). The bytes after the header are the chunk's **slice**.
+
+### 14c. The mr1 chunk-set rule — NORMATIVE
+
+The rule runs over every `ClassMr` chunk of a payload, after every candidate
+has passed §14b. Chunks are grouped into **sets** in payload order: a
+chunk joins the latest set with its chunk-set id when that set holds fewer
+chunks than its first chunk's count; otherwise it opens a new set. Two sets with one chunk-set id are two copies of a card, each
+its own card in the kit list (S4 E6-14 item 2). Sets are taken in the order of
+their first record in the payload, and the first set that breaks a rule is
+refused with that rule, checked in this order:
+
+| order | reason | the set breaks the rule when |
+| --- | --- | --- |
+| 1 | `SET_COUNT` | a chunk's count differs from the count of the set's first record (in payload order) |
+| 2 | `SET_INDEX` | a chunk's index is not below that count |
+| 3 | `SET_DUPLICATE` | an index occurs twice, whether or not the two strings are the same |
+| 4 | `SET_MISSING` | an index from 0 to count − 1 is absent |
+| 5 | `SET_SLICES` | with the slices in index order and `len` their total length: `len` is under 2, or count is not max(2, ⌈len / 45⌉), or a slice is not ⌈len / count⌉ bytes (the last: the rest) |
+| 6 | `SET_ID` | the top 20 bits of SHA-256(`"mr1/chunks"` ‖ the slices in index order) are not the set's chunk-set id |
+| 7 | `CARD_SPLIT` | a record that is not in the set sits between the set's first and last record |
+
+The order of chunks **inside** a set is free: a set given as chunk 1 then
+chunk 0 passes. Each detail a sentence names (§14g) is fixed here: for
+`SET_COUNT` and `SET_INDEX`, the first record in payload order that breaks the
+rule; for `SET_DUPLICATE`, the first repeated index in payload order and the
+first two records that carry it; for `SET_MISSING`, the lowest absent index;
+for `CARD_SPLIT`, the first such record.
+
+A single-string card has no set and passes this rule. Two different cards
+whose chunks are mixed are two sets, each short of chunks, and the first is
+refused `SET_MISSING` (vector `mixed-cards`).
+
+**Not checked, on purpose: whether the reassembled bytes are a card** (seat
+map, shapes, network). The rules above are mr's framing rules (mr1 spec §3,
+"Decode (D)", its order kept); decoding the card is mr-codec's and is STOP-1.
+
+### 14d. The kit rule and admission — NORMATIVE
+
+A payload **offers a kit** when it holds at least one mr1 candidate (§14b).
+A payload with no mr1 candidate offers none, and Engrave Bundle and the
+payload menu behave exactly as before this section.
+
+A payload that offers a kit is **eligible** when every check below passes,
+run in this order over all its records (public section, then secret section);
+the first failure is its reason:
+
+| order | reason | fails when |
+| --- | --- | --- |
+| 1 | the §14b reasons | an mr1 candidate, in payload order, is `ClassUnknown` |
+| 2 | `KIT_OTHER_RECORD` | a record, in payload order, is neither `ClassMDMK` nor `ClassMr` |
+| 3 | the §14c reasons | an mr1 set breaks §14c |
+| 4 | `KIT_UNCONFIRMED_MDMK` | a `ClassMDMK` record, in payload order, is unconfirmed under `[mdmk-decode]` (§12.6) |
+| 5 | `CARD_SPLIT` | an md1 or mk1 card (one `[mdmk-decode]` group; a single-string md1 is a card alone) has a record of another card between its first and last record |
+
+`[mdmk-decode]` (§12.6) groups md1/mk1 records, in every payload, by the same run rule
+(a record joins the latest group of its (hrp, chunk-set id) while that group holds fewer
+strings than its count), on host and device alike, so two complete copies of one mk1
+card each confirm; F1, F2 and F4 read the same grouping.
+
+An eligible kit is a list of **cards** in the order of their first record: an
+mr1 card (a single string or one set), an mk1 card or an md1 card. Each card
+has: its **kind** (`md1`, `mk1` or `mr1`); its strings in index order (a single
+string is index 0); **begins**, the first 8 characters of its index-0 string;
+**ends**, the last 4 characters of its highest-index string. N is the number of
+cards.
+
+**Admission (§3.3.2).** `ClassMr` is admitted at Engrave Bundle and nowhere
+else, and Engrave Bundle consumes it only through the kit door: the gather
+flow, which takes md1 and mk1 cards, never offers an mr1 record. The kit door
+consumes the kit's `ClassMDMK` records too, under Engrave Bundle's existing
+`MDMK` cell. The Sealed Payload container is untouched: `seal`'s allow-list
+still refuses an mr1 record, and `me seal` still answers "unrecognized HRP
+'mr'".
+
+### 14e. The device: boot routing, Engrave Bundle and the kit door
+
+Both builds carry this; nothing here is profile-gated. Every text in quotes is
+NORMATIVE and is listed again in §14g where it has a substitution.
+
+**The plate plan.** A card's strings, in index order, are packed onto plates
+by the fork's existing first-fit packer (`bundlePlatePlan`,
+`bundleCardPlates`), never across cards. That packer already trial-fits every
+plate against a worst-case title AND footer of 18 of the font's widest glyph
+(`bundlePlateFitMark`, `backup.MaxTitleLen`), so marking a plate changes no
+plate count. Plate p of q of card k of N carries the title "CARD k/N" and the
+footer "PLATE p/q" (STOP-3, RULED 2026-11-22). M is the total number of plates of the N cards.
+
+**The payload menu (Load Payload, and at boot).** After a payload loads (the
+digest was compared, §12.2), when the payload offers a kit:
+
+- eligible: the menu's lead is "Engrave kit now (N cards, M plates)?" and its
+  choices are ENGRAVE KIT, LOAD AGAIN, UNLOAD, in that order. ENGRAVE KIT
+  opens the kit list. A card or plate count of 1 is written "1 card" or
+  "1 plate";
+- not eligible: before the menu, a screen titled "Kit Refused" shows the
+  reason's sentence (§14g), a blank line, and "Nothing from this payload
+  can be engraved as a kit. Write the kit payload again." Its only way on is
+  to dismiss it; then the menu shows exactly as it does today.
+
+Both bullets apply every time the payload menu opens while this payload is
+loaded, at boot, after Load Payload and from the carousel. At a load, "Kit
+Refused" comes after the Payload Warnings screen and its KEEP / UNLOAD, and is
+not shown when the holder chose UNLOAD.
+
+The menu already opens at boot after a load (G-P3.15), so this is the boot
+route: a kit payload is one press from the kit list. A payload that offers no
+kit shows today's menu unchanged.
+
+**Engrave Bundle.** With a loaded payload that offers a kit: eligible opens
+the kit list at once (no gather, no "Cards from where?"); not eligible shows
+the "Kit Refused" screen above and then returns to the carousel. With no
+payload, or a payload that offers no kit, Engrave Bundle is unchanged.
+
+**The kit list**, titled "Engrave Kit": a paged, selectable list (the unlock
+plate list's pattern: Back, Page, OK). Its first line is "N cards, M plates.
+Start at:" (with "1 card" and "1 plate" as in the menu) and each entry reads "Card k of N: <kind>, begins <begins>, ends
+<ends>", with " (cut)" appended when every plate of that card has been cut
+since this payload was loaded. The highlight opens on card 1 when the list is
+entered from the menu or from Engrave Bundle and after a run reaches the end of
+the kit; after a run stops by Back, it opens on the card the run stopped in.
+OK starts the run at the highlighted card; Back returns to the carousel.
+
+**The run** cuts the cards from the chosen card k to card N, in list order.
+For each plate, a choice screen titled "Card k of N | Plate p of q", lead
+"Choose engraving", offers one choice, TEXT ONLY; choosing it opens the
+engrave screen. An engrave that does not complete shows the same choice
+screen again. Back on the choice screen:
+
+- before the card's plate 1 is cut (p = 1): returns to the kit list, with no
+  other screen;
+- after (p > 1): a screen titled "Engrave Kit" says "Stopped before plate p of
+  q of card k of N. To finish this card, choose card k in the list again: it
+  starts again at its plate 1." and then returns to the kit list.
+
+After the last plate of card N, a screen titled "Engrave Kit" says "Cards s to
+N of this kit are cut.", s being the card the run started at ("Card N of this
+kit is cut." when s = N), then the kit list returns. The ms1 reminder that ends Engrave Bundle's gather flow is not
+shown: a kit's seeds come through the Sealed Payload. A plate that does not lay
+out (which the shared geometry should make impossible) shows a screen titled
+"Engrave Kit" saying "Card k of N, plate p of q does not fit on a plate, so
+this kit cannot be engraved on this machine." and returns to the kit list.
+
+Nothing is written to flash and nothing survives a power cut: the " (cut)"
+marks live in the session, and mr-gui's ticks (S4) are the record of progress.
+A payload may carry a card more than once (S4: one copy per kit that holds
+it); each copy is its own card k. Starting the run at a card again also cuts a
+further copy (Q7).
+
+### 14f. The Refugium warning
+
+In the Refugium build, when a loaded payload, plaintext or sealed (STOP-2,
+RULED (a): Brian 2026-11-22), holds a record whose class is secret by §3.3.1
+(`ClassMnemonic`, `ClassCodex32Secret`, `ClassPassphrase`, `ClassPreimage`,
+`ClassPhrase`), the "Payload Warnings" screen shows the line below: in a
+plaintext payload directly after the line "A SECRET is stored unencrypted in
+flash."; in a sealed payload as the screen's last line, after F2's line when F2
+is raised, and the screen shows for this line alone when no flag is raised.
+The line:
+
+"Refugium build: secrets travel only in the Sealed Payload, never in this one.
+Unload this payload unless you mean to engrave its secret now."
+
+The KEEP / UNLOAD choice follows the screen whenever this line is on it, and
+nothing is refused (Q3). An md1/mk1 record that is secret only because it is unconfirmed
+(`[mdmk-decode]`) does not raise this line; its own F1 line is unchanged. The
+default build never shows it.
+(`ClassPassphrase` cannot reach this screen in the Refugium build, whose load
+refuses a `pass:` record first; it is listed so the rule reads off §3.3.1.)
+
+### 14g. The sentences — NORMATIVE
+
+One sentence per reason, on both surfaces. The placeholders differ by surface:
+
+| placeholder | `me` (stderr) | the device |
+| --- | --- | --- |
+| `{R}` (opens a sentence) | `record <i>, as given (records count from 0)` | `Record <n> of this payload` |
+| `{r}` (inside a sentence) | `record <i>, as given (records count from 0)` | `record <n> of this payload` |
+| `{rr}` | `records <i1> and <i2>, as given (records count from 0)` | `records <n1> and <n2> of this payload` |
+
+`<i>` is the position in the list given to `me sysw pack`, from 0; `<n>` is
+the position in the loaded payload, from 1, public section first (the device's
+existing count, `syswFirstPassphraseRecord`). `{B}` is the first 8 characters
+of the set's or card's first record in payload order; `{k}` is the card's kind;
+`{n}` is the record's length in characters; `{p}` its first 4 characters;
+`{class}` is the surface's existing name for the record's class (`me`'s
+`class_name`, the device's inventory name). The counts are as §14c fixes them:
+`{c}` and `{c0}` the counts, `{cm1}` the count less one, `{i}` the index.
+
+| reason | sentence |
+| --- | --- |
+| `MR_CASE` | {R} is an mr1 string with capital letters; the mr1 strings of a kit are all lowercase, as mr prints them. |
+| `MR_CHARACTER` | {R} begins mr1 but holds a character no mr1 string uses. |
+| `MR_LENGTH` | {R} begins mr1 but is {n} characters long; an mr1 string is 17 to 96 characters long. |
+| `MR_CHECKSUM` | {R} is an mr1 string whose checksum does not match: at least one character is wrong. |
+| `MR_RESERVED_SYMBOL` | {R} begins {p}, which no mr1 card or chunk begins with. |
+| `MR_CHUNK_SHORT` | {R} is an mr1 chunk too short to hold its chunk header. |
+| `MR_CHUNK_PADDING` | {R} is an mr1 chunk that does not end the way mr ends a chunk (0 to 4 zero bits after its last byte). |
+| `SET_COUNT` | The mr1 card that begins {B} disagrees with itself: {r} says the card has {c} chunks, but its first chunk says {c0}. |
+| `SET_INDEX` | The mr1 card that begins {B} has {c} chunks, numbered 0 to {cm1}, but {r} is numbered {i}. |
+| `SET_DUPLICATE` | The mr1 card that begins {B} holds chunk {i} twice: {rr}. Each copy of a card holds each chunk once, and a copy must be complete before the next copy starts. |
+| `SET_MISSING` | The mr1 card that begins {B} is incomplete: chunk {i} of its {c} chunks is missing (chunks are numbered from 0), or a chunk repeated after a complete copy began a second, incomplete copy. |
+| `SET_SLICES` | The mr1 card that begins {B} is not divided into chunks the way mr divides a card, so mr did not write it. |
+| `SET_ID` | The mr1 card that begins {B} does not match its own chunk-set id: its chunks come from different cards, or one was altered. |
+| `CARD_SPLIT` | The {k} card that begins {B} is split: {r} sits between its strings but is not part of it. Keep each card's strings together. |
+| `KIT_OTHER_RECORD` | {R} is not an md1, mk1 or mr1 string (it is: {class}), so this payload is not a kit. |
+| `KIT_UNCONFIRMED_MDMK` | {R} is an md1 or mk1 string whose card does not decode: it is incomplete or damaged. |
+
+Every screen text of §14e and §14f is in quotes there; none has a
+placeholder other than the counts and positions named beside it.
+
+### 14h. The `me` surface
+
+- `me` runs §14b to §14d over the records in **payload order**: the public
+  section, then the secret section, each in the order given (the order `me
+  sysw show` lists them), so its verdicts and details are the device's; `{r}`
+  and `{rr}` then name each record by its as-given index.
+- `classify`: the `ClassMr` arm of §14b; an mr1 candidate that fails it is
+  `Unknown` with its §14b reason, never `Unrecognised`. `class_name` names
+  the class "mr1 string"; `me sysw show` prints "public record <i>: mr1
+  string" for one.
+- `me sysw pack`: an mr1 candidate refused by §14b prints "me: " and its
+  sentence and exits 4 (the existing unclassifiable path). Then the §14c rule
+  runs over the payload; a refusal prints "me: " and its sentence and exits 4.
+  Then, when the payload holds a `ClassMr` record, the kit rule's checks 2, 4
+  and 5 run; a failure prints "me: this payload is not a kit the device will
+  engrave: " followed by its sentence, once, on stderr, and the pack goes on
+  (exit 0). An `mr1` CARD_SPLIT is a §14c refusal; an md1/mk1 CARD_SPLIT is
+  this warning.
+- The `Unrecognised` refusal and `pack`'s help name the new string:
+  "not an md1/mk1/mr1/ms1/mt1 string" and "an md1/mk1/mr1/ms1/mt1 string".
+- No flag is added or changed. `me seal` and `me bundle` are unchanged.
+
+### 14i. Vectors, tests and build impact
+
+**Vectors.** `design/vectors/sysw_mr_v1_vectors.json`, written by
+`scripts/gen-sysw-mr-vectors.py` (an independent Python implementation of
+§14b and §14c, self-tested on twelve real mr1 strings in four sets) and
+checked by `scripts/check-sysw-mr-vectors.sh`, which runs `mr decode` on every
+string and set vector as the format's oracle and `me sysw show` on every kit
+vector's md1/mk1 strings. The cards are signet cards from `mr create
+--network signet` over BIP-39 test-vector seeds; the constructed vectors carry
+their construction in `why`. Counts: 13 string, 12 set and 10 kit vectors.
+
+| vector | outcome |
+| --- | --- |
+| `single-card`, `chunk-0`, `chunk-1` | `ClassMr` |
+| `upper`, `mixed` | `MR_CASE` (mr reads `upper`) |
+| `character-b` | `MR_CHARACTER` |
+| `too-long`, `too-short` | `MR_LENGTH` |
+| `checksum` | `MR_CHECKSUM` |
+| `reserved-u` | `MR_RESERVED_SYMBOL` |
+| `chunk-short` | `MR_CHUNK_SHORT` |
+| `chunk-pad-long`, `chunk-pad-nonzero` | `MR_CHUNK_PADDING` |
+| `complete`, `complete-reversed`, `framing-only` | pass (`framing-only` is not a card: mr refuses it, STOP-1) |
+| `missing`, `mixed-cards` | `SET_MISSING` |
+| `duplicate` | `SET_DUPLICATE` |
+| `count` | `SET_COUNT` |
+| `index` | `SET_INDEX` |
+| `id` | `SET_ID` |
+| `slices`, `count-formula` | `SET_SLICES` |
+| `split` | `CARD_SPLIT` (mr1) |
+| `kit-2of3` | eligible: 6 cards (mr1, four mk1, md1) |
+| `kit-two-copies` | eligible: 4 cards (mr1, mk1, the same mr1 again, a second mk1) |
+| `kit-two-copies-mk1` | eligible: 4 cards (mr1, mk1, the same mr1 again, the same mk1 again) |
+| `kit-single` | eligible: 1 card |
+| `kit-text` | `KIT_OTHER_RECORD` (free text) |
+| `kit-mk1-alone` | `KIT_UNCONFIRMED_MDMK` |
+| `kit-mk1-split` | `CARD_SPLIT` (mk1) |
+| `kit-upper` | `MR_CASE` |
+| `kit-missing` | `SET_MISSING` |
+| `no-mr1` | offers no kit |
+
+**Tests.** §8.3 tests 24 to 32.
+
+**Build impact (the tests and files that change).**
+
+- me: `crates/me-cli/src/sysw/record.rs` gains `Class::Mr` (not secret, not
+  bearer); a new `sysw/mr.rs` holds §14b to §14d and loads the vector file;
+  `sysw/mod.rs` gains the classify arm and the `UnknownReason` for §14b;
+  `main.rs` gains the sentences, the pack steps of §14h, `class_name` and the
+  `show` line; `sysw/coverage.rs` places tests 24 to 32 and its `HIGHEST`
+  becomes 32.
+- me tests that pin changed text: `crates/me-cli/tests/sysw_cli.rs` (the
+  `Unrecognised` sentence, 2539 and 2559) and any test that packs an mr1 string
+  and expects exit 4 with `Unrecognised`.
+- Fork (Go port, after the Rust): `codex32` gains the mr1 verifier;
+  `sysw/classify.go`, `sysw/record.go` gain `ClassMr`; the §14c and §14d
+  rules port with the vector file vendored; `gui/sysw_admit.go` gains the
+  `progBundle` cell and `gui/sysw_admit_oracle_test.go` changes with it;
+  `gui/sysw_unload.go` (the menu), `gui/bundle_flow.go` (the door, the plan
+  with marks), `gui/sysw_load.go` (the §14f line, as a `_refugium.go` /
+  `!refugium` twin per `gui/refugium_build_test.go`), `gui/transaction.go`
+  (`txClassName` names `ClassMr` "mr1 string"). The comment above the boot
+  load in `gui/gui.go` that calls the Sealed Payload frozen is S1b's.
+- me and Go, the run grouping (§14c, §14d): me's `mdmk_unconfirmed_why`
+  (the `[mdmk-decode]` caller of §14d check 4 and of F1, F2, F4) and the Go
+  `md.Reassemble` caller group md1/mk1 records by runs, not by (hrp, chunk-set
+  id) alone. RED row, which fails today (all four records "md1/mk1 —
+  unconfirmed", "the device will treat it as a SECRET"): `me sysw pack
+  --no-passphrase --in dupmk.txt --out dupmk.bin; me sysw show dupmk.bin`,
+  where `dupmk.txt` is the two strings of the first mk1 plate (`kit-two-copies-mk1`)
+  given twice; `scripts/check-sysw-mr-vectors.sh` prints it as `RED
+  kit-two-copies-mk1` until the build flips that arm.
+- Toolkit manual: `docs/manual/src/30-workflows/3B-payload-unlock-refusals.md`
+  "Which records get refused" (the Sealed Payload's unlock refusal, which
+  still refuses an mr1 record, §14d) gains one row for an mr1 string naming
+  where it belongs (a `sysw` payload), in lockstep with the me build. The §14g
+  sentences are not transcribed there: `me` prints its own (§14h), and the
+  device's "Kit Refused" screen is not on that page.
+- mr (S3) and mr-gui (S4): the kit payload writer must satisfy §14c and
+  §14d, and mr-gui's rows use the kit list's card order and its begins/ends.
+
+### 14j. STOPs — product questions, all ruled 2026-11-22
+
+- **STOP-1. Does any implementation decode an mr1 card before engraving it?**
+  RULED (a), Brian 2026-11-22.
+  (a) No, framing only, everywhere (the text above), with §11's non-claim:
+  a writer other than mr can hide up to 50 bytes per string, unflagged.
+  (b) `me sysw pack` also decodes each card with mr-codec (the F-699 injected
+  validator, behind me's `mr1-cli` feature) and refuses a set that is not a
+  card; the device stays framing-only. (c) Both decode. **Recommended: (a)**:
+  the kit payload's only v1 writer is mr's own code, the device cannot decode a
+  card without porting mr-codec's card layer, and (b) helps only kits packed by
+  hand with me built with that feature.
+- **STOP-2. Does the §14f line also appear for a SEALED systemwide payload
+  holding a secret, in the Refugium build?** RULED (a), Brian 2026-11-22. Q3 named the plaintext case. (a)
+  Yes, the same line, since the Refugium rule is about the container that
+  carries secrets, not about encryption; (b) no, plaintext only. **Recommended: (a).**
+- **STOP-3. The engraved marks.** RULED (a), 2026-11-22 (decided by the
+  coordinator, to WORDING_REVIEW). The recommended "Card k/N · Plate p/q"
+  cannot be cut as written: "·" is not in the engraving font (only printable
+  ASCII is, `font/sh/sh_coverage_test.go`), and the packer reserves 18
+  characters per mark row (`bundlePlateFitMark`), so "CARD 12/14 PLATE 1/2"
+  (20) may not fit. (a) Title "CARD k/N", footer "PLATE p/q" (the text above;
+  two rows of each plate). (b) One footer "k/N p/q". (c) One footer
+  "CARD k/N PLATE p/q", shortened to "C k/N P p/q" when over 18 characters.
+  **Recommended: (a)**, the only form that reads the same on every plate.
+
+### 14k. The secret list
+
+This section closes no row of `coordinator/status/secret-criticals.md` and
+keeps every kit row open: `kitarch-a-s1`, `kitarch-b-s1` and `kitarch-c-a1`
+stay on the alpha list by Brian's Q3 ruling (§14f warns; nothing refuses);
+`kitarch-a-s2`, `kitarch-b-s2`, `kitarch-c-a2` and `kitsynth-s1` concern
+secrets in this container, which the kit path no longer routes here (S1b);
+`kitarch-c-a3` and the `kitsealx-*` rows belong to S1b and S3.
