@@ -580,7 +580,8 @@ fails closed with "payload unreadable":
 - `reserved == 0x00` (v1; in v2 offset 11 is `pw_form`, checked per §14.2)
 - **If `ct_len > 0`** (something is encrypted):
   `kdf_id == 0x01`, `aead_id == 0x01`, `100_000 <= iterations <= 2_000_000`,
-  `0 < ct_len <= 8191`.
+  `0 < ct_len <= 8191`. **v2 only:** if offset 11 is 6 to 12 (the n-word password form), `iterations >= 600_000` as
+  well (§14.2, amended 2026-11-22); the generated-words form and v1 keep 100,000.
 - **If `ct_len == 0`** (nothing is encrypted): `kdf_id == 0x00`,
   `aead_id == 0x00`, `iterations == 0`, and `salt` and `iv` **all-zero**.
   Any non-zero value in those fields is a malformed blob and MUST be rejected —
@@ -2295,7 +2296,7 @@ Changes, and nothing else:
    SeedQR (§14.6).
 
 Unchanged for v2 as for v1: the 52-byte layout and every other field; PBKDF2-HMAC-SHA256 and AES-256-GCM; the AAD
-(§6.1a); the iteration bounds `100_000 ..= 2_000_000` (§6.2); `MaxRecords` 24 (both sections together, the titles
+(§6.1a); the iteration bounds `100_000 ..= 2_000_000` (§6.2), **except** that a `pw_form` 6 to 12 payload also needs `iterations >= 600_000` (§14.2); `MaxRecords` 24 (both sections together, the titles
 record included), `MaxRecordLen` 512, `MaxSectionLen` 8191; the public-section allow-list (`md1`/`mk1` only, decoded
 as card sets); the §6.6 hash and its label `MNEMBLOB/pub/v1` (it covers the public records and the `sealed` byte, not
 the version, so a v2 payload's hash equals the v1 hash of the same public records and shape; vector V2-C pins it at
@@ -2317,6 +2318,7 @@ version 2` (`seal/wire.go:135@25abe8e`, run 2026-11-22) and the program shows `P
 | `0x01` | any | `0x00` | `reserved`, as §6.2. Any other value: `reserved byte must be 0, got <b>`. |
 | `0x02` | `> 0` | `0x00` | `pw_form` 0: the password is §8's twelve generated words with a valid BIP-39 checksum. |
 | `0x02` | `> 0` | `6 ..= 12` | `pw_form` n: the password is n words from the BIP-39 English list, **no checksum** (§14.5). |
+| `0x02` | `> 0` | `6 ..= 12` and `iterations < 600_000` | refused: `iteration count <n> out of range [600000, 2000000] for a 6 to 12 word password` (RULED, Brian 2026-11-22; below). |
 | `0x02` | `> 0` | anything else | refused: `password form byte must be 0 or 6 to 12, got <b>`. |
 | `0x02` | `0` | `0x00` | public-only v2 payload; no password. |
 | `0x02` | `0` | anything else | refused: `pw_form must be zero when nothing is encrypted` (§6.2's anti-downgrade-staging rule, extended to the new field). |
@@ -2324,13 +2326,40 @@ version 2` (`seal/wire.go:135@25abe8e`, run 2026-11-22) and the program shows `P
 
 Check order (normative; the Rust `Header::decode` and the Go `ParseHeader` both follow it, so the same blob gets the
 same refusal): length, magic, version; **v1 only:** reserved; read the integers; section caps; empty; then the
-sealed branch (`kdf_id`, `aead_id`, `iterations`, **v2:** `pw_form`) or the unsealed branch (`kdf_id`, `aead_id`,
+sealed branch (`kdf_id`, `aead_id`, `iterations` against §6.2's `100_000 ..= 2_000_000`, **v2:** `pw_form`, **v2 with
+`pw_form` 6 to 12:** `iterations >= 600_000`) or the unsealed branch (`kdf_id`, `aead_id`,
 `iterations`, `salt`, `iv`, **v2:** `pw_form`); then region fit.
 
-The Rust messages above are `WireError`'s `Display` (two new variants: `PwForm(u8)` and the existing
+The Rust messages above are `WireError`'s `Display` (two new variants: `PwForm(u8)` and `PwFormIterations(u32)`, and the existing
 `UnsealedFieldNotZero("pw_form")`). The Go port carries one new sentinel, `ErrPwForm = errors.New("seal: password form
 byte must be 0 or 6 to 12")`, wrapped as `"%w, got %d"`, and reuses `ErrUnsealedFieldNotZero` wrapped as
 `"%w: pw_form"`. On the device every header refusal, these included, still reads `Payload unreadable.` (§6.2).
+
+**The n-word iteration floor (STOP-4, RULED Brian 2026-11-22; not the author's recommendation).** A v2 payload with
+`ct_len > 0`, offset 11 in 6 to 12 and `iterations < 600_000` is refused. The upper bound stays 2,000,000 and the
+generated-words form (offset 11 = 0) and v1 keep 100,000 to 2,000,000. Nothing else changes for them. It is a
+**header-stage** refusal, the same stage and place as §6.2's range check: it runs inside `Header::decode` / `ParseHeader`,
+after `iterations` has passed `100_000 ..= 2_000_000` and after `pw_form` has passed 0 or 6 to 12, so a payload with
+`iterations = 50_000` still reads as §6.2's range refusal, and one with offset 11 = `0x05` and `iterations = 599_999`
+still reads as `PwForm(5)`. It therefore runs before any password prompt, any word check, any KDF work and any
+authentication, and it needs no key.
+- **Rust.** `wire::MIN_ITERATIONS_NWORD: u32 = 600_000`; `WireError::PwFormIterations(u32)`, Display
+  `iteration count <n> out of range [600000, 2000000] for a 6 to 12 word password` (the same shape as `Iterations`'s
+  `iteration count <n> out of range [100000, 2000000]`, with the n-word lower bound and the suffix). `open` returns it
+  as `OpenError::Wire(..)`, `seal_v2` as `SealError::PwFormIterations(u32)` with the same Display, and `seal_v2`
+  refuses before any KDF work. No `me` command reads a payload and none is added, so there is no `me` exit behaviour and
+  no toolkit-manual text for this refusal; the library error is the whole host surface.
+- **Go.** `seal.MinIterationsNWord = 600_000`; the refusal wraps the existing sentinel as `fmt.Errorf("%w: %d is below
+  %d for a 6 to 12 word password", ErrIterations, iterations, MinIterationsNWord)`, so `errors.Is(err, ErrIterations)`
+  holds for it as for §6.2's range refusal.
+- **Device.** Exactly §6.2's: the program shows `Payload unreadable.`, no prompt, no KDF, nothing decrypted. The
+  holder is not told the reason (the text is the same for every header refusal); the cause is read from the library
+  error on the workstation.
+- **Writer.** mr-sitting and `seal_v2` write 600,000 for this form (W1T §T19.6), so a conforming writer never meets
+  the refusal; it exists so that a weaker writer cannot produce a payload the device would open.
+- **Timing.** The floor adds no wait beyond what 600,000 already costs: about 80 s by §14.5 item 3's first frame,
+  inside the three-minute row of §10.2.4. §10.2.4's bound on the upper range (above about 1,343,284 iterations) is
+  unchanged and is not touched here.
 
 The Rust `Header` gains two fields, `version: u8` and `pw_form: u8`; `encode` writes both. For a v1 header `pw_form`
 is 0 and encodes as the reserved byte, so every v1 vector (A-G) encodes byte-identically.
@@ -2405,7 +2434,7 @@ the refusal is shown, and no plate is offered:
 
 `<i>` and `<index>` count the seed records from 0 (the titles record and `md1`/`mk1` records are not counted).
 
-**Absence.** A v2 payload with no titles record is legal (STOP-1, recommended answer): each ms1 plate is titled with
+**Absence.** A v2 payload with no titles record is legal (STOP-1, RULED Brian 2026-11-22): each ms1 plate is titled with
 its codex32 id as in v1 (`ENTR` for every ms1 mr makes), and the Refugium build still cuts it with a Standard SeedQR
 (§14.6). The writer of a Refugium sitting (spec S3) always writes the record.
 
@@ -2462,14 +2491,14 @@ same texts); it never generates words (the writer that generates them is mr-sitt
 
 1. The notice, once per session, before entry, reads (n from the header):
    `Enter the <n>-word plates password for this payload.` then a blank line, then `These words are the payload's
-   password. They are NOT a seed and no wallet is derived from them.` (STOP-2 on the word "password".)
+   password. They are NOT a seed and no wallet is derived from them.` (STOP-2, RULED Brian 2026-11-22: "password".)
 2. Entry is the existing word keyboard (`inputWordsFlow`) over exactly n slots, every word restricted to the BIP-39
    English list as typed, **no checksum gate** and no `done` terminator: entry ends when slot n is filled. Back with
    fewer than n words leaves the program with no KDF and no error, as §10.2 step 5 does today. There is no separate
    count confirmation: the count is fixed by the header and shown in the notice, so a short entry cannot reach the KDF.
 3. The KDF runs (§10.2 step 7). Its first frame, before a rate is measured, reads `Unlocking. This takes about <S>
    seconds.` with `S = 10 × ceil(iterations / 75,000)` (600,000 gives 80, from the measured 40.2 s wall at 300,000 on
-   the SeedHammer II; 100,000 gives 20); later frames keep today's measured countdown. A v1 or `pw_form` 0 payload
+   the SeedHammer II; 600,000 is the lowest value this form can carry, §14.2); later frames keep today's measured countdown. A v1 or `pw_form` 0 payload
    keeps today's first frame, `Unlocking. This takes about 30 seconds.`
 4. A tag failure shows today's §10.2 step 8 body with `passphrase` replaced by `password`: `Wrong password, or this
    payload has been altered.` then, with a public section, the hash lines unchanged; without one, `Check the words and
@@ -2480,7 +2509,7 @@ same texts); it never generates words (the writer that generates them is mr-sitt
 
 ### 14.6 The Refugium build's ms1 plate (F5) — NORMATIVE for that build
 
-In the Refugium build, every ms1 seed record the Sealed Payload program cuts (v1 or v2, titled or not; STOP-3) is cut
+In the Refugium build, every ms1 seed record the Sealed Payload program cuts (v1 or v2, titled or not; STOP-3, RULED Brian 2026-11-22) is cut
 with `backup.EngraveSeedStringSeedQR`: the ms1 string as text, the title (§14.4, or the codex32 id when there is no
 titles record), and the **Standard SeedQR of the BIP-39 words of its entropy**, never a QR of the ms1 string (UI spec
 §4.4, D15). The default build is unchanged (`EngraveSeedString`, text + QR of the string). If the plate does not fit,
@@ -2498,7 +2527,9 @@ the entropy than that for it, and zeroes what it decoded.
 
 - `wire::VERSION_V2: u8 = 0x02`, `wire::PW_WORDS_MIN: u8 = 6`, `wire::PW_WORDS_MAX: u8 = 12`; `wire::VERSION` stays
   `0x01`.
-- `WireError::PwForm(u8)`, Display `password form byte must be 0 or 6 to 12, got <b>`.
+- `WireError::PwForm(u8)`, Display `password form byte must be 0 or 6 to 12, got <b>`. `wire::MIN_ITERATIONS_NWORD: u32 =
+  600_000`; `WireError::PwFormIterations(u32)`, Display `iteration count <n> out of range [600000, 2000000] for a 6 to
+  12 word password` (§14.2).
 - `seal::titles`: `pub const TITLES_PREFIX: &str = "text:"`, `pub const TITLES_MAGIC: &str = "refugium-plates 2"`,
   `pub fn encode_titles(titles: &[&str]) -> Result<String, TitlesError>` (refuses an empty list as `Empty` and a title
   outside the 33 as `Line(i + 2)`), `pub fn ms1_letter(ms1: &str) -> Option<char>`, `pub enum TitlesError` (the ten
@@ -2506,7 +2537,7 @@ the entropy than that for it, and zeroes what it decoded.
 - `seal::seal_v2(payload: Payload, titles: Option<Vec<String>>, words: &str, pw_form: u8, iterations: u32) ->
   Result<Vec<u8>, SealError>`: appends the titles record last, then runs §14.4's checks 8-10 and every §9 check on the
   records; a payload `open` would refuse never leaves it. New `SealError` variants: `Titles(TitlesError)`,
-  `Password(String)`, `PwForm(u8)`.
+  `Password(String)`, `PwForm(u8)`, `PwFormIterations(u32)` (the §14.2 Display).
 - `seal::open(blob: &[u8], password: &str) -> Result<Opened, OpenError>`; `Opened { version: u8, pw_form: u8, public:
   Vec<String>, secret: Zeroizing<Vec<String>>, titles: Option<Vec<String>> }`; `secret` excludes the titles record.
   `OpenError` variants and Display: `Wire(WireError)` (its Display); `Public(SealError)` (its Display: the public
@@ -2559,11 +2590,14 @@ Inputs. The ms1 strings are `ms encode --hex -` (ms 0.20.4) of test entropies: `
 | N-title-set | `beef` × 6 (6) | — | `A16`, titles `SEED Q` | `Line(2)`, T-1 |
 | N-no-final-lf | `beef` × 6 (6) | — | `A16`, titles `SEED A` without the final LF | `NoFinalLf`, T-1 |
 | N-empty | `beef` × 6 (6) | — | `A16`, titles block of the magic line only | `Empty`, T-1 |
+| N-floor-599999 | `beef` × 6 (6), **599,999 iterations** | — | `A16`, `P`, titles `SEED A`, `KEEP; DO NOT LOAD` (V2-A's records) | `WireError::PwFormIterations(599999)`, `iteration count 599999 out of range [600000, 2000000] for a 6 to 12 word password`, at the header, before any word check or KDF; device `Payload unreadable.` Its accepted side is V2-A (offset 11 = 6, exactly 600,000) and, for the unchanged lower bound, V2-C (offset 11 = 0, 100,000) |
 | N-v1-text | `beef` × 12 (v1) | — | `A16`, titles `SEED A` | `Record { index: 1, .. }` (a v1 `text:` record is a record, §14.4) |
 | N-public-titles | `beef` × 6 (6) | titles `SEED A` | `A16` | `Public(..)`, before any KDF: `record 0 (records count from 0) in the public section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; device `Payload unreadable.` |
 
 Salts and IVs: V2-A `feed`×8 / `face`×6; V2-B `deaf`×8 / `fade`×6; V2-C `dead`×8 / `beef`×6; every N vector salt
-`0bad`×8, IV `0c01`×6 … `0c0b`×6 in the order of the shape table below. N-v1-text is a **v1** payload (offset 8 `0x01`; its `pw_form` cell
+`0bad`×8 (N-floor-599999: `0bee`×8), IV `0c01`×6 … `0c0a`×6 and N-v1-text `0c0b`×6 (N-floor-599999: `0c0c`×6). Every
+N vector with offset 11 = 6 carries 600,000 iterations except N-floor-599999, because 100,000 would be refused at the
+header (§14.2) before the titles check each one exists to reach. N-v1-text is a **v1** payload (offset 8 `0x01`; its `pw_form` cell
 is the reserved byte), the only vector here that is not v2. Titles records as encoded:
 
 ```
@@ -2583,16 +2617,17 @@ N-empty text:726566756769756d2d706c6174657320320a
 | V2-A | 6 | 600000 | 0 | 242 | 3 | 310 |
 | V2-B | 12 | 600000 | 0 | 763 | 8 | 831 |
 | V2-C | 0 | 100000 | 396 | 75 | 6 | 539 |
-| N-count | 6 | 100000 | 0 | 194 | 3 | 262 |
-| N-letter | 6 | 100000 | 0 | 143 | 2 | 211 |
-| N-hot-letter | 6 | 100000 | 0 | 151 | 2 | 219 |
-| N-magic | 6 | 100000 | 0 | 118 | 2 | 186 |
-| N-two | 6 | 100000 | 0 | 186 | 3 | 254 |
-| N-not-last | 6 | 100000 | 0 | 118 | 2 | 186 |
-| N-title-set | 6 | 100000 | 0 | 118 | 2 | 186 |
-| N-no-final-lf | 6 | 100000 | 0 | 116 | 2 | 184 |
-| N-empty | 6 | 100000 | 0 | 92 | 2 | 160 |
-| N-public-titles | 6 | 100000 | 67 | 50 | 2 | 185 |
+| N-count | 6 | 600000 | 0 | 194 | 3 | 262 |
+| N-letter | 6 | 600000 | 0 | 143 | 2 | 211 |
+| N-hot-letter | 6 | 600000 | 0 | 151 | 2 | 219 |
+| N-magic | 6 | 600000 | 0 | 118 | 2 | 186 |
+| N-two | 6 | 600000 | 0 | 186 | 3 | 254 |
+| N-not-last | 6 | 600000 | 0 | 118 | 2 | 186 |
+| N-title-set | 6 | 600000 | 0 | 118 | 2 | 186 |
+| N-no-final-lf | 6 | 600000 | 0 | 116 | 2 | 184 |
+| N-empty | 6 | 600000 | 0 | 92 | 2 | 160 |
+| N-public-titles | 6 | 600000 | 67 | 50 | 2 | 185 |
+| N-floor-599999 | 6 | 599999 | 0 | 242 | 3 | 310 |
 | N-v1-text | 0 | 100000 | 0 | 118 | 2 | 186 |
 
 | vector | derived key | tag | blob sha256 |
@@ -2600,16 +2635,17 @@ N-empty text:726566756769756d2d706c6174657320320a
 | V2-A | `1fd820f0f39f26c95fb3f37da90a0d7229211fdab999b398ec993a6bba2e8293` | `feba7555940c2450f55e3094b7126290` | `0e0dc8706b48d1522aaca3a90af983954e6d287284035977181029f94cbac8b2` |
 | V2-B | `f3ff490ac8de9211170403cbfa23f0f3e65f2c941b135afcd1acda721e301243` | `2c8eece9d4799a365066c03a1d46e2c9` | `9b060a4492ce7df8c22db42b9e5c62e66564b0222825b118d47a61399fe6f4ca` |
 | V2-C | `bf2f469f1a0ecb1550956cbcc6074f40801644080d37cd167eb1aec3d6e51c2f` | `253073b0d7b44e98b3ed18065f8ed03b` | `40c57d694562bff204f3f75e703a73018f08fb6c9a81cfa7b9acc68a88ee9b8b` |
-| N-count | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `d128ecfb16984308eca6ef4f12783668` | `29474a156bb25c13a7e8cb354df9d2f6bed57cbf4d1918d34e261044cafd0e7c` |
-| N-letter | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `8ba2a4e6ab7a400a3c70db2b1249b1c1` | `a5e11064e09d7ba527e082e62d83b9cb6bbcea216cb3286a46322d9ae2ab21fa` |
-| N-hot-letter | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `aea017b268ab85a28ca6ace669103f94` | `1e36a68b336bff1e98070dff6d25ec18f83465c93cdd8e5e8856f21e8a1ca84a` |
-| N-magic | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `385e237b58161542415078794cfa3e5d` | `766de605885b19b6cd97408a45cfa2a0c1fdc158c180ecd34eaaed1205950785` |
-| N-two | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `b25ef437fdf9d8932f86620eb7cdb2cc` | `1be1428a63aecfd3905d38783d41b19c309c2c10ca35d191d1d3366481f96a82` |
-| N-not-last | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `9933be555d4cbb03ecc772637ff21a1c` | `fbc669493cdd054078f5e0b9e10ce63aa343fea428c1310cfcffa12d0b43124a` |
-| N-title-set | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `51655338e61088d9299e8d404fcf5a4b` | `95a28a9eff0fab5e1b33582f1f159ecaed9df01070411991038a3e13b150598e` |
-| N-no-final-lf | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `00772a7b070b183fc4f9c10d17130181` | `5535f086e675ed70ee70894367f870c3de6b97b1b732bfabb9f12dff861afd29` |
-| N-empty | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `85a64e2cc8dd3714f8d4c8929a86523e` | `9c5d8bfcfc28518da892d3d8e033237d5f337076467d42105c9e5596c17b9917` |
-| N-public-titles | `beedadc9fcfdaf3fe82c9b2aaa9b971592eed64c05d62f3a179144a56884037d` | `d7ec58953d74975a069d9a20fe6f71d1` | `fd3b5c16d604f000cae3dbf53385d1619564e4fd8ec43e5a063e26d16ebd3181` |
+| N-count | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `88b3a5931833118f3a4a3592a51c21cc` | `4b9f90ed08a15763a4a199f719dcec1369b053b6808f204d8a9f849f54f81076` |
+| N-letter | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `bb05491ee2a186d522e1d9446788620e` | `2c7da6bc2af6788cd1f5ad92f55aef7cf549d5064475bdb13f94affc2657f845` |
+| N-hot-letter | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `c36fad64eca65f8bef46ece80c2b2337` | `216167ee91fbb37a932d35651e63fab1f11b7a341d7b4f51f67018b80472993f` |
+| N-magic | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `09dca35aa90bb80afed346b0bf4503db` | `71de074b0acad2d44d557c046ea38ed5710b22d3d1b70af9af6fe3227edabba7` |
+| N-two | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `be1c666ff199af4ab7a702afc76d67c5` | `639068b8daab3f5d3f3582bdee409fff4e68ef9ffce76dae5312989e1e92807c` |
+| N-not-last | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `d592bf52d2e4508821e3b55805e9d2e7` | `3abe5c40c05e87b2e41cee6f4a4ec05ee98770ab08f7ceea5afafdcc53a6ece5` |
+| N-title-set | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `9c492381aade5ceef2be2f61f060e602` | `e6589dbb955ea1c4b489d7599b2de29f69c5e397f07cba11bad631c308dc5528` |
+| N-no-final-lf | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `73c0c75d90c65aaa8e28b91c790e8777` | `11627120a79db02a6e3d9eb91be9944503ca430ef95f29a9ef9f4ca4950a4906` |
+| N-empty | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `39f45ca6b9f1f068e5ec60c54fd2d285` | `c630356857c7044c3f7ef55736912e505850bf33f5cdfe4f6cba061561885bf3` |
+| N-public-titles | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `a3b7904cf57e1bd5edf561a2978258b7` | `ea3a9745ac46620948102ab0a460a714563aa403007e35f5b82daee9abd543b7` |
+| N-floor-599999 | `5faefae09d72d4c9d4a81f0449c392b21acbd2b882a7d7bb5afc2944391a211b` | `11f1e7bccfdd56728796835b3eb08e69` | `54f6cc76a5e94f24f43f6b0492be2ac061cfdd4ea06408c0b6abbd9e40c280d7` |
 | N-v1-text | `f9d64e3768933e7640594111d09cd7292a79ad67087e2793b910e5c8a172fede` | `7084c887b52f7df2e780d2aca5e508f2` | `40d0921bb243e842518d4dbf3d7cc7e7f06bf7a75e7a181b2b54836ae244a35c` |
 
 ```
@@ -2619,26 +2655,28 @@ V2-B            4d4e454d424c4f420201010c000927c0deafdeafdeafdeafdeafdeafdeafdeaf
                 fadefadefadefadefadefade00000000000002fb
 V2-C            4d4e454d424c4f4202010100000186a0deaddeaddeaddeaddeaddeaddeaddead
                 beefbeefbeefbeefbeefbeef0000018c0000004b
-N-count         4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-count         4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c010c010c010c010c010c0100000000000000c2
-N-letter        4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-letter        4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c020c020c020c020c020c02000000000000008f
-N-hot-letter    4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-hot-letter    4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c030c030c030c030c030c030000000000000097
-N-magic         4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-magic         4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c040c040c040c040c040c040000000000000076
-N-two           4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-two           4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c050c050c050c050c050c0500000000000000ba
-N-not-last      4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-not-last      4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c060c060c060c060c060c060000000000000076
-N-title-set     4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-title-set     4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c070c070c070c070c070c070000000000000076
-N-no-final-lf   4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-no-final-lf   4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c080c080c080c080c080c080000000000000074
-N-empty         4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-empty         4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c090c090c090c090c090c09000000000000005c
-N-public-titles 4d4e454d424c4f4202010106000186a00bad0bad0bad0bad0bad0bad0bad0bad
+N-public-titles 4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c0a0c0a0c0a0c0a0c0a0c0a0000004300000032
+N-floor-599999  4d4e454d424c4f4202010106000927bf0bee0bee0bee0bee0bee0bee0bee0bee
+                0c0c0c0c0c0c0c0c0c0c0c0c00000000000000f2
 N-v1-text       4d4e454d424c4f4201010100000186a00bad0bad0bad0bad0bad0bad0bad0bad
                 0c0b0c0b0c0b0c0b0c0b0c0b0000000000000076
 ```
@@ -2647,7 +2685,10 @@ Header refusals (no crypto; edit V2-A's header bytes, every other byte unchanged
 `0x0d`, `0x80`, `0xff` → `PwForm(b)`; offset 8 to `0x00` or `0x03` → `UnknownVersion`; offset 8 to `0x01` (a v1
 header carrying 6) → `ReservedNotZero(6)`, `reserved byte must be 0, got 6` (run at `aa1bc2db` 2026-11-22: today's
 text); a v2 public-only header (vector E's header with offset 8 set to `0x02`) with offset 11 set to `0x06` →
-`UnsealedFieldNotZero("pw_form")`.
+`UnsealedFieldNotZero("pw_form")`. Floor edits on V2-A's header (iterations is offset 12..16): `599999`
+(`000927bf`) → `PwFormIterations(599999)`; `600000` unchanged -> accepted; `2000000` accepted; `2000001` → `Iterations(2000001)`
+(§6.2's text); `50000` → `Iterations(50000)`, not the floor (the range check runs first); offset 11 = `0x05` with
+`599999` → `PwForm(5)`, not the floor; V2-C's header with iterations kept at `100000` (offset 11 = 0) → accepted.
 
 ### 14.10 Test rows — the tests that must exist (ME first, then the ports)
 
@@ -2657,6 +2698,8 @@ TRACE rows: the Rule cell is binding. Every row names the plausible wrong implem
 | --- | --- | --- | --- | --- |
 | `v2_header_round_trips_each_password_form` | ME `seal/wire.rs` | `pw_form` 0, 6, 12 headers encode then decode equal; V2-A's header hex decodes to `version 2, pw_form 6, iterations 600000, pub_len 0, ct_len 242` | a decoder that still pins `version == 1` | RED, run: `Err(UnknownVersion(2))`, `unsupported format version 2` |
 | `v2_refuses_pw_form_outside_0_and_6_to_12` | ME `seal/wire.rs` | each §14.9 offset-11 edit gives `PwForm(b)` and its text | a range check written `<= 12` only, or `!= 0` only | RED (no variant) |
+| `v2_refuses_n_word_payload_below_600000_iterations` | ME `seal/wire.rs`, `seal/mod.rs` | N-floor-599999's header gives `PwFormIterations(599999)` and its text; `open(blob, "beef beef beef beef beef beef")` returns `OpenError::Wire(PwFormIterations(599999))` in under 200 ms (no KDF); the floor edits of §14.9's last paragraph each give their stated result; V2-A (600,000) and V2-C (100,000, offset 11 = 0) open | a floor written `>= 100_000` for every form, `> 600_000`, or applied to offset 11 = 0 or to v1; a check placed after the KDF or after the tag | RED (no variant, no v2 code) |
+| `seal_v2_refuses_n_word_below_600000_iterations` | ME `seal/mod.rs` | `seal_v2` with `pw_form` 6 and iterations 599,999: `SealError::PwFormIterations(599999)`, nothing returned; with `pw_form` 0 and 100,000: a payload | a writer that emits a payload `open` refuses | RED (absent) |
 | `v2_public_only_refuses_nonzero_pw_form` | ME `seal/wire.rs` | `UnsealedFieldNotZero("pw_form")`, `pw_form must be zero when nothing is encrypted` | the unsealed branch skipping offset 11 | RED |
 | `v1_still_refuses_a_nonzero_reserved_byte` | ME `seal/wire.rs` | v1 header with offset 11 = 6: `ReservedNotZero(6)`, `reserved byte must be 0, got 6` | v2 parsing leaking into v1 | GREEN today, run; must stay |
 | `rejects_bad_magic_version_reserved_kdf_and_aead` (changed) | ME `seal/wire.rs` | its `(8, 0x02, "version")` case becomes `(8, 0x03, "version")`; all other cases unchanged | — | changes in the v2 RED commit |
@@ -2672,7 +2715,7 @@ TRACE rows: the Rule cell is binding. Every row names the plausible wrong implem
 | `v1_open_treats_text_records_as_records` | ME `seal/mod.rs` | `open(N-v1-text, "beef" × 12)`: `Record { index: 1, .. }`, `record 1 (records count from 0) in the secret section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; `open(C, "beef" × 12)` opens with `titles: None` | titles parsing applied to v1 | RED (absent) |
 | `seal_v2_refuses_what_open_refuses` | ME `seal/mod.rs` | `seal_v2` with N-count's, N-letter's and N-hot-letter's inputs: `SealError::Titles(..)` with the same inner variant; nothing returned | a writer that emits a payload the reader refuses | RED (absent) |
 | `me_seal_still_writes_version_1` | ME `tests/` (CLI) | `me seal --seal-secret <A16> --out <tmp>.uf2`, first UF2 block's payload: byte 8 = `0x01`, byte 11 = `0x00` | `me seal` switched to v2 | GREEN today; must stay |
-| Go parity rows | fork `seal/` | the Go port passes every vector and refusal above from the vendored `seal_v2_vectors.json` with a provenance pin (ME commit) | Go leading Rust | planned in S2 |
+| Go parity rows | fork `seal/` | the Go port (`errors.Is(err, ErrIterations)` for N-floor-599999 included) passes every vector and refusal above from the vendored `seal_v2_vectors.json` with a provenance pin (ME commit) | Go leading Rust | planned in S2 |
 | Device rows | fork `gui/` | §14.4's T-1/T-2 texts and lead line, §14.5's notice, entry, first KDF frame and retry body, §14.6's plate (Refugium build) and default-build plate, `Payload unreadable.` for a version-3 header | — | planned in S2 |
 | Hardware H-v2 | fork, bench | §14.8 | — | planned in S2 (phase P2) |
 
@@ -2690,22 +2733,23 @@ comparing against the next record; N-hot-letter kills a check that matches only 
   overrule is now marked in the documents overruled (F-125's edit 1 for this document; its `passphrase.rs` doc edit
   is the builder's, in the ME v2 commit).
 - §2.2a and §12 item 6 ("the 128-bit generated passphrase"): a v2 `pw_form` n payload's defence is n × 11 bits plus
-  ~19 KDF bits at 600,000 iterations (6 words: about 85 bits); accepted by Brian's 2026-11-22 ruling because the
+  ~19 KDF bits at 600,000 iterations (6 words: about 85 bits), and 600,000 is now the enforced minimum for the form
+  (§14.2, STOP-4); accepted by Brian's 2026-11-22 ruling because the
   payload lives only from its write to its erase inside one sitting (R-5).
 - §2.3 and §2.2 item 12 (F-123): "use Sealed Payload for anything you intend to protect" now says the two classes
   differ in behaviour, not in whether funds are safe if the machine is taken.
 - §2.2 item 16 gains the F-124 release gate (R-6).
 
-### 14.12 Open STOPs (product points this spec does not decide; spec text follows the recommendation)
+### 14.12 STOPs (all four RULED by Brian, 2026-11-22)
 
-- **STOP-1 — a v2 payload holding ms1 with no titles record.** (a) Legal; plates titled with the codex32 id (`ENTR`)
+- **STOP-1 — RULED (Brian 2026-11-22): (a). A v2 payload holding ms1 with no titles record.** (a) Legal; plates titled with the codex32 id (`ENTR`)
   — **recommended**: the record is authenticated, so its absence is a writer choice, and the id title is today's
   behaviour; (b) refused in the Refugium build. 
-- **STOP-2 — the word on the device for the n-word form.** (a) `plates password` / `password` — **recommended**: it
+- **STOP-2 — RULED (Brian 2026-11-22): (a). the word on the device for the n-word form.** (a) `plates password` / `password` — **recommended**: it
   is what mr-sitting tells the holder to write down (ST-PW-01); (b) `passphrase`, as the v1 screens say.
-- **STOP-3 — which ms1 plates get the F5 SeedQR in the Refugium build.** (a) Every ms1 the Sealed Payload program
+- **STOP-3 — RULED (Brian 2026-11-22): (a). which ms1 plates get the F5 SeedQR in the Refugium build.** (a) Every ms1 the Sealed Payload program
   cuts, v1 or v2 — **recommended**: one plate shape per build, matching D15; (b) only titled v2 plates.
-- **STOP-4 — an iteration floor for the n-word form.** (a) Keep §6.2's 100,000 floor for every form —
+- **STOP-4 — RULED (Brian 2026-11-22): (b), a floor of 600,000, NOT the recommendation (§14.2). An iteration floor for the n-word form.** (a) Keep §6.2's 100,000 floor for every form —
   **recommended**: the architect ruled the crypto unchanged, and the writer fixes 600,000 (W1T §T19.6); (b) refuse a
   `pw_form` n payload below 600,000 (device and `open`), which makes a weaker writer impossible at the cost of a
   second floor.

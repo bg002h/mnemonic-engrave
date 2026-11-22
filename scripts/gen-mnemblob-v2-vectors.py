@@ -47,6 +47,17 @@ D_PUBLIC = [
 ]
 D_MS1 = "ms10entrsqqg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9pzs3gg5y2z9q5f042qmrw90mw"
 
+# n-word iteration floor (S1b STOP-4, Brian 2026-11-22). --check requires the spec text to carry it.
+NWORD_FLOOR = 600_000
+FLOOR_TEXTS = [
+    "`iterations < {f_us}` is refused",
+    "MIN_ITERATIONS_NWORD: u32 = {f_us}",
+    "[{f_nc}, 2000000] for a 6 to 12 word password",
+    "`seal.MinIterationsNWord = {f_us}`",
+    "a floor of {f_c}, NOT the recommendation",
+    "`{f_nc}` unchanged -> accepted",
+]
+
 BEEF12 = " ".join(["beef"] * 12)
 BEEF6 = " ".join(["beef"] * 6)
 ZOO12 = " ".join(["zoo"] * 12)
@@ -140,26 +151,30 @@ def vectors():
         build("V2-B", 12, ZOO12, 600_000, rep("deaf", 8), rep("fade", 6), [],
               seven + [titles_record(t7)]),
         build("V2-C", 0, BEEF12, 100_000, rep("dead", 8), rep("beef", 6), D_PUBLIC, [D_MS1]),
-        build("N-count", 6, BEEF6, 100_000, neg_salt, rep("0c01", 6), [],
+        build("N-count", 6, BEEF6, 600_000, neg_salt, rep("0c01", 6), [],
               [MS1["A16"], MS1["P"], titles_record(["title SEED A"])]),
-        build("N-letter", 6, BEEF6, 100_000, neg_salt, rep("0c02", 6), [],
+        build("N-letter", 6, BEEF6, 600_000, neg_salt, rep("0c02", 6), [],
               [MS1["B"], titles_record(["title SEED C"])]),
-        build("N-hot-letter", 6, BEEF6, 100_000, neg_salt, rep("0c03", 6), [],
+        build("N-hot-letter", 6, BEEF6, 600_000, neg_salt, rep("0c03", 6), [],
               [MS1["G"], titles_record(["title HOT SEED F"])]),
-        build("N-magic", 6, BEEF6, 100_000, neg_salt, rep("0c04", 6), [],
+        build("N-magic", 6, BEEF6, 600_000, neg_salt, rep("0c04", 6), [],
               [MS1["A16"], titles_record(["title SEED A"], magic="refugium-plates 1")]),
-        build("N-two", 6, BEEF6, 100_000, neg_salt, rep("0c05", 6), [],
+        build("N-two", 6, BEEF6, 600_000, neg_salt, rep("0c05", 6), [],
               [MS1["A16"], titles_record(["title SEED A"]), titles_record(["title SEED A"])]),
-        build("N-not-last", 6, BEEF6, 100_000, neg_salt, rep("0c06", 6), [],
+        build("N-not-last", 6, BEEF6, 600_000, neg_salt, rep("0c06", 6), [],
               [titles_record(["title SEED A"]), MS1["A16"]]),
-        build("N-title-set", 6, BEEF6, 100_000, neg_salt, rep("0c07", 6), [],
+        build("N-title-set", 6, BEEF6, 600_000, neg_salt, rep("0c07", 6), [],
               [MS1["A16"], titles_record(["title SEED Q"])]),
-        build("N-no-final-lf", 6, BEEF6, 100_000, neg_salt, rep("0c08", 6), [],
+        build("N-no-final-lf", 6, BEEF6, 600_000, neg_salt, rep("0c08", 6), [],
               [MS1["A16"], titles_record(["title SEED A"], final_lf=False)]),
-        build("N-empty", 6, BEEF6, 100_000, neg_salt, rep("0c09", 6), [],
+        build("N-empty", 6, BEEF6, 600_000, neg_salt, rep("0c09", 6), [],
               [MS1["A16"], titles_record([])]),
-        build("N-public-titles", 6, BEEF6, 100_000, neg_salt, rep("0c0a", 6),
+        build("N-public-titles", 6, BEEF6, 600_000, neg_salt, rep("0c0a", 6),
               [titles_record(["title SEED A"])], [MS1["A16"]]),
+        # n-word floor (S1b STOP-4, Brian 2026-11-22): byte 11 = 6 below 600,000 is refused at the header.
+        # The accepted side at exactly 600,000 with byte 11 = 6 is V2-A; byte 11 = 0 at 100,000 is V2-C.
+        build("N-floor-599999", 6, BEEF6, 599_999, rep("0bee", 8), rep("0c0c", 6), [],
+              [MS1["A16"], MS1["P"], titles_record(["title SEED A", "title KEEP; DO NOT LOAD"])]),
         build("N-v1-text", 0, BEEF12, 100_000, neg_salt, rep("0c0b", 6), [],
               [MS1["A16"], titles_record(["title SEED A"])], version=1),
     ]
@@ -189,6 +204,14 @@ def main():
             for s in v["secret"] + v["public"]:
                 if s.startswith("text:") and s not in flat:
                     missing.append(f"{v['name']} titles record {s[:24]}...")
+        floor_args = dict(f_us=f"{NWORD_FLOOR:_}", f_nc=str(NWORD_FLOOR), f_c=f"{NWORD_FLOOR:,}")
+        flat1 = " ".join(text.split())
+        for t in FLOOR_TEXTS:
+            want = t.format(**floor_args)
+            if want not in flat1:
+                missing.append(f"floor text {want}")
+        by = {v["name"]: v for v in vs}
+        assert by["V2-A"]["iterations"] == NWORD_FLOOR and by["N-floor-599999"]["iterations"] == NWORD_FLOOR - 1
         for m in missing:
             print("MISSING", m)
         print(f"checked {len(vs)} vectors, {len(missing)} missing")
