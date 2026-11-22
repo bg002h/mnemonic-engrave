@@ -197,9 +197,9 @@ measured, exit 101). The ulimit is applied through
 `sh -c` (`trap '' XFSZ; ulimit -f 1; exec "$0" ...` for W1, the same without the trap for W2); the child writes 4096
 bytes of `N` over a 15-byte old file `OLD-VALID-CARD\n`.
 
-RED is two commits. RED-1 adds W1-W4 and the GREEN guards W5-W11 (all compile against 7caf903a): W1-W4 fail as
-"measured today", W5-W11 pass. RED-2 adds S1-S10: the build fails with E0425 on `same_file`; record that output.
-W12-W16 and W17 land in the GREEN commit, with the seam and the temp-name function they call. Measured results on
+RED is two commits. RED-1 adds W1-W4 and the GREEN guards W5-W11 and W17 (all compile against 7caf903a): W1-W4 fail as
+"measured today", W5-W11 and W17 pass. RED-2 adds S1-S10: the build fails with E0425 on `same_file`; record that output.
+W12-W16 land in the GREEN commit, with the seam and the temp-name function they call. Measured results on
 `7caf903a` are given.
 
 | row | kind | setup | expected after the fix | measured today |
@@ -217,7 +217,7 @@ W12-W16 and W17 land in the GREEN commit, with the seam and the temp-name functi
 | W9 `a_fifo_target_is_written_directly` (unix) | GREEN guard | `mkfifo` (std has none; `std::process::Command::new("mkfifo")`), reader thread | reader receives exactly the bytes; dir holds only the FIFO | GREEN |
 | W10 `dev_stdout_on_a_pipe_is_written_directly` (unix) | GREEN guard | child with piped stdout calls `write_private("/dev/stdout", b"via-dev-stdout")` | child stdout contains `via-dev-stdout`; child reports `child-result: Ok` | GREEN |
 | W11 `a_250_byte_file_name_is_written` | GREEN guard | target name of 250 `a` bytes | `Ok`; bytes; dir holds only the target | GREEN |
-| W17 `dev_stdout_on_a_regular_file_is_written_directly` (unix) | GREEN guard (lands in the GREEN commit) | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/stdout", b"via")` | `f` keeps its inode number, starts with `via` (not equal: libtest's own stdout lines may precede), mode 0600; dir holds only `f` | GREEN |
+| W17 `dev_stdout_on_a_regular_file_is_written_directly` (unix) | GREEN guard | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/stdout", b"via")` | `f` keeps its inode number, starts with `via` (not equal: libtest's own stdout lines may precede), mode 0600; dir holds only `f` | GREEN |
 | W12 `the_temp_name_is_the_target_name_or_the_fallback` | new | calls the private temp-name function | 200-byte name -> `<name>.7.3.tmp` for pid 7, n 3; 201-byte name -> `mnemonic-io-lib.7.3.tmp` | n/a (new function) |
 | W13 `a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file` | new | old `card.txt` = `old`; for each step of the platform (unix: `CreateTemp`, `Preflight`, `Chmod`, `Write`, `Sync`, `Rename`; other: `CreateTemp`, `Preflight`, `Write`, `Sync`, `Rename`) inject an error | `Err` whose `Display` is `injected at <Step>`; bytes `old`; dir holds only the target | n/a (new branch) |
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |
@@ -280,7 +280,7 @@ Outside the table: mnemonic-refugium (`6e2072e72`) has no `write_private` and no
    the lock, `--precise 0.1.2` fails `revspec '0.1.2' not found`); the lock must then show `version = "0.1.2"` with
    the crates.io source. ms also refreshes `vendor/`, deletes the
    `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line from
-   `ci/repro/vendor-git-sources.txt`, and passes `ci/repro/vendor-freshness.sh`. ms also edits `.github/workflows/man-release.yml`: delete the `pins` job and `needs: pins`; delete `git_source_url` and `git_source_rev` from the `repro` job (an empty or absent pair makes the toolkit workflow skip its fourth `[source]` stanza); in both musl build steps delete the `IO_LIB_REV` and `IO_LIB_SRC` lines and the three `--config "source.\"${IO_LIB_SRC}\"..."` lines (and the `-e IO_LIB_REV` passthrough in the aarch64 step), keeping the `source.crates-io.replace-with` and `vendored-sources` configs. `grep -n 'mnemonic-engrave\|IO_LIB\|pins' .github/workflows/*.yml` must then print no ms workflow line other than comments. Order among them is
+   `ci/repro/vendor-git-sources.txt`, and passes `ci/repro/vendor-freshness.sh`. ms also edits `.github/workflows/man-release.yml`: delete the `pins` job and `needs: pins`; delete `git_source_url` and `git_source_rev` from the `repro` job (an empty or absent pair makes the toolkit workflow skip its fourth `[source]` stanza); in both musl build steps delete the `IO_LIB_REV` and `IO_LIB_SRC` lines and the three `--config "source.\"${IO_LIB_SRC}\"..."` lines (and the `-e IO_LIB_REV="$IO_LIB_REV" \` line in the x86_64 `docker run` step), keeping the `source.crates-io.replace-with` and `vendored-sources` configs. `grep -n 'mnemonic-engrave\|IO_LIB\|pins' .github/workflows/*.yml` must then print no ms workflow line other than comments. Order among them is
    free; the master table order is #9 md, #10 mk, #11 ms, #12 mt, #14 tk.
 
 ## 11. Out of scope, and proposed FOLLOWUPS lines (listed, not appended)
