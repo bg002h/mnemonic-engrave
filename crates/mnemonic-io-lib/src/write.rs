@@ -312,11 +312,62 @@ fn fill_and_rename(
     handle.write_all(bytes)?;
     #[cfg(test)]
     fault(Step::Sync)?;
-    handle.sync_all()?;
+    sync_temp(handle)?;
     // Step 8: rename over the final name; no copy fallback.
     #[cfg(test)]
     fault(Step::Rename)?;
     fs::rename(temp, fin)
+}
+
+/// Step 7's sync. On Apple targets std's `sync_all` is `fcntl(F_FULLFSYNC)`
+/// with no fallback, and SMB and some FUSE volumes refuse it with ENOTSUP
+/// (45); there a plain `fsync(2)` runs instead and its result stands, as Go
+/// (go#64215) and SQLite do. Any other error is returned unchanged.
+fn sync_temp(handle: &File) -> io::Result<()> {
+    full_sync_or_plain(cfg!(target_vendor = "apple"), handle.sync_all(), || {
+        plain_fsync(handle)
+    })
+}
+
+/// The fallback rule of `sync_temp`, separated so every platform can test it.
+fn full_sync_or_plain(
+    apple: bool,
+    full: io::Result<()>,
+    plain: impl FnOnce() -> io::Result<()>,
+) -> io::Result<()> {
+    match full {
+        Err(e) if apple && e.raw_os_error() == Some(45) => plain(),
+        r => r,
+    }
+}
+
+/// `fsync(2)` itself: std exposes no plain fsync on Apple targets, and the
+/// crate takes no dependency (spec section 2 item 4), so it is declared here
+/// against libSystem, which std already links.
+#[cfg(target_vendor = "apple")]
+fn plain_fsync(handle: &File) -> io::Result<()> {
+    use std::os::raw::c_int;
+    use std::os::unix::io::AsRawFd;
+    extern "C" {
+        fn fsync(fd: c_int) -> c_int;
+    }
+    loop {
+        // SAFETY: the descriptor belongs to `handle`, which outlives the call.
+        if unsafe { fsync(handle.as_raw_fd()) } == 0 {
+            return Ok(());
+        }
+        let e = io::Error::last_os_error();
+        if e.kind() != io::ErrorKind::Interrupted {
+            return Err(e);
+        }
+    }
+}
+
+/// Off Apple targets `sync_all` is already the plain sync (never reached:
+/// `full_sync_or_plain` falls back only on Apple).
+#[cfg(not(target_vendor = "apple"))]
+fn plain_fsync(handle: &File) -> io::Result<()> {
+    handle.sync_all()
 }
 
 /// One side of a "same file" question.
@@ -513,11 +564,13 @@ mod tests {
             "W10" => write_private(Path::new("/dev/stdout"), b"via-dev-stdout")
                 .map(|()| "Ok".to_string()),
             "W17" => write_private(Path::new("/dev/stdout"), b"via").map(|()| "Ok".to_string()),
+            "W19" => write_private(Path::new("/dev/fd/1"), b"via").map(|()| "Ok".to_string()),
             "S7" => Ok(show(same_file(
                 Endpoint::Path(&target),
                 &[Endpoint::Stdout],
             ))),
             "S8" => Ok(show(same_file(Endpoint::Stdout, &[Endpoint::Stdin]))),
+            "S11" => Ok(show(same_file(Endpoint::Path(&target), &[Endpoint::Stdin]))),
             other => panic!("unknown child row {other}"),
         };
         match r {
@@ -778,6 +831,27 @@ mod tests {
         assert_eq!(names(d.path()), vec!["f".to_string()]);
     }
 
+    /// W19: `/dev/fd/1` on a regular file is written directly (same inode).
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_1_on_a_regular_file_is_written_directly() {
+        use std::os::unix::fs::MetadataExt;
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, b"OLD").unwrap();
+        let ino = std::fs::metadata(&f).unwrap().ino();
+        let sf = std::fs::OpenOptions::new().write(true).open(&f).unwrap();
+        let out = run_child("W19", &f, Stdio::from(sf), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        assert_eq!(
+            std::fs::metadata(&f).unwrap().ino(),
+            ino,
+            "inode replaced via /dev/fd/1"
+        );
+        assert!(std::fs::read(&f).unwrap().starts_with(b"via"));
+    }
+
     /// **THE GATE, and the pre-existing target is the whole of it.**
     ///
     /// The fresh-file half passes under any implementation that sets a mode at
@@ -906,6 +980,49 @@ mod tests {
         r.unwrap();
         assert_eq!(std::fs::read(&t).unwrap(), b"new");
         assert_eq!(names(d.path()), vec!["card.txt".to_string()]);
+    }
+
+    /// W18: ENOTSUP from the full sync falls back to a plain fsync on Apple
+    /// targets only; every other error, and every error elsewhere, stands.
+    #[test]
+    fn enotsup_from_the_full_sync_falls_back_to_fsync_on_apple_only() {
+        let os = |n| Err(std::io::Error::from_raw_os_error(n));
+        let called = Cell::new(0);
+        let plain = |r: std::io::Result<()>| {
+            let c = &called;
+            move || {
+                c.set(c.get() + 1);
+                r
+            }
+        };
+        let code = |r: std::io::Result<()>| r.err().and_then(|e| e.raw_os_error());
+        // Apple, ENOTSUP: the plain fsync runs and its result stands.
+        assert!(full_sync_or_plain(true, os(45), plain(Ok(()))).is_ok());
+        assert_eq!(
+            code(full_sync_or_plain(true, os(45), plain(os(5)))),
+            Some(5)
+        );
+        assert_eq!(called.get(), 2);
+        // Apple, any other error or success: no fallback.
+        assert_eq!(
+            code(full_sync_or_plain(true, os(5), plain(Ok(())))),
+            Some(5)
+        );
+        assert_eq!(
+            code(full_sync_or_plain(true, os(22), plain(Ok(())))),
+            Some(22)
+        );
+        assert!(full_sync_or_plain(true, Ok(()), plain(os(5))).is_ok());
+        // Elsewhere, ENOTSUP is an error like any other.
+        assert_eq!(
+            code(full_sync_or_plain(false, os(45), plain(Ok(())))),
+            Some(45)
+        );
+        assert_eq!(called.get(), 2);
+        // The real sync on this platform succeeds on a local file.
+        let d = tempfile::tempdir().unwrap();
+        let f = File::create(d.path().join("t")).unwrap();
+        sync_temp(&f).unwrap();
     }
 
     /// W15: a stale leftover is skipped and left alone.
@@ -1061,6 +1178,28 @@ mod tests {
         let out = run_child("S8", d.path(), Stdio::piped(), None);
         let se = String::from_utf8_lossy(&out.stderr).to_string();
         assert!(se.contains("child-result: None"), "child stderr: {se}");
+    }
+
+    /// S11: stdin redirected from the output file is the same file.
+    #[cfg(unix)]
+    #[test]
+    fn stdin_redirected_from_the_output_file_is_the_same_file() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, b"x").unwrap();
+        let sf = std::fs::File::open(&f).unwrap();
+        let exe = std::env::current_exe().unwrap();
+        let out = Command::new(exe)
+            .args(["--exact", "write::tests::child", "--nocapture"])
+            .env("MNEMONIC_IO_LIB_CHILD", "S11")
+            .env("MNEMONIC_IO_LIB_TARGET", &f)
+            .stdin(Stdio::from(sf))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Some(0)"), "child stderr: {se}");
     }
 
     /// S9: a non-regular path never matches (metadata only, never written).

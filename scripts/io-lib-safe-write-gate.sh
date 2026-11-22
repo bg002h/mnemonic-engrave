@@ -5,7 +5,7 @@
 #   scripts/io-lib-safe-write-gate.sh plan    spec/plan/coverage-map consistency (no build)
 #   scripts/io-lib-safe-write-gate.sh red1    after RED-1: 15 tests, exactly W1-W4 FAIL, 11 pass
 #   scripts/io-lib-safe-write-gate.sh red2    after RED-2: unit-test build fails with E0425 on same_file
-#   scripts/io-lib-safe-write-gate.sh green   after GREEN / version commit: 30 rows pass, workspace
+#   scripts/io-lib-safe-write-gate.sh green   after GREEN / version commit: 33 rows pass, workspace
 #                                              nextest, doctests, lint-gate, Windows+macOS compile
 #                                              checks, version 0.1.2, empty [dependencies]
 #
@@ -48,7 +48,7 @@ check_plan() {
   local n
   # spec texts of the `spec: r3` commit
   grep -qF 'x86_64 `docker run` step' "$SPEC" && ok "spec r3 M1 text" || bad "spec r3 M1 text missing"
-  grep -qF 'W5-W11 and W17 pass.' "$SPEC" && grep -qF 'W12-W16 land in the GREEN commit' "$SPEC" \
+  grep -qF 'W5-W11 and W17 pass.' "$SPEC" && grep -qF 'W12-W16 and W18 land in the GREEN commit' "$SPEC" \
     && ! grep -qF 'lands in the GREEN commit)' "$SPEC" && ok "spec r2 M2 texts" || bad "spec r2 M2 texts"
   # no code fences in the plan
   n=$(grep -c '^```' "$PLAN"); [ "$n" -eq 0 ] && ok "plan has no fenced code block" || bad "plan has $n fence lines"
@@ -121,11 +121,15 @@ mode_green() {
   need_toolchain; need_not_root
   nextest green-io -p mnemonic-io-lib -E "$IOFILTER"
   local sum; sum=$(grep -E 'Summary' "$OUT/green-io.txt" | tail -1); echo "$sum"
-  echo "$sum" | grep -qE ' 30 tests run: 30 passed' && ok "30 rows passed" || bad "not 30 run / 30 passed"
+  echo "$sum" | grep -qE ' 33 tests run: 33 passed' && ok "33 rows passed" || bad "not 33 run / 33 passed"
   local id name
   while read -r id name; do
     grep -qE "PASS .*write::tests::$name\$" "$OUT/green-io.txt" || bad "row $id $name did not PASS"
   done < <(rows_from_spec)
+  # W19 and S11 are named by the me#41 review s2 fold, not by a spec section-8 row
+  for name in dev_fd_1_on_a_regular_file_is_written_directly stdin_redirected_from_the_output_file_is_the_same_file; do
+    grep -qE "PASS .*write::tests::$name\$" "$OUT/green-io.txt" || bad "row $name did not PASS"
+  done
   nextest green-ws --workspace --all-targets
   grep -E 'Summary' "$OUT/green-ws.txt" | tail -1
   grep -qE 'Summary .* 0 failed|Summary .* [0-9]+ passed(, [0-9]+ skipped)?$' "$OUT/green-ws.txt" && ! grep -qE '^ +(FAIL|TIMEOUT|SIGABRT) ' "$OUT/green-ws.txt" \

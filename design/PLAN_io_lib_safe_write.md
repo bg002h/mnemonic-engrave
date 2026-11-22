@@ -86,6 +86,7 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [W10] | RED-1 passes (guard) | ATOMIC for every non-regular destination |
 | [W11] | RED-1 passes (guard) | always suffix the name, so 250 bytes exceeds NAME_MAX |
 | [W17] | RED-1 passes (guard) | no stdio-alias rule: ATOMIC on `/dev/stdout` replaces the redirected file's inode |
+| [W19] | GREEN | prefix rule off: ATOMIC on `/dev/fd/1` replaces the redirected file's inode |
 | [W12] | GREEN | limit 201 instead of 200 bytes; or the fallback name changed |
 | [W13] | GREEN | skip `remove_file` after one step; or swallow the step's error |
 | [W14] | GREEN | propagate the directory-sync error |
@@ -101,6 +102,7 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [S8] | RED-2 compile error | let `NonRegular` match `NonRegular` (two pipes would match) |
 | [S9] | RED-2 compile error | compare by path for non-regular files (`/dev/null` matches itself) |
 | [S10] | RED-2 compile error | let `Unknown` match, or panic on a lookup error |
+| [S11] | GREEN | `Endpoint::Stdin` as `Identity::Unknown`; or Stdin reading fd 1 instead of fd 0 |
 
 A mutant that no row turns red is a STOP: paste it and report.
 

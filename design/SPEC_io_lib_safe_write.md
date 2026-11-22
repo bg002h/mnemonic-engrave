@@ -91,7 +91,7 @@ create on Unix, `set_permissions(0600)` on the open handle on Unix, `set_len(0)`
    the preflight, the rename would silently replace a file the holder made read-only, a promise change).
 6. On Unix, `set_permissions(0600)` on the temp handle (umask cannot loosen or tighten the result; parity with
    F-244).
-7. `write_all(bytes)`, then `sync_all()`, then drop (close) the handle.
+7. `write_all(bytes)`, then `sync_all()`, then drop (close) the handle. On Apple targets a `sync_all` error with `raw_os_error() == Some(45)` (ENOTSUP) is followed by a plain `fsync(2)`, whose result is step 7's result (section 6, macOS).
 8. `std::fs::rename(temp, final)`. No copy fallback: a rename that fails (a bind-mounted target, `EXDEV`, `EBUSY`,
    Windows sharing violation) is a refusal. **Rename across filesystems = refuse.**
 9. On any error in steps 6 to 8 (and step 5, above): `remove_file(temp)` (its own error ignored), then return the step's error. The old
@@ -122,7 +122,7 @@ tightening already intends); no `sync_all` in DIRECT (today has none).
 | hard-linked target | ATOMIC | replaced at the given name only; the other name keeps the old bytes (CHANGE, ruled) |
 | directory without write permission, writable file in it | step 4 fails | `Permission denied (os error 13)`; old file untouched, bytes and mode (CHANGE, ruled) |
 | ENOSPC / quota / EFBIG during the write | step 7 fails | the OS error; temp removed; old kept (the fix) |
-| failure at fsync of the data | step 7 fails | same |
+| failure at fsync of the data | step 7 fails | same (on Apple, ENOTSUP from `F_FULLFSYNC` first retries with a plain `fsync`; only that one's failure refuses) |
 | run killed mid-write | none | old kept; one 0600 leftover `<name>.<pid>.<n>.tmp` beside it (new, named) |
 | rename refused (bind-mounted target, cross-device, busy, Windows sharing) | step 8 fails | the OS error (a bind-mounted target: `Device or resource busy (os error 16)`, measured); temp removed; old kept |
 | directory fsync fails after the rename | step 10 | ignored; `Ok` |
@@ -165,6 +165,8 @@ directory handle without non-std flags); no `(dev, ino)` check in step 3 (the fi
 file); `std::fs::rename` replaces an existing file, and fails if another process holds the file open without
 delete sharing, which is a refusal with the old file kept. `same_file` per section 5. **PROPOSED.**
 
+**macOS (Apple targets).** std's `sync_all` is `fcntl(F_FULLFSYNC)` with no fallback, and SMB and some FUSE volumes refuse it with ENOTSUP (45). On that error step 7 calls `fsync(2)` itself (declared `extern "C"` against libSystem, which std already links; no dependency, one `unsafe` call, retried on `EINTR`) and uses its result, as Go (go#64215) and SQLite do. Any other `sync_all` error refuses as on every platform. So `--out` to an SMB share keeps working and still flushes before the rename. **RULED** (architect-me41-s1-i1).
+
 ## 7. Holder-visible changes, in one list
 
 1. A failed `--out` write keeps the previous file byte-identical (the fix; md-C4, mk-I1, ms-I13, mt-C3, me-I5, tk-I3).
@@ -199,7 +201,7 @@ bytes of `N` over a 15-byte old file `OLD-VALID-CARD\n`.
 
 RED is two commits. RED-1 adds W1-W4 and the GREEN guards W5-W11 and W17 (all compile against 7caf903a): W1-W4 fail as
 "measured today", W5-W11 and W17 pass. RED-2 adds S1-S10: the build fails with E0425 on `same_file`; record that output.
-W12-W16 land in the GREEN commit, with the seam and the temp-name function they call. Measured results on
+W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name function they call. Measured results on
 `7caf903a` are given.
 
 | row | kind | setup | expected after the fix | measured today |
@@ -223,6 +225,7 @@ W12-W16 land in the GREEN commit, with the seam and the temp-name function they 
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |
 | W15 `a_stale_leftover_is_skipped_and_left_alone` (unix) | new | pre-create `card.txt.<own pid>.0.tmp` = `stale` | `Ok`; target new; the stale file still holds `stale` | n/a |
 | W16 `the_temp_name_search_stops_after_100_taken_names` (unix) | new | pre-create `card.txt.<own pid>.<n>.tmp` for n 0 to 99 | `Err` kind `AlreadyExists`; target `old`; the 100 files unchanged | n/a |
+| W18 `enotsup_from_the_full_sync_falls_back_to_fsync_on_apple_only` | new | calls the private `full_sync_or_plain` with injected results, then `sync_temp` on a local temp file | apple + 45: the plain result stands (Ok, then os 5), called twice; apple + os 5 / os 22: returned, no call; apple + Ok: Ok, no call; not apple + 45: os 45, no call; `sync_temp` Ok | n/a (new function) |
 | S1 `the_same_path_twice_is_the_same_file` | RED (compile) | existing file | `Some(0)` | `same_file` absent: E0425 |
 | S2 `a_hard_link_is_the_same_file` (unix) | RED (compile) | `a`, `b` hard link | `same_file(Path(a), [Path(b)])` = `Some(0)` | E0425 |
 | S3 `a_symlink_is_the_same_file` | RED (compile; symlink creation cfg(unix)) | `link` -> `real` | `Some(0)` | E0425 |

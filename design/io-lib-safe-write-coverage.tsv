@@ -22,7 +22,7 @@
 22	3	FIFO, char or block device, socket, directory, a pipe or tty behind `/dev/stdout`	W9
 23	3	`Ok` and `is_file()`: mode REPLACE.	W3
 24	3	`/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes	CODE
-25	3	(`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: DIRECT.	CODE
+25	3	(`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: DIRECT.	W19
 26	3	At most 40 hops; a 41st hop	CODE
 27	3	same `(dev, ino)` as step 1; otherwise DIRECT (this sends any race to today's path).	CODE
 28	3	ABSENT: `symlink_metadata(final)` must be `NotFound`; otherwise	CODE
