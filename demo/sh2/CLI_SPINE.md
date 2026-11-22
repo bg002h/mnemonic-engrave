@@ -32,7 +32,7 @@ Each release carries checksum files; verify before running (`md`, `ms` and
 ```sh
 curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.21.0/SHA256SUMS.portable
 curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.21.0/SHA256SUMS.portable
-curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/SHA256SUMS.portable
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.1/SHA256SUMS.portable
 shasum -a 256 -c md.sums --ignore-missing
 shasum -a 256 -c ms.sums --ignore-missing
 shasum -a 256 -c tk.sums --ignore-missing
@@ -44,7 +44,7 @@ Linux: md stays in portable; ms and mnemonic use SHA256SUMS.x86_64:
 # md's linux-amd64 is in SHA256SUMS.portable; ms and mnemonic are in SHA256SUMS.x86_64
 curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.21.0/SHA256SUMS.portable
 curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.21.0/SHA256SUMS.x86_64
-curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/SHA256SUMS.x86_64
+curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.1/SHA256SUMS.x86_64
 sha256sum -c --ignore-missing md.sums
 sha256sum -c --ignore-missing ms.sums
 sha256sum -c --ignore-missing tk.sums
