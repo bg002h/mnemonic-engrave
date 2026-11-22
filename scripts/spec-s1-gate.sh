@@ -82,7 +82,7 @@ Card k of N: <kind>, begins <begins>, ends <ends>
 Card k of N | Plate p of q
 Choose engraving
 Stopped before plate p of q of card k of N. To finish this card, choose card k in the list again: it starts again at its plate 1.
-Cards k to N of this kit are cut.
+Cards s to N of this kit are cut.
 Card N of this kit is cut.
 Card k of N, plate p of q does not fit on a plate, so this kit cannot be engraved on this machine.
 Refugium build: secrets travel only in the Sealed Payload, never in this one. Unload this payload unless you mean to engrave its secret now.

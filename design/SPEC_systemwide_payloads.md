@@ -1855,11 +1855,12 @@ payload, or a payload that offers no kit, Engrave Bundle is unchanged.
 
 **The kit list**, titled "Engrave Kit": a paged, selectable list (the unlock
 plate list's pattern: Back, Page, OK). Its first line is "N cards, M plates.
-Start at:" and each entry reads "Card k of N: <kind>, begins <begins>, ends
+Start at:" (with "1 card" and "1 plate" as in the menu) and each entry reads "Card k of N: <kind>, begins <begins>, ends
 <ends>", with " (cut)" appended when every plate of that card has been cut
-since this payload was loaded. The highlight opens on card 1, and after a pause
-on the paused card. OK starts the run at the highlighted card; Back returns to
-the carousel.
+since this payload was loaded. The highlight opens on card 1 when the list is
+entered from the menu or from Engrave Bundle and after a run reaches the end of
+the kit; after a run stops by Back, it opens on the card the run stopped in.
+OK starts the run at the highlighted card; Back returns to the carousel.
 
 **The run** cuts the cards from the chosen card k to card N, in list order.
 For each plate, a choice screen titled "Card k of N | Plate p of q", lead
@@ -1873,9 +1874,9 @@ screen again. Back on the choice screen:
   q of card k of N. To finish this card, choose card k in the list again: it
   starts again at its plate 1." and then returns to the kit list.
 
-After the last plate of card N, a screen titled "Engrave Kit" says "Cards k to
-N of this kit are cut." ("Card N of this kit is cut." when k = N), then the kit
-list returns. The ms1 reminder that ends Engrave Bundle's gather flow is not
+After the last plate of card N, a screen titled "Engrave Kit" says "Cards s to
+N of this kit are cut.", s being the card the run started at ("Card N of this
+kit is cut." when s = N), then the kit list returns. The ms1 reminder that ends Engrave Bundle's gather flow is not
 shown: a kit's seeds come through the Sealed Payload. A plate that does not lay
 out (which the shared geometry should make impossible) shows a screen titled
 "Engrave Kit" saying "Card k of N, plate p of q does not fit on a plate, so
