@@ -2074,8 +2074,7 @@ their construction in `why`. Counts: 13 string, 12 set and 10 kit vectors.
   still refuses an mr1 record, §14d) gains one row for an mr1 string naming
   where it belongs (a `sysw` payload), in lockstep with the me build. The §14g
   sentences are not transcribed there: `me` prints its own (§14h), and the
-  device's "Kit Refused" screen is not on that page. The plan's ME-1 step 3
-  wording, on its own branch, is superseded by this ruling.
+  device's "Kit Refused" screen is not on that page.
 - mr (S3) and mr-gui (S4): the kit payload writer must satisfy §14c and
   §14d, and mr-gui's rows use the kit list's card order and its begins/ends.
 
