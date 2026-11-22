@@ -4,6 +4,20 @@
   "wallet_plates": 4,
   "key_slots": 1,
   "keyless_template": true,
+  "missing_keys": [
+    {
+      "md1_plates": [
+        1
+      ],
+      "key_slots": 1,
+      "present_slots": [],
+      "missing_slots": [
+        {
+          "slot": 0
+        }
+      ]
+    }
+  ],
   "ms1_required": true,
   "sets": [
     {

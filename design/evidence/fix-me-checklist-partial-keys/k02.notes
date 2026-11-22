@@ -1,0 +1,2 @@
+me: NOTE — the md1 policy on plates 1-4 carries the xpubs of key slots @0, @2 only. It does NOT carry the xpub of key slot @1 [b8688df1], and the wallet cannot be restored without it: keep an mk1 card (or the seed) for it. `me bundle` does not match mk1 cards to key slots.
+me: NOTE — this policy declares 3 key slots. `me bundle` cannot know how many of those seeds are yours, so ms1 plates are NOT counted above: hold all 3 and you need 3 of them.

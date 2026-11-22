@@ -1,0 +1,21 @@
+[
+  {
+    "md1_plates": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "key_slots": 3,
+    "present_slots": [
+      0,
+      2
+    ],
+    "missing_slots": [
+      {
+        "slot": 1,
+        "fingerprint": "b8688df1"
+      }
+    ]
+  }
+]

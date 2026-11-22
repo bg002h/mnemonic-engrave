@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`me bundle` names the cosigner keys a partly keyed md1 does not carry**
+  (bughunt-1119 bh-me-C1, Critical). A 2-of-3 md1 carrying one xpub got a
+  checklist that said nothing about the other two, at exit 0; F-602 had
+  covered only the key-less template. Each such policy now gets a NOTE naming
+  its missing key slots (with each slot's fingerprint when the card carries
+  it), and the manifest gains `missing_keys`: one entry per md1 policy that
+  lacks any xpub, key-less templates included. Exit codes and all other fields
+  are unchanged.
+
 ## [0.13.0] - 2026-11-04
 
 ### Added
