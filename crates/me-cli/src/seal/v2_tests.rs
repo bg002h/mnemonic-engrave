@@ -1008,3 +1008,230 @@ fn open_names_the_declared_length_of_a_truncated_blob() {
         "{e:?}"
     );
 }
+
+// ── review rows (rv-me44-s1) ────────────────────────────────────────────────
+mod rv_rows {
+    use super::*;
+    use crate::sysw::mr;
+
+    const ALPHA: &[u8; 32] = b"qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+    /// An mr1 string from its data symbols: the 13-symbol checksum is appended.
+    fn mr1(data: &[u8]) -> String {
+        let mut input = md_codec::bch::hrp_expand("mr");
+        input.extend_from_slice(data);
+        input.extend(std::iter::repeat(0u8).take(13));
+        let p = md_codec::bch::polymod_run(&input) ^ 0x085d21404aee15059u128;
+        let mut all = data.to_vec();
+        for i in 0..13 {
+            all.push(((p >> (5 * (12 - i))) & 31) as u8);
+        }
+        let mut s = String::from("mr1");
+        for v in all {
+            s.push(ALPHA[v as usize] as char);
+        }
+        s
+    }
+
+    /// A chunk: `l`, 20-bit csid, count-1, index, then the slice bytes.
+    fn chunk(csid: u32, count: u8, index: u8, slice: &[u8]) -> String {
+        let mut bits: Vec<u8> = Vec::new();
+        let mut push = |v: u32, n: usize| {
+            for k in (0..n).rev() {
+                bits.push(((v >> k) & 1) as u8);
+            }
+        };
+        push(31, 5);
+        push(csid, 20);
+        push(u32::from(count) - 1, 6);
+        push(u32::from(index), 6);
+        for b in slice {
+            push(u32::from(*b), 8);
+        }
+        while bits.len() % 5 != 0 {
+            bits.push(0);
+        }
+        let data: Vec<u8> = bits
+            .chunks(5)
+            .map(|c| c.iter().fold(0u8, |a, b| (a << 1) | b))
+            .collect();
+        mr1(&data)
+    }
+
+    #[test]
+    fn rv_builder_agrees_with_check_string() {
+        let c = chunk(0x12345, 3, 1, &[0xaa]);
+        let m = mr::check_string(&c).unwrap();
+        let ch = m.chunk.unwrap();
+        assert_eq!((ch.csid, ch.count, ch.index, ch.slice), (0x12345, 3, 1, vec![0xaa]));
+    }
+
+    /// §14b check 5: every symbol of card version 7 (`u`, `a`, `7`) is reserved.
+    #[test]
+    fn rv_reserved_symbols_are_u_a_and_7() {
+        for sym in [b'u', b'a', b'7'] {
+            let v = ALPHA.iter().position(|&a| a == sym).unwrap() as u8;
+            let s = mr1(&[v, 0]);
+            assert_eq!(mr::check_string(&s), Err(mr::MrReason::ReservedSymbol), "{s}");
+        }
+        // The neighbours are single-string cards.
+        for sym in [b'e', b'6', b'm'] {
+            let v = ALPHA.iter().position(|&a| a == sym).unwrap() as u8;
+            assert!(mr::check_string(&mr1(&[v, 0])).is_ok());
+        }
+    }
+
+    /// §14c / the coordinator's run ruling: a group is full at its FIRST
+    /// string's count, so a later string that says a smaller count still joins
+    /// the group and is refused as SET_COUNT (record 2).
+    #[test]
+    fn rv_run_group_is_bound_by_the_first_strings_count() {
+        let recs = vec![
+            chunk(0xabcde, 3, 0, &[1]),
+            chunk(0xabcde, 3, 1, &[2]),
+            chunk(0xabcde, 2, 2, &[3]),
+        ];
+        let e = mr::check_sets(&recs).unwrap_err();
+        assert_eq!(e.reason, mr::Reason::SetCount, "{e:?}");
+        assert!(
+            matches!(e.detail, mr::Detail::Count { record: 2, count: 2, first_count: 3, .. }),
+            "{e:?}"
+        );
+    }
+
+    fn seal6(public: Vec<String>, words: &str, pw: u8, it: u32) -> Result<Vec<u8>, SealError> {
+        seal_v2_deterministic(
+            Payload { public, secret: vec![s(A16)] },
+            None,
+            words,
+            pw,
+            it,
+            rep([0x0b, 0xad]),
+            rep([0x0c, 0x01]),
+        )
+    }
+
+    /// S1b §14.3 / §14.7: the writer's header refusals, each before any KDF.
+    #[test]
+    fn rv_seal_v2_refuses_the_header_cases_open_refuses() {
+        let t = Instant::now();
+        for pw in [1u8, 5, 13, 255] {
+            let e = seal6(vec![], ABANDON12, pw, 600_000).unwrap_err();
+            assert!(matches!(e, SealError::PwForm(b) if b == pw), "{pw}: {e:?}");
+        }
+        for it in [99_999u32, 2_000_001] {
+            let e = seal6(vec![], ABANDON12, 0, it).unwrap_err();
+            assert!(matches!(e, SealError::Iterations(n) if n == it), "{it}: {e:?}");
+        }
+        let e = seal6(vec![s(A16)], ABANDON12, 0, 100_000).unwrap_err();
+        assert!(matches!(e, SealError::SecretInPublic(0)), "{e:?}");
+        assert!(t.elapsed() < Duration::from_millis(500), "before any KDF work");
+    }
+
+    /// §14.4 check 3: lower-case hex, even, at least 2 digits, UTF-8.
+    #[test]
+    fn rv_titles_not_hex_cases() {
+        let block = hex(b"refugium-plates 2\ntitle SEED A\n");
+        let rec = |t: &str| vec![s(A16), s(t)];
+        let nothex = |t: String| {
+            let e = titles::check_titles(&rec(&t)).unwrap_err();
+            assert_eq!(e, titles::TitlesError::NotHex, "{t}");
+        };
+        nothex(format!("text:{}", block.to_uppercase()));
+        nothex(format!("text:{}0", block));
+        nothex("text:".to_string());
+        nothex("text:ff0a".to_string());
+        assert!(titles::check_titles(&rec(&format!("text:{block}"))).is_ok());
+    }
+
+    /// §14.4: all 33 titles, and the letter is the TOP nibble.
+    #[test]
+    fn rv_titles_letters_p_and_top_nibble() {
+        assert!(titles::encode_titles(&["SEED P", "HOT SEED P", "HOT SEED A"]).is_ok());
+        let m = ms_codec::encode(
+            ms_codec::Tag::ENTR,
+            &ms_codec::Payload::Entr(vec![0x1f; 16]),
+        )
+        .unwrap();
+        assert_eq!(titles::ms1_letter(&m), Some('B'));
+        let m = ms_codec::encode(
+            ms_codec::Tag::ENTR,
+            &ms_codec::Payload::Entr(vec![0xf1; 16]),
+        )
+        .unwrap();
+        assert_eq!(titles::ms1_letter(&m), Some('P'));
+    }
+
+    /// §14.7 read side: a section that is not UTF-8 is `NotUtf8`.
+    #[test]
+    fn rv_decode_section_not_utf8() {
+        assert_eq!(
+            container::decode_section(&[0xff, 0xfe]),
+            Err(container::ContainerError::NotUtf8)
+        );
+    }
+
+    /// `TooShort` keeps its own text.
+    #[test]
+    fn rv_too_short_text() {
+        let b = blob_of("V2-A");
+        let e = open(&b[..40], BEEF6).err().unwrap();
+        assert_eq!(e.to_string(), "blob too short: 40 bytes, need at least 52");
+    }
+
+    /// `[mdmk-decode]` run grouping (S1 §14d): a group is full at its FIRST
+    /// string's count, so a later string that says a smaller count still joins.
+    #[test]
+    fn rv_mdmk_run_group_is_bound_by_the_first_strings_count() {
+        let rewrite = |src: &str, count: u8, index: u8| -> String {
+            let (mut bytes, nbits) = md_codec::codex32::unwrap_string(src).unwrap();
+            let mut put = |at: usize, v: u32, n: usize| {
+                for k in 0..n {
+                    let bit = ((v >> (n - 1 - k)) & 1) as u8;
+                    let pos = at + k;
+                    bytes[pos / 8] = (bytes[pos / 8] & !(0x80 >> (pos % 8))) | (bit << (7 - pos % 8));
+                }
+            };
+            put(25, u32::from(count) - 1, 6);
+            put(31, u32::from(index), 6);
+            md_codec::codex32::wrap_payload(&bytes, nbits).unwrap()
+        };
+        let recs = vec![
+            rewrite(D_PUBLIC[2], 3, 0),
+            rewrite(D_PUBLIC[3], 3, 1),
+            rewrite(D_PUBLIC[4], 2, 1),
+        ];
+        let cards = crate::sysw::record::mdmk_cards(&recs);
+        assert_eq!(cards.len(), 1, "{cards:?}");
+        assert_eq!(cards[0].members.len(), 3);
+    }
+
+    /// §6.4 / §14.7: the 24-record cap spans both sections. Five public and
+    /// twenty secret records fit each section and not the payload: the writer
+    /// refuses it and the reader refuses what the raw builder wrote.
+    #[test]
+    fn rv_record_cap_spans_both_sections() {
+        let public: Vec<String> = D_PUBLIC.iter().map(|x| s(x)).collect();
+        let secret: Vec<String> = (0..20).map(|_| s(A16)).collect();
+        let e = seal_v2_deterministic(
+            Payload { public: public.clone(), secret: secret.clone() },
+            None,
+            BEEF6,
+            6,
+            600_000,
+            rep([0x0b, 0xad]),
+            rep([0x0c, 0x01]),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(e, SealError::Container(container::ContainerError::RecordCount(25))),
+            "{e:?}"
+        );
+        let blob = raw_blob(&v("cap", 6, BEEF6, 600_000, rep([0x0b, 0xad]), rep([0x0c, 0x01]), public, secret));
+        let e = open(&blob, BEEF6).err().unwrap();
+        assert!(
+            matches!(e, OpenError::Container(container::ContainerError::RecordCount(25))),
+            "{e:?}"
+        );
+    }
+}
