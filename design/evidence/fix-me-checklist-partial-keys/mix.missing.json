@@ -1,0 +1,44 @@
+[
+  {
+    "md1_plates": [
+      1
+    ],
+    "key_slots": 3,
+    "present_slots": [],
+    "missing_slots": [
+      {
+        "slot": 0,
+        "fingerprint": "73c5da0a"
+      },
+      {
+        "slot": 1,
+        "fingerprint": "b8688df1"
+      },
+      {
+        "slot": 2,
+        "fingerprint": "28645006"
+      }
+    ]
+  },
+  {
+    "md1_plates": [
+      2,
+      3,
+      4
+    ],
+    "key_slots": 3,
+    "present_slots": [
+      0
+    ],
+    "missing_slots": [
+      {
+        "slot": 1,
+        "fingerprint": "b8688df1"
+      },
+      {
+        "slot": 2,
+        "fingerprint": "28645006"
+      }
+    ]
+  }
+]
