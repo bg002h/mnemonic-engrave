@@ -2592,11 +2592,13 @@ Inputs. The ms1 strings are `ms encode --hex -` (ms 0.20.4) of test entropies: `
 | N-empty | `beef` × 6 (6) | — | `A16`, titles block of the magic line only | `Empty`, T-1 |
 | N-floor-599999 | `beef` × 6 (6), **599,999 iterations** | — | `A16`, `P`, titles `SEED A`, `KEEP; DO NOT LOAD` (V2-A's records) | `WireError::PwFormIterations(599999)`, `iteration count 599999 out of range [600000, 2000000] for a 6 to 12 word password`, at the header, before any word check or KDF; device `Payload unreadable.` Its accepted side is V2-A (offset 11 = 6, exactly 600,000) and, for the unchanged lower bound, V2-C (offset 11 = 0, 100,000) |
 | N-share | `beef` × 6 (6) | — | the BIP-93 share `ms13casha320zyxwvutsrqpnmlkjhgfedca2a8d0zehn8a0t`, `P`, titles `SEED A`, `KEEP; DO NOT LOAD` (V2-A's shape, `A16` replaced) | device (Go, which admits what `codex32.New` admits): `NonMs1Secret(0)`, T-1. The Rust `open` refuses it earlier, as `Record { index: 0, .. }` (ms-codec's length refusal; `me seal` prints it today as `record 0 (records count from 0) in the secret section: invalid record: string length 48 outside v0.1 set [50, 56, 62, 69, 75]`) |
+| N-not-hex | `beef` × 6 (6) | — | `A16`, then the record `text:zz` | `NotHex`: `the titles record is not text: followed by lower-case hex of UTF-8`, T-1 |
+| N-mnemonic | `beef` × 6 (6) | — | the BIP-39 mnemonic `abandon` × 11 `about`, titles `SEED A` | `NonMs1Secret(0)`: `titles apply only to ms1 entr records; secret record 0 (records count from 0) is not one`, T-1 (a mnemonic is a secret record, so it is a seed record, but it is not an ms1 entr record: check 8) |
 | N-v1-text | `beef` × 12 (v1) | — | `A16`, titles `SEED A` | `Record { index: 1, .. }` (a v1 `text:` record is a record, §14.4) |
 | N-public-titles | `beef` × 6 (6) | titles `SEED A` | `A16` | `Public(..)`, before any KDF: `record 0 (records count from 0) in the public section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; device `Payload unreadable.` |
 
 Salts and IVs: V2-A `feed`×8 / `face`×6; V2-B `deaf`×8 / `fade`×6; V2-C `dead`×8 / `beef`×6; every N vector salt
-`0bad`×8 (N-floor-599999: `0bee`×8), IV `0c01`×6 … `0c0a`×6, N-v1-text `0c0b`×6 (N-floor-599999: `0c0c`×6) and N-share `0c0d`×6. Every
+`0bad`×8 (N-floor-599999: `0bee`×8), IV `0c01`×6 … `0c0a`×6, N-v1-text `0c0b`×6 (N-floor-599999: `0c0c`×6) N-share `0c0d`×6, N-not-hex `0c0e`×6 and N-mnemonic `0c0f`×6. Every
 N vector with offset 11 = 6 carries 600,000 iterations except N-floor-599999, because 100,000 would be refused at the
 header (§14.2) before the titles check each one exists to reach. N-v1-text is a **v1** payload (offset 8 `0x01`; its `pw_form` cell
 is the reserved byte), the only vector here that is not v2. Titles records as encoded:
@@ -2610,7 +2612,8 @@ N-magic text:726566756769756d2d706c6174657320310a7469746c65205345454420410a
 N-title-set text:726566756769756d2d706c6174657320320a7469746c65205345454420510a
 N-no-final-lf text:726566756769756d2d706c6174657320320a7469746c6520534545442041
 N-empty text:726566756769756d2d706c6174657320320a
-(N-count, N-two, N-not-last, N-public-titles, N-share, N-v1-text: text:726566756769756d2d706c6174657320320a7469746c65205345454420410a)
+N-not-hex text:zz
+(N-count, N-two, N-not-last, N-public-titles, N-share, N-mnemonic, N-v1-text: text:726566756769756d2d706c6174657320320a7469746c65205345454420410a)
 ```
 
 | vector | pw_form | iterations | pub_len | ct_len | records | blob length |
@@ -2630,6 +2633,8 @@ N-empty text:726566756769756d2d706c6174657320320a
 | N-public-titles | 6 | 600000 | 67 | 50 | 2 | 185 |
 | N-floor-599999 | 6 | 599999 | 0 | 242 | 3 | 310 |
 | N-share | 6 | 600000 | 0 | 240 | 3 | 308 |
+| N-not-hex | 6 | 600000 | 0 | 58 | 2 | 126 |
+| N-mnemonic | 6 | 600000 | 0 | 161 | 2 | 229 |
 | N-v1-text | 0 | 100000 | 0 | 118 | 2 | 186 |
 
 | vector | derived key | tag | blob sha256 |
@@ -2649,6 +2654,8 @@ N-empty text:726566756769756d2d706c6174657320320a
 | N-public-titles | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `a3b7904cf57e1bd5edf561a2978258b7` | `ea3a9745ac46620948102ab0a460a714563aa403007e35f5b82daee9abd543b7` |
 | N-floor-599999 | `5faefae09d72d4c9d4a81f0449c392b21acbd2b882a7d7bb5afc2944391a211b` | `11f1e7bccfdd56728796835b3eb08e69` | `54f6cc76a5e94f24f43f6b0492be2ac061cfdd4ea06408c0b6abbd9e40c280d7` |
 | N-share | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `2d9fa2dd73451640226cee5006819dbc` | `e254d0bc69125096557754b625aa72bcaa3e33d08041505de1feef6d513be620` |
+| N-not-hex | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `f00d80f68d3a83fbdef6c4f22c0e08b0` | `d2b31db4bc5be9f72ca44431bbcbb1ae9e0d6bfccd068d77e9fdd902aa6aa472` |
+| N-mnemonic | `c89a222034c1c198d154757ff218c1fe6faa97174ac575493b121fd64d5c8d75` | `e9cc62cfdadc2f266d8e4007119e1ead` | `916a9c96ff03cd6b62688d1297adda8d31998454c54e521fb08619f7d562b54c` |
 | N-v1-text | `f9d64e3768933e7640594111d09cd7292a79ad67087e2793b910e5c8a172fede` | `7084c887b52f7df2e780d2aca5e508f2` | `40d0921bb243e842518d4dbf3d7cc7e7f06bf7a75e7a181b2b54836ae244a35c` |
 
 ```
@@ -2682,6 +2689,10 @@ N-floor-599999  4d4e454d424c4f4202010106000927bf0bee0bee0bee0bee0bee0bee0bee0bee
                 0c0c0c0c0c0c0c0c0c0c0c0c00000000000000f2
 N-share         4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
                 0c0d0c0d0c0d0c0d0c0d0c0d00000000000000f0
+N-not-hex       4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
+                0c0e0c0e0c0e0c0e0c0e0c0e000000000000003a
+N-mnemonic      4d4e454d424c4f4202010106000927c00bad0bad0bad0bad0bad0bad0bad0bad
+                0c0f0c0f0c0f0c0f0c0f0c0f00000000000000a1
 N-v1-text       4d4e454d424c4f4201010100000186a00bad0bad0bad0bad0bad0bad0bad0bad
                 0c0b0c0b0c0b0c0b0c0b0c0b0000000000000076
 ```

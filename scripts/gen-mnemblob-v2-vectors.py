@@ -60,6 +60,7 @@ FLOOR_TEXTS = [
     "`{f_nc}` unchanged -> accepted",
 ]
 
+ABANDON12 = " ".join(["abandon"] * 11 + ["about"])
 BEEF12 = " ".join(["beef"] * 12)
 BEEF6 = " ".join(["beef"] * 6)
 ZOO12 = " ".join(["zoo"] * 12)
@@ -184,6 +185,13 @@ def vectors():
         # S1b review r1 I-2: a BIP-93 share is an ms1 but has no entr letter (device NonMs1Secret(0), T-1).
         build("N-share", 6, BEEF6, 600_000, neg_salt, rep("0c0d", 6), [],
               [SHARE, MS1["P"], titles_record(["title SEED A", "title KEEP; DO NOT LOAD"])]),
+        # S1b r3 I-2, closed by the S2 plan (row v2_titles_refusals): a titles record that is not hex
+        # (NotHex, T-1) and a BIP-39 mnemonic in the encrypted section of a titled payload (check 8: the
+        # mnemonic is a secret record but not an ms1 entr record, NonMs1Secret(0), T-1).
+        build("N-not-hex", 6, BEEF6, 600_000, neg_salt, rep("0c0e", 6), [],
+              [MS1["A16"], "text:zz"]),
+        build("N-mnemonic", 6, BEEF6, 600_000, neg_salt, rep("0c0f", 6), [],
+              [ABANDON12, titles_record(["title SEED A"])]),
         build("N-v1-text", 0, BEEF12, 100_000, neg_salt, rep("0c0b", 6), [],
               [MS1["A16"], titles_record(["title SEED A"])], version=1),
     ]
