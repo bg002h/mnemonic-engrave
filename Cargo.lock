@@ -545,8 +545,8 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "md-codec"
-version = "0.48.4"
-source = "git+https://github.com/bg002h/descriptor-mnemonic?rev=6cf6599ab71eb37adef836641095fb3c8756784f#6cf6599ab71eb37adef836641095fb3c8756784f"
+version = "0.48.5"
+source = "git+https://github.com/bg002h/descriptor-mnemonic?rev=c8bb97a5e2feccded5f05caf4c79c2458756c1c2#c8bb97a5e2feccded5f05caf4c79c2458756c1c2"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -616,8 +616,8 @@ dependencies = [
 
 [[package]]
 name = "ms-codec"
-version = "0.10.0"
-source = "git+https://github.com/bg002h/mnemonic-secret?rev=e5dff6f9c2b7ae7dc02a4a137e7322abab32211e#e5dff6f9c2b7ae7dc02a4a137e7322abab32211e"
+version = "0.10.1"
+source = "git+https://github.com/bg002h/mnemonic-secret?rev=62b4d9dc903566bc648dbf347bf571f9451ae817#62b4d9dc903566bc648dbf347bf571f9451ae817"
 dependencies = [
  "getrandom 0.3.4",
  "pbkdf2",
@@ -628,8 +628,8 @@ dependencies = [
 
 [[package]]
 name = "mt-codec"
-version = "0.1.0"
-source = "git+https://github.com/bg002h/mnemonic-transaction?rev=72b79b8762ec208b6143afade8c4b66a551bd29d#72b79b8762ec208b6143afade8c4b66a551bd29d"
+version = "0.2.0"
+source = "git+https://github.com/bg002h/mnemonic-transaction?rev=eec7910b06b6f6bc528de5731708c29cf7e37acd#eec7910b06b6f6bc528de5731708c29cf7e37acd"
 dependencies = [
  "bitcoin",
  "thiserror",
