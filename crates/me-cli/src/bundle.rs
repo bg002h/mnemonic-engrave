@@ -579,6 +579,7 @@ pub fn run_bundle(input: &str) -> Result<Manifest, BundleError> {
         wallet_plates: total_plates,
         key_slots,
         keyless_template,
+        missing_keys: Vec::new(),
         ms1_required: true,
         sets,
         plates,

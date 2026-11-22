@@ -44,5 +44,8 @@ emit k1only md encode "$T" "${P[@]}" "${F3[@]}" --key "@1=$K1"
 emit k02    md encode "$T" "${P[@]}" "${F3[@]}" --key "@0=$K0" --key "@2=$K2"
 emit k3     md encode "$T" "${P[@]}" "${F3[@]}" --key "@0=$K0" --key "@1=$K1" --key "@2=$K2"
 emit k1nofp md encode "$T" "${P[@]}" "${F02[@]}" --key "@0=$K0"
+# Taproot shape row (review N3): tr(@0, pk(@1)), the xpub of @1 only.
+TT='tr(@0/<0;1>/*,pk(@1/<0;1>/*))'
+emit tr1    md encode "$TT" "${P[@]}" --fingerprint @0=73c5da0a --fingerprint @1=b8688df1 --key "@1=$K1"
 emit mk1-slot1 mk encode --xpub "$K1" --origin-fingerprint b8688df1 --origin-path "m/48'/1'/0'/2'" --from-md1-set "$D/k1.txt"
 exit $fail

@@ -37,7 +37,7 @@ bad() { echo "FAIL $*"; fail=1; }
 
 echo "== A. CLI rows"
 cargo build --locked -p mnemonic-engrave --bin me >"$LOG/build.log" 2>&1 || { bad "build (see $LOG/build.log)"; exit 1; }
-ME=target/debug/me
+ME="${CARGO_TARGET_DIR:-target}/debug/me"
 while IFS=: read -r case inputs; do
     [ -z "$case" ] && continue
     : >"$LOG/$case.in"
@@ -99,6 +99,7 @@ for t in \
     template_and_partial_policies_are_reported_in_plate_order \
     partial_keys_note_fires_with_the_mk1_card_present \
     partial_keys_note_single_plate_form \
+    partial_keys_taproot_key_on_second_slot_names_slot_zero \
     a_keyless_template_says_the_cosigner_cards_are_missing \
     bundle_manifest_golden; do
     n=$(grep -cE "^ *PASS .*[ :]$t\$" "$LOG/nextest.log")

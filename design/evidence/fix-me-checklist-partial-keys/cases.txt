@@ -6,3 +6,4 @@ k3:k3
 k0:k0
 mix:k1,k0
 k1mk:k1,mk1-slot1
+tr1:tr1

@@ -69,6 +69,31 @@ pub struct PlateEntry {
     pub preview: Option<String>,
 }
 
+/// One slot of an md1 policy whose card does not carry that slot's xpub
+/// (bh-me-C1).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct MissingSlot {
+    pub slot: u8,
+    /// The card's fingerprint record entry FOR THIS SLOT, 8 lowercase hex
+    /// digits; omitted when the card has none (never fabricated).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+}
+
+/// One md1 policy (an unchunked string or a chunk set) that lacks the xpub of
+/// at least one of its key slots (bh-me-C1).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct MissingKeys {
+    /// The `plate` numbers of this policy's md1 plates, ascending.
+    pub md1_plates: Vec<usize>,
+    /// The policy's declared key slots (`Descriptor.n`).
+    pub key_slots: usize,
+    /// Slot indices whose xpub the card carries, ascending (may be empty).
+    pub present_slots: Vec<u8>,
+    /// Slots without an xpub, ascending.
+    pub missing_slots: Vec<MissingSlot>,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct Manifest {
     pub tool: &'static str,
@@ -91,6 +116,10 @@ pub struct Manifest {
     /// True when a decoded md1 is a TEMPLATE: no `Pubkeys` TLV, so the plate
     /// carries the policy and none of the cosigner keys (F-602).
     pub keyless_template: bool,
+    /// Every md1 policy that lacks at least one xpub, in plate order; omitted
+    /// when none does (bh-me-C1).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub missing_keys: Vec<MissingKeys>,
     pub ms1_required: bool,
     pub sets: Vec<SetEntry>,
     pub plates: Vec<PlateEntry>,
@@ -314,6 +343,35 @@ mod tests {
         assert_eq!(serde_json::to_value(Integrity::Na).unwrap(), "n/a");
     }
 
+    /// T9 (bh-me-C1): the single-plate form of the partial-keys note. MUTATION:
+    /// render `plates {a}-{b}` from the plate count -> `plates 2-2`.
+    #[test]
+    fn partial_keys_note_single_plate_form() {
+        let m = Manifest {
+            tool: "me",
+            version: "x.y.z",
+            hashlock_kinds: Vec::new(),
+            wallet_plates: 3,
+            key_slots: 2,
+            keyless_template: false,
+            missing_keys: vec![MissingKeys {
+                md1_plates: vec![2],
+                key_slots: 2,
+                present_slots: vec![0],
+                missing_slots: vec![MissingSlot {
+                    slot: 1,
+                    fingerprint: None,
+                }],
+            }],
+            ms1_required: true,
+            sets: Vec::new(),
+            plates: Vec::new(),
+        };
+        let want = "me: NOTE — the md1 policy on plate 2 carries the xpub of key slot @0 only. It does NOT carry the xpub of key slot @1, and the wallet cannot be restored without it: keep an mk1 card (or the seed) for it. `me bundle` does not match mk1 cards to key slots.\n";
+        let c = m.checklist();
+        assert!(c.contains(want), "partial-keys line missing:\n{c}");
+    }
+
     #[test]
     fn checklist_lists_public_plates_and_ms1_reminder() {
         let m = Manifest {
@@ -323,6 +381,7 @@ mod tests {
             wallet_plates: 3,
             key_slots: 3,
             keyless_template: false,
+            missing_keys: Vec::new(),
             ms1_required: true,
             sets: vec![SetEntry {
                 kind: Kind::Mk1,
@@ -408,6 +467,7 @@ mod tests {
             wallet_plates: 3,
             key_slots: 3,
             keyless_template: false,
+            missing_keys: Vec::new(),
             ms1_required: true,
             sets: Vec::new(),
             plates: Vec::new(),
