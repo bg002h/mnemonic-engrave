@@ -49,19 +49,19 @@
     <tr><th>Windows</th><td><code>windows-amd64</code></td><td><code>windows-amd64</code></td></tr>
   </table>
   <div class="code"><pre><code><span class="c"># the descriptor tool</span>
-curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.8/md-0.20.8-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.21.0/md-0.21.0-macos-amd64.tar.gz
 <span class="c"># the seed tool</span>
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.6/ms-0.20.6-macos-amd64.tar.gz
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.21.0/ms-0.21.0-macos-amd64.tar.gz
 
-tar -xzf md-0.20.8-macos-amd64.tar.gz
-tar -xzf ms-0.20.6-macos-amd64.tar.gz
+tar -xzf md-0.21.0-macos-amd64.tar.gz
+tar -xzf ms-0.21.0-macos-amd64.tar.gz
 chmod +x md ms</code></pre></div>
 
   <p>Linux x86-64, ready to paste:</p>
-  <div class="code"><pre><code>curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.8/md-0.20.8-linux-amd64.tar.gz
-curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.6/ms-0.20.6-x86_64-linux-musl.tar.gz
-tar -xzf md-0.20.8-linux-amd64.tar.gz
-tar -xzf ms-0.20.6-x86_64-linux-musl.tar.gz
+  <div class="code"><pre><code>curl -LO https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.21.0/md-0.21.0-linux-amd64.tar.gz
+curl -LO https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.21.0/ms-0.21.0-x86_64-linux-musl.tar.gz
+tar -xzf md-0.21.0-linux-amd64.tar.gz
+tar -xzf ms-0.21.0-x86_64-linux-musl.tar.gz
 chmod +x md ms</code></pre></div>
 
   <div class="note warn">
@@ -100,16 +100,16 @@ tar -xzf mnemonic-0.107.0-x86_64-linux-musl.tar.gz &amp;&amp; chmod +x mnemonic<
 
   <p><b>Check what you downloaded</b> (<code>md</code>, <code>ms</code> and
   <code>mnemonic</code>). Each release ships checksum files. macOS (Intel or Apple Silicon):</p>
-  <div class="code"><pre><code>curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.8/SHA256SUMS.portable
-curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.6/SHA256SUMS.portable
+  <div class="code"><pre><code>curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.21.0/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.21.0/SHA256SUMS.portable
 curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/SHA256SUMS.portable
 shasum -a 256 -c md.sums --ignore-missing
 shasum -a 256 -c ms.sums --ignore-missing
 shasum -a 256 -c tk.sums --ignore-missing</code></pre></div>
   <p>Linux x86-64:</p>
   <div class="code"><pre><code><span class="c"># md's linux-amd64 is in SHA256SUMS.portable; ms and mnemonic are in SHA256SUMS.x86_64</span>
-curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.20.8/SHA256SUMS.portable
-curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.20.6/SHA256SUMS.x86_64
+curl -L -o md.sums https://github.com/bg002h/descriptor-mnemonic/releases/download/descriptor-mnemonic-md-cli-v0.21.0/SHA256SUMS.portable
+curl -L -o ms.sums https://github.com/bg002h/mnemonic-secret/releases/download/ms-cli-v0.21.0/SHA256SUMS.x86_64
 curl -L -o tk.sums https://github.com/bg002h/mnemonic-toolkit/releases/download/mnemonic-toolkit-v0.107.0/SHA256SUMS.x86_64
 sha256sum -c --ignore-missing md.sums
 sha256sum -c --ignore-missing ms.sums

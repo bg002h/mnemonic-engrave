@@ -235,7 +235,7 @@ argv.** §6d enumerates what does not.
 | D1 | **Composition is a shell pipeline into `me sysw pack`.** No new umbrella binary. | a new `m` front-end that sniffs and dispatches |
 | D2 | **Host-side only this cycle.** "Engravable as plaintext in a QR" for `md`/`mk`/`ms` needs new record classes and device rendering; it becomes its own spec with a firmware gate. | doing both at once; device first |
 | D3 | **Refuse secret/bearer material on argv, with `--allow-argv-secret`.** | refusing with no override; warning only; a declared-posture mechanism |
-| D4 | **stdout is canonical (ungrouped); the grouped form moves to the stderr engraving card.** | flipping the default only; teaching `me sysw pack` to strip separators |
+| D4 | **stdout is canonical (ungrouped); the grouped form moves to the stderr engraving card.** **REVERSED by Brian 2026-11-22 — see "D4 reversed" below.** | flipping the default only; teaching `me sysw pack` to strip separators |
 | D5 | **One shared crate owns the IO + safety layer**, depended on by **all six** — `md`, `mk`, `ms`, `mt`, `me`, and the toolkit. | spec + conformance vectors with copied code; a pure-logic crate with per-repo flag wiring |
 | D6 | **`me sysw pack --expect <kinds>` closes C-1**, opt-in, keyed on kinds. | a record COUNT; a conjunction-shaped acceptance form; `pack` running the producers itself |
 | D7 | **This cycle makes the encoding tier UNIFORM and RELOCATES nothing** (§9a). Tier placement is its own cycle. | bundling relocation into this cycle, which would make symmetry wait on placement |
@@ -252,6 +252,21 @@ on top of it.
 `me sysw pack` to strip separators would make admission LOOSER on the
 funds-sensitive side. `me` refuses an elided `md1` deliberately; *"strip whatever
 looks like a separator"* is how a mangled string gets silently accepted.
+
+**D4 reversed (Brian 2026-11-22, typed "B").** `ms`, `md` and `mk` print their
+string **once, on stdout**; the grouped stderr copy is dropped everywhere. `mt
+encode` and `mnemonic bundle` already behave this way and are the model. What
+D4 got right stands: **stdout is the canonical artifact and the default is
+ungrouped**, so `ms encode | me sysw pack`, `md encode | me sysw pack` and `mk
+encode | me sysw pack` still need no `--group-size 0` and no `grep`. What is
+reversed is where the grouped form lives: it is **stdout, on request**
+(`--group-size N`, default `0`), not a second copy on stderr. The reason is the
+one Brian saw: every successful `encode` printed the same string twice, once
+plain and once grouped, and no consumer read the second copy (the 2026-11-22
+sweep: `coordinator/agent-reports/fix-doc-single-print.md`). The per-repo
+changes are `design/FIX_ms_single_print.md` (mnemonic-secret),
+`design/FIX_md_single_print.md` (descriptor-mnemonic) and
+`design/FIX_mk_single_print.md` (mnemonic-key).
 
 **On D5:** four copies of one rule is the shape that let `pack` and
 `pack_deterministic` drift until a vector round-trip caught it — that module's
@@ -646,8 +661,10 @@ Measured stdout, per verb:
 
 **The rule binds `encode` only, this cycle.**
 
-- **`encode`** — stdout is the canonical artifact, ungrouped, nothing else. This
-  is the whole of §3's defect and the whole of D4.
+- **`encode`** — stdout is the canonical artifact, ungrouped by default, nothing
+  else. This is the whole of §3's defect. Since D4's reversal (2026-11-22) it is
+  also the ONLY place the string is printed: `--group-size N` groups it there,
+  on request.
 - **`decode`** — **explicitly out of scope, and named so rather than left
   ambiguous.** `mk decode` and `ms decode` emit labelled multi-field reports
   that scripts read today. Changing them is a breaking change to a
@@ -689,7 +706,20 @@ Measured stdout, per verb:
 - **stdout is used when `--out` is not given.** An earlier draft said *"when
   neither is given"* after a three-item list (M-5); the antecedent is `--out`
   alone, and the input channel has no bearing on where output goes.
-- `--group-size` / `--separator` affect **the stderr card only** (D4).
+- `--group-size` / `--separator` group **stdout, on request** (D4 reversed,
+  2026-11-22). `--group-size` defaults to `0` (unbroken) on `ms encode`, `md
+  encode`, `md descriptor --emit md1` and `mk encode`; `--separator` stays
+  whitespace-only (§6c) and defaults to `space`. `--out FILE` receives exactly
+  the bytes stdout would have carried, grouped or not, as `mt encode --out`
+  does. `--json` ignores both flags (`ms encode --json --out FILE`: FILE is the
+  artifact and follows `--group-size`; the JSON report stays unbroken). No
+  string is repeated on stderr. Out of scope, unchanged: `ms split` (prints
+  each share once, grouped on stdout by default — F-284). `ms hashlock` also
+  prints its preimage ms1 once (coordinator ruling 2026-11-22, applying Brian's
+  "print once"): in text mode without `--out` its stderr card keeps the grouped
+  string, which is then the only copy (stdout never carries it); under `--out
+  FILE` the card line reads `preimage (ms1):  written to FILE`, and under
+  `--json` it reads `preimage (ms1):  in the JSON (preimage_ms1)`. With both `--out FILE` and `--json` it reads `preimage (ms1):  written to FILE and in the JSON (preimage_ms1)`, and the JSON keeps `preimage_ms1` (architect ruling 2026-11-22, FIX_ms_single_print.md Q1). Under `--out FILE` or `--json` the card prints no form of the preimage (its hex and, under `--json`, its phrase record name where they are) and its first line says where the preimage is; text mode without `--out` is unchanged (architect ruling 2026-11-22).
 - **`--json` is UNCHANGED and explicitly OUT OF SCOPE this cycle.**
 
 **On `--json`, correcting a false premise (I-8).** An earlier draft excluded
@@ -758,29 +788,24 @@ exactly the kind an operator carries between tools. **The cost of uniform
 whitespace-only is two cosmetic options; the cost of getting it wrong is a
 plate.**
 
-**D4 moves the grouped form "to the stderr engraving card", and three of the
-five tools have no card to move it to (M-1).** Measured stderr on a successful
-`encode`:
+**D4 moved the grouped form "to the stderr engraving card" (M-1), and P3 then
+invented a card for `md` and `mk`. D4's reversal (Brian 2026-11-22) removes it
+again:** after the reversal no encoder prints its string on stderr. What each
+tool's stderr carries on a successful `encode`, text mode:
 
-| | stderr on success | card-shaped? |
-| --- | --- | --- |
-| `md` | **1 line**, a `note:` — the same whether the output chunks or not | no |
-| `mk` | **1 line**, a `note:` | no |
-| `ms` | **4 lines** — word count, language, a passphrase note, a private-material warning | yes, and `--no-engraving-card` cuts it to the 1 warning |
-| `mt` | a full report plus a `SUGGESTED LEGEND` | yes |
-| `mnemonic` | not measured; it carries `--no-engraving-card` | presumed yes |
+| | stderr on success, after the reversal |
+| --- | --- |
+| `md encode` | `chunk-set-id: 0x<5 hex>` (chunked only), the existing advisories, the output-class `note:` |
+| `md descriptor --emit md1` | as `md encode`, plus its seating notes |
+| `mk encode` | with `--keys` and two or more cards, one `card <i> of <n>: lines <a>-<b>` line per card (the F-311 card boundary); then the output-class `note:` |
+| `ms encode` | `word count: <n>`, `language: <l> (BIP-39 checksum valid)` (phrase input only), `passphrase: not stored in ms1 (record separately if used)`, then the private-material `warning:` (only when stdout carries the ms1). `--no-engraving-card` keeps only the `warning:` |
+| `mt encode` | unchanged: a report plus a `SUGGESTED LEGEND`, no strings |
+| `mnemonic bundle` | unchanged: a metadata panel, no strings |
 
-So D4 requires **inventing an engraving card for `md` and `mk`**, and an earlier
-draft compressed that into three words in the P3 row. **P3 owns the card's
-contents, and the plan must specify them**, or two implementers render them two
-ways. The minimum the card must carry is the grouped string itself, since after
-D4 that is the only place it exists.
-
-**A consequence operators must be told about, because it is new.** After D4,
-`ms encode --no-engraving-card`, and any pipeline using `2>/dev/null`, yield
-**no grouped form anywhere** — today grouping arrives on stdout unconditionally,
-so it survives both. That is the correct behaviour and it is a real change in
-what a redirect throws away.
+**A consequence operators must be told about.** The grouped form now exists
+only when asked for: `ms encode --group-size 5`, `md encode --group-size 5`,
+`mk encode --group-size 5`. A plain `encode` prints the unbroken string, which
+every reading verb of every tool accepts, grouped or not.
 
 **Open interaction, for the plan's reconciliation sweep (M-3).** F-245 is open:
 `me sysw pack` packs a record's trailing whitespace verbatim into the public
@@ -1640,7 +1665,7 @@ receive §6's treatment there.** The tier cycle carries it with them:
 | `--in` / `--out` / `-` on all four encoders | reading material and writing the artifact IS the encoding job; the operator ruled these "very good for all m\*-cli" |
 | the argv refusal and its override | argv arrives at *that* process; `/proc/<pid>/cmdline` is the binary's own, and no other tool can refuse on its behalf |
 | the world-readable and terminal gates | they guard the binary's **own** stdout, which is the artifact it just produced |
-| grouping to the stderr card, whitespace-only separators | presentation of the string that binary encodes |
+| grouping on request (stdout; the stderr card until D4's reversal, 2026-11-22), whitespace-only separators | presentation of the string that binary encodes |
 | exit-code alignment | each tool's own vocabulary |
 | `me sysw pack --expect` | payload prep, in the payload tier |
 
