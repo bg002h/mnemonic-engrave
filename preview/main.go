@@ -13,6 +13,8 @@ import (
 // Keep this as the -X target; do not remove it.
 var version string
 
+const usageLine = "usage: me-preview [--version] | render --format <svg|png> --out <FILE|-> [--mode <text+qr|text|qr>]"
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
@@ -22,7 +24,7 @@ func main() {
 //	0 on success, 1 on a render/usage error.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: me-preview [--version] | render --format <svg|png> --out <FILE|-> [--mode <text+qr|text|qr>]")
+		fmt.Fprintln(stderr, usageLine)
 		return 1
 	}
 
@@ -46,6 +48,13 @@ func runRender(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	format := fs.String("format", "", "output format: svg or png")
 	out := fs.String("out", "", "output file path, or - for stdout")
 	if err := fs.Parse(args); err != nil {
+		return 1
+	}
+	// bh-me-I18: Go's flag package stops at the first non-flag, so anything
+	// after it was silently ignored. Refuse before stdin is read or --out opened.
+	if fs.NArg() > 0 {
+		fmt.Fprintf(stderr, "me-preview: unexpected operand %q\n", fs.Arg(0))
+		fmt.Fprintln(stderr, usageLine)
 		return 1
 	}
 

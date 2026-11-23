@@ -78,7 +78,9 @@ fn conflict(opt: &str, leaf: &str) -> String {
 }
 
 fn notake(opt: &str, leaf: &str) -> String {
-    format!("me: --{opt} is a converter option (me with no subcommand); '{leaf}' does not take it\n")
+    format!(
+        "me: --{opt} is a converter option (me with no subcommand); '{leaf}' does not take it\n"
+    )
 }
 
 #[test]
@@ -86,7 +88,15 @@ fn bh_me_i3_root_in_honoured_by_sysw_pack() {
     let d = setup();
     let o = me_in(
         d.path(),
-        &["--in", "given", "sysw", "pack", "--no-passphrase", "--out", "a1.bin"],
+        &[
+            "--in",
+            "given",
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            "a1.bin",
+        ],
         b"text:6364\n",
     );
     assert_eq!(code(&o), 0, "{}", err(&o));
@@ -101,7 +111,14 @@ fn bh_me_i3_root_out_honoured_by_sysw_pack() {
     let d = setup();
     let o = me(
         d.path(),
-        &["--out", "a2.bin", "sysw", "pack", "--no-passphrase", "text:6869"],
+        &[
+            "--out",
+            "a2.bin",
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "text:6869",
+        ],
     );
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert_eq!(
@@ -162,7 +179,15 @@ fn bh_me_i3_root_converter_option_refused_by_sysw_pack() {
     let d = setup();
     let o = me(
         d.path(),
-        &["--hex", "sysw", "pack", "--no-passphrase", "--out", "a5.bin", "text:6162"],
+        &[
+            "--hex",
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            "a5.bin",
+            "text:6162",
+        ],
     );
     assert_eq!(code(&o), 2);
     assert_eq!(err(&o), notake("hex", "sysw pack"));
@@ -173,11 +198,17 @@ fn bh_me_i3_root_converter_option_refused_by_sysw_pack() {
 fn bh_me_i3_first_misplaced_option_is_named() {
     let d = setup();
     // A5b: the first refused option in command-line order is the one named.
-    let o = me(d.path(), &["--echo", "--in", "given", "bundle", "--in", "other"]);
+    let o = me(
+        d.path(),
+        &["--echo", "--in", "given", "bundle", "--in", "other"],
+    );
     assert_eq!(code(&o), 2);
     assert_eq!(err(&o), notake("echo", "bundle"));
     // A5c: a conflict that comes before a not-taken option is the one named.
-    let o = me(d.path(), &["--in", "given", "--echo", "bundle", "--in", "other"]);
+    let o = me(
+        d.path(),
+        &["--in", "given", "--echo", "bundle", "--in", "other"],
+    );
     assert_eq!(code(&o), 2);
     assert_eq!(err(&o), conflict("in", "bundle"));
 }
@@ -220,9 +251,15 @@ fn bh_me_i3_root_in_honoured_by_seal() {
 #[test]
 fn bh_me_i3_root_out_honoured_by_sysw_wipe() {
     let d = setup();
-    let r = me(d.path(), &["sysw", "wipe", "--fill", "zeros", "--out", "a6c.ref"]);
+    let r = me(
+        d.path(),
+        &["sysw", "wipe", "--fill", "zeros", "--out", "a6c.ref"],
+    );
     assert_eq!(code(&r), 0, "{}", err(&r));
-    let o = me(d.path(), &["--out", "a6c.bin", "sysw", "wipe", "--fill", "zeros"]);
+    let o = me(
+        d.path(),
+        &["--out", "a6c.bin", "sysw", "wipe", "--fill", "zeros"],
+    );
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert_eq!(
         fs::read(d.path().join("a6c.bin")).unwrap(),
@@ -274,7 +311,11 @@ fn bh_me_i3_controls_guard_seal_text_converter_unchanged() {
         &["--out", "a9.uf2", "seal", "--allow-argv-secret", MS1],
     );
     assert_eq!(code(&o), 3);
-    assert!(err(&o).lines().next().unwrap().starts_with("me: argument 5 on ARGV"));
+    assert!(err(&o)
+        .lines()
+        .next()
+        .unwrap()
+        .starts_with("me: argument 5 on ARGV"));
     assert!(!d.path().join("a9.uf2").exists());
     // A10: `--out` in neither place keeps clap's text byte for byte.
     let o = me(d.path(), &["seal", "--plaintext", MD1]);
@@ -309,7 +350,13 @@ fn bh_me_i11_printed_show_command_runs_as_printed() {
     ] {
         let o = me(
             d.path(),
-            &["sysw", "pack", "--no-passphrase", &format!("--out={name}"), "text:6162"],
+            &[
+                "sysw",
+                "pack",
+                "--no-passphrase",
+                &format!("--out={name}"),
+                "text:6162",
+            ],
         );
         assert_eq!(code(&o), 0, "{name}: {}", err(&o));
         let e = err(&o);
@@ -325,7 +372,11 @@ fn bh_me_i11_printed_show_command_runs_as_printed() {
             .output()
             .unwrap();
         assert_eq!(s.status.code(), Some(0), "{name}: {}", err(&s));
-        let digest = |t: &str| t.lines().find(|l| l.starts_with("digest:")).map(str::to_owned);
+        let digest = |t: &str| {
+            t.lines()
+                .find(|l| l.starts_with("digest:"))
+                .map(str::to_owned)
+        };
         let shown = String::from_utf8_lossy(&s.stdout).into_owned() + &err(&s);
         assert!(digest(&e).is_some(), "{name}");
         assert_eq!(digest(&shown), digest(&e), "{name}");
@@ -337,7 +388,14 @@ fn bh_me_i11_printed_show_plain_path_unchanged() {
     let d = setup();
     let o = me(
         d.path(),
-        &["sysw", "pack", "--no-passphrase", "--out", "plain.bin", "text:6162"],
+        &[
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            "plain.bin",
+            "text:6162",
+        ],
     );
     assert_eq!(code(&o), 0, "{}", err(&o));
     assert!(err(&o)
@@ -363,7 +421,10 @@ fn bh_me_i11_printed_picotool_path_is_one_shell_word() {
     );
     assert_eq!(code(&o), 0, "{}", err(&o));
     let e = err(&o);
-    let line = e.lines().find(|l| l.starts_with("load:")).expect("load line");
+    let line = e
+        .lines()
+        .find(|l| l.starts_with("load:"))
+        .expect("load line");
     assert_eq!(line, seal_load_line("'my copy.uf2'"));
     let word = line
         .strip_prefix("load:  picotool load --verify ")

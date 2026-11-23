@@ -949,6 +949,17 @@ they still hold** without a machine, which is what makes the comparison a real
 control rather than a number they must have transcribed correctly the first
 time.
 
+- **Options before a subcommand (bh-me-I3, ruling T32, 2026-11-22).** The converter's options (`--in`, `--out`,
+  `--stdout`, `--hex`, `--base64`, `--echo`, `--allow-world-readable`) may be typed before a subcommand. Each is
+  honoured as if given after the subcommand when the subcommand has an option of the same name; a path option
+  also given after the subcommand with a different value is refused, exit 2; an option the subcommand does not
+  have is refused, exit 2. Nothing is read or written before these checks. The texts are FIX_me_cli_arg_contract
+  §4.
+- **Printed commands (bh-me-I11, 2026-11-22).** A path printed inside a command (`re-print it with: me sysw show
+  …`, and `seal`'s `load:  picotool load --verify …`) is one shell word: plain paths print as is, a leading `-`
+  gets `./`, anything else is single-quoted, and a path that is not UTF-8 or carries a control character or a backslash prints
+  the placeholder `<the file you just wrote>`.
+
 Subcommands sit under `sysw` rather than beside `seal` so that no invocation can
 produce a systemwide container while the operator believes they are producing a
 Sealed Payload one, or vice versa. The two features are frozen apart
