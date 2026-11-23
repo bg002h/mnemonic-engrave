@@ -1622,7 +1622,7 @@ unconfirmed record counts as SECRET.** Nothing is refused: admission (§3.3.2)
 and consumption are untouched.
 
 The set a record belongs to is found by runs (§14d): a record joins the latest
-group of its (hrp, chunk-set id) that holds fewer strings than its count; otherwise it
+group of its (hrp, chunk-set id) that holds fewer strings than the count its first string states; otherwise it
 opens a new group.
 
 Added 2026-08-12, demoting §5.3.2's refusal — §13 D6 records what it was and
@@ -1822,7 +1822,7 @@ the first failure is its reason:
 
 `[mdmk-decode]` (§12.6) groups md1/mk1 records, in every payload, by the same run rule
 (a record joins the latest group of its (hrp, chunk-set id) while that group holds fewer
-strings than its count), on host and device alike, so two complete copies of one mk1
+strings than the count its first string states), on host and device alike, so two complete copies of one mk1
 card each confirm; F1, F2 and F4 read the same grouping.
 
 An eligible kit is a list of **cards** in the order of their first record: an
@@ -1865,10 +1865,16 @@ digest was compared, §12.2), when the payload offers a kit:
   can be engraved as a kit. Write the kit payload again." Its only way on is
   to dismiss it; then the menu shows exactly as it does today.
 
-Both bullets apply every time the payload menu opens while this payload is
-loaded, at boot, after Load Payload and from the carousel. At a load, "Kit
+The payload menu opens after every load of a payload that offers a kit,
+whatever started the load: at boot, from the Load Payload carousel entry with
+nothing loaded, and by LOAD AGAIN. Both bullets apply every time the payload
+menu opens while this payload is loaded, after a load and from the carousel,
+so "Kit Refused" shows once at each load and then the menu. At a load, "Kit
 Refused" comes after the Payload Warnings screen and its KEEP / UNLOAD, and is
-not shown when the holder chose UNLOAD.
+not shown when the holder chose UNLOAD; a load that ends in UNLOAD opens no
+menu. A payload that offers no kit is unchanged (§14d): the menu follows its
+load at boot only, and a load of it from the carousel or by LOAD AGAIN returns
+to the carousel.
 
 The menu already opens at boot after a load (G-P3.15), so this is the boot
 route: a kit payload is one press from the kit list. A payload that offers no
@@ -1885,7 +1891,8 @@ Start at:" (with "1 card" and "1 plate" as in the menu) and each entry reads "Ca
 <ends>", with " (cut)" appended when every plate of that card has been cut
 since this payload was loaded. The highlight opens on card 1 when the list is
 entered from the menu or from Engrave Bundle and after a run reaches the end of
-the kit; after a run stops by Back, it opens on the card the run stopped in.
+the kit; after a run stops by Back, it opens on the card the run stopped in;
+after a plate does not fit, it opens on that plate's card.
 OK starts the run at the highlighted card; Back returns to the carousel.
 
 **The run** cuts the cards from the chosen card k to card N, in list order.
