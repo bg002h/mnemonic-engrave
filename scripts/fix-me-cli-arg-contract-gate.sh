@@ -93,6 +93,11 @@ printf 'text:6364\n' | "$ME" --in given sysw pack --no-passphrase --out a1.bin 2
 [ $rc = 2 ] && [ "$(cat a5c.err)" = "me: --in was given before 'bundle' and again after it, with a different value; give it once, after 'bundle'" ] \
     && ok A5c || { bad "A5c: exit $rc"; head -2 a5c.err | sed 's/^/    got: /'; }
 
+# A5d bh_me_i3_misplaced_option_after_valued_option_is_named (review I1: a value-taking root option does not end the scan)
+"$ME" --in given --hex sysw pack --no-passphrase --out a5d.bin >/dev/null 2>a5d.err; rc=$?
+[ $rc = 2 ] && [ "$(cat a5d.err)" = "me: --hex is a converter option (me with no subcommand); 'sysw pack' does not take it" ] && ! exists a5d.bin \
+    && ok A5d || { bad "A5d: exit $rc"; head -2 a5d.err | sed 's/^/    got: /'; }
+
 # A6 bh_me_i3_root_out_honoured_by_seal
 "$ME" --out a6.uf2 seal --plaintext "$MD1" --plaintext "$MD1B" --plaintext "$MD1C" </dev/null 2>a6.err; rc=$?
 [ $rc = 0 ] && exists a6.uf2 && has_line "load:  picotool load --verify a6.uf2   (machine in BOOTSEL)" a6.err \
@@ -190,6 +195,7 @@ for t in \
     bh_me_i3_root_in_same_value_honoured \
     bh_me_i3_root_converter_option_refused_by_sysw_pack \
     bh_me_i3_first_misplaced_option_is_named \
+    bh_me_i3_misplaced_option_after_valued_option_is_named \
     bh_me_i3_root_out_honoured_by_seal \
     bh_me_i3_root_in_honoured_by_seal \
     bh_me_i3_root_out_honoured_by_sysw_wipe \

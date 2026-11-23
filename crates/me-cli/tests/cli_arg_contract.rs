@@ -436,3 +436,41 @@ fn bh_me_i11_printed_picotool_path_is_one_shell_word() {
         .unwrap();
     assert_eq!(String::from_utf8_lossy(&w.stdout).trim(), "1");
 }
+
+#[test]
+fn bh_me_i3_misplaced_option_after_valued_option_is_named() {
+    let d = setup();
+    // A value-taking root option must not end the scan: `--hex` after
+    // `--in given` is still a root option typed before the subcommand.
+    let o = me(
+        d.path(),
+        &[
+            "--in",
+            "given",
+            "--hex",
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            "z1.bin",
+        ],
+    );
+    assert_eq!(code(&o), 2, "{}", err(&o));
+    assert_eq!(err(&o), notake("hex", "sysw pack"));
+    assert!(!d.path().join("z1.bin").exists());
+    let o = me(
+        d.path(),
+        &[
+            "--in",
+            "given",
+            "--base64",
+            "sysw",
+            "pack",
+            "--no-passphrase",
+            "--out",
+            "z2.bin",
+        ],
+    );
+    assert_eq!(code(&o), 2, "{}", err(&o));
+    assert_eq!(err(&o), notake("base64", "sysw pack"));
+}

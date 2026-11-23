@@ -170,6 +170,7 @@ that master happens to satisfy, because the second value wins).
 | A5 | `bh_me_i3_root_converter_option_refused_by_sysw_pack` (STOP-1) | exit 2; stderr is exactly T-NOTAKE(`hex`, `sysw pack`); no `a5.bin` | exit 0 (RED) |
 | A5b | `bh_me_i3_first_misplaced_option_is_named` (STOP-1) | `me --echo --in given bundle --in other`: exit 2; stderr is exactly T-NOTAKE(`echo`, `bundle`) | exit 4 (RED) |
 | A5c | same test (P-2: command-line order) | `me --in given --echo bundle --in other`: exit 2; stderr is exactly T-CONFLICT(`in`, `bundle`) | exit 4 (RED) |
+| A5d | `bh_me_i3_misplaced_option_after_valued_option_is_named` (review-build5-me-cli-arg-contract I1: a value-taking root option does not end the scan) | `me --in given --hex sysw pack --no-passphrase --out z1.bin`: exit 2; stderr is exactly T-NOTAKE(`hex`, `sysw pack`); no `z1.bin`; the same with `--base64` and `z2.bin` | not run at master; RED with the value-skip disabled (review plant P1) |
 | A6 | `bh_me_i3_root_out_honoured_by_seal` | exit 0; `a6.uf2` exists; stderr line `load:  picotool load --verify a6.uf2   (machine in BOOTSEL)` | exit 2, clap missing `--out` (RED) |
 | A6b | `bh_me_i3_root_in_honoured_by_seal` | `me --in recs.txt seal --out a6b.uf2 </dev/null` (recs.txt = the three md1 test cards, one per line): exit 0; `a6b.uf2` exists; stderr line `load:  picotool load --verify a6b.uf2   (machine in BOOTSEL)` | exit 2, `me: nothing to seal` (RED) |
 | A6c | `bh_me_i3_root_out_honoured_by_sysw_wipe` | `me --out a6c.bin sysw wipe --fill zeros`: exit 0; `a6c.bin` byte-equal to `me sysw wipe --fill zeros --out a6c.ref`; stdout 0 bytes | exit 0, `a6c.bin` absent, 65,536 bytes on stdout (RED) |
@@ -197,7 +198,7 @@ on tempdir paths, which D6.3 prints unchanged; `seal_cli.rs:360` anchors on the 
 
 New tests, each named exactly as in §5 (the gate counts each PASS once):
 
-- `crates/me-cli/tests/cli_arg_contract.rs` (new): the fifteen Rust tests of §5. Each runs the built binary in its own
+- `crates/me-cli/tests/cli_arg_contract.rs` (new): the sixteen Rust tests of §5. Each runs the built binary in its own
   tempdir as the current directory, so the printed paths are the relative names the rows pin.
   `bh_me_i3_controls_guard_seal_text_converter_unchanged` holds A9, A10 and A11.
   `bh_me_i11_printed_show_command_runs_as_printed` runs the printed tail through `sh -c` with the directory of
