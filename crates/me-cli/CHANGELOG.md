@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`me bundle --preview` trusts the sidecar's version probe only when it exits 0 and prints exactly `me-preview <version>`** (bughunt-1119 bh-me-I19, Important). A probe that exits non-zero is refused with exit 2 and the sidecar's stderr; any other output shape is refused as before for an unreadable version; no plate is rendered. `scripts/build-preview.sh --check` no longer approves a sidecar whose probe exits non-zero, and compares the probe's stdout only. The developer gates bh-me-I12, I13 and I14 (mt1 vector generator, SH2 demo build) are fixed alongside.
 - **A converter option typed before a subcommand is honoured or refused, printed
   commands quote their path, and `me-preview` refuses a stray operand**
   (bughunt-1119 bh-me-I3, bh-me-I11 and bh-me-I18, all Important; ruling T32).
@@ -41,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it), and the manifest gains `missing_keys`: one entry per md1 policy that
   lacks any xpub, key-less templates included. Exit codes and all other fields
   are unchanged.
+- **`me sysw show` refuses a public section that is not UTF-8, and `sysw::region_image` refuses a short
+  container** (bughunt-1119 bh-me-I8 and bh-me-I7, both Important). `show` printed an identity, skipped the digest
+  and the records in silence, and exited 0; it now exits 4 and names the file offset where UTF-8 decoding first
+  fails, and prints no identity or digest. `region_image` padded a container shorter than its header declares into
+  a full region image the reader then refused; it now returns the `TooShort` error `open` returns. Exit codes
+  elsewhere are unchanged.
 
 ## [0.13.0] - 2026-11-04
 

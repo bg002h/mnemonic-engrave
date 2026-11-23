@@ -949,6 +949,12 @@ they still hold** without a machine, which is what makes the comparison a real
 control rather than a number they must have transcribed correctly the first
 time.
 
+**AMENDED (FIX_me_inspection_fail_open, bughunt-1119 I8):** `show` refuses, at exit 4, a container whose
+public section is not UTF-8, after the truncation check and before any identity or digest is printed. It used to
+print an identity, skip the digest and the record list in silence, and exit 0. The refusal names the file offset
+where UTF-8 decoding first fails. A sealed container is checked the same way: its public section is read
+without a passphrase. A container with no public section has nothing to check.
+
 - **Options before a subcommand (bh-me-I3, ruling T32, 2026-11-22).** The converter's options (`--in`, `--out`,
   `--stdout`, `--hex`, `--base64`, `--echo`, `--allow-world-readable`) may be typed before a subcommand. Each is
   honoured as if given after the subcommand when the subcommand has an option of the same name; a path option

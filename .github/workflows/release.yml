@@ -213,6 +213,14 @@ jobs:
           go build ./...
           go test ./...
 
+      # bh-me-I12, I13, I14 (design/FIX_me_dev_gates.md): the mt1 vector
+      # generator's self-test and the SH2 demo build were never run by CI.
+      - name: Dev gates (mt1 vector generator, SH2 demo build)
+        if: steps.docs.outputs.docs_only != 'true'
+        run: |
+          python3 -I scripts/test/gen_mt1_vectors_test.py
+          bash scripts/test/demo-sh2-embed-stale.test.sh
+
       # E3a (plan section 6.4): the OTP tooling. run-e2e-otp.sh drives
       # scripts/refugium-otp.sh against scripts/test/fake_picotool.py, a
       # row-level RP2350 simulator that enforces picotool's argument order and

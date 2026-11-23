@@ -102,20 +102,33 @@ pub fn locate_sidecar(explicit: Option<&Path>) -> Option<PathBuf> {
     locate_in(exe_dir, explicit)
 }
 
-/// Run `<sidecar> --version` and return the parsed semver string.
-///
-/// The sidecar prints `me-preview <version>` to stdout; we strip the `me-preview`
-/// prefix and trim. An empty version (a plain `go build` with no `-ldflags`)
-/// round-trips as `""`, which the caller treats as a mismatch against the crate
-/// version.
+/// Run `<sidecar> --version` and return the version.
+/// The probe must exit 0 and print exactly `me-preview <version>` with at most one
+/// trailing newline (SPEC_me_bundle_phaseB_preview.md §4.1); nothing is trimmed.
+/// A non-zero exit is an error carrying the exit code and the sidecar's stderr.
+/// An empty version (a plain `go build` with no `-ldflags`) round-trips as `""`,
+/// which the caller treats as a mismatch.
 pub fn sidecar_version(path: &Path) -> io::Result<String> {
     let out = Command::new(path).arg("--version").output()?;
+    if !out.status.success() {
+        let code = out
+            .status
+            .code()
+            .map_or_else(|| "signal".to_string(), |c| c.to_string());
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let stderr = stderr.trim();
+        let mut msg = format!("me-preview --version failed (exit {code})");
+        if !stderr.is_empty() {
+            msg.push_str(": ");
+            msg.push_str(stderr);
+        }
+        return Err(io::Error::other(msg));
+    }
     let stdout = String::from_utf8_lossy(&out.stdout);
-    // Find the first non-empty line that starts with the expected prefix.
-    for line in stdout.lines() {
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("me-preview") {
-            return Ok(rest.trim().to_string());
+    let line = stdout.strip_suffix('\n').unwrap_or(&stdout);
+    if !line.contains('\n') {
+        if let Some(rest) = line.strip_prefix("me-preview ") {
+            return Ok(rest.to_string());
         }
     }
     Err(io::Error::new(
