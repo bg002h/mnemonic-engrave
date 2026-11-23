@@ -1,0 +1,53 @@
+diff --git a/design/IMPLEMENTATION_PLAN_fork_refugium_kit.md b/design/IMPLEMENTATION_PLAN_fork_refugium_kit.md
+index a313e87..81a585b 100644
+--- a/design/IMPLEMENTATION_PLAN_fork_refugium_kit.md
++++ b/design/IMPLEMENTATION_PLAN_fork_refugium_kit.md
+@@ -353,8 +353,16 @@ ROW TestV2PublicOnlyRefusesNonzeroPwForm | SH-3 | sh | ./seal/ | - | now=0 | bui
+ ROW TestV1StillRefusesANonzeroReservedByte | SH-3 | sh | ./seal/ | - | now=0 | built=1
+ - Rule: v1 header with offset 11 = 6 → `ErrReservedNotZero`, ", got 6". GUARD: green today. Mutant: v2 parsing in v1.
+ ROW TestMS1LetterIsTheTopNibbleOfTheEntropy | SH-3 | sh | ./seal/ | - | now=0 | built=1
+-- Rule: as the Rust row; the share and a non-`0x00` prefix → not ok; the entropy slice handed to the §7 hook is all
+-  zero when `ms1Letter` returns (secret row `s1b-r2-letter-check-materialise`). RED: absent. Mutant: no `clear`.
++- Rule: as the Rust row; the share and a non-`0x00` prefix → not ok. Wipe (§7 `ms1LetterEntropyHook`; secret rows
++  `s1b-r2-letter-check-materialise`, `plankits2-r1-s1-wipe-hook-vacuous`): the hook fires exactly once per
++  `ms1Letter` call in which `DecodeMS1` returns entropy and never otherwise: once each for `A16`, `A` … `G`, `P` and
++  the row's `0x02` payload, never for the N-share string (the threshold digit is tested first). It is called with
++  `ms1Letter`'s own entropy slice (not a copy) while that slice still holds the secret; the test copies the slice
++  inside the hook and keeps it. The copy has `len` 16 for `A16` and 32 for `A` … `G` and `P`, and equals the
++  vector's entropy bytes (`B`: 32 × `0x11`, `P`: 32 × `0xff`); after `ms1Letter` returns every byte of the kept
++  slice is zero. A hook call count of 0 for any of those vectors fails: a nil capture is not "all zero", and `A16`
++  and `A` are all-zero while live, so `B` … `G` and `P` carry the wipe proof. RED: absent. Mutants: no `clear`;
++  hook not called; hook called with a copy (`bytes.Clone(entropy)`).
+ ROW TestV2VectorsMatchTheIndependentGenerator | SH-3 | sh | ./seal/ | - | now=0 | built=1
+ - Rule: every vendored vector's header, key, tag and blob SHA-256 from the Go code; the file's SHA-256 equals its
+   provenance entry (D4 (a)). RED: absent. Mutant: AAD without the public section.
+@@ -436,8 +444,16 @@ ROW TestRefugiumSealedMS1TextOnlyFallback | SH-4 | sh | ./gui/ | refugium | now=
+   `errSeedQRDisagree`: the padding-bit string shows "does not fit"); no length gate: 24 bytes gets an 18-word SeedQR.
+ ROW TestRefugiumSealedMS1WipePoints | SH-4 | sh | ./gui/ | refugium | now=0 | built=1
+ - Rule (§5): the entropy slice and the `bip39.Mnemonic` handed to the §7 hooks are all zero before the engrave
+-  screen's job starts; `rec` is zero as today. RED: absent. Mutant: `clear(m)` after `Engrave` (resident through
+-  the ~21-minute cut).
++  screen's job starts; `rec` is zero as today. Each hook (`unlockSeedQREntropyHook`, `unlockSeedQRWordsHook`) fires
++  exactly once per `unlockCodex32SeedQRPlan` call, on the success and the error path alike, with the plan's own
++  slice (not a copy) while it still holds the secret; the test copies it inside the hook and keeps it. V2-A: each
++  hook fires twice; the entropy copies have `len` 16 (`A16`, 16 × `0x00`) and 32 (`P`, 32 × `0xff`), the mnemonic
++  copies `len` 12 ("abandon" × 11, "about") and 24 ("zoo" × 23, "vote"). The `A16` padding-bit string of
++  `TestRefugiumSealedMS1TextOnlyFallback` (refused by `EngraveSeedStringSeedQR`): each hook fires once, `len` 16
++  and 12, the same contents as `A16`'s. After each `unlockCodex32SeedQRPlan` call returns, every kept byte is 0
++  and every kept word is 0 (the zero `bip39.Word`, "abandon"). A hook call count of 0 fails: a nil capture is not
++  "all zero", and `A16`'s entropy is all zero while live, so `P` carries the wipe proof. RED: absent. Mutants:
++  `clear(m)` after `Engrave` (resident through the ~21-minute cut); hook not called; hook called with a copy.
+ ROW TestDefaultBuildSealedMS1Unchanged | SH-4 | sh | ./gui/ | - | now=0 | built=1
+ - Rule: untagged build, vector C's ms1 plate equals `EngraveSeedString` (text + QR of the string), titled with its
+   id. GUARD: green today. Mutant: SeedQR not profile-gated.
+@@ -529,7 +545,9 @@ marks live in the session (`syswSession`), cleared by LOAD AGAIN and UNLOAD; not
+   leave path.
+ - Wipes: new package vars `unlockSeedQREntropyHook func([]byte)` and `unlockSeedQRWordsHook func(bip39.Mnemonic)`
+   in `gui/unlock_session.go`, and `ms1LetterEntropyHook func([]byte)` in `seal/titles.go`, each nil in production;
+-  tests keep the slice and assert it zero afterwards (the `master_key_residue_test.go` pattern).
++  each is called with the function's own slice while it still holds the secret; tests count the calls, copy the
++  slice inside the hook, keep it, and assert it zero afterwards, and a hook that never fired fails the test (the
++  `master_key_residue_test.go` pattern, with its "never fired" check).
+ - Kit door: `kitCardPlates` (a package var defaulting to `bundleCardPlates`) and `kitPlateLayout` (defaulting to
+   the TEXT ONLY layout) are the two seams `TestKitDoorRun` (one string per plate) and `TestKitDoorPlateDoesNotFit`
+   (layout error) replace; `TestKitLeadPlatesEqualCuts` uses neither. Engraving is the test engraver every bundle
