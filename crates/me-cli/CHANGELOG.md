@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Descriptor intake refuses a `{label, descriptor}` JSON that names a field
+  twice, and an unhardened path index of 2^31 or more** (bughunt-1119 bh-me-I2
+  and bh-me-I15, both Important; ruling T31). A top-level member named twice,
+  exact or under Go `encoding/json`'s case fold (ASCII case, U+017F, U+212A),
+  made `me` read one wallet and the device another (measured: 2-of-3 against
+  1-of-3); it now exits 3 with its own sentence naming the colliding members.
+  A path index such as `2147483696` was silently rewritten as the hardened
+  `48h` in the backup's recorded origin; it is now refused with the existing
+  "is not a path" texts. Exit codes elsewhere are unchanged.
 - **`me bundle` names the cosigner keys a partly keyed md1 does not carry**
   (bughunt-1119 bh-me-C1, Critical). A 2-of-3 md1 carrying one xpub got a
   checklist that said nothing about the other two, at exit 0; F-602 had

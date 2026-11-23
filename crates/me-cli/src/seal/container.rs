@@ -13,8 +13,16 @@ pub const MAX_RECORD_LEN: usize = 512;
 #[derive(Debug, PartialEq, Eq)]
 pub enum ContainerError {
     RecordCount(usize),
-    RecordTooLong { index: usize, len: usize },
-    EmbeddedSeparator { index: usize, ch: char },
+    RecordTooLong {
+        index: usize,
+        len: usize,
+    },
+    EmbeddedSeparator {
+        index: usize,
+        ch: char,
+    },
+    /// A section that is not UTF-8 (read side only: `open`).
+    NotUtf8,
 }
 
 impl std::fmt::Display for ContainerError {
@@ -32,6 +40,7 @@ impl std::fmt::Display for ContainerError {
                 f,
                 "record {index} contains {ch:?}, which is the record separator"
             ),
+            ContainerError::NotUtf8 => write!(f, "section is not valid UTF-8"),
         }
     }
 }
@@ -72,6 +81,33 @@ pub fn encode_section(records: &[String]) -> Result<Zeroizing<String>, Container
         }
     }
     Ok(Zeroizing::new(trimmed.join("\n")))
+}
+
+/// The read side of [`encode_section`] (§6.4): LF-separated records, each 1 to
+/// [`MAX_RECORD_LEN`] bytes with no CR. An empty section holds no records (the
+/// public section of a payload that has none). The count cap spans both
+/// sections, so it is the caller's.
+pub fn decode_section(bytes: &[u8]) -> Result<Vec<String>, ContainerError> {
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let text = std::str::from_utf8(bytes).map_err(|_| ContainerError::NotUtf8)?;
+    let records: Vec<String> = text.split('\n').map(str::to_string).collect();
+    for (i, r) in records.iter().enumerate() {
+        if let Some(pos) = r.find('\r') {
+            return Err(ContainerError::EmbeddedSeparator {
+                index: i,
+                ch: r[pos..].chars().next().unwrap(),
+            });
+        }
+        if r.is_empty() || r.len() > MAX_RECORD_LEN {
+            return Err(ContainerError::RecordTooLong {
+                index: i,
+                len: r.len(),
+            });
+        }
+    }
+    Ok(records)
 }
 
 #[cfg(test)]

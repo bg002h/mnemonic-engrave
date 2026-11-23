@@ -537,6 +537,29 @@ pub fn json_missing_descriptor(label: &str, keys: &str) -> Refusal {
     )
 }
 
+/// §6 row 5's DUPLICATE-member half (FIX_me_descriptor_input_strict, bughunt-1119
+/// I2, ruling T31). Go's `encoding/json` lets the last matching member win and the
+/// host took the exact-case one, so the two read different wallets; no reading is
+/// safe to pick. Same row; the remedy is to re-export or to keep one member.
+pub fn json_duplicate_member(names: &[String]) -> Refusal {
+    let list = names
+        .iter()
+        .map(|n| format!("`{}`", quote_operator(n)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    Refusal::new(
+        Row::JsonInnerMalformed,
+        format!(
+            "the `{{label, descriptor}}` JSON names one field more than once: {list}. \
+             A wallet export names each field once, and field names match without \
+             regard to case, so this file does not say which value is meant. \
+             Re-export from your wallet software. If you edit the file instead, keep \
+             only the member whose value is your wallet's, and check the quorum and \
+             address `me` prints next."
+        ),
+    )
+}
+
 /// §6 row 14. `md encode` accepts miniscript TEMPLATES — a different tool and
 /// input form, which is why the remedy names it and does not point at `me`.
 pub fn miniscript(fragment: &str) -> Refusal {

@@ -71,6 +71,7 @@ fn class_name(c: Class) -> &'static str {
         Class::Descriptor => "Descriptor",
         Class::MdMk => "MdMk",
         Class::Mt => "Mt",
+        Class::Mr => "Mr",
         Class::Tx => "Tx",
         Class::Address => "Address",
         Class::Key => "Key",

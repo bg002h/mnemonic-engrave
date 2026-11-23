@@ -33,3 +33,9 @@
 # CHANGELOG.md files, which they edit in those repos, never in this one.
 ^scripts/cut-release\.sh$
 ^scripts/test/cut-release\.test\.sh$
+
+# Not run by CI: the S1 spec's vector generator, oracle check and gate (they
+# need `mr` on PATH or read the spec text); no workflow names them.
+^scripts/gen-sysw-mr-vectors\.py$
+^scripts/check-sysw-mr-vectors\.sh$
+^scripts/spec-s1-gate\.sh$
