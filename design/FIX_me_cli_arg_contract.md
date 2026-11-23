@@ -75,7 +75,7 @@ first non-flag.
   command line before it, and the leaf subcommand (`bundle`, `seal`, `hash`, `sysw pack`, `sysw wipe`,
   `sysw show`) declares an option with the **same long name**, the run behaves exactly as if the option had been
   given after the leaf: every existing rule of the leaf applies to it unchanged (for example `sysw pack`'s
-  `pass records on argv OR via --in, not both` refusal, and `seal`'s requirement of `--out`).
+  `pass records on argv OR via --in, not both` refusal, and `seal`'s requirement of `--out`). Matching is by long name (`seal`'s `--in` is the field `in_path`).
 - **D2 (I3, T32) conflict.** If the leaf was also given that option: a **flag** (`--allow-world-readable`) given
   in both places is honoured once (the values cannot differ). A **path** option given in both places with
   byte-identical values (`OsStr` equality, no canonicalisation) is honoured once; with any other values it is
@@ -102,8 +102,8 @@ first non-flag.
 - **D5 seal's required `--out`.** With `--out` in neither place the output stays byte-for-byte the present clap
   text (row A10). With `--out` only before `seal`, the seal runs (row A6). The mechanism is the builder's.
 - **D6 (I11) one shell word per path.** Both printed commands render the path with one rule, `shell_word`:
-  1. (STOP-2 recommendation) a path that is not valid UTF-8, or contains a C0 control character (U+0000-U+001F)
-     or U+007F, is not rendered: the line prints the placeholder `<the file you just wrote>` instead.
+  1. (STOP-2 recommendation) a path that is not valid UTF-8, or contains a C0 control character (U+0000-U+001F),
+     U+007F or a backslash, is not rendered: the line prints the placeholder `<the file you just wrote>` instead.
   2. A path whose first character is `-` gets `./` prepended (it is relative; no `--` is needed, so picotool's
      parser is not relied on).
   3. If every character is in `A-Z a-z 0-9 _ . / , : @ + -`, the path prints as is (every path a test or doc
@@ -130,7 +130,7 @@ first non-flag.
     §4.
   - **Printed commands (bh-me-I11, 2026-11-22).** A path printed inside a command (`re-print it with: me sysw show
     …`, and `seal`'s `load:  picotool load --verify …`) is one shell word: plain paths print as is, a leading `-`
-    gets `./`, anything else is single-quoted, and a path that is not UTF-8 or carries a control character prints
+    gets `./`, anything else is single-quoted, and a path that is not UTF-8 or carries a control character or a backslash prints
     the placeholder `<the file you just wrote>`.
 - `design/SPEC_me_bundle_phaseB_preview.md` §4.1, append to the `me-preview render` bullet: "An operand after the
   flags (anything `flag` leaves unparsed) is refused before stdin is read: `me-preview: unexpected operand "<arg>"`,
@@ -169,7 +169,10 @@ that master happens to satisfy, because the second value wins).
 | A4 | `bh_me_i3_root_in_same_value_honoured` | exit 0; container = `text:6162`'s | passes |
 | A5 | `bh_me_i3_root_converter_option_refused_by_sysw_pack` (STOP-1) | exit 2; stderr is exactly T-NOTAKE(`hex`, `sysw pack`); no `a5.bin` | exit 0 (RED) |
 | A5b | `bh_me_i3_first_misplaced_option_is_named` (STOP-1) | `me --echo --in given bundle --in other`: exit 2; stderr is exactly T-NOTAKE(`echo`, `bundle`) | exit 4 (RED) |
+| A5c | same test (P-2: command-line order) | `me --in given --echo bundle --in other`: exit 2; stderr is exactly T-CONFLICT(`in`, `bundle`) | exit 4 (RED) |
 | A6 | `bh_me_i3_root_out_honoured_by_seal` | exit 0; `a6.uf2` exists; stderr line `load:  picotool load --verify a6.uf2   (machine in BOOTSEL)` | exit 2, clap missing `--out` (RED) |
+| A6b | `bh_me_i3_root_in_honoured_by_seal` | `me --in recs.txt seal --out a6b.uf2 </dev/null` (recs.txt = the three md1 test cards, one per line): exit 0; `a6b.uf2` exists; stderr line `load:  picotool load --verify a6b.uf2   (machine in BOOTSEL)` | exit 2, `me: nothing to seal` (RED) |
+| A6c | `bh_me_i3_root_out_honoured_by_sysw_wipe` | `me --out a6c.bin sysw wipe --fill zeros`: exit 0; `a6c.bin` byte-equal to `me sysw wipe --fill zeros --out a6c.ref`; stdout 0 bytes | exit 0, `a6c.bin` absent, 65,536 bytes on stdout (RED) |
 | A7 | `bh_me_i3_root_in_conflict_refused_by_bundle` | exit 2; stderr is exactly T-CONFLICT(`in`, `bundle`) | exit 4 (RED) |
 | A8 | `bh_me_i3_root_allow_world_readable_honoured_by_sysw_pack` | umask 022, stdout to a file: exit 0; stdout = `text:6162`'s container | exit 2, F-244 refusal (RED) |
 | A9 | `bh_me_i3_controls_guard_seal_text_converter_unchanged` (control) | `me --out a9.uf2 seal --allow-argv-secret <MS1>`: exit 3, first line starts `me: argument 5 on ARGV`; no file | passes |
@@ -194,7 +197,7 @@ on tempdir paths, which D6.3 prints unchanged; `seal_cli.rs:360` anchors on the 
 
 New tests, each named exactly as in §5 (the gate counts each PASS once):
 
-- `crates/me-cli/tests/cli_arg_contract.rs` (new): the thirteen Rust tests of §5. Each runs the built binary in its own
+- `crates/me-cli/tests/cli_arg_contract.rs` (new): the fifteen Rust tests of §5. Each runs the built binary in its own
   tempdir as the current directory, so the printed paths are the relative names the rows pin.
   `bh_me_i3_controls_guard_seal_text_converter_unchanged` holds A9, A10 and A11.
   `bh_me_i11_printed_show_command_runs_as_printed` runs the printed tail through `sh -c` with the directory of
@@ -224,7 +227,9 @@ New tests, each named exactly as in §5 (the gate counts each PASS once):
   (b) ANSI-C quoting `$'…'` (bash and zsh only; fish and POSIX `sh` read it differently); (c) keep the lossy text.
   **Recommend (a)**: it never prints a wrong command and reuses a text the operator already sees for stdout.
   No row covers it (a non-UTF-8 name needs an OS-specific fixture); the builder adds a unit test of `shell_word`
-  for one non-UTF-8 `OsStr` and one path with `\n` if (a) is ruled.
+  for one non-UTF-8 `OsStr` (`#[cfg(unix)]`, `OsStrExt::from_bytes`), one path with `\n` and one with a
+  backslash (`a\\b.bin`; fish reads `\\` inside single quotes as one backslash). Ruled (a) with the backslash
+  extension (architect-bh-batch5, 2026-11-22).
 - **P-1 (D2) equal values are not a conflict.** T32 refuses a *conflicting* value; byte-identical paths do not
   conflict, so `--in a … --in a` is honoured (A4). Paths are compared as bytes, never resolved.
 - **P-2 (D4) first offender only.** One refusal line, for the first refused root option in command-line order.

@@ -17,8 +17,9 @@
 #   D. doc-tests, cargo fmt --check, and both clippy runs of the CI `test` job on
 #      the CI-pinned toolchain (1.85.0, release.yml RUST_TOOLCHAIN).
 # NOT covered: shells other than the host `sh` for the I11 re-run rows (the quoting
-# rule is POSIX single-quoting, which bash, dash, zsh and fish all read the same
-# way, but only `sh` is executed here); CI jobs this change does not touch (OTP
+# rule is POSIX single-quoting, which bash, dash and zsh read the same way; fish
+# reads \\ and \' inside single quotes as escapes, so a path with a backslash
+# prints the placeholder; only `sh` is executed here); CI jobs this change does not touch (OTP
 # e2e, shellcheck, cross builds, the ndef-roundtrip oracle) — the PR's CI runs
 # them. Wording quality is not machine-checkable: the new texts are PROPOSED in
 # the FIX doc. Rows A5 and A5b assert the STOP-1 recommendation; if the architect
@@ -87,10 +88,27 @@ printf 'text:6364\n' | "$ME" --in given sysw pack --no-passphrase --out a1.bin 2
 [ $rc = 2 ] && [ "$(cat a5b.err)" = "me: --echo is a converter option (me with no subcommand); 'bundle' does not take it" ] \
     && ok A5b || { bad "A5b: exit $rc"; head -2 a5b.err | sed 's/^/    got: /'; }
 
+# A5c bh_me_i3_first_misplaced_option_is_named (P-2: command-line order, a conflict before a not-taken option)
+"$ME" --in given --echo bundle --in other >/dev/null 2>a5c.err; rc=$?
+[ $rc = 2 ] && [ "$(cat a5c.err)" = "me: --in was given before 'bundle' and again after it, with a different value; give it once, after 'bundle'" ] \
+    && ok A5c || { bad "A5c: exit $rc"; head -2 a5c.err | sed 's/^/    got: /'; }
+
 # A6 bh_me_i3_root_out_honoured_by_seal
 "$ME" --out a6.uf2 seal --plaintext "$MD1" --plaintext "$MD1B" --plaintext "$MD1C" </dev/null 2>a6.err; rc=$?
 [ $rc = 0 ] && exists a6.uf2 && has_line "load:  picotool load --verify a6.uf2   (machine in BOOTSEL)" a6.err \
     && ok A6 || { bad "A6: exit $rc"; head -3 a6.err | sed 's/^/    got: /'; }
+
+# A6b bh_me_i3_root_in_honoured_by_seal (seal's --in is the field in_path: match by long name, not by id)
+printf '%s\n%s\n%s\n' "$MD1" "$MD1B" "$MD1C" >recs.txt
+"$ME" --in recs.txt seal --out a6b.uf2 </dev/null 2>a6b.err; rc=$?
+[ $rc = 0 ] && exists a6b.uf2 && has_line "load:  picotool load --verify a6b.uf2   (machine in BOOTSEL)" a6b.err \
+    && ok A6b || { bad "A6b: exit $rc"; head -2 a6b.err | sed 's/^/    got: /'; }
+
+# A6c bh_me_i3_root_out_honoured_by_sysw_wipe
+"$ME" sysw wipe --fill zeros --out a6c.ref 2>/dev/null
+"$ME" --out a6c.bin sysw wipe --fill zeros >a6c.stdout 2>a6c.err; rc=$?
+[ $rc = 0 ] && cmp -s a6c.bin a6c.ref && [ ! -s a6c.stdout ] && ok A6c \
+    || bad "A6c: exit $rc, a6c.bin $(exists a6c.bin && echo present || echo absent), stdout $(wc -c <a6c.stdout) bytes"
 
 # A7 bh_me_i3_root_in_conflict_refused_by_bundle
 "$ME" --in given bundle --in other >/dev/null 2>a7.err; rc=$?
@@ -173,6 +191,8 @@ for t in \
     bh_me_i3_root_converter_option_refused_by_sysw_pack \
     bh_me_i3_first_misplaced_option_is_named \
     bh_me_i3_root_out_honoured_by_seal \
+    bh_me_i3_root_in_honoured_by_seal \
+    bh_me_i3_root_out_honoured_by_sysw_wipe \
     bh_me_i3_root_in_conflict_refused_by_bundle \
     bh_me_i3_root_allow_world_readable_honoured_by_sysw_pack \
     bh_me_i3_controls_guard_seal_text_converter_unchanged \
