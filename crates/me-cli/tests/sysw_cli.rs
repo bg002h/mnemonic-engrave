@@ -553,6 +553,106 @@ fn show_on_a_truncated_container_fails_cleanly_without_printing_a_digest() {
     );
 }
 
+const T_UTF8_PREFIX: &str = "me: this file's public section is not UTF-8 text (where UTF-8 decoding first fails, at file offset ";
+const T_UTF8_SUFFIX: &str = "); it is damaged, or it was not written by `me sysw pack`. No identity or digest is shown, because either would be a number for records that cannot be read.";
+
+fn t_utf8(o: usize) -> String {
+    format!("{T_UTF8_PREFIX}{o}{T_UTF8_SUFFIX}")
+}
+
+/// A packed `text:6162` container (public section at offsets 52-60).
+fn plain_container(dir: &std::path::Path) -> Vec<u8> {
+    let f = dir.join("plain.bin");
+    me().args(["sysw", "pack", "--no-passphrase", "text:6162", "--out"])
+        .arg(&f)
+        .assert()
+        .success();
+    std::fs::read(&f).unwrap()
+}
+
+fn sealed_container() -> Vec<u8> {
+    use mnemonic_engrave::sysw;
+    sysw::pack(
+        vec!["text:6162".into(), "pass:6869".into()],
+        Some("abandon abandon abandon abandon abandon abandon"),
+        sysw::wire::MIN_ITERATIONS,
+    )
+    .unwrap()
+}
+
+fn show_bytes(dir: &std::path::Path, bytes: &[u8]) -> std::process::Output {
+    let f = dir.join("show.bin");
+    std::fs::write(&f, bytes).unwrap();
+    me().args(["sysw", "show"])
+        .arg(&f)
+        .assert()
+        .get_output()
+        .clone()
+}
+
+/// R3 (FIX_me_inspection_fail_open, bh-me-I8).
+#[test]
+fn show_refuses_a_public_section_that_is_not_utf8() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut b = plain_container(dir.path());
+    b[60] = 0xff;
+    let o = show_bytes(dir.path(), &b);
+    assert_eq!(o.status.code(), Some(4));
+    let (out, err) = (
+        String::from_utf8_lossy(&o.stdout),
+        String::from_utf8_lossy(&o.stderr),
+    );
+    assert!(err.lines().any(|l| l == t_utf8(60)), "stderr: {err}");
+    assert!(!out.lines().any(|l| l.starts_with("identity:")));
+    assert!(!out.lines().any(|l| l.starts_with("public record")));
+    assert!(digest_line(&err).is_none());
+}
+
+/// R4 (FIX_me_inspection_fail_open): the offset names the first failing byte.
+#[test]
+fn show_names_the_first_bad_byte_of_the_public_section() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut b = plain_container(dir.path());
+    b[52] = 0x80;
+    let o = show_bytes(dir.path(), &b);
+    assert_eq!(o.status.code(), Some(4));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.lines().any(|l| l == t_utf8(52)), "stderr: {err}");
+}
+
+/// R5 (FIX_me_inspection_fail_open): a sealed container's public section is
+/// checked the same way.
+#[test]
+fn show_refuses_a_sealed_public_section_that_is_not_utf8() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut b = sealed_container();
+    let h = mnemonic_engrave::sysw::wire::Header::parse(&b).unwrap();
+    assert_eq!(h.pub_len, 9);
+    b[60] = 0xff;
+    let o = show_bytes(dir.path(), &b);
+    assert_eq!(o.status.code(), Some(4));
+    let (out, err) = (
+        String::from_utf8_lossy(&o.stdout),
+        String::from_utf8_lossy(&o.stderr),
+    );
+    assert!(err.lines().any(|l| l == t_utf8(60)), "stderr: {err}");
+    assert!(!out.lines().any(|l| l.starts_with("identity:")));
+}
+
+/// R8 (FIX_me_inspection_fail_open): truncation is reported before UTF-8.
+#[test]
+fn show_reports_truncation_before_an_unreadable_public_section() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut b = sealed_container();
+    b[60] = 0xff;
+    b.pop();
+    let o = show_bytes(dir.path(), &b);
+    assert_eq!(o.status.code(), Some(4));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("it is truncated"), "stderr: {err}");
+    assert!(!err.contains("is not UTF-8 text"), "stderr: {err}");
+}
+
 #[test]
 fn an_unplaceable_record_is_named_with_its_index() {
     me().args(["sysw", "pack", "--no-passphrase", MD1, "not a record"])

@@ -968,6 +968,37 @@ mod tests {
         ));
     }
 
+    /// R1 (FIX_me_inspection_fail_open, bh-me-I7): a container missing its
+    /// last public byte is refused with the error `open` returns.
+    #[test]
+    fn region_image_refuses_a_blob_missing_its_last_public_byte() {
+        let blob = pack(vec!["text:6869".into()], None, wire::MIN_ITERATIONS).unwrap();
+        assert_eq!(blob.len(), 61);
+        assert_eq!(
+            region_image(&blob[..60]).unwrap_err(),
+            SyswError::Wire(wire::WireError::TooShort(60))
+        );
+    }
+
+    /// R2 (FIX_me_inspection_fail_open, bh-me-I7): a sealed container missing
+    /// its last tag byte is refused likewise.
+    #[test]
+    fn region_image_refuses_a_sealed_blob_missing_its_last_tag_byte() {
+        let blob = pack(
+            vec!["text:6162".into(), "pass:6869".into()],
+            Some(PASS),
+            wire::MIN_ITERATIONS,
+        )
+        .unwrap();
+        let h = wire::Header::parse(&blob).unwrap();
+        assert!(h.sealed());
+        assert_eq!(h.total_len(), blob.len());
+        assert_eq!(
+            region_image(&blob[..blob.len() - 1]).unwrap_err(),
+            SyswError::Wire(wire::WireError::TooShort(blob.len() - 1))
+        );
+    }
+
     /// C1, as a property rather than two cases: whatever `pack` emits, the
     /// reader accepts. This is the invariant `bound` now enforces by running the
     /// reader, and it is what makes a writer/reader drift impossible to ship.
