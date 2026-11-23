@@ -231,8 +231,10 @@ nix develop --command \
 - raw redundant-row readback of `CRIT1` (×8) and `BOOT_FLAGS1` (×3), so a partial
   write is visible
 
-> **Never send the NFC `lock-boot` debug command to this unit.** It is the
-> factory provisioning path (`gui/gui.go:1626` → `LockBoot()`). It cannot waste
+> **Never send the NFC `lock-boot` debug command to this unit.** On SeedHammer's retail firmware it is the
+> factory provisioning path (`LockBoot()`). The fork's builds, default and Refugium, carry no such command
+> from the merge of seedhammer `design/FIX_lockboot_default_remove.md` on; older fork builds still carry it
+> and still execute it. On retail firmware it cannot waste
 > a boot-key slot — `AddBootKey` returns the existing slot on an exact match —
 > but it burns white-label OTP rows for no benefit.
 
