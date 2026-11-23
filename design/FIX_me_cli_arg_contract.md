@@ -9,7 +9,7 @@
   of "the printed command fails as printed".
 - Base: master `e09d538dcd0b552cdc58fe7ff228e2eca5f7f64e`. Author: Claude Opus 5.5 (claude-opus-5-5), 2026-11-22.
 - **Two STOPs** (§7): STOP-1 (a converter option before a subcommand that has no option of that name) and
-  STOP-2 (a printed path that is not UTF-8 or carries a control character). The document is written with each
+  STOP-2 (a printed path that is not UTF-8 or carries a control character or a backslash). The document is written with each
   STOP's recommendation in place; rows that depend on a STOP say so. Four new holder-visible texts are
   **PROPOSED (architect confirms)** (§4).
 - **Files the build changes** (for build ordering against other me rows): `crates/me-cli/src/main.rs`,
