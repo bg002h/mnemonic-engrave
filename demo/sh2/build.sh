@@ -13,17 +13,13 @@ EMU="$FORK/cmd/emu"
 
 [ -d "$EMU" ] || { echo "no emulator at $EMU (set FORK=/path/to/seedhammer)" >&2; exit 1; }
 
-# emu.wasm is gitignored in the fork, so it may not exist yet. Build it unless
-# it is already newer than EVERY Go source in the fork, plus go.mod/go.sum. The
-# emulator links gui/, md/ and the rest; checking only cmd/emu once shipped a
-# stale wasm after a gui/ copy change (2026-09-23).
-if [ ! -f "$EMU/emu.wasm" ] || [ -n "$(find "$FORK" \( -name '*.go' -o -name go.mod -o -name go.sum \) -newer "$EMU/emu.wasm" -print -quit)" ]; then
-  echo "== building emu.wasm"
-  command -v go >/dev/null || { echo "go not on PATH; needed to build emu.wasm" >&2; exit 1; }
-  (cd "$EMU" && ./build.sh)
-else
-  echo "== emu.wasm is current ($(wc -c < "$EMU/emu.wasm") bytes)"
-fi
+# emu.wasm is gitignored in the fork and is rebuilt on every run: Go's build
+# cache tracks every input, //go:embed payloads included. A freshness test on
+# *.go and go.mod/go.sum shipped a stale wasm after an embedded-payload change
+# (bh-me-I14), and an earlier cmd/emu-only test missed a gui/ change (2026-09-23).
+echo "== building emu.wasm"
+command -v go >/dev/null || { echo "go not on PATH; needed to build emu.wasm" >&2; exit 1; }
+(cd "$EMU" && ./build.sh)
 
 rm -rf dist && mkdir -p dist/emu
 cp src/index.html src/mission.html src/app.css src/missions.js dist/
