@@ -10,6 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`me bundle --preview` trusts the sidecar's version probe only when it exits 0 and prints exactly `me-preview <version>`** (bughunt-1119 bh-me-I19, Important). A probe that exits non-zero is refused with exit 2 and the sidecar's stderr; any other output shape is refused as before for an unreadable version; no plate is rendered. `scripts/build-preview.sh --check` no longer approves a sidecar whose probe exits non-zero, and compares the probe's stdout only. The developer gates bh-me-I12, I13 and I14 (mt1 vector generator, SH2 demo build) are fixed alongside.
+- **A converter option typed before a subcommand is honoured or refused, printed
+  commands quote their path, and `me-preview` refuses a stray operand**
+  (bughunt-1119 bh-me-I3, bh-me-I11 and bh-me-I18, all Important; ruling T32).
+  `me --in f sysw pack ...` read stdin and dropped `--in`; `me --out f seal ...`
+  failed on a missing `--out`. Each of `--in`, `--out` and
+  `--allow-world-readable` before `bundle`, `seal`, `sysw pack` or `sysw wipe`
+  now behaves as if given after it when that subcommand has an option of the
+  same name; a different value given in both places, or an option the
+  subcommand does not have, exits 2 and names the option, before anything is
+  read or written. The pack card's `re-print it with: me sysw show ...` line and
+  `seal`'s `picotool load --verify ...` line print the path as one shell word
+  (quoted when it needs it; a path that is not UTF-8 or carries a control
+  character or a backslash prints `<the file you just wrote>`). `me-preview
+  render` refuses an operand after its flags (exit 1) instead of ignoring
+  everything from it on. Exit codes elsewhere are unchanged.
 - **Descriptor intake refuses a `{label, descriptor}` JSON that names a field
   twice, and an unhardened path index of 2^31 or more** (bughunt-1119 bh-me-I2
   and bh-me-I15, both Important; ruling T31). A top-level member named twice,
