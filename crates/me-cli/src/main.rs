@@ -2050,12 +2050,29 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
                 return EXIT_INVALID;
             }
+            // The public section is read without a passphrase, so a sealed
+            // container is checked the same way (FIX_me_inspection_fail_open).
+            let section =
+                &blob[sysw::wire::HEADER_LEN..sysw::wire::HEADER_LEN + h.pub_len as usize];
+            let public = match std::str::from_utf8(section) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!(
+                        "me: this file's public section is not UTF-8 text (where UTF-8 decoding \
+                         first fails, at file offset {}); it is damaged, or it was not written \
+                         by `me sysw pack`. No identity or digest is shown, because either would \
+                         be a number for records that cannot be read.",
+                        sysw::wire::HEADER_LEN + e.valid_up_to()
+                    );
+                    return EXIT_INVALID;
+                }
+            };
             println!(
                 "identity: {}",
                 hex(&sysw::identity::identity(&blob[..h.total_len()]))
             );
             print_digest(&blob);
-            print_records(&blob, &h);
+            print_records(public);
             EXIT_OK
         }
     }
@@ -2117,6 +2134,9 @@ fn print_digest(blob: &[u8]) {
         return;
     };
     let Ok(s) = std::str::from_utf8(section) else {
+        // Unreachable from `show`, which refuses a non-UTF-8 public section
+        // first (FIX_me_inspection_fail_open); `pack` builds the section from
+        // `String`s.
         return;
     };
     let refs: Vec<&str> = s.split('\n').collect();
@@ -2330,18 +2350,11 @@ fn report_unsigned_overrides(records: &[String]) {
 ///
 /// Sealed payloads' secret records stay unread: `show` has no passphrase, and
 /// nothing here reaches the ciphertext.
-fn print_records(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
+fn print_records(s: &str) {
     use mnemonic_engrave::sysw;
-    if h.pub_len == 0 {
+    if s.is_empty() {
         return;
     }
-    let end = sysw::wire::HEADER_LEN + h.pub_len as usize;
-    let Some(section) = blob.get(sysw::wire::HEADER_LEN..end) else {
-        return;
-    };
-    let Ok(s) = std::str::from_utf8(section) else {
-        return;
-    };
     let records: Vec<String> = s.split('\n').map(str::to_owned).collect();
     // Both computed ONCE for the whole loop; each was recomputed per pass
     // before.

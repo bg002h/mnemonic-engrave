@@ -949,6 +949,12 @@ they still hold** without a machine, which is what makes the comparison a real
 control rather than a number they must have transcribed correctly the first
 time.
 
+**AMENDED (FIX_me_inspection_fail_open, bughunt-1119 I8):** `show` refuses, at exit 4, a container whose
+public section is not UTF-8, after the truncation check and before any identity or digest is printed. It used to
+print an identity, skip the digest and the record list in silence, and exit 0. The refusal names the file offset
+where UTF-8 decoding first fails. A sealed container is checked the same way: its public section is read
+without a passphrase. A container with no public section has nothing to check.
+
 Subcommands sit under `sysw` rather than beside `seal` so that no invocation can
 produce a systemwide container while the operator believes they are producing a
 Sealed Payload one, or vice versa. The two features are frozen apart

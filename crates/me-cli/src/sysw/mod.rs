@@ -733,14 +733,18 @@ fn bound(blob: Vec<u8>) -> Result<Vec<u8>, SyswError> {
 /// Padding moves neither the identity nor the digest: both bound themselves by
 /// the header's declared total.
 ///
-/// Refuses what [`bound`] refuses: a blob larger than the region, and one the
-/// reader would not parse. A caller holding something that is not a container
-/// gets an error here, not a region image of it.
+/// Refuses what [`bound`] refuses (a blob larger than the region, and one
+/// `Header::parse` would not parse) and also one shorter than its header
+/// declares (the `TooShort` `open` returns). A caller holding something that is
+/// not a container gets an error here, not a region image of it.
 pub fn region_image(blob: &[u8]) -> Result<Zeroizing<Vec<u8>>, SyswError> {
     if blob.len() > wire::REGION_LEN {
         return Err(SyswError::TooLarge(blob.len()));
     }
-    wire::Header::parse(blob).map_err(SyswError::Wire)?;
+    let h = wire::Header::parse(blob).map_err(SyswError::Wire)?;
+    if blob.len() < h.total_len() {
+        return Err(SyswError::Wire(wire::WireError::TooShort(blob.len())));
+    }
     let mut img = Zeroizing::new(vec![0xFFu8; wire::REGION_LEN]);
     img[..blob.len()].copy_from_slice(blob);
     Ok(img)

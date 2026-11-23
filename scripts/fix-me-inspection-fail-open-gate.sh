@@ -2,11 +2,11 @@
 # fix-me-inspection-fail-open-gate.sh — the build gate for
 # design/FIX_me_inspection_fail_open.md (bughunt-1119 bh-me-I7, bh-me-I8).
 #
-#   bash scripts/fix-me-inspection-fail-open-gate.sh --cli   # CLI rows R3-R7 only (fast; the RED demonstration)
+#   bash scripts/fix-me-inspection-fail-open-gate.sh --cli   # CLI rows R3-R8 only (fast; the RED demonstration)
 #   bash scripts/fix-me-inspection-fail-open-gate.sh         # everything below
 #
 # What it runs:
-#   A. CLI rows (the FIX doc's R3-R7): builds `me` (--locked), packs three containers
+#   A. CLI rows (the FIX doc's R3-R8): builds `me` (--locked), packs three containers
 #      (`text:6162` unsealed; `text:6162` + `pass:6869` sealed; `pass:6869` sealed, no public
 #      section), flips one public-section byte with dd, and runs `me sysw show` on each file.
 #      Each row requires the exit code; a refusal row requires its T-UTF8 line as one whole
@@ -14,7 +14,7 @@
 #      requires exit 0 and its identity/digest lines.
 #   B. the full nextest suite ONCE to a log (Go on PATH, ME_REQUIRE_GO=1, as CI); each
 #      named FIX test must PASS exactly once, and no FAIL line may appear.
-#   C. doc-tests, cargo fmt --check, and both clippy runs of the CI `test` job on the
+#   C. doc-tests, cargo fmt --check, ci/code-docs-check.sh and both clippy runs of the CI `test` job on the
 #      CI-pinned toolchain (1.85.0, release.yml RUST_TOOLCHAIN).
 # NOT covered: R1/R2 (library rows) run only in B, as unit tests; the device side
 # (firmware reads of a damaged public section are unchanged by this FIX); CI jobs this
@@ -50,7 +50,7 @@ flip() {
 refuse() {
     "$ME" sysw show "$LOG/$2.bin" >"$LOG/$2.show.out" 2>"$LOG/$2.show.err"
     local rc=$?
-    local want="me: this file's public section is not UTF-8 text (first bad byte at file offset $3); it is damaged, or it was not written by \`me sysw pack\`. No identity or digest is shown, because either would be a number for records that cannot be read."
+    local want="me: this file's public section is not UTF-8 text (where UTF-8 decoding first fails, at file offset $3); it is damaged, or it was not written by \`me sysw pack\`. No identity or digest is shown, because either would be a number for records that cannot be read."
     [ "$rc" = 4 ] || bad "$1: exit $rc, want 4"
     grep -qxF -- "$want" "$LOG/$2.show.err" || { bad "$1: stderr lacks the T-UTF8 line for offset $3"; sed 's/^/    got: /' "$LOG/$2.show.err" | head -3; }
     grep -q '^identity:' "$LOG/$2.show.out" && bad "$1: printed an identity"
@@ -120,11 +120,12 @@ for t in \
 done
 
 echo "== C. doc-tests and lints"
-cargo test --locked --doc >"$LOG/doctest.log" 2>&1 || bad "C: doc-tests (see $LOG/doctest.log)"
-cargo fmt --check >"$LOG/fmt.log" 2>&1 || bad "C: cargo fmt --check (see $LOG/fmt.log)"
+cargo +1.85.0 test --locked --doc >"$LOG/doctest.log" 2>&1 || bad "C: doc-tests (see $LOG/doctest.log)"
+cargo +1.85.0 fmt --check >"$LOG/fmt.log" 2>&1 || bad "C: cargo fmt --check (see $LOG/fmt.log)"
 cargo +1.85.0 clippy --all-targets --locked -- -D warnings >"$LOG/clippy.log" 2>&1 || bad "C: clippy (see $LOG/clippy.log)"
 cargo +1.85.0 clippy -p mnemonic-engrave --lib --no-default-features --locked -- -D warnings >"$LOG/clippy-nodef.log" 2>&1 \
     || bad "C: no-default-features clippy (see $LOG/clippy-nodef.log)"
+bash ci/code-docs-check.sh >"$LOG/code-docs.log" 2>&1 || bad "C: ci/code-docs-check.sh (see $LOG/code-docs.log)"
 
 [ $fail = 0 ] && echo "gate: PASS" || echo "gate: FAIL"
 exit $fail

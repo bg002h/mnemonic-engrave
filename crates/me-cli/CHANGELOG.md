@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it), and the manifest gains `missing_keys`: one entry per md1 policy that
   lacks any xpub, key-less templates included. Exit codes and all other fields
   are unchanged.
+- **`me sysw show` refuses a public section that is not UTF-8, and `sysw::region_image` refuses a short
+  container** (bughunt-1119 bh-me-I8 and bh-me-I7, both Important). `show` printed an identity, skipped the digest
+  and the records in silence, and exited 0; it now exits 4 and names the file offset where UTF-8 decoding first
+  fails, and prints no identity or digest. `region_image` padded a container shorter than its header declares into
+  a full region image the reader then refused; it now returns the `TooShort` error `open` returns. Exit codes
+  elsewhere are unchanged.
 
 ## [0.13.0] - 2026-11-04
 

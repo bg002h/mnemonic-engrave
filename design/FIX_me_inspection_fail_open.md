@@ -42,10 +42,11 @@ prints a 64-digit identity, no digest, no records, empty stderr, and exits 0. `o
   `blob.len() < h.total_len()` with `SyswError::Wire(wire::WireError::TooShort(blob.len()))`, the error `open`
   returns for the same input. A blob longer than `total_len` up to `REGION_LEN` stays accepted (a padded image
   round-trips; the existing test `region_image_pads_with_erased_flash_and_refuses_what_bound_refuses` pins it).
-  The doc comment's "Refuses" paragraph names the new case: "and one shorter than its header declares (the
-  `TooShort` `open` returns)". The CHANGELOG entry (§6) records the behaviour change.
-- **I8.** In the `Show` arm, after the truncation refusal and before the `identity:` line, when `h.pub_len > 0`,
-  decode the public section `blob[HEADER_LEN..HEADER_LEN + pub_len]` with `std::str::from_utf8`. On `Err(e)`,
+  The doc comment's "Refuses" sentence is replaced by: "Refuses what [`bound`] refuses (a blob larger than the
+  region, and one `Header::parse` would not parse) and also one shorter than its header declares (the `TooShort`
+  `open` returns)." The CHANGELOG entry (§6) records the behaviour change.
+- **I8.** In the `Show` arm, after the truncation refusal and before the `identity:` line, decode the public
+  section (empty when `pub_len == 0`) `blob[HEADER_LEN..HEADER_LEN + pub_len]` with `std::str::from_utf8`. On `Err(e)`,
   print T-UTF8 to stderr with `{o}` = `HEADER_LEN + e.valid_up_to()` and return `EXIT_INVALID` (4). On `Ok(s)`,
   pass `s` to `print_records` in place of `(&blob, &h)` (its `pub_len == 0` early return becomes `s.is_empty()`;
   its silent `from_utf8` arm is deleted). `print_digest` keeps its signature because `pack` calls it on its own
@@ -61,14 +62,14 @@ prints a 64-digit identity, no digest, no records, empty stderr, and exits 0. `o
   `**AMENDED (FIX_me_inspection_fail_open, bughunt-1119 I8):** \`show\` refuses, at exit 4, a container whose
   public section is not UTF-8, after the truncation check and before any identity or digest is printed. It used to
   print an identity, skip the digest and the record list in silence, and exit 0. The refusal names the file offset
-  of the first byte that breaks UTF-8. A sealed container is checked the same way: its public section is read
+  where UTF-8 decoding first fails. A sealed container is checked the same way: its public section is read
   without a passphrase. A container with no public section has nothing to check.`
 
 ## 4. Printed texts and exit codes
 
 | id | stream | exit | text | status |
 |---|---|---|---|---|
-| T-UTF8 | stderr, one line | 4 (`EXIT_INVALID`) | ``me: this file's public section is not UTF-8 text (first bad byte at file offset {o}); it is damaged, or it was not written by `me sysw pack`. No identity or digest is shown, because either would be a number for records that cannot be read.`` | **PROPOSED (architect confirms)** |
+| T-UTF8 | stderr, one line | 4 (`EXIT_INVALID`) | ``me: this file's public section is not UTF-8 text (where UTF-8 decoding first fails, at file offset {o}); it is damaged, or it was not written by `me sysw pack`. No identity or digest is shown, because either would be a number for records that cannot be read.`` | **PROPOSED (architect confirms)** |
 
 `{o}` is a decimal byte offset from the start of the file. The text avoids "payload unreadable" (spec §5.2 and the
 comment at main.rs:2028-2030) and does not claim tampering. Every other `show` text and exit code is unchanged.
@@ -129,7 +130,7 @@ No existing test changes: none packs or shows a non-UTF-8 public section, and no
 CHANGELOG (`crates/me-cli/CHANGELOG.md`, `## [Unreleased]` → `### Fixed`, appended after the existing bullets):
 `- **\`me sysw show\` refuses a public section that is not UTF-8, and \`sysw::region_image\` refuses a short
   container** (bughunt-1119 bh-me-I8 and bh-me-I7, both Important). \`show\` printed an identity, skipped the digest
-  and the records in silence, and exited 0; it now exits 4 and names the file offset of the first bad byte, and
+  and the records in silence, and exited 0; it now exits 4 and names the file offset where UTF-8 decoding first fails, and
   prints no identity or digest. \`region_image\` padded a container shorter than its header declares into a full
   region image the reader then refused; it now returns the \`TooShort\` error \`open\` returns. Exit codes
   elsewhere are unchanged.` (**PROPOSED**, same status as T-UTF8.)
