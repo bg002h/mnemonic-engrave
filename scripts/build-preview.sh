@@ -36,7 +36,12 @@ VERSION="$(sed -n '0,/^version = /s/^version = "\(.*\)"/\1/p' "$ROOT/crates/me-c
 
 if [ "${1:-}" = "--check" ]; then
   [ -x "$OUT" ] || { echo "MISSING: $OUT — run without --check"; exit 1; }
-  got="$("$OUT" --version 2>&1 || true)"
+  rc=0
+  got="$("$OUT" --version)" || rc=$?
+  if [ "$rc" != 0 ]; then
+    echo "FAILED: $OUT --version exited $rc — run without --check"
+    exit 1
+  fi
   if [ "$got" = "me-preview $VERSION" ]; then
     echo "ok: $got matches the crate"
     exit 0
@@ -55,7 +60,12 @@ CGO_ENABLED=0 "$GO" build -trimpath \
 
 # Verify the stamp actually landed. `-X` against a missing symbol is silently
 # ignored by the Go linker, so a successful build proves nothing on its own.
-got="$("$OUT" --version 2>&1)"
+rc=0
+got="$("$OUT" --version)" || rc=$?
+if [ "$rc" != 0 ]; then
+  echo "FATAL: built sidecar's --version exited $rc" >&2
+  exit 1
+fi
 [ "$got" = "me-preview $VERSION" ] || {
   echo "FATAL: built sidecar reports '$got', expected 'me-preview $VERSION'" >&2
   exit 1

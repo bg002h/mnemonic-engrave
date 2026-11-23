@@ -15,7 +15,10 @@ the crate on purpose. An independent derivation is the only kind that can
 disagree.
 
 VALIDATED BEFORE USE, and this is not optional: `--self-test` reproduces all 40
-of `mk-codec`'s committed vectors (19 regular-code, 21 long-code). If this
+of `mk-codec`'s committed vectors (19 regular-code, 21 long-code), from the
+copy in `scripts/test/fixtures/mk-codec-v0.1-vectors.json` (mnemonic-key 6faf8a60)
+or the file `--mk-vectors` names. A missing corpus, or one that does not verify
+as exactly 19 regular and 21 long strings, fails the self-test. If this
 implementation were wrong, every vector it emits would be wrong and the whole
 defence would rest on a broken generator. Run it first.
 
@@ -26,7 +29,7 @@ itself into looking correct.
 
 Usage:
     gen-mt1-vectors.py --self-test
-    gen-mt1-vectors.py --from-regtest <datadir> --rpcport <port> --out design/vectors
+    gen-mt1-vectors.py --from-regtest <datadir> --rpcport <port> --tx <label>=<hexfile>:<note> [--tx ...] --out design/vectors
 """
 
 import argparse
@@ -52,6 +55,8 @@ GEN_LONG = [
     0x0C577EAECCF1990D13C, 0x1887F74F8DC71B10651,
 ]
 POLYMOD_INIT = 0x23181B3
+# The vendored mk corpus: 40 strings, 19 regular-code and 21 long-code.
+MK_CORPUS_COUNTS = (19, 21)
 REGULAR = (GEN_REGULAR, 60, 0x0FFFFFFFFFFFFFFF, 13)
 LONG = (GEN_LONG, 70, 0x3FFFFFFFFFFFFFFFFF, 15)
 
@@ -225,25 +230,31 @@ def self_test(mk_vectors: Path) -> bool:
 
     # (3) reproduce mk's committed corpus — validates bech32, hrp_expand, the
     #     polymod loop and BOTH generator polynomials against known-good data
+    strs = []
     if mk_vectors.exists():
         v = json.loads(mk_vectors.read_text())
         strs = [s for vec in v["vectors"]
                 for s in vec.get("expected", {}).get("strings", [])]
-        r = sum(verify("mk", [CHARSET.index(c) for c in s.rpartition("1")[2]],
-                       MK_REGULAR_CONST, REGULAR) for s in strs)
-        l = sum(verify("mk", [CHARSET.index(c) for c in s.rpartition("1")[2]],
-                       MK_LONG_CONST, LONG) for s in strs)
-        good = (r + l) == len(strs) and len(strs) > 0
+
+        def fam(s, const, code):
+            return verify("mk", [CHARSET.index(c) for c in s.rpartition("1")[2]],
+                          const, code)
+        r = sum(1 for s in strs
+                if fam(s, MK_REGULAR_CONST, REGULAR) and not fam(s, MK_LONG_CONST, LONG))
+        l = sum(1 for s in strs
+                if fam(s, MK_LONG_CONST, LONG) and not fam(s, MK_REGULAR_CONST, REGULAR))
+        good = (r + l) == len(strs) and (r, l) == MK_CORPUS_COUNTS
         ok &= good
         print(f"  {'ok  ' if good else 'FAIL'} mk corpus: {r + l}/{len(strs)} "
               f"verify ({r} regular, {l} long)")
     else:
-        print(f"  skip  mk corpus not found at {mk_vectors}")
+        ok = False
+        print(f"  FAIL mk corpus not found at {mk_vectors}")
 
     # (4) HRP separation — proven, not asserted. A genuine mk1 string must fail
     #     under any other HRP, against every constant. This is why the spec's
     #     cross-format claim was retracted: the HRP already separates them.
-    if mk_vectors.exists() and strs:
+    if mk_vectors.exists():
         s = next((x for x in strs if verify("mk",
                  [CHARSET.index(c) for c in x.rpartition("1")[2]],
                  MK_REGULAR_CONST, REGULAR)), None)
@@ -255,6 +266,9 @@ def self_test(mk_vectors: Path) -> bool:
             ok &= not leaks
             print(f"  {'ok  ' if not leaks else 'FAIL'} HRP separation: an mk1 string "
                   f"verifies under no other HRP/constant pair")
+        else:
+            ok = False
+            print("  FAIL HRP separation: the corpus has no regular-code mk1 string to test")
     return bool(ok)
 
 
@@ -312,9 +326,13 @@ def main():
     ap.add_argument("--tx", action="append", default=[],
                     help="LABEL=HEXFILE:note — repeatable")
     ap.add_argument("--out", default="design/vectors")
-    ap.add_argument("--mk-vectors", default="/scratch/code/shibboleth/mnemonic-key/"
-                    "crates/mk-codec/src/test_vectors/v0.1.json")
+    ap.add_argument("--mk-vectors",
+                    default=str(Path(__file__).resolve().parent / "test" / "fixtures"
+                                / "mk-codec-v0.1-vectors.json"))
     a = ap.parse_args()
+    if not a.self_test and (not a.tx or a.from_regtest is None):
+        ap.error("generation needs --from-regtest DATADIR and at least one "
+                 "--tx LABEL=HEXFILE:note; --self-test alone validates without writing")
 
     print("SELF-TEST — this implementation is validated before it is trusted")
     if not self_test(Path(a.mk_vectors)):

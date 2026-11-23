@@ -11,7 +11,6 @@
 ^scripts/acceptance-count\.py$
 ^scripts/descriptor-seam-vectors/rows\.py$
 ^scripts/followups-status\.sh$
-^scripts/gen-mt1-vectors\.py$
 ^scripts/gen-sa-fixture\.py$
 ^scripts/gen-tx-journey\.sh$
 ^scripts/h[256]-plan-blocks-vs-tree\.sh$

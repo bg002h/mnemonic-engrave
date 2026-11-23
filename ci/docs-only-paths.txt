@@ -20,3 +20,6 @@
 - ^design/agent-reports/e3a-g-facts\.md$
 # crates/me-cli/src/sysw/mr.rs and the sysw_cli, seal_cli tests read it
 - ^design/vectors/sysw_mr_v1_vectors\.json$
+# scripts/gen-mt1-vectors.py (run by CI through scripts/test/gen_mt1_vectors_test.py)
+- ^design/SPEC_mt_v0_1\.md$
+- ^design/vectors/mt1_v1_vectors\.md$
