@@ -16,6 +16,7 @@
 ^scripts/gen-tx-journey\.sh$
 ^scripts/h[256]-plan-blocks-vs-tree\.sh$
 ^scripts/importability-matrix\.py$
+^scripts/io-lib-safe-write-gate\.sh$
 ^scripts/liana-live-gate\.sh$
 ^scripts/mutation-run\.py$
 ^scripts/plan-apply-gate-go\.sh$
