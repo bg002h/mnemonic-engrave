@@ -459,4 +459,5 @@ jobs:
 """
 
 if __name__ == "__main__":
-    pass
+    sys.stderr.write("retired 2026-11-24 (alpha mode): the deployed .github/workflows/release.yml files are the source of truth; this template is stale and would revert them\n")
+    raise SystemExit(2)
