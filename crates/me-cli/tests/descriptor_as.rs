@@ -1171,3 +1171,33 @@ fn a_quoted_label_can_neither_close_the_quote_nor_reorder_the_line() {
         "a legitimate non-ASCII label was mangled:\n{err}"
     );
 }
+
+/// FIX_sec_canonical_keeps_xpub_depth §5 row 5: a depth-4 key promoted under a
+/// depth-3 origin packs, announces and reads back as the key AS SUPPLIED.
+#[test]
+fn promotion_of_a_depth_4_key_packs_and_announces_the_key_as_supplied() {
+    const D4: &str = "xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan";
+    let want = format!("pkh([4bbaa801/44h/0h/0h]{D4})#57c9a380");
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("container.bin");
+    let (run, _d) = pack_in(
+        &format!("[4bbaa801/44h/0h/0h]{D4}\n"),
+        &["--as", "descriptor", "--out", out.to_str().unwrap()],
+    );
+    let err = stderr(&run);
+    assert_eq!(code(&run), 0, "stderr:\n{err}");
+    assert!(
+        err.lines()
+            .any(|l| l == format!("      inferred wallet: {want}")),
+        "stderr:\n{err}"
+    );
+    assert!(
+        err.lines().any(|l| l
+            == "      The key's version bytes may be normalised (`zpub` becomes `xpub`); its depth, child number and key material are unchanged."),
+        "stderr:\n{err}"
+    );
+    let blob = std::fs::read(&out).unwrap();
+    let payload = mnemonic_engrave::sysw::open(&blob, None).unwrap();
+    assert_eq!(payload.public.len(), 1);
+    assert_eq!(payload.public[0], want);
+}
