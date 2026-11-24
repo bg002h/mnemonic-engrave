@@ -30,17 +30,6 @@ on:
   push:
     tags:
       - 'v*'
-    branches:
-      - master
-      - 'ci/**'
-  pull_request:
-    # ready_for_review: a PR leaving draft gets the Windows leg (the default
-    # types, plus that one).
-    types: [opened, synchronize, reopened, ready_for_review]
-  # A NON-PUBLISHING release rehearsal: the full matrix builds, `assemble`
-  # packs, writes SHA256SUMS, minisign-signs it and VERIFIES the signature,
-  # and the attest + publish steps (tag-only) are skipped. It proves the
-  # signing secret works without cutting a release.
   workflow_dispatch:
 
 permissions:
@@ -64,7 +53,7 @@ env:
 # schedules and dispatches are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # ---------------------------------------------------------------------------
