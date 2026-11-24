@@ -440,6 +440,22 @@ pub fn decode_public_set(records: &[&str]) -> Result<(), RecordError> {
 /// dropped-secret bug. Nothing about the body, the signature or the emitted
 /// bytes changes, so Sealed Payload's behaviour cannot move.
 pub(crate) fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>), RecordError> {
+    chunk_header(s, kind).map(|(hrp, h)| (hrp, h.map(|(csid, _, _)| csid)))
+}
+
+/// A chunk header's `(chunk_set_id, count, index)`.
+pub(crate) type ChunkFields = (u32, u8, u8);
+
+/// [`chunk_key`] with the rest of the chunk header: `(hrp, Some((chunk_set_id,
+/// count, index)))` for a chunked string, `(hrp, None)` for a single-string
+/// card. The run grouping of `[mdmk-decode]` (S1 §14d) needs the count to know
+/// when a group is full and the index to name a card's first and last string.
+/// `chunk_key` is this with the count and index dropped, so the two cannot
+/// disagree about which strings group.
+pub(crate) fn chunk_header(
+    s: &str,
+    kind: RecordKind,
+) -> Result<(char, Option<ChunkFields>), RecordError> {
     use md_codec::bitstream::BitReader;
     use md_codec::ChunkHeader;
     use mk_codec::string_layer::{decode_string, StringLayerHeader};
@@ -451,7 +467,12 @@ pub(crate) fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>)
             let mut r = BitReader::new(&bytes);
             // A non-chunked md1 fails the chunked-flag read; that is the signal,
             // not an error.
-            Ok(('d', ChunkHeader::read(&mut r).ok().map(|h| h.chunk_set_id)))
+            Ok((
+                'd',
+                ChunkHeader::read(&mut r)
+                    .ok()
+                    .map(|h| (h.chunk_set_id, h.count, h.index)),
+            ))
         }
         RecordKind::Mk => {
             let d = decode_string(s).map_err(|e| RecordError::Invalid(e.to_string()))?;
@@ -460,7 +481,12 @@ pub(crate) fn chunk_key(s: &str, kind: RecordKind) -> Result<(char, Option<u32>)
             Ok((
                 'k',
                 match h {
-                    StringLayerHeader::Chunked { chunk_set_id, .. } => Some(chunk_set_id),
+                    StringLayerHeader::Chunked {
+                        chunk_set_id,
+                        total_chunks,
+                        chunk_index,
+                        ..
+                    } => Some((chunk_set_id, total_chunks, chunk_index)),
                     StringLayerHeader::SingleString { .. } => None,
                     // StringLayerHeader is #[non_exhaustive], so this arm is
                     // MANDATORY — it will not compile without it. Fail closed: an

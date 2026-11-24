@@ -39,6 +39,8 @@ empty/clean directory. This prevents cross-run plate mixing without silently del
 user files (deletion is riskier than refusal and could clobber an unrelated file that
 happens to match).
 
+`render_plate` removes any existing `plate-<idx>.<ext>` before it spawns `me-preview`, so the F9 check judges only this run's output; a removal error other than not-found is reported as `cannot run me-preview: <error>`.
+
 Placement: in `wire_previews` (main.rs), immediately after the `dir.is_dir()` check and
 BEFORE the render loop. Scan with `std::fs::read_dir`; match file names against a small
 helper `is_plate_artifact(name) -> bool` (`plate-` prefix AND `.svg`/`.png` suffix).
@@ -103,9 +105,9 @@ Every file `me`/`me-preview` writes containing or depicting md1/mk1 material →
 (0o600 on Unix; no-op semantics on Windows where mode bits differ, guarded by cfg).
 Sites:
 - main.rs:140 NDEF `--out`: replace `std::fs::write` with a helper `write_private(path,
-  bytes)` using `OpenOptions` with `.write(true).create(true).truncate(true)` and, under
+  bytes)` using `OpenOptions` with `.write(true).create(true)` and, under
   `#[cfg(unix)]`, `.mode(0o600)`; on non-unix the same options without `.mode`.
-  **`truncate(true)` is load-bearing (R0 I2):** `fs::write` truncates; without it a
+  Truncation is load-bearing (R0 I2) and happens after the mode is set (`set_len(0)` after `set_permissions`, on a regular file only; a pipe or FIFO is written without truncation), so a refused chmod leaves the existing file unchanged. `fs::write` truncates; without it a
   shrinking overwrite (a smaller manifest over a larger one) would leave trailing stale
   bytes → invalid JSON.
 - main.rs:205 manifest: same helper.
@@ -115,9 +117,7 @@ Sites:
 Note zeroize/leak scope honestly: 0o600 protects at-rest on multi-user hosts; it does
 NOT change that the manifest embeds raw strings and previews depict QR — that visibility
 is intrinsic to the artifacts' purpose. Defense-in-depth, not a secrecy guarantee. Also
-**0o600 binds on CREATE; an overwrite of a pre-existing file keeps its old mode** (R0 L3)
-— acceptable residual: the NDEF/manifest targets are user-named and the preview targets
-are forced-fresh by A1.
+`.mode(0o600)` binds only on create, so on Unix `write_private` also calls `set_permissions(0o600)` on the open file (F-244): an overwrite of a pre-existing file ends at 0o600, and a refused chmod fails the write before any byte of the old file is touched (R0 L3, superseded).
 
 Acceptance:
 - After `me --out f.ndef` (Unix): `metadata(f).permissions().mode() & 0o077 == 0`.

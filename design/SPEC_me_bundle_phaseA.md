@@ -82,6 +82,25 @@ Each is surfaced verbatim alongside the human framing "set `<chunk_set_id>` is i
 - **`sets[]`** lists **only multi-string chunked sets** (chunked md1 and mk1) — each `set-verified`. An **unchunked single md1** is NOT a chunk set: it appears **only in `plates[]`** with `integrity: "bch-only"` and **no `chunk_set_id`/`chunk_index`**, and is **omitted from `sets[]`** (resolves m-2). The example's md1 set is a *chunked-of-1* (`total: 1`, hence it has a `chunk_set_id` and is `set-verified`). `sets[]` models ≥1 independent sets (e.g. one chunked md1 + two mk1 key cards → three entries), confirmed sound in design R1 (multi-set Q5). `string` is omitted for the `ms1` plate; `chunk_set_id`/`chunk_index` omitted for unchunked md1 and ms1.
 - **`version`** is the crate version at build time (`env!("CARGO_PKG_VERSION")`) — the `"0.2.0"` literal above is illustrative, NOT hardcoded. The §10 manifest golden test (#12) must therefore either pin/normalize the `version` field or assert on a version-independent projection, so a routine version bump does not break the golden.
 - **`card_fingerprint` / `card_path`** identify the mk1 **card** a chunk plate belongs to, carried straight from the decoded `KeyCard`'s origin. Present on `mk1-chunk` plates only — **both are omitted** on `md1` and `ms1` plates, and `card_fingerprint` is omitted for a **`--privacy-preserving`** card, which has none by design. They are *reporting* fields: nothing in the pipeline consumes them, and they do not participate in set integrity. Rendered as lowercase hex and an apostrophe-hardened path (matching `mk decode`), with no leading `m/`.
+- **`missing_keys`** lists every md1 policy whose card does not carry the xpub of each of its key slots (bh-me-C1).
+  One entry per policy (an unchunked md1 string, or a chunk set) that lacks at least one xpub, in plate order;
+  a key-less template has an entry too, with every slot missing. The field is **omitted** when no policy lacks
+  an xpub. It sits after `keyless_template` in the object. Entry keys:
+  - `md1_plates`: the `plate` numbers of that policy's md1 plates, ascending.
+  - `key_slots`: that policy's declared key slots (`Descriptor.n`).
+  - `present_slots`: the slot indices whose xpub the card carries, ascending (may be empty).
+  - `missing_slots`: one object per slot without an xpub, ascending by `slot`: `{"slot": <index>}` plus
+    `"fingerprint": "<8 lowercase hex>"` when the card's fingerprint record has an entry **for that slot**;
+    the key is omitted otherwise, never fabricated.
+  - `me bundle` does not match supplied mk1 cards to slots, so an mk1 card in the bundle does not remove a slot
+    from `missing_slots`.
+
+Example (fixture `k1`, xpub on `@0` only, fingerprints on all three slots):
+
+    "missing_keys": [
+      { "md1_plates": [1, 2, 3], "key_slots": 3, "present_slots": [0],
+        "missing_slots": [ { "slot": 1, "fingerprint": "b8688df1" }, { "slot": 2, "fingerprint": "28645006" } ] }
+    ]
 - Hex `chunk_set_id` rendered `0x%05x` (20-bit). The schema is forward-compatible for a Phase-B consumer (it selects which plate to preview via `plates[]`).
 
 ## 7. Guided workflow checklist (stderr)
@@ -124,6 +143,25 @@ The scan that decides this is **per card, keyed on `chunk_set_id` — never per
 plate.** Every chunk of one card trivially shares that card's origin, so a
 per-plate scan would mark all 34 pathological plates ambiguous and suffix every
 one of them, hiding the real case the suffix exists to flag.
+
+**Partly keyed policy note (bh-me-C1).** For each `missing_keys` entry whose `present_slots` is **not** empty,
+in entry order, the checklist prints one line. These lines come after the F-602 TEMPLATE note (if any) and
+before the key-slots note. An entry whose `present_slots` is empty (a key-less template) prints no such line;
+the TEMPLATE note covers it. The line is:
+
+    me: NOTE — the md1 policy on <PLATES> carries the <XPUB> of key <SLOT> <PRESENT> only. It does NOT carry <MISSING-CLAUSE> `me bundle` does not match mk1 cards to key slots.
+
+- `<PLATES>`: `plate <a>` when the policy has one md1 plate, else `plates <a>-<b>` (first and last of
+  `md1_plates`, joined by a hyphen-minus).
+- `<XPUB>` `<SLOT>`: `xpub` `slot` when `present_slots` has one element, else `xpubs` `slots`.
+- `<PRESENT>`: each present slot as `@<i>`, joined by `, `.
+- `<MISSING-CLAUSE>`, with `<M>` = each missing slot as `@<i> [<fingerprint>]`, or `@<i>` when it has no
+  fingerprint, joined by `, `:
+  - one missing slot: `the xpub of key slot <M>, and the wallet cannot be restored without it: keep an mk1 card (or the seed) for it.`
+  - two or more: `the xpubs of key slots <M>, and the wallet cannot be restored without them: keep an mk1 card (or the seed) for each of them.`
+
+The dash after `NOTE` is U+2014, as in the other notes; the backticks around `me bundle` are printed. One line,
+no wrapping.
 
 ## 8. Edge cases (resolves m-4)
 - Empty input → exit 2. All lines `ms1` → exit 3 at the first `ms1` line. Exact-duplicate chunk (same `chunk_index` twice in a set) → codec dup-detection → exit 4. Incomplete set (missing chunk) → exit 4. Corrupted (BCH-correctable or failing) string → exit 4 at step 3. Mixed md1 + mk1 with any incomplete set → exit 4 (no manifest). A lone unchunked md1 with no mk1 → valid 1-public-plate manifest (+ ms1 reminder). mk1 chunks only, no md1 → valid manifest (+ ms1 reminder).

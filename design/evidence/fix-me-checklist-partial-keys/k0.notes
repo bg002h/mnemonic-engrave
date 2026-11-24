@@ -1,0 +1,2 @@
+me: NOTE — this md1 is a TEMPLATE: it carries the policy and NONE of the cosigner keys. The plate above cannot restore this wallet alone. You also need every cosigner's xpub — an mk1 card each, not counted here — or every seed.
+me: NOTE — this policy declares 3 key slots. `me bundle` cannot know how many of those seeds are yours, so ms1 plates are NOT counted above: hold all 3 and you need 3 of them.

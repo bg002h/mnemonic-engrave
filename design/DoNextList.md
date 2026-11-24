@@ -393,7 +393,7 @@ this generator inherits the same defect**, so fix it before writing one.
 ### 8. Doc gates — **DECIDED 2026-08-18, and the citation gate is now WIRED (not to CI).**
 
 **Call (operator stand-in, `design/agent-reports/decision-item8-item9.md`):**
-`plan-cite-check.sh` runs from **`scripts/push-master.sh`** as a blocking,
+`plan-cite-check.sh` runs from **`scripts/push-via-staging.sh`** as a blocking,
 **changed-docs-only** step. CI is the wrong home. `plan-build-gate.sh` stays a
 fold-time local tool.
 

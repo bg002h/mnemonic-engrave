@@ -42,6 +42,31 @@ def key(fp, org, k, tail=""):
     return "[%s/%s]%s%s" % (fp, org, k, tail)
 
 
+def origin_serialised(k, org):
+    """k re-serialised with depth and child number taken from the origin path
+    `org` -- me's promotion canonical (cascade.rs canonical_string). Keeps the
+    16-key row's canonical byte-identical to me's encoder until FOLLOWUPS
+    sh2-me-canonical-depth lands; the fork (fix-01) keeps the input key's own."""
+    import hashlib
+    A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    n = 0
+    for ch in k:
+        n = n * 58 + A.index(ch)
+    b = bytearray(n.to_bytes(82, "big")[:78])
+    steps = org.split("/")
+    last = steps[-1]
+    child = int(last.rstrip("h'")) | (0x80000000 if last[-1] in "h'" else 0)
+    b[4] = len(steps)
+    b[9:13] = child.to_bytes(4, "big")
+    b += hashlib.sha256(hashlib.sha256(bytes(b)).digest()).digest()[:4]
+    n = int.from_bytes(b, "big")
+    out = ""
+    while n:
+        n, r = divmod(n, 58)
+        out = A[r] + out
+    return out
+
+
 def sm(k, keys, wrap="wsh", form="sortedmulti"):
     inner = "%s(%d,%s)" % (form, k, ",".join(keys))
     if wrap == "wsh":
@@ -223,8 +248,8 @@ R(name="promotion/15-bare-tpub-host-refused", input=SKT,
   covers=["promotion-near-miss", "gate"],
   gate=G(True, "descriptor-refusal", 3, "promotion-testnet-key"))
 
-# ---- narrowed-4.7: every shape S4.7 narrows (host false / device true) -----
-NAR = SPEC + " S4.7 (host narrows; device measured ACCEPT)"
+# ---- narrowed-4.7: every shape S4.7 narrows (host false; device measured) ---
+NAR = SPEC + " S4.7 (host narrows; device_admits is measured)"
 R(name="narrowed/tr-sortedmulti", input=std(n=2, wrap="wsh").replace("wsh(", "tr(", 1),
   host_admits=False, md1_admits=False, format="bip380", source=NAR, covers=["narrowed-4.7"])
 R(name="narrowed/wpkh-sortedmulti", input=std(n=2).replace("wsh(", "wpkh(", 1),
@@ -271,6 +296,8 @@ R(name="narrowed/use-site-non-consecutive", input=std(n=2, tail="/<0;2>/*"),
 # ---- accepted-extreme ------------------------------------------------------
 R(name="accepted/sh-wsh-sortedmulti-16-keys",
   input=sm(2, ["[%08x/%s]%s/<0;1>/*" % (i + 1, ORG, k) for i, k in enumerate(K16)], "shwsh"),
+  canonical_from=sm(2, ["[%08x/%s]%s/<0;1>/*" % (i + 1, ORG, origin_serialised(k, ORG))
+                        for i, k in enumerate(K16)], "shwsh"),
   host_admits=True, md1_admits=True, format="bip380",
   source=SPEC + " S4.7 conjunct 3 (r6's recorded construction: 16 unhardened "
                 "children of the dc567276 fixture key; sh(wsh(...)) redeemScript is 34 bytes)",
@@ -287,12 +314,12 @@ BW42 = SPEC + " S4.2 (host refuses; device measured)"
 R(name="bluewallet/no-format-header",
   input=BW_SH_FIXTURE.replace("Format: P2WSH\n", ""),
   host_admits=False, md1_admits=False, format="none",
-  source=BW42 + " defect 1: parse ACCEPTS, Descriptor.Encode() panics",
-  covers=["narrowed-4.2"], device_probe="panic:encode")
+  source=BW42 + " defect 1: parse REFUSES (fix-06b/50: no Format header)",
+  covers=["narrowed-4.2"])
 R(name="bluewallet/zero-cosigner-lines", input="Name: only\n",
   host_admits=False, md1_admits=False, format="none",
-  source=BW42 + " defect 2: exact `Name: only` spelling; 0 keys, Script=Unknown",
-  covers=["narrowed-4.2"], device_probe="panic:encode")
+  source=BW42 + " defect 2: exact `Name: only` spelling; parse REFUSES (fix-06b/50: 0 keys)",
+  covers=["narrowed-4.2"])
 R(name="bluewallet/derivation-after-keys",
   input="Name: after\nPolicy: 2 of 2\nFormat: P2WSH\n\n%s: %s\n%s: %s\nDerivation: m/48'/0'/0'/2'\n"
         % ("dc567276", K0, "f245ae38", K1),
@@ -478,6 +505,16 @@ R(name="gate/duplicate-key-same-use-site",
   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K0, "/<0;1>/*")]),
   host_admits=False, md1_admits=False, format="bip380",
   source=SPEC + " S4.7 conjunct 8 / S7 clause 8: the same (xpub, use-site) in two slots",
+  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
+R(name='gate/duplicate-key-implicit-use-site',
+  input='wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/<0;1>/*))',
+  host_admits=False, md1_admits=False, format="bip380",
+  source="F-530 review C-2: the SAME wallet as duplicate-key-same-use-site with the second key's use site left implicit. derive::receive_path states that an absent path IS <0;1>/*, so these are one key at two seats -- and conjunct 8(b) compared a.children == b.children, admitted it, and derived the same key twice.",
+  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
+R(name='gate/duplicate-key-change-chain-only',
+  input='wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/3/*,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/<2;3>/*))',
+  host_admits=False, md1_admits=False, format="bip380",
+  source='F-530 fold review NEW-1: a fixed child and a multipath key that are ONE key on the change chain and two on receive. Conjunct 8(b) compared receive only, so the primary admitted what the Go port refused; the shared file carried no row of this shape, so the parity gate could not see the divergence.',
   covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
 R(name="gate/colliding-origin-multi",
   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K1, "/<0;1>/*")], form="multi"),

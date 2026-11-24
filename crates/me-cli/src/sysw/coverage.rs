@@ -93,6 +93,34 @@ pub const COVERAGE: &[(u32, Where)] = &[
     // which taps the slot rather than synthesising the button event.
     (22, Where::Device),
     (23, Where::Vector("S-D")), // secrets-only usable whatever the passphrase
+    // Amendment S1 (2026-11-22): the mr1 class, the chunk-set rule, the kit rule.
+    // 24 to 26 run over `design/vectors/sysw_mr_v1_vectors.json`, here and in Go.
+    (24, Where::Unit("sysw_mr_string_vectors")), // §14b
+    (25, Where::Unit("sysw_mr_set_vectors")),    // §14c
+    (26, Where::Unit("sysw_mr_kit_vectors")),    // §14d
+    (27, Where::Cli),                            // §14h, `me sysw pack`
+    // 28 to 32 are the fork's: its Go port and the device screens. Test 28's
+    // sealed half (`seal_still_refuses_mr1`) is a `me` guard.
+    (
+        28,
+        Where::DeviceUnbuilt("S1 §14d admission; fork phase SH-1"),
+    ),
+    (
+        29,
+        Where::DeviceUnbuilt("S1 §14e payload menu; fork phase SH-2"),
+    ),
+    (
+        30,
+        Where::DeviceUnbuilt("S1 §14e kit door; fork phase SH-2"),
+    ),
+    (
+        31,
+        Where::DeviceUnbuilt("S1 §14f Refugium warning; fork phase SH-2"),
+    ),
+    (
+        32,
+        Where::DeviceUnbuilt("S1 §14e plate count M; fork phase SH-2"),
+    ),
 ];
 
 /// Every vector this crate must ship, derived from [`COVERAGE`] rather than
@@ -228,7 +256,7 @@ mod tests {
     /// build, which is the only reason this file is worth its weight.
     #[test]
     fn assert_every_named_test_is_placed() {
-        const HIGHEST: u32 = 23;
+        const HIGHEST: u32 = 32;
         for id in 1..=HIGHEST {
             assert!(
                 COVERAGE.iter().any(|(n, _)| *n == id),

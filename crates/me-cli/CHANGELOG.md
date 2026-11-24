@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`me bundle --preview` trusts the sidecar's version probe only when it exits 0 and prints exactly `me-preview <version>`** (bughunt-1119 bh-me-I19, Important). A probe that exits non-zero is refused with exit 2 and the sidecar's stderr; any other output shape is refused as before for an unreadable version; no plate is rendered. `scripts/build-preview.sh --check` no longer approves a sidecar whose probe exits non-zero, and compares the probe's stdout only. The developer gates bh-me-I12, I13 and I14 (mt1 vector generator, SH2 demo build) are fixed alongside.
+- **A converter option typed before a subcommand is honoured or refused, printed
+  commands quote their path, and `me-preview` refuses a stray operand**
+  (bughunt-1119 bh-me-I3, bh-me-I11 and bh-me-I18, all Important; ruling T32).
+  `me --in f sysw pack ...` read stdin and dropped `--in`; `me --out f seal ...`
+  failed on a missing `--out`. Each of `--in`, `--out` and
+  `--allow-world-readable` before `bundle`, `seal`, `sysw pack` or `sysw wipe`
+  now behaves as if given after it when that subcommand has an option of the
+  same name; a different value given in both places, or an option the
+  subcommand does not have, exits 2 and names the option, before anything is
+  read or written. The pack card's `re-print it with: me sysw show ...` line and
+  `seal`'s `picotool load --verify ...` line print the path as one shell word
+  (quoted when it needs it; a path that is not UTF-8 or carries a control
+  character or a backslash prints `<the file you just wrote>`). `me-preview
+  render` refuses an operand after its flags (exit 1) instead of ignoring
+  everything from it on. Exit codes elsewhere are unchanged.
+- **Descriptor intake refuses a `{label, descriptor}` JSON that names a field
+  twice, and an unhardened path index of 2^31 or more** (bughunt-1119 bh-me-I2
+  and bh-me-I15, both Important; ruling T31). A top-level member named twice,
+  exact or under Go `encoding/json`'s case fold (ASCII case, U+017F, U+212A),
+  made `me` read one wallet and the device another (measured: 2-of-3 against
+  1-of-3); it now exits 3 with its own sentence naming the colliding members.
+  A path index such as `2147483696` was silently rewritten as the hardened
+  `48h` in the backup's recorded origin; it is now refused with the existing
+  "is not a path" texts. Exit codes elsewhere are unchanged.
+- **`me bundle` names the cosigner keys a partly keyed md1 does not carry**
+  (bughunt-1119 bh-me-C1, Critical). A 2-of-3 md1 carrying one xpub got a
+  checklist that said nothing about the other two, at exit 0; F-602 had
+  covered only the key-less template. Each such policy now gets a NOTE naming
+  its missing key slots (with each slot's fingerprint when the card carries
+  it), and the manifest gains `missing_keys`: one entry per md1 policy that
+  lacks any xpub, key-less templates included. Exit codes and all other fields
+  are unchanged.
+- **`me sysw show` refuses a public section that is not UTF-8, and `sysw::region_image` refuses a short
+  container** (bughunt-1119 bh-me-I8 and bh-me-I7, both Important). `show` printed an identity, skipped the digest
+  and the records in silence, and exited 0; it now exits 4 and names the file offset where UTF-8 decoding first
+  fails, and prints no identity or digest. `region_image` padded a container shorter than its header declares into
+  a full region image the reader then refused; it now returns the `TooShort` error `open` returns. Exit codes
+  elsewhere are unchanged.
+
+## [0.13.0] - 2026-11-04
+
 ### Added
 
 - **`sysw::region_image`**, the library form of `me sysw pack --region`
@@ -19,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Test `bughunt_me_01` skips where `unshare --map-auto` has no subuid range**
+  (the GitHub runner), and fails there under `ME_REQUIRE_USERNS=1`, as
+  `ME_REQUIRE_GO=1` does for the Go oracle.
 - **md-codec moves from 0.47.0 to 0.48.4** (F-700), the same rev
   mnemonic-refugium pins, so a program linking both holds one md-codec. 0.48.x
   adds API and changes no wire format.

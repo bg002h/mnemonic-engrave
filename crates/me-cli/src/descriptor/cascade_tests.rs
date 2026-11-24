@@ -243,6 +243,143 @@ fn a_missing_label_is_fine_and_a_missing_descriptor_key_is_named_as_missing() {
     );
 }
 
+// ── FIX_me_descriptor_input_strict (bughunt-1119 I2, I15; ruling T31) ──────
+
+/// The duplicate group the JSON branch reports for `doc`, or panics.
+fn dup_group(doc: &str) -> Vec<String> {
+    let errs = cascade(&normalise(doc)).unwrap_err();
+    match errs.json {
+        Some(JsonError::DuplicateMember { names }) => names,
+        other => panic!("{doc}: want DuplicateMember, got {other:?}"),
+    }
+}
+
+#[test]
+fn json_duplicate_members_are_refused_exact_or_case_variant() {
+    let d = FIXTURE;
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"Descriptor\":\"{d}\"}}"
+        )),
+        ["descriptor", "Descriptor"]
+    );
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"Descriptor\":\"{d}\",\"descriptor\":\"{d}\"}}"
+        )),
+        ["Descriptor", "descriptor"]
+    );
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"descriptor\":\"{d}\"}}"
+        )),
+        ["descriptor", "descriptor"]
+    );
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"label\":\"x\",\"Label\":\"y\",\"descriptor\":\"{d}\"}}"
+        )),
+        ["label", "Label"]
+    );
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"label\":\"x\",\"Descriptor\":\"{d}\",\"DESCRIPTOR\":\"{d}\"}}"
+        )),
+        ["descriptor", "Descriptor", "DESCRIPTOR"]
+    );
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"devices\":[],\"devices\":[]}}"
+        )),
+        ["devices", "devices"]
+    );
+    assert_eq!(
+        dup_group("{\"label\":\"a\",\"label\":\"b\"}"),
+        ["label", "label"]
+    );
+    // A JSON escape is decoded before names are compared.
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"Descr\\u0069ptor\":\"{d}\"}}"
+        )),
+        ["descriptor", "Descriptor"]
+    );
+}
+
+#[test]
+fn json_duplicate_detection_folds_like_go_encoding_json() {
+    let d = FIXTURE;
+    // U+017F LATIN SMALL LETTER LONG S folds to `s`.
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"descriptor\":\"{d}\",\"de\u{17f}criptor\":\"{d}\"}}"
+        )),
+        ["descriptor", "de\u{17f}criptor"]
+    );
+    // U+212A KELVIN SIGN folds to `k`; the JSON escape is written as such.
+    assert_eq!(
+        dup_group(&format!(
+            "{{\"\\u212ax\":1,\"kx\":2,\"descriptor\":\"{d}\"}}"
+        )),
+        ["\u{212a}x", "kx"]
+    );
+    // Every other character compares exactly: no collision, the document parses.
+    let doc = format!("{{\"\u{c4}\":1,\"\u{e4}\":2,\"descriptor\":\"{d}\"}}");
+    assert_eq!(ok(&doc).branch, Branch::Json);
+}
+
+#[test]
+fn json_duplicate_check_runs_before_field_lookup() {
+    let d = FIXTURE;
+    assert_eq!(
+        dup_group(&format!("{{\"descriptor\":null,\"Descriptor\":\"{d}\"}}")),
+        ["descriptor", "Descriptor"]
+    );
+    assert_eq!(
+        dup_group("{\"descriptor\":\"not a descriptor\",\"Descriptor\":\"nor this\"}"),
+        ["descriptor", "Descriptor"]
+    );
+}
+
+#[test]
+fn json_nested_duplicates_are_not_inspected() {
+    let d = FIXTURE;
+    let doc = format!("{{\"descriptor\":\"{d}\",\"devices\":[{{\"type\":\"a\",\"Type\":\"b\"}}]}}");
+    assert_eq!(ok(&doc).branch, Branch::Json);
+}
+
+#[test]
+fn path_element_refuses_an_index_above_2_pow_31_minus_1() {
+    for p in [
+        "2147483648",
+        "2147483696",
+        "4294967295",
+        "2147483648h",
+        "2147483696'",
+    ] {
+        assert!(parse_path_element(p).is_err(), "{p}");
+    }
+    // The three callers keep their own error variants.
+    let e = parse_key(
+        None,
+        &format!("[4bbaa801/2147483696/1h/0h/2h]{XPUB}/<0;1>/*"),
+    )
+    .unwrap_err();
+    assert!(matches!(e, KeyError::InvalidOriginPath(_)), "{e:?}");
+    let e = parse_key(None, &format!("[4bbaa801/84h/0h/0h]{XPUB}/2147483696/*")).unwrap_err();
+    assert!(matches!(e, KeyError::InvalidChildrenPath(_)), "{e:?}");
+    assert!(parse_path_m("m/48'/1'/0'/2147483650").is_err());
+    assert!(parse_path("2147483696/1h").is_err());
+}
+
+#[test]
+fn path_element_admits_2147483647_unhardened_and_hardened() {
+    assert_eq!(parse_path_element("2147483647"), Ok(2147483647));
+    assert_eq!(parse_path_element("2147483647h"), Ok(0xFFFF_FFFF));
+    assert_eq!(parse_path_element("0"), Ok(0));
+    assert_eq!(parse_path_element("0h"), Ok(HARDENED));
+}
+
 // ── §4.5 ───────────────────────────────────────────────────────────────────
 
 /// §4.5, R0's I5: the announcement prints BOTH forms, and the second assertion

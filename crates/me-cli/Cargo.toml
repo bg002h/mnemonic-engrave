@@ -1,6 +1,6 @@
 [package]
 name = "mnemonic-engrave"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 description = "Prepare wallet backups and signed transactions for a SeedHammer II: `me sysw pack` builds the payload it engraves, from mt1 strings or a tx: record; bare `me` converts one md1/mk1/mt1 string to an NFC NDEF payload. Refuses secret ms1."
 license = "MIT OR Unlicense"
@@ -30,7 +30,7 @@ mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 # SPEC_liana_unspendable_internal_key §9a). md-codec is unpublishable while it
 # depends on the rust-miniscript git patch below, so crates.io stopped at 0.42
 # -- which reads no wire version but 4, and fails every version-8 plate.
-# 6cf6599a is tag `md-codec-v0.48.4`. A rev, not the tag: a tag can be moved, a
+# c8bb97a5 is tag `md-codec-v0.48.5`. A rev, not the tag: a tag can be moved, a
 # rev cannot. Same shape as mnemonic-toolkit.
 #
 # F-700 (Refugium plan phase E2): this rev EQUALS mnemonic-refugium's workspace
@@ -41,7 +41,7 @@ mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 #
 # NEEDS the root `[patch.crates-io]` miniscript override: md-codec 0.47+ calls
 # APIs that exist only at that rev (`derive_at_index`, `Terminal::SortedMultiA`).
-md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "6cf6599ab71eb37adef836641095fb3c8756784f" }
+md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "c8bb97a5e2feccded5f05caf4c79c2458756c1c2" }
 # §5.4's `address 0:` line -- the executable check the operator makes before
 # anything is engraved. `md_codec::Descriptor::derive_address` is the derivation
 # (md-codec's `derive` feature is default-on and already in this tree), and its
@@ -80,7 +80,7 @@ rand = "0.9"
 # refuses (F-539), and `--emit-record` learned the phrase record carries the
 # METHOD axis and not the KIND axis. The old pin predated both, so `me` was
 # validating against a corpus the host had already moved.
-ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "e5dff6f9c2b7ae7dc02a4a137e7322abab32211e" }
+ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "62b4d9dc903566bc648dbf347bf571f9451ae817" }
 # The mt1 wire format -- the PRIMARY for everything sysw::mt converges on.
 # A path dependency because mt-codec lives in a private sibling repo
 # (mnemonic-transaction) and is unpublished; the layout is the constellation's
@@ -101,7 +101,7 @@ ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "e5dff6f9c
 # than assumed: `git diff origin/main..HEAD -- crates/mt-codec/` is EMPTY. The
 # six unpushed commits touch `mt-cli` and the spec only, and `me` depends on
 # `mt-codec`. So this needs no push -- an outward-facing act -- to build.
-mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "72b79b8762ec208b6143afade8c4b66a551bd29d" }
+mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "eec7910b06b6f6bc528de5731708c29cf7e37acd" }
 rpassword = { version = "7.5.4", optional = true }
 
 # F-700 (Refugium plan phase E2): the library carries no CLI crate. clap and

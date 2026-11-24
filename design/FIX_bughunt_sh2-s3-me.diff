@@ -1,0 +1,142 @@
+--- a/scripts/descriptor-seam-vectors/rows.py
++++ b/scripts/descriptor-seam-vectors/rows.py
+@@ -42,6 +42,31 @@
+     return "[%s/%s]%s%s" % (fp, org, k, tail)
+ 
+ 
++def origin_serialised(k, org):
++    """k re-serialised with depth and child number taken from the origin path
++    `org` -- me's promotion canonical (cascade.rs canonical_string). Keeps the
++    16-key row's canonical byte-identical to me's encoder until FOLLOWUPS
++    sh2-me-canonical-depth lands; the fork (fix-01) keeps the input key's own."""
++    import hashlib
++    A = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
++    n = 0
++    for ch in k:
++        n = n * 58 + A.index(ch)
++    b = bytearray(n.to_bytes(82, "big")[:78])
++    steps = org.split("/")
++    last = steps[-1]
++    child = int(last.rstrip("h'")) | (0x80000000 if last[-1] in "h'" else 0)
++    b[4] = len(steps)
++    b[9:13] = child.to_bytes(4, "big")
++    b += hashlib.sha256(hashlib.sha256(bytes(b)).digest()).digest()[:4]
++    n = int.from_bytes(b, "big")
++    out = ""
++    while n:
++        n, r = divmod(n, 58)
++        out = A[r] + out
++    return out
++
++
+ def sm(k, keys, wrap="wsh", form="sortedmulti"):
+     inner = "%s(%d,%s)" % (form, k, ",".join(keys))
+     if wrap == "wsh":
+@@ -223,8 +248,8 @@
+   covers=["promotion-near-miss", "gate"],
+   gate=G(True, "descriptor-refusal", 3, "promotion-testnet-key"))
+ 
+-# ---- narrowed-4.7: every shape S4.7 narrows (host false / device true) -----
+-NAR = SPEC + " S4.7 (host narrows; device measured ACCEPT)"
++# ---- narrowed-4.7: every shape S4.7 narrows (host false; device measured) ---
++NAR = SPEC + " S4.7 (host narrows; device_admits is measured)"
+ R(name="narrowed/tr-sortedmulti", input=std(n=2, wrap="wsh").replace("wsh(", "tr(", 1),
+   host_admits=False, md1_admits=False, format="bip380", source=NAR, covers=["narrowed-4.7"])
+ R(name="narrowed/wpkh-sortedmulti", input=std(n=2).replace("wsh(", "wpkh(", 1),
+@@ -271,6 +296,8 @@
+ # ---- accepted-extreme ------------------------------------------------------
+ R(name="accepted/sh-wsh-sortedmulti-16-keys",
+   input=sm(2, ["[%08x/%s]%s/<0;1>/*" % (i + 1, ORG, k) for i, k in enumerate(K16)], "shwsh"),
++  canonical_from=sm(2, ["[%08x/%s]%s/<0;1>/*" % (i + 1, ORG, origin_serialised(k, ORG))
++                        for i, k in enumerate(K16)], "shwsh"),
+   host_admits=True, md1_admits=True, format="bip380",
+   source=SPEC + " S4.7 conjunct 3 (r6's recorded construction: 16 unhardened "
+                 "children of the dc567276 fixture key; sh(wsh(...)) redeemScript is 34 bytes)",
+@@ -287,12 +314,12 @@
+ R(name="bluewallet/no-format-header",
+   input=BW_SH_FIXTURE.replace("Format: P2WSH\n", ""),
+   host_admits=False, md1_admits=False, format="none",
+-  source=BW42 + " defect 1: parse ACCEPTS, Descriptor.Encode() panics",
+-  covers=["narrowed-4.2"], device_probe="panic:encode")
++  source=BW42 + " defect 1: parse REFUSES (fix-06b/50: no Format header)",
++  covers=["narrowed-4.2"])
+ R(name="bluewallet/zero-cosigner-lines", input="Name: only\n",
+   host_admits=False, md1_admits=False, format="none",
+-  source=BW42 + " defect 2: exact `Name: only` spelling; 0 keys, Script=Unknown",
+-  covers=["narrowed-4.2"], device_probe="panic:encode")
++  source=BW42 + " defect 2: exact `Name: only` spelling; parse REFUSES (fix-06b/50: 0 keys)",
++  covers=["narrowed-4.2"])
+ R(name="bluewallet/derivation-after-keys",
+   input="Name: after\nPolicy: 2 of 2\nFormat: P2WSH\n\n%s: %s\n%s: %s\nDerivation: m/48'/0'/0'/2'\n"
+         % ("dc567276", K0, "f245ae38", K1),
+@@ -479,6 +506,16 @@
+   host_admits=False, md1_admits=False, format="bip380",
+   source=SPEC + " S4.7 conjunct 8 / S7 clause 8: the same (xpub, use-site) in two slots",
+   covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
++R(name='gate/duplicate-key-implicit-use-site',
++  input='wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/<0;1>/*))',
++  host_admits=False, md1_admits=False, format="bip380",
++  source="F-530 review C-2: the SAME wallet as duplicate-key-same-use-site with the second key's use site left implicit. derive::receive_path states that an absent path IS <0;1>/*, so these are one key at two seats -- and conjunct 8(b) compared a.children == b.children, admitted it, and derived the same key twice.",
++  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
++R(name='gate/duplicate-key-change-chain-only',
++  input='wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/3/*,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/<2;3>/*))',
++  host_admits=False, md1_admits=False, format="bip380",
++  source='F-530 fold review NEW-1: a fixed child and a multipath key that are ONE key on the change chain and two on receive. Conjunct 8(b) compared receive only, so the primary admitted what the Go port refused; the shared file carried no row of this shape, so the parity gate could not see the divergence.',
++  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
+ R(name="gate/colliding-origin-multi",
+   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K1, "/<0;1>/*")], form="multi"),
+   host_admits=False, md1_admits=False, format="bip380",
+--- a/scripts/descriptor-seam-vectors/comment.json
++++ b/scripts/descriptor-seam-vectors/comment.json
+@@ -58,14 +58,12 @@
+  "   from a hand-stated value on 4, and it has no input-vs-canonical ambiguity.)",
+  "  canonical      -- REQUIRED wherever host_admits is true: the re-encoded",
+  "                    descriptor string both parsers must produce.",
+- "  device_probe   -- the row's input PANICS the device, and at which site. The",
+- "                    only surviving value is \"panic:encode\" (S4.2 defects 1-2):",
+- "                    parse ACCEPTS and Descriptor.Encode() panics, so the Go test",
+- "                    may parse but must NOT call Encode. A panic would CRASH the",
+- "                    suite rather than fail it -- a false-signal shape. S2 retired",
+- "                    the \"panic:parse\" marker with the parse panic it named: the",
+- "                    fingerprint guard is `!= 4` now and the parser errors",
+- "                    cleanly, so no row bars the Go test from OutputDescriptor.",
++ "  device_probe   -- the row's input PANICS the device, and at which site. No",
++ "                    row carries one now: fix-06b/50 made the parser refuse",
++ "                    S4.2 defects 1-2, so \"panic:encode\" retired with the",
++ "                    Encode() panic it named, as S2 retired \"panic:parse\"",
++ "                    (the fingerprint guard is `!= 4`). Every row reaches",
++ "                    OutputDescriptor, and both halves pin the count at 0.",
+  "  covers         -- which S7 required-row bullets this row discharges. The",
+  "                    coverage manifest below is NORMATIVE and is counted, not",
+  "                    read.",
+--- a/crates/me-cli/tests/descriptor_seam.rs
++++ b/crates/me-cli/tests/descriptor_seam.rs
+@@ -43,7 +43,7 @@
+ /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
+ /// + re-pin recipe.
+ const SEAM_VECTORS_SHA256: &str =
+-    "ed3706e29fde0ee86e13accd0ecc6492ea2ad9391ff2d911d798d69bb03760f4";
++    "34093bfd3aa8f303670098838ff6fe76c7cb7485199338088f795d9e15b0674b";
+ 
+ const PATH: &str = "testdata/descriptor_seam_vectors.json";
+ 
+@@ -151,8 +151,8 @@
+     rows: 74,
+     host_admits_true: 19,
+     md1_admits_true: 15,
+-    device_admits_true: 40,
+-    device_admits_false: 34,
++    device_admits_true: 29,
++    device_admits_false: 45,
+     // ZERO since S2: the one `panic:parse` row's parse panic is fixed (P3.1's
+     // `!= 4` fingerprint guard), so its `device_admits` is measurable and no row
+     // omits the column.
+@@ -165,7 +165,7 @@
+     // ZERO since S2: the four-row `sysw_class` SAMPLE retired in favour of the
+     // derived rule below, which is exhaustive over every row in the file.
+     sysw_class: 0,
+-    device_probe: 2,
++    device_probe: 0,
+     gate_fields: 39,
+     refusal_row: 20,
+     both_routes_address_0: 11,

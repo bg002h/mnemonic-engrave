@@ -115,9 +115,11 @@ enum Command {
         plaintext: Vec<String>,
 
         /// Write the UF2 here. Created 0600. REQUIRED — never stdout, because
-        /// the passphrase shares that stream.
-        #[arg(long, required = true)]
-        out: PathBuf,
+        /// the passphrase shares that stream. It may also be given before
+        /// `seal` (the converter's `--out`); `apply_root_options` enforces the
+        /// requirement after that merge, with clap's own text.
+        #[arg(long)]
+        out: Option<PathBuf>,
 
         /// Required to encrypt seed material — an ms1 record or a BIP-39
         /// mnemonic. A best-effort guard so it never happens by accident, not a
@@ -180,7 +182,7 @@ enum SyswCmd {
     /// one line that told them where they were. Being first is the fix; the
     /// short/long split itself is a sound convention and was not the defect.
     ///
-    /// A record is a BIP-39 mnemonic, an md1/mk1/ms1/mt1 string, or one of the
+    /// A record is a BIP-39 mnemonic, an md1/mk1/mr1/ms1/mt1 string, or one of the
     /// prefixed forms — which carry their bodies as LOWERCASE HEX.
     ///
     /// `text:<hex of the UTF-8 bytes>` is free text.
@@ -659,6 +661,190 @@ fn main() {
     std::process::exit(run());
 }
 
+/// The converter's options that are declared on the root parser.
+const ROOT_OPTIONS: [&str; 7] = [
+    "in",
+    "out",
+    "stdout",
+    "hex",
+    "base64",
+    "echo",
+    "allow-world-readable",
+];
+
+/// Which converter options were typed before the subcommand, in command-line
+/// order. Reads raw argv because clap does not keep the order. An option that
+/// takes a value (`--in`, `--out`) has its next token skipped, so a value that
+/// happens to spell a subcommand is not mistaken for it. The first token that
+/// is not an option is the subcommand and ends the scan.
+fn root_options_before_subcommand(argv: &[String]) -> Vec<&'static str> {
+    let mut found: Vec<&'static str> = Vec::new();
+    let mut it = argv.iter().skip(1);
+    while let Some(a) = it.next() {
+        let Some(long) = a.strip_prefix("--") else {
+            break;
+        };
+        let (name, has_value) = match long.split_once('=') {
+            Some((n, _)) => (n, true),
+            None => (long, false),
+        };
+        if let Some(known) = ROOT_OPTIONS.iter().find(|k| **k == name) {
+            if !found.contains(known) {
+                found.push(known);
+            }
+            if !has_value && (*known == "in" || *known == "out") {
+                it.next();
+            }
+        }
+    }
+    found
+}
+
+/// bh-me-I3 (ruling T32): the converter's options typed before a subcommand are
+/// honoured as if given after it when the leaf declares an option of the same
+/// long name, refused when the leaf was given a different value, and refused
+/// when the leaf has no such option. Runs after `Cli::parse()` and before any
+/// dispatch, so a refusal reads and writes nothing.
+fn apply_root_options(cli: &mut Cli, argv: &[String]) -> Result<(), i32> {
+    use clap::CommandFactory;
+
+    struct Leaf<'a> {
+        name: &'static str,
+        r#in: Option<&'a mut Option<PathBuf>>,
+        out: Option<&'a mut Option<PathBuf>>,
+        allow_world_readable: Option<&'a mut bool>,
+    }
+    fn conflict(opt: &str, leaf: &str) -> i32 {
+        eprintln!(
+            "me: --{opt} was given before '{leaf}' and again after it, with a different value; give it once, after '{leaf}'"
+        );
+        EXIT_USAGE
+    }
+    fn merge(
+        root: &Option<PathBuf>,
+        slot: Option<&mut Option<PathBuf>>,
+        opt: &str,
+        leaf: &str,
+    ) -> Result<(), i32> {
+        let Some(slot) = slot else {
+            return Err(notake(opt, leaf));
+        };
+        match (slot.as_ref(), root) {
+            (_, None) => Ok(()),
+            (None, Some(_)) => {
+                *slot = root.clone();
+                Ok(())
+            }
+            (Some(v), Some(r)) if v.as_os_str() == r.as_os_str() => Ok(()),
+            (Some(_), Some(_)) => Err(conflict(opt, leaf)),
+        }
+    }
+    fn notake(opt: &str, leaf: &str) -> i32 {
+        eprintln!(
+            "me: --{opt} is a converter option (me with no subcommand); '{leaf}' does not take it"
+        );
+        EXIT_USAGE
+    }
+
+    let mut leaf = match &mut cli.command {
+        None => return Ok(()),
+        Some(Command::Bundle { r#in, .. }) => Leaf {
+            name: "bundle",
+            r#in: Some(r#in),
+            out: None,
+            allow_world_readable: None,
+        },
+        Some(Command::Seal { in_path, out, .. }) => Leaf {
+            name: "seal",
+            r#in: Some(in_path),
+            out: Some(out),
+            allow_world_readable: None,
+        },
+        Some(Command::Hash { .. }) => Leaf {
+            name: "hash",
+            r#in: None,
+            out: None,
+            allow_world_readable: None,
+        },
+        Some(Command::Sysw { cmd }) => match cmd {
+            SyswCmd::Pack {
+                r#in,
+                out,
+                allow_world_readable,
+                ..
+            } => Leaf {
+                name: "sysw pack",
+                r#in: Some(r#in),
+                out: Some(out),
+                allow_world_readable: Some(allow_world_readable),
+            },
+            SyswCmd::Wipe { out, .. } => Leaf {
+                name: "sysw wipe",
+                r#in: None,
+                out: Some(out),
+                allow_world_readable: None,
+            },
+            SyswCmd::Show { .. } => Leaf {
+                name: "sysw show",
+                r#in: None,
+                out: None,
+                allow_world_readable: None,
+            },
+        },
+    };
+
+    for opt in root_options_before_subcommand(argv) {
+        match opt {
+            "in" => merge(&cli.r#in, leaf.r#in.take(), opt, leaf.name)?,
+            "out" => merge(&cli.out, leaf.out.take(), opt, leaf.name)?,
+            "allow-world-readable" => match leaf.allow_world_readable.take() {
+                // A flag given in both places is honoured once.
+                Some(flag) => *flag = *flag || cli.allow_world_readable,
+                None => return Err(notake(opt, leaf.name)),
+            },
+            _ => return Err(notake(opt, leaf.name)),
+        }
+    }
+
+    // `seal` needs `--out` from one place or the other. With neither, say so in
+    // clap's own words: re-parse argv with the requirement restored.
+    if let Some(Command::Seal { out: None, .. }) = &cli.command {
+        let mut cmd =
+            Cli::command().mut_subcommand("seal", |s| s.mut_arg("out", |a| a.required(true)));
+        if let Err(e) = cmd.try_get_matches_from_mut(argv) {
+            e.exit();
+        }
+        return Err(EXIT_USAGE);
+    }
+    Ok(())
+}
+
+/// One shell word for a path printed inside a command (bh-me-I11, FIX D6).
+/// A path that is not UTF-8, or holds a control character or a backslash, is
+/// not rendered at all: the placeholder never names a different file. A leading
+/// `-` gets `./`. A path made only of `A-Z a-z 0-9 _ . / , : @ + -` prints as
+/// is; anything else is single-quoted with each `'` written as `'\''`. An
+/// empty path is quoted too, so it stays one word.
+fn shell_word(path: &std::path::Path) -> String {
+    let Some(s) = path.to_str() else {
+        return "<the file you just wrote>".to_string();
+    };
+    if s.chars().any(|c| c.is_ascii_control() || c == '\\') {
+        return "<the file you just wrote>".to_string();
+    }
+    let s = if s.starts_with('-') {
+        format!("./{s}")
+    } else {
+        s.to_string()
+    };
+    let plain = |c: char| c.is_ascii_alphanumeric() || "_./,:@+-".contains(c);
+    if !s.is_empty() && s.chars().all(plain) {
+        s
+    } else {
+        format!("'{}'", s.replace('\'', "'\\''"))
+    }
+}
+
 fn run() -> i32 {
     // §6d, and the ORDERING IS THE FIX. This must decide before
     // `Cli::parse()`: clap names the offending VALUE in its error for every
@@ -670,7 +856,10 @@ fn run() -> i32 {
         eprintln!("me: {msg}");
         return EXIT_REFUSED;
     }
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
+    if let Err(code) = apply_root_options(&mut cli, &std::env::args().collect::<Vec<_>>()) {
+        return code;
+    }
 
     if let Some(Command::Bundle {
         r#in,
@@ -699,6 +888,10 @@ fn run() -> i32 {
         iterations,
     }) = &cli.command
     {
+        // `apply_root_options` has already refused a missing `--out`.
+        let Some(out) = out else {
+            return EXIT_USAGE;
+        };
         return run_seal_cli(
             payload,
             in_path.as_ref(),
@@ -1059,7 +1252,7 @@ fn run_seal_cli(
     eprintln!();
     eprintln!(
         "load:  picotool load --verify {}   (machine in BOOTSEL)",
-        out.display()
+        shell_word(out)
     );
     eprintln!("wipe:  picotool erase -r 0x10E00000 0x10E10000");
     EXIT_OK
@@ -1508,13 +1701,14 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
-            let (recs, document) = match read_records(records, r#in.as_ref(), *allow_argv_secret) {
-                Ok(r) => (r.records, r.document),
-                Err((msg, code)) => {
-                    eprintln!("me: {msg}");
-                    return code;
-                }
-            };
+            let (recs, document) =
+                match read_records(records, r#in.as_ref(), *allow_argv_secret, r#as.is_some()) {
+                    Ok(r) => (r.records, r.document),
+                    Err((msg, code)) => {
+                        eprintln!("me: {msg}");
+                        return code;
+                    }
+                };
 
             // SPEC_descriptor_input.md §5.1/§5.3/§5.4 — THE `--as` PATH.
             //
@@ -1880,7 +2074,12 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // act on. Nothing here refuses: §13 D6 demoted the refusal, and a
             // single card of a chunked set is exactly what `me bundle`
             // legitimately produces.
-            report_unconfirmed(&recs);
+            let unconfirmed = report_unconfirmed(&recs);
+            // S1 §14h: a payload holding an mr1 record is checked against the
+            // kit rule (checks 2, 4 and 5; 1 and 3 were refused above), and a
+            // failure is one warning line. The pack goes on: the device
+            // engraves such a payload through its other doors.
+            report_kit(&recs, &unconfirmed);
 
             let blob = match sysw::pack_with(recs, passphrase.as_deref(), *iterations, admission) {
                 Ok(b) => b,
@@ -2044,12 +2243,29 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
                 return EXIT_INVALID;
             }
+            // The public section is read without a passphrase, so a sealed
+            // container is checked the same way (FIX_me_inspection_fail_open).
+            let section =
+                &blob[sysw::wire::HEADER_LEN..sysw::wire::HEADER_LEN + h.pub_len as usize];
+            let public = match std::str::from_utf8(section) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!(
+                        "me: this file's public section is not UTF-8 text (where UTF-8 decoding \
+                         first fails, at file offset {}); it is damaged, or it was not written \
+                         by `me sysw pack`. No identity or digest is shown, because either would \
+                         be a number for records that cannot be read.",
+                        sysw::wire::HEADER_LEN + e.valid_up_to()
+                    );
+                    return EXIT_INVALID;
+                }
+            };
             println!(
                 "identity: {}",
                 hex(&sysw::identity::identity(&blob[..h.total_len()]))
             );
             print_digest(&blob);
-            print_records(&blob, &h);
+            print_records(public);
             EXIT_OK
         }
     }
@@ -2079,7 +2295,7 @@ fn hex(b: &[u8]) -> String {
 fn print_pack_card(blob: &[u8], out: Option<&std::path::PathBuf>) {
     print_digest(blob);
     match out {
-        Some(p) => eprintln!("          re-print it with: me sysw show {}", p.display()),
+        Some(p) => eprintln!("          re-print it with: me sysw show {}", shell_word(p)),
         None => eprintln!("          re-print it with: me sysw show <the file you just wrote>"),
     }
 }
@@ -2111,6 +2327,9 @@ fn print_digest(blob: &[u8]) {
         return;
     };
     let Ok(s) = std::str::from_utf8(section) else {
+        // Unreachable from `show`, which refuses a non-UTF-8 public section
+        // first (FIX_me_inspection_fail_open); `pack` builds the section from
+        // `String`s.
         return;
     };
     let refs: Vec<&str> = s.split('\n').collect();
@@ -2128,8 +2347,9 @@ fn print_digest(blob: &[u8]) {
 /// show` numbers the PUBLIC SECTION instead, and on a sealed payload the two
 /// diverge: secrets move out of the public section, so argv record 3 can be
 /// public record 1. Renumbering either would be worse than naming both.
-fn report_unconfirmed(records: &[String]) {
-    for (i, why) in mnemonic_engrave::sysw::record::mdmk_unconfirmed_why(records) {
+fn report_unconfirmed(records: &[String]) -> Vec<usize> {
+    let walk = mnemonic_engrave::sysw::record::mdmk_unconfirmed_why(records);
+    for &(i, why) in &walk {
         match why.version_note() {
             // F-449 stage 4a (SPEC §6a): name the version, and do not claim the
             // plate is broken -- a newer `me`, or newer firmware, may read it.
@@ -2166,6 +2386,21 @@ fn report_unconfirmed(records: &[String]) {
              The device will REPLACE your plate legend with a re-encode warning, and \n      \
              QR plates will be unavailable: a set that does not reassemble has no \n      \
              transaction bytes to encode."
+        );
+    }
+    walk.into_iter().map(|(i, _)| i).collect()
+}
+
+/// S1 §14h: the kit warning. One line on stderr, once, when the payload holds
+/// an mr1 record and the kit rule's checks 2, 4 or 5 fail. `unconfirmed` is the
+/// as-given indices `report_unconfirmed` already walked, so the `[mdmk-decode]`
+/// walk (and its chunk-set-id side effect) runs once.
+fn report_kit(records: &[String], unconfirmed: &[usize]) {
+    use mnemonic_engrave::sysw::mr;
+    if let mr::Kit::Refused(r) = mr::kit(records, unconfirmed) {
+        eprintln!(
+            "me: this payload is not a kit the device will engrave: {}",
+            mr_sentence(r.reason, &r.detail, records)
         );
     }
 }
@@ -2308,18 +2543,11 @@ fn report_unsigned_overrides(records: &[String]) {
 ///
 /// Sealed payloads' secret records stay unread: `show` has no passphrase, and
 /// nothing here reaches the ciphertext.
-fn print_records(blob: &[u8], h: &mnemonic_engrave::sysw::wire::Header) {
+fn print_records(s: &str) {
     use mnemonic_engrave::sysw;
-    if h.pub_len == 0 {
+    if s.is_empty() {
         return;
     }
-    let end = sysw::wire::HEADER_LEN + h.pub_len as usize;
-    let Some(section) = blob.get(sysw::wire::HEADER_LEN..end) else {
-        return;
-    };
-    let Ok(s) = std::str::from_utf8(section) else {
-        return;
-    };
     let records: Vec<String> = s.split('\n').map(str::to_owned).collect();
     // Both computed ONCE for the whole loop; each was recomputed per pass
     // before.
@@ -2505,7 +2733,7 @@ fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::recor
         C::Mnemonic | C::Codex32Secret | C::Passphrase | C::Preimage => {
             println!("secret record {i}: {} — not shown", class_name(class));
         }
-        C::FreeText | C::Tx | C::Address | C::Unknown => {
+        C::FreeText | C::Mr | C::Tx | C::Address | C::Unknown => {
             println!("public record {i}: {}", class_name(class));
         }
     }
@@ -2968,24 +3196,7 @@ fn report_sealed_preimage(records: &[String]) {
 
 /// A record CLASS, for an operator. Names the class, never the record.
 fn class_name(c: mnemonic_engrave::sysw::record::Class) -> &'static str {
-    use mnemonic_engrave::sysw::record::Class as C;
-    match c {
-        C::Mnemonic => "BIP-39 mnemonic",
-        C::Codex32Secret => "codex32 secret",
-        C::Passphrase => "passphrase",
-        C::FreeText => "free text",
-        C::Descriptor => "descriptor",
-        C::MdMk => "md1/mk1 card",
-        C::Mt => "mt1 chunk",
-        C::Tx => "raw transaction",
-        C::Address => "address",
-        C::Key => "cosigner key (key:)",
-        C::Hash => "sha256 hashlock (hash:)",
-        C::Now => "pack time (now:)",
-        C::Preimage => "hashlock preimage plate",
-        C::Phrase => "hashlock phrase (phrase:)",
-        C::Unknown => "unrecognised record",
-    }
+    c.name()
 }
 
 fn report_strength(passphrase: Option<&str>, records: &[String]) {
@@ -3040,8 +3251,9 @@ fn read_records(
     argv: &[String],
     in_path: Option<&std::path::PathBuf>,
     allow_argv_secret: bool,
+    as_present: bool,
 ) -> Result<Records, (String, i32)> {
-    if let Some(p) = in_path {
+    if let Some(p) = in_path.filter(|_| argv.is_empty()) {
         let raw = std::fs::read_to_string(p)
             .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
         // R7, and it applies to THIS channel too -- see `no_records`.
@@ -3153,6 +3365,23 @@ fn read_records(
                     EXIT_REFUSED,
                 ));
             }
+        }
+        // R1 (bug hunt #4): argv AND --in. Checked AFTER the guard above, for
+        // the pack arm's rule: a flag-shape usage error must not pre-empt a
+        // refusal about material already in the shell's history.
+        if in_path.is_some() {
+            if !as_present {
+                return Err((
+                    "pass records on argv OR via --in, not both".to_string(),
+                    EXIT_USAGE,
+                ));
+            }
+            // With `--as`, the caller's §5.1 shape check refuses this
+            // invocation in its own words. Read neither --in nor stdin.
+            return Ok(Records {
+                records: argv.to_vec(),
+                document: argv.join("\n"),
+            });
         }
         // §6b — `-` MEANS STDIN, AND IT IS IMPLEMENTED RATHER THAN MERELY
         // ACCEPTED. §6b's wording is permissive enough that an implementation
@@ -3309,6 +3538,156 @@ fn emit(
             eprintln!("me: {e}");
             EXIT_USAGE
         }
+    }
+}
+
+/// `{R}`, `{r}` of S1 §14g on the `me` surface: the record by its position in
+/// the list as given.
+fn mr_record(i: usize) -> String {
+    format!("record {i}, as given (records count from 0)")
+}
+
+/// S1 §14g's sentences for the §14b reasons, `me` form. `len` is `{n}` and
+/// `prefix` is `{p}`.
+fn mr_string_sentence(
+    reason: mnemonic_engrave::sysw::mr::MrReason,
+    i: usize,
+    len: usize,
+    prefix: &str,
+) -> String {
+    use mnemonic_engrave::sysw::mr::MrReason as M;
+    let r = mr_record(i);
+    match reason {
+        M::Case => format!(
+            "{r} is an mr1 string with capital letters; the mr1 strings of a kit are all \
+             lowercase, as mr prints them."
+        ),
+        M::Character => format!("{r} begins mr1 but holds a character no mr1 string uses."),
+        M::Length => format!(
+            "{r} begins mr1 but is {len} characters long; an mr1 string is 17 to 96 characters \
+             long."
+        ),
+        M::Checksum => format!(
+            "{r} is an mr1 string whose checksum does not match: at least one character is \
+             wrong."
+        ),
+        M::ReservedSymbol => {
+            format!("{r} begins {prefix}, which no mr1 card or chunk begins with.")
+        }
+        M::ChunkShort => format!("{r} is an mr1 chunk too short to hold its chunk header."),
+        M::ChunkPadding => format!(
+            "{r} is an mr1 chunk that does not end the way mr ends a chunk (0 to 4 zero bits \
+             after its last byte)."
+        ),
+    }
+}
+
+/// S1 §14g's sentence for one reason, `me` form. `records` is the list as
+/// given, read only for the §14b reasons' `{n}` and `{p}` inside a kit.
+fn mr_sentence(
+    reason: mnemonic_engrave::sysw::mr::Reason,
+    detail: &mnemonic_engrave::sysw::mr::Detail,
+    records: &[String],
+) -> String {
+    use mnemonic_engrave::sysw::mr::{Detail as D, Reason as R};
+    match (reason, detail) {
+        (R::Mr(m), D::Record(i)) => {
+            let t = records.get(*i).map(|r| r.trim()).unwrap_or("");
+            mr_string_sentence(
+                m,
+                *i,
+                t.chars().count(),
+                &t.chars().take(4).collect::<String>(),
+            )
+        }
+        (
+            R::SetCount,
+            D::Count {
+                begins,
+                record,
+                count,
+                first_count,
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} disagrees with itself: {} says the card has \
+             {count} chunks, but its first chunk says {first_count}.",
+            mr_record(*record)
+        ),
+        (
+            R::SetIndex,
+            D::Index {
+                begins,
+                record,
+                index,
+                count,
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} has {count} chunks, numbered 0 to {}, but {} is \
+             numbered {index}.",
+            count - 1,
+            mr_record(*record)
+        ),
+        (
+            R::SetDuplicate,
+            D::Duplicate {
+                begins,
+                index,
+                records: [a, b],
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} holds chunk {index} twice: records {a} and {b}, \
+             as given (records count from 0). Each copy of a card holds each chunk once, and a \
+             copy must be complete before the next copy starts."
+        ),
+        (
+            R::SetMissing,
+            D::Missing {
+                begins,
+                index,
+                count,
+            },
+        ) => format!(
+            "The mr1 card that begins {begins} is incomplete: chunk {index} of its {count} \
+             chunks is missing (chunks are numbered from 0), or a chunk repeated after a \
+             complete copy began a second, incomplete copy."
+        ),
+        (R::SetSlices, D::Begins(begins)) => format!(
+            "The mr1 card that begins {begins} is not divided into chunks the way mr divides a \
+             card, so mr did not write it."
+        ),
+        (R::SetId, D::Begins(begins)) => format!(
+            "The mr1 card that begins {begins} does not match its own chunk-set id: its chunks \
+             come from different cards, or one was altered."
+        ),
+        (
+            R::CardSplit,
+            D::Split {
+                kind,
+                begins,
+                record,
+            },
+        ) => format!(
+            "The {} card that begins {begins} is split: {} sits between its strings but is not \
+             part of it. Keep each card's strings together.",
+            kind.name(),
+            mr_record(*record)
+        ),
+        (R::KitOtherRecord, D::Other { record, class }) => format!(
+            "{} is not an md1, mk1 or mr1 string (it is: {}), so this payload is not a kit.",
+            mr_record(*record),
+            class_name(*class)
+        ),
+        (R::KitUnconfirmedMdmk, D::Record(i)) => format!(
+            "{} is an md1 or mk1 string whose card does not decode: it is incomplete or \
+             damaged.",
+            mr_record(*i)
+        ),
+        // The reason and its detail come from one `Refusal`, so a mismatch is a
+        // skew between two modules, not an input: say so rather than panic.
+        (r, _) => format!(
+            "an mr1 refusal ({}) with a detail that does not fit it",
+            r.name()
+        ),
     }
 }
 
@@ -3492,9 +3871,10 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                     ms_codec::consts::VALID_STR_LENGTHS,
                     ms_codec::consts::VALID_MNEM_STR_LENGTHS,
                 ),
+                U::Mr(f) => mr_string_sentence(f.reason, *i, f.len, &f.prefix),
                 U::Unrecognised => format!(
                     "record {i}, as given (records count from 0) is not a form this container can \
-                     place: not a BIP-39 mnemonic, not an md1/mk1/ms1/mt1 string, and not \
+                     place: not a BIP-39 mnemonic, not an md1/mk1/mr1/ms1/mt1 string, and not \
                      a `text:`/`pass:`/`tx:`/`key:`/`hash:`/`now:`/`phrase:` record. Addresses are not \
                      classifiable here, \
                      and neither is a wallet descriptor `me` refuses — see sysw::classify"
@@ -3546,13 +3926,14 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
             .into(),
         E::Crypto => "the passphrase did not open this payload".into(),
         E::NotUtf8 => "the records are not valid UTF-8".into(),
+        E::MrSet(r) => mr_sentence(r.reason, &r.detail, &[]),
         E::Wire(w) => format!("malformed container: {w:?}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{is_plate_artifact, write_block, PayloadKind, WriteBlock};
+    use super::{is_plate_artifact, shell_word, write_block, PayloadKind, WriteBlock};
     // `destination` and `Destination` are the library half's now, and only
     // this test module consults them directly.
     use mnemonic_engrave::io::{destination, Destination};
@@ -3615,7 +3996,7 @@ mod tests {
             ("leading space", format!("  {MS1}")),
             ("trailing space", format!("{MS1}  ")),
         ] {
-            let (msg, code) = super::read_records(std::slice::from_ref(&rec), None, false)
+            let (msg, code) = super::read_records(std::slice::from_ref(&rec), None, false, false)
                 .expect_err(&format!("{what} must be refused"));
             assert_eq!(
                 code,
@@ -3635,7 +4016,7 @@ mod tests {
         // The control: a record that is genuinely nothing is NOT refused here.
         // Without it, `Err` for every input would satisfy the loop above.
         assert!(
-            super::read_records(&["text:6869".to_string()], None, false).is_ok(),
+            super::read_records(&["text:6869".to_string()], None, false, false).is_ok(),
             "a legitimate text: record must pass this gate"
         );
     }
@@ -3709,5 +4090,40 @@ mod tests {
 
         // The ruled pipeline: a pipe, no mode concern. Must never be blocked.
         assert_eq!(write_block(false, Bearer, false, false, None), W::None);
+    }
+
+    /// FIX_me_cli_arg_contract §7 STOP-2 (bh-me-I11): a path that cannot be
+    /// printed as one shell word prints the placeholder, never a wrong command.
+    #[test]
+    fn shell_word_placeholder_for_unprintable_paths() {
+        use std::path::Path;
+        const PH: &str = "<the file you just wrote>";
+        assert_eq!(shell_word(Path::new("a\nb.bin")), PH);
+        assert_eq!(shell_word(Path::new("a\\\\b.bin")), PH);
+        assert_eq!(shell_word(Path::new("a\x1b[0m.bin")), PH);
+        assert_eq!(shell_word(Path::new("a\x7f.bin")), PH);
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let p = Path::new(std::ffi::OsStr::from_bytes(b"a\xff.bin"));
+            assert_eq!(shell_word(p), PH);
+        }
+    }
+
+    #[test]
+    fn shell_word_quotes_and_prefixes() {
+        use std::path::Path;
+        assert_eq!(shell_word(Path::new("plain.bin")), "plain.bin");
+        assert_eq!(
+            shell_word(Path::new("/tmp/x,y:z@w+v-u_t.bin")),
+            "/tmp/x,y:z@w+v-u_t.bin"
+        );
+        assert_eq!(shell_word(Path::new("my copy.bin")), "'my copy.bin'");
+        assert_eq!(shell_word(Path::new("it's.bin")), "'it'\\''s.bin'");
+        assert_eq!(shell_word(Path::new("-dash.bin")), "./-dash.bin");
+        assert_eq!(shell_word(Path::new("-my copy")), "'./-my copy'");
+        assert_eq!(shell_word(Path::new("a=b")), "'a=b'");
+        assert_eq!(shell_word(Path::new("~x")), "'~x'");
+        assert_eq!(shell_word(Path::new("")), "''");
     }
 }

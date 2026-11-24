@@ -43,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "ed3706e29fde0ee86e13accd0ecc6492ea2ad9391ff2d911d798d69bb03760f4";
+    "34093bfd3aa8f303670098838ff6fe76c7cb7485199338088f795d9e15b0674b";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -151,8 +151,8 @@ const POP: Pop = Pop {
     rows: 74,
     host_admits_true: 19,
     md1_admits_true: 15,
-    device_admits_true: 40,
-    device_admits_false: 34,
+    device_admits_true: 29,
+    device_admits_false: 45,
     // ZERO since S2: the one `panic:parse` row's parse panic is fixed (P3.1's
     // `!= 4` fingerprint guard), so its `device_admits` is measurable and no row
     // omits the column.
@@ -165,7 +165,7 @@ const POP: Pop = Pop {
     // ZERO since S2: the four-row `sysw_class` SAMPLE retired in favour of the
     // derived rule below, which is exhaustive over every row in the file.
     sysw_class: 0,
-    device_probe: 2,
+    device_probe: 0,
     gate_fields: 39,
     refusal_row: 20,
     both_routes_address_0: 11,

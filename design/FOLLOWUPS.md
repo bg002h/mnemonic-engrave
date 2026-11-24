@@ -9950,6 +9950,8 @@ than ~21 min.
 2. **Raw bytes or UR?** The fork vendors `bc/ur`. UR is self-describing and
    multi-part, which is worth something for recovery, at a size cost — and it is
    arguably a *third* format to know, which cuts against the whole point.
+   Choosing UR wires the fork's `bc/*`, which carries deferred defects `sh-ur-*`
+   (sh2 bughunt); that phase takes them first.
 3. **What states the QR's content type**, so a recoverer knows whether they are
    holding a transaction, a descriptor or a seed? A plate legend is the obvious
    answer and costs text budget.
@@ -14091,7 +14093,7 @@ them would have falsified row 12's own control in the same commit.
 
 ### F-351 — `ms-shares combine` and `slip39 combine` have NO multi-record private channel, so `--share` cannot be refused without advising an impossible remedy (repo: **mnemonic-toolkit**; owning phase: **whichever phase gives `mnemonic` an `--in`**) `#argv` `#channels` `#p3`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-11-19 — resolved by mnemonic-toolkit PR #172 (branch fix/argv-secrets, commit cdff8b08, draft): `--share` on `ms-shares combine`, `slip39 combine` and `seed-xor combine` and `--ms1` on `verify-bundle` and `import-wallet` are refused by the argv guard; the channel is `--share -` (one share) plus `--share @env:VAR` per further share, `--ms1 -` / `--ms1 @env:VAR` on verify-bundle, `--ms1 @env:VAR` on import-wallet. Update the commit cite if the PR is squashed.
 **Found 2026-08-27 by P3's mnemonic branch, while building the argv refusal.**
 `--share` is one of the eleven argv-material shapes F-292 measured, and it is
 the one shape the refusal deliberately does **not** cover.
@@ -14147,7 +14149,7 @@ the exposure is positional-only.
 
 ### F-353 — `--ms1` has no private channel on `verify-bundle` or `import-wallet`, so it is not refused there (repo: **mnemonic-toolkit**; owning phase: **whichever phase adds a second stdin channel or an `--in` to those two verbs**) `#argv` `#channels` `#p3`
 
-**Status:** OPEN
+**Status:** CLOSED 2026-11-19 — resolved by mnemonic-toolkit PR #172 (branch fix/argv-secrets, commit cdff8b08, draft): `--share` on `ms-shares combine`, `slip39 combine` and `seed-xor combine` and `--ms1` on `verify-bundle` and `import-wallet` are refused by the argv guard; the channel is `--share -` (one share) plus `--share @env:VAR` per further share, `--ms1 -` / `--ms1 @env:VAR` on verify-bundle, `--ms1 @env:VAR` on import-wallet. Update the commit cite if the PR is squashed.
 **Found 2026-08-27 by P3's mnemonic branch.** `--ms1` carries seed-equivalent
 material and is refused on `inspect`, `repair` and the three `xpub-search` verbs.
 It is exempt on the other two carriers, and the exemption is measured rather than
@@ -20272,7 +20274,7 @@ port relies on it.
 
 ### F-688 — toolkit 0.104.0 still accepts four argv secrets with only a warning (owning phase: **next mnemonic-toolkit release**) `#mnemonic-toolkit` `#secret-handling`
 
-**Status:** OPEN — secret-handling class: logged, non-gating (operator ruling 2026-08-27)
+**Status:** CLOSED 2026-11-19 — resolved by mnemonic-toolkit PR #172 (branch fix/argv-secrets, commit cdff8b08, draft): `--share` on `ms-shares combine`, `slip39 combine` and `seed-xor combine` and `--ms1` on `verify-bundle` and `import-wallet` are refused by the argv guard; the channel is `--share -` (one share) plus `--share @env:VAR` per further share, `--ms1 -` / `--ms1 @env:VAR` on verify-bundle, `--ms1 @env:VAR` on import-wallet. Update the commit cite if the PR is squashed.
 Filed 2026-09-25 from the same design doc. `import-wallet --ms1`,
 `seed-xor combine --share`, `slip39 combine --share` and `ms-shares combine
 --share` run with secret material on argv without `--allow-argv-secret`,
@@ -20639,3 +20641,746 @@ images have only entry 0 as a clear entry, so the hash is right; an image sealed
 `--clear --pin-xip-sram` has a second clear entry and would hash wrongly, so
 `picosign` would compute a signature the boot ROM rejects. Fork-native code (no Rust
 primary). Fix with a test image that has two clear entries.
+
+### F-709 — cut-release spec r1: 20 Minors and 5 Nits, deferred (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r1.md` (r1: 0C/7I/20M/5N; the 7 Importants are folded in the spec). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the r1 spec's: fold r1 added offline rows 51-68, so the network rows M1, M2, M10 and M12 call 51-55, 53, 56-58 and 58 were 69-73, 71, 74-76 and 76 after fold r1 and are now 71-75, 73, 76-78 and 78 (fold r2 added offline rows 69 and 70; rows 33-49 are unchanged).
+
+Minors (one line each):
+
+
+- M1: P2-P21 carry no mode column. `--verify` needs no checkout, and `--land-pr` needs only P1-P3 and P9. A builder that applies P10-P21 to `--verify` breaks rows 51-55 (fails closed).
+- M2: V4's behaviour for a `SHA256SUMS*` with no `.minisig` is undecided (skip, which is what row 53's "4 ok, 2 failed" needs, measured), and so is whether V2's `--` line counts as ok.
+- M3: §5.3 step 3 does not say which of the two refusal texts print, or in what order, when PVS exits non-zero and its output has the bypass line.
+- M4: The resume path (X = N for every crate) is undecided: does step 7 check `<bin> --version`, and what does the Cargo.lock line print for 0 crates? Also: does `--push` print §5.2's would-lines with `PUSH:`?
+- M5: A crate row with no CHANGELOG in a repo that has one (mnemonic-io-lib in engrave) gets `== CHANGELOG: none in mnemonic-engrave`, which is false. C7's handling of a D with no CHANGELOG is only implied.
+- M6: §8(d)'s line format omits the `origin/<default>:` prefix that `git grep <rev>` prints (measured). The builder must be told to strip it.
+- M7: §8(b) does not say whether P and X are regex-escaped, as (a) does. Run as printed (unescaped) it changes exactly 4 lines for ms, md and mk and 1 for gui today (measured).
+- M8: P1 omits `curl` (engrave §5.1 step 8 and toolkit `install-assets.test.sh`), `readelf` (that test's glibc floors) and `timeout` (V6).
+- M9: P20 matches `mnemonic-toolkit-v[0-9.]+`, while `install-pin-check.yml` matches `mnemonic-toolkit-v[0-9]+\.[0-9]+\.[0-9]+` (measured). A first mention ending in "." would refuse falsely, so use the workflow's regex.
+- M10: Rows 56-58 must name the bare copy `<repo>.git`, or P3 refuses. The spec does not say so.
+- M11: §8(a) stops at the commit and push. `check-install-links.sh`'s own FAIL text says "rebuild with demo/sh2/build.sh, and redeploy", so the live page stays stale until `demo/sh2/deploy.sh` runs, which the block does not list.
+- M12: (c)'s toml branch "insert after `[installer-ahead]`" is today's real case (measured) but has no offline row. F-tk exercises only the append branch, and row 58 does not check the toml.
+- M13: §5.3 step 3's "origin/<default> is unchanged" is false when PVS's master push was rejected because origin moved. The printed reset is still right; say "does not have the release commit".
+- M14: §8(b)'s mirrors grep also lists GUI-tier pins that must not move: `manual-gui.yml:227` and `cross-tool-differential.yml:88` for md (measured). Only (d) says some references are deliberate.
+- M15: On a re-run after a bypass, PVS re-stages a SHA that is already on master. Its `ci/staging` push is a no-op and it reads the old check runs, so the re-run tags with no new CI evidence. The STOP rests on the operator having read the previous output.
+- M16: P7 runs only for `--push`. `--land-pr` performs an irreversible merge with uncommitted tooling unchecked.
+- M17: Restore-on-failure by trap is stated only for `--dry-run`. A Ctrl-C during `--push`'s build leaves files modified; the next run's P13 lists them.
+- M18: P18's "origin tag" could come from `ls-remote` or from local tags after the fetch; the spec does not say which. With local tags, a local-only tag would count.
+- M19: `--land-pr` step 2 runs the release-pins check in any repo. A `release-pins-*` head outside the toolkit is refused with "does not contain mnemonic-toolkit-v<V>" (fails closed, but the message misleads).
+- M20: Low-risk rules with no row (each fails closed):
+  - usage: U3, U4, U5, U6, U8
+  - preflight: P1, P2, P8, P9, P10, P15 local-only, P16
+  - CHANGELOG: C2
+  - the `-dev` version rule
+  - toolkit: the (b) invariant exit 4, the (c) checks exit 4, a missing `mnemonic)` entry
+  - §5.1: the step 4 and step 6 failures; step 8 (there is no engrave fixture)
+  - §7: not OPEN, wrong base, no checks, checks timeout, merge failure, ancestry failure
+  - §8: the (b) block and the 40-line cap
+
+Nits (one line each):
+
+- N1: §5.3 step 3 says "drop the local commit", but the toolkit has two.
+- N2: `--help`'s "6 tag push failed (no tag pushed)" is wrong for the peel-mismatch exit 6, where a tag is on origin.
+- N3: P15 local-only says "if you made it by hand", but an interrupted cut-release.sh run leaves local tags too.
+- N4: Row 49's "(its refs are refs/tags/<tag>)" cannot be checked by grep when the refs are in a variable.
+- N5: Rows 35-39 and 42 omit their command and asset setup; they implicitly reuse row 34's and row 33's.
+
+### F-710 — cut-release spec r2: 15 Minors, 4 Nits and 2 design concerns, deferred (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r2.md` (r2: 0C/3I/15M/4N; the 3 Importants are folded in the spec by fold r2). Each line below is the review's line, verbatim. The builder of `scripts/cut-release.sh` reads these before building; none blocks the spec. Row numbers in the lines are the spec's at the r2 review head (`f54464bc`): fold r2 added offline rows 69 and 70 and renumbered the network rows 69-76 to 71-78, so the network rows the lines call 71 (first design concern), 75 (M14) and 76 (M11, M14) are now 73, 77 and 78 (rows 1-68 are unchanged).
+
+Minors (one line each):
+
+- M1 [pre-existing] §7 step 2 says "`git fetch` the head": `git fetch origin <branch>` does not bring the tag (measured: tags `[]`; plain `git fetch origin` does; `git merge-base --is-ancestor "<tag>^{}" ...` then rc 128, not the exit-9 refusal). Rows 46/47 run in the checkout that created the tag, so they cannot see it. Fix: "`git fetch --quiet --tags origin`". Conditions: the builder fetches only the head branch, and `--land-pr` runs in a checkout without the tag; fails closed.
+- M2 [fold] Toolkit exit 5 after (b) landed: `follow-on.txt` is written only before the tag push and the `finish:` line only follows exits 7/8/9, so the by-hand recovery never lists the engrave-demo and reference moves; add to the second I-1 line "..., then the pins-PR line below, then the moves in <git-dir>/cut-release/follow-on.txt" and write the file with `pins-pr-body.md` before §6.3 step 1.
+- M3 [fold] For a lib-only run `<bin tags>` is empty, so the finish line prints `cut-release.sh --verify ; once it shows 0 failed ...`: bare `--verify` checks all seven CLIs, five of which fail today (V3/V4), so the condition cannot hold; omit the `--verify` clause when there is no bin tag. Conditions: lib-only run and an exit 7 (mk-codec CI) or a signal.
+- M4 [pre-existing, E4/E9 touched] §6.3 step 5's exit-9 text says "(c) is at refs/heads/release-pins-<N>" even when the `git push` (not `gh`) failed; the complete pins-PR line is printed right after it and works, so only the claim is wrong.
+- M5 [fold] §6.3 step 4's exit-9 text says "commit the fix to that branch, then gh pr create ...": `gh pr create --head` explicitly skips pushing (`gh pr create --help`), so the fix commit never reaches the PR; add "push it" after "commit the fix to that branch". Conditions: step-4 exit 9 and an operator who takes the text literally.
+- M6 [fold] Rows pin printed recovery text but run only one command (row 56's tag line): the 4a pins-PR line, the two exit-9 texts and the `finish:` line are never executed by a row (I ran the pins-PR line in `sandbox-b`: it works from both the exit-5 and the exit-7 state), row 56 does not assert that the pins-PR line follows or that local master stays at (c), and rows 43, 59, 61-64 do not assert the reset or finish line; extend row 60 to run the printed pins-PR line and assert bare `release-pins-0.105.2` = (c) and the `pr create` argv.
+- M7 [fold] No row for step 4's "origin has every tag" and "mixed" outcomes or the peel-mismatch exit 6; the mixed outcome is unreachable under `--atomic`, the other two fail closed.
+- M8 [pre-existing] `--trailer` goes "to `git commit --trailer`", but the toolkit makes two commits; say whether (c) carries it (cosmetic, no row).
+- M9 [pre-existing] Fake gh "answers exactly the calls of §5.3, §5.4, §6.3 and §7": P9's `gh auth status` is §4 and `gh release download`'s argv is nowhere fixed, so a literal fake answers 99 to every `--push`, `--verify` and `--land-pr` row; row 33's "gh.log has no `fake gh: unexpected`" is vacuous unless the fake also logs that line. Fails loudly (red harness).
+- M10 [pre-existing] "Rows 44-47 run on the F-tk state that row 42 leaves" but row 43 (`as 42 with FAKE_INSTALL_ASSETS=fail`) needs a fresh F-tk (a re-run after row 42 meets P15) and sits between them; rows 66/67 also need "row 42's state" again. Say that each row builds its own fixture directory and that rows 44-47, 66 and 67 first re-run row 42's setup.
+- M11 [pre-existing; deepens F-709 M12] §6.2's "insert right after the `[installer-ahead]` line": the real `pinned-upstream.toml` has two comment lines containing `[installer-ahead]` (lines 95, 119) before the header (line 123), so an unanchored match misplaces the key; say "the line that is exactly `[installer-ahead]`". F-tk's file has no such comment and row 76 cannot see placement; the PR's CI would reject it (fails closed).
+- M12 [fold] A Ctrl-C or crash inside the toolkit's PVS window leaves the checkout detached at (b) and no trap runs (4a starts at the tag push): P11 then P12a say "finish as cut-release.sh printed", nothing was printed, and if (b) had landed the P12a "drop it" advice discards (c) and P19 then refuses. Conditions: signal inside PVS and (b) already landed.
+- M13 [pre-existing; the fold added more] Printed commands name `cut-release.sh` bare (`--verify`, `--land-pr 77`, P15 hint), but §2 says other repos reach it by absolute path, so they are not runnable as printed from a toolkit checkout; print the script's absolute path (the banner already has it).
+- M14 [pre-existing] Network row 75 inserts `## ms-cli [Unreleased]` unconditionally; once the real CHANGELOG carries one, C2 fires and the row fails (row 76 handles the same case).
+- M15 [pre-existing] §5.4 has no FAIL text for a failed download (`gh release download` under `set -e` aborts `--verify` with exit 1 instead of a FAIL line and exit 8).
+
+Nits (one line each):
+
+- N1 [pre-existing] Tag regex accepts `ms-cli-v0.20.03`; P22 may pass it numerically and cargo rejects the manifest (`invalid leading zero in patch version number`, measured) with step 4's misleading "run 'cargo fetch'" text; reject leading zeros in the tag regex.
+- N2 [pre-existing] Row 4 pins only line 1 of `--help`; the exit-code table is unpinned.
+- N3 [pre-existing] Row 25 lists `would check <lib tag>` before `would verify <bin tag>`; §5.2 puts verify first (rows match by membership, so harmless).
+- N4 [fold] Review labels `(I-2)`, `(I-4)`, `(I-5)`, `(I-6)` remain inside rows 51, 65, 67, 68 and mean nothing to the builder.
+
+Design concerns (ungraded):
+
+- V6 runs the archive's binary even after V4/V5 FAIL or when the sums file is unsigned (rows 37, 63, 71 pin that); consider running it only when V5 passed and the sums file verified.
+- The resume path tags `HEAD` (origin tip) after PVS re-stages it; if commits sit on top of the original release commit it tags the later tip. It still has manifest N, a matching heading and CI, so not graded.
+
+### F-711 — cut-release spec r3: 6 Minors and 3 Nits (owning phase: cut-release build)
+
+**Status:** OPEN — owning phase: cut-release build (M1, M2, M3, M4, M6, N1, N2 and N3 closed 2026-11-01 by the spec burn-down commit 67c3cb20; M5 stays open)
+deferred-minor (RULES.md). Filed from `design/agent-reports/review-spec-cut-release-r3.md` (r3, last round: 0C/0I/6M/3N). Each line below is the review's line, verbatim. Burn-down at the owning phase: the build's first commit applies the exact spec fix texts of M1, M2, M3, M4, M6, N1 and N2 (N3 is folded into M2's fix), because M1, M4 and M6 leave points a builder would otherwise have to decide; M5 (the review gate scripts) stays open.
+
+Minors (one line each):
+
+- **M1 [fold; text is the r2 reviewer's I-2 fix] The EXIT trap's guard omits exit 6, and the instant of "the variable set after the tag push" is undecided.** Measured: set right after `git push --atomic` returns, step 4's post-push `exit 6` (peel mismatch) becomes exit 7 with a "stopped by a failing command" line (`out/trap-exit6_after_push.err`). Conditions: a remote tag that peels differently or reads empty right after an atomic push, and the builder choosing that instant. Fails closed, the exit-6 text still prints first. Fix, anchor 4a bullet 1, old `and no exit 7, 8 or 9 and no signal trap has begun (a third variable they set).` new `and no exit 6, 7, 8 or 9 and no signal trap has begun (a third variable they set; step 4's exit 6 after the push sets it too, so the EXIT trap never changes an exit 6).` and, same bullet, after `and also EXIT.` insert ` The variable set after the tag push is set the moment git push --atomic returns 0, or when step 4 prints the "continuing" line.`
+- **M2 [fold; r2 reviewer's text] P23 refuses when S is a proper ancestor of HEAD (state I-1d), prints a false reason, and the S = HEAD exemption has no row.** Measured in `sb-anc`. Conditions: a kept/bypass staging from an earlier release, and master moved past it before the next release. Fix: P23 condition old `prints a sha S, and S is not the sha of \`HEAD\`` new `prints a sha S, S is not the sha of \`HEAD\`, and \`git merge-base --is-ancestor <S> HEAD\` exits non-zero (an S unknown locally counts as not an ancestor)`; after the §4 table add `P23: <12> is the first 12 characters of S. S = HEAD (the resume path) and S behind HEAD (an old staging a fast-forward covers) are allowed.`; row 69 setup old `pushes an unrelated commit to` new `pushes a commit that is not an ancestor of the bare master tip to`, and append to its expect `; then, with ci/staging set to the sha of HEAD and then to its parent, --dry-run ms-cli-v0.20.3 exits 0 both times with $T/pvs.log absent or empty`.
+- **M3 [fold; r2 reviewer's text] `FAKE_GH_FAIL=1` "on its first `run list` call" is ambiguous in row 70, which runs two cut-release processes.** A gh.log- or marker-derived "first" fails only the ms leg; the toolkit leg then exits 0 and the row goes red for a fixture reason. Test-only. Fix, old `on its first \`run list\` call fake gh prints` new `on every \`run list\` call fake gh prints`, and append `(the script makes no \`run list\` call before the tag push)`.
+- **M4 [fold; the open point 1] Whether the traps print step 6's NOT-listed line.** Conditions for a wrong claim: an abort or signal after a clean verify (the §8 block) and a builder printing it. Fix: 4a bullet 1, old `(for the toolkit after the §6.3 step 6 reset), and exits 7.` new the same followed by ` Neither trap prints step 6's \`== follow-on pins are NOT listed\` line: an abort can come after a clean verify, and the finishing lines are true in every state.`; §5.3 step 6, old `Exits 7 and 8 also print` new `Exits 7 and 8 from steps 5 and 6 (not the traps' exit 7) also print`.
+- **M5 [fold; gate tooling] Gate blind spots (Q4).** `mech_checks.py` check 5 (quoted text matches a template) prints but never fails; a defined-but-wrong exit code and a deleted-but-quoted refusal pass; `row49_check.py` ignores the spec's row 49 and §2 wording; none of the scripts is committed. Fix: `fail()` on any unmatched text except the known row-59 header; add `bin/exit_cross.py`; read row 49's prefixes and counts from the spec; commit the scripts under `scripts/` with a "does not cover" line (CLAUDE.md pattern).
+- **M6 [pre-existing r1 text, a path added by the fold] A failing toolkit reset inside an exit path is undecided; under `set -e` it aborts the exit path.** Measured (`sb-reset`): an uncommitted edit to `install.sh` makes `git reset --keep` fail, the trap returns rc 128 and prints no finishing line. Conditions: toolkit run, any post-tag exit, tracked edits to a file that differs between (b) and (c) during the wait. Fix, §6.3 step 6, old `does the same reset first.` new the same followed by ` A failing reset is ignored: its git error shows, and the exit code and the finishing lines are unchanged.`
+
+Nits (one line each):
+
+- N1 [fold; open point 2] 4a bullet 2, old `- The trap, and every exit 7, 8 or 9, ends with:` new `- The signal trap, the EXIT trap and every exit 7, 8 or 9 end with:`.
+- N2 [fold] `--help` line `7 a release run failed` no longer covers the signal and EXIT traps' exit 7: new `7 a release run failed or the script stopped after the tag push` (row 4 pins only line 1).
+- N3 [fold] The fold report says "no deviation", but the r2 fix's P23 parenthetical (`<12>` = first 12 of S; S = HEAD is the resume path) is absent from the spec. Folded into M2's fix.
+
+### F-712 — cut-release whole-diff r1: 1 Minor and 1 Nit (owning phase: none; ownerless residue)
+
+**Status:** OPEN — deferred-minor (RULES.md). Filed from `design/agent-reports/whole-diff-cut-release-r1.md` (r1, single Opus slice: 0C/0I/1M/1N on e1d25113).
+
+- **M1 Post-push peel-mismatch `exit 6` is untested (plant J survives; build deviation 12).** `scripts/cut-release.sh:1328-1333`. Reaching it needs the tag on origin moved between the atomic push and `ls-remote`. The report gives the exact row `cr_push_tag_moved_after_push` (a post-receive hook on the fixture bare repo moves the tag to `master~1`; expects exit 6 and the "peels to" line); the reviewer ran it: passes on e1d25113, fails with plant J. Applying it also needs a spec row 79 in SPEC §11.
+- N1 `CUT_RELEASE_TEST_ONLY` runs leave `~/.cache/cut-release-test/run-*` directories behind (the harness prints "kept <dir>").
+
+### `sh2-bughunt-importants` — the sh2 bug-hunt Importants (repo: **seedhammer fork + mnemonic-engrave**; owning phase: **sh2 FIX build**)
+
+- **Surfaced:** sh2 bug hunt; grade `design/agent-reports/bughunt-grade-sh2.md`; FIX `design/FIX_bughunt_sh2.md`.
+- **Grade:** I ×22 (2, 3, 4, 31a, 31b, 32, 21, 22, 1, 6a, 6b, 6c, 11, 50a, 50b, 50c, 7, 13, 14, 30c, 30d, 49) plus 39 (host seam).
+- **Companion:** seedhammer fork (`gui`, `bip380`, `nonstandard`, `codex32`, `picobin`, `driver/otp`, `cmd/vectorfont`, `cmd/controller`).
+- **Build impact (1):** me seam vectors regenerated (`FIX_bughunt_sh2-s3-me.diff`; 74 rows, sha `34093bfd…674b`) and re-pinned in `crates/me-cli/tests/descriptor_seam.rs`: `owed-to-build`
+- **Build impact (2):** fork `nonstandard/testdata/` copied byte-identically and sha and counts (29/45/0) re-pinned in `nonstandard/descriptor_seam_test.go` (`FIX_bughunt_sh2-s3-fork.diff`): `owed-to-build`
+- **Build impact (3):** `SPEC_descriptor_input.md` §4.2 lead-in and AMENDED paragraph per FIX §4: `owed-to-build`
+- **Build impact (4):** fork fixes per FIX §3 and test expectations per FIX §7: `owed-to-build`
+- **Build impact (5):** 39 host seam and its RED row; host `go build ./...` passes: `owed-to-build`
+- **Build impact (6):** `cmd/emu/confinement_test.go:89-96` comment updated: `owed-to-build`
+- **Build impact (7):** CI tinygo and wasm vet green on the head: `owed-to-build`
+- **Build impact (8):** font regeneration shows no diff: `owed-to-build`
+- **Build impact (9):** `t.Skip("deferred-minor: <slug>")` on every deferred row: `owed-to-build`
+- **Build impact (10):** FOLLOWUPS deferred entries and the F-234 cross-link appended: `owed-to-build`
+- **Build impact (11):** spec §4.3/§4.7/§7/§9 amendments per FIX §4 (architect S3): `owed-to-build`
+- **Status:** `open`
+- **Tier:** v1
+
+### `sh-nfc-scanner-overflow-sticky` — The NFC scanner keeps the overflow error after the oversized tag ends; clear on EOF or error (fix-09). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 9; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** The NFC scanner keeps the overflow error after the oversized tag ends; clear on EOF or error (fix-09).
+- **Fix (for later):** the grade's fix-09.
+- **RED row:** `TestBughuntSh209ScannerOverflowSticky`, skipped with `t.Skip("deferred-minor: sh-nfc-scanner-overflow-sticky")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-multisig-verify-pp-back` — Back on the verify-flow passphrase keyboard goes forward to "not checked yet"; step back (fix-33). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 33; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back on the verify-flow passphrase keyboard goes forward to "not checked yet"; step back (fix-33).
+- **Fix (for later):** the grade's fix-33.
+- **RED row:** `TestBughuntSh233MultisigVerifyPassphraseCancel`, skipped with `t.Skip("deferred-minor: sh-multisig-verify-pp-back")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-build-which-md1-back` — Back on "Which md1?" is taken as Full policy; abort the flow (fix-42). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 42; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back on "Which md1?" is taken as Full policy; abort the flow (fix-42).
+- **Fix (for later):** the grade's fix-42.
+- **RED row:** `TestBughuntSh242BuildWhichMd1Back`, skipped with `t.Skip("deferred-minor: sh-build-which-md1-back")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-composer-resume-back-seat` — Back on the first resumed slot releases @1's seat; keep it (fix-48). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 48; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back on the first resumed slot releases @1's seat; keep it (fix-48).
+- **Fix (for later):** the grade's fix-48.
+- **RED row:** `TestBughuntSh248ComposerSeatResumeBack`, skipped with `t.Skip("deferred-minor: sh-composer-resume-back-seat")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-md1-gather-index-past-total` — A chunk index past the total is accepted; classify as gatherIgnored (fix-05). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 5; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** A chunk index past the total is accepted; classify as gatherIgnored (fix-05).
+- **Fix (for later):** the grade's fix-05.
+- **RED row:** `TestBughuntSh205Md1GatherIndexPastTotal`, skipped with `t.Skip("deferred-minor: sh-md1-gather-index-past-total")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-jobtime-60-min` — Job time prints "60 min" or "2 h 0 min"; carry into hours and print "2 h" (fix-23). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 23; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Job time prints "60 min" or "2 h 0 min"; carry into hours and print "2 h" (fix-23).
+- **Fix (for later):** the grade's fix-23.
+- **RED row:** `TestBughuntSh223JobTimeCarriesMinutesIntoHours`, skipped with `t.Skip("deferred-minor: sh-jobtime-60-min")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-truncate-doc` — The truncateForDisplay doc says at most n; the contract is n plus the marker; fix the doc (fix-24). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 24; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** The truncateForDisplay doc says at most n; the contract is n plus the marker; fix the doc (fix-24).
+- **Fix (for later):** the grade's fix-24.
+- **RED row:** `TestBughuntSh224TruncateForDisplayAtMostN`, skipped with `t.Skip("deferred-minor: sh-truncate-doc")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-legacy-keyless-path-at-creation` — A legacy keyless first path is refused at finish, not at creation (fix-45). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 45; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** A legacy keyless first path is refused at finish, not at creation (fix-45).
+- **Fix (for later):** the grade's fix-45.
+- **RED row:** `TestBughuntSh245LegacyFirstKeylessPathRefusedAtCreation`, skipped with `t.Skip("deferred-minor: sh-legacy-keyless-path-at-creation")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-payload-merge-same-txid` — Signed and unsigned copies of one txid count as two candidates; merge on txid (fix-51). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 51; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Signed and unsigned copies of one txid count as two candidates; merge on txid (fix-51).
+- **Fix (for later):** the grade's fix-51.
+- **RED row:** `TestBughuntSh251PayloadMergeNeedsIdenticalBytes`, skipped with `t.Skip("deferred-minor: sh-payload-merge-same-txid")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-fountain-bounds` — The UR fountain decoder panics or OOMs on seqLen 0, a length mismatch, a huge seqLen or seqNum 0; latent, becomes I when wired (fix-10). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 10a-d; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/fountain`
+- **What:** The UR fountain decoder panics or OOMs on seqLen 0, a length mismatch, a huge seqLen or seqNum 0; latent, becomes I when wired (fix-10).
+- **Fix (for later):** the grade's fix-10.
+- **RED row:** `TestBughuntSh210aSeqLenZero`, `10bDataLengthMismatch`, `10cHugeSeqLen`, `10dSeqNumZero`, skipped with `t.Skip("deferred-minor: sh-ur-fountain-bounds")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-10, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bip39-valid-bounds` — bip39 `Valid` panics on 0 or 27 words (fix-12). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 12; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bip39`
+- **What:** bip39 `Valid` panics on 0 or 27 words (fix-12).
+- **Fix (for later):** the grade's fix-12.
+- **RED row:** `TestBughuntSh212ValidPanicsOnEmptyAndLong`, skipped with `t.Skip("deferred-minor: sh-bip39-valid-bounds")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-tapleaf-pkh-as-pk` — TapLeavesChunks describes a pkh leaf as pk; latent, becomes I when wired (fix-34). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 34; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `md`
+- **What:** TapLeavesChunks describes a pkh leaf as pk; latent, becomes I when wired (fix-34).
+- **Fix (for later):** the grade's fix-34.
+- **RED row:** `TestBughuntSh234PkhLeafDescribedAsPk`, skipped with `t.Skip("deferred-minor: sh-tapleaf-pkh-as-pk")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-parsepath-unhardened-overflow` — ParsePath wraps an unhardened index of 2^31 or more (fix-35). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 35; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bip32`
+- **What:** ParsePath wraps an unhardened index of 2^31 or more (fix-35).
+- **Fix (for later):** the grade's fix-35.
+- **RED row:** `TestBughuntSh235ParsePathUnhardenedOverflow`, skipped with `t.Skip("deferred-minor: sh-parsepath-unhardened-overflow")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-hdkey-index-range` — A UR HD key index of 2^31 or more wraps; latent, becomes I when wired (fix-36). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 36; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/urtypes`
+- **What:** A UR HD key index of 2^31 or more wraps; latent, becomes I when wired (fix-36).
+- **Fix (for later):** the grade's fix-36.
+- **RED row:** `TestBughuntSh236HDKeyIndexAtLeast2p31`, skipped with `t.Skip("deferred-minor: sh-ur-hdkey-index-range")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-36, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-range-shape` — The UR encoder's range shape is refused by its own parser; latent, becomes I when wired (fix-37). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 37; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/urtypes`
+- **What:** The UR encoder's range shape is refused by its own parser; latent, becomes I when wired (fix-37).
+- **Fix (for later):** the grade's fix-37.
+- **RED row:** `TestBughuntSh237RangeDerivationShape`, skipped with `t.Skip("deferred-minor: sh-ur-range-shape")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-37, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-script-type-mismatch` — UR accepts wpkh or pkh(sortedmulti); latent, becomes I when wired (fix-38). (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, finding 38; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bc/urtypes`
+- **What:** UR accepts wpkh or pkh(sortedmulti); latent, becomes I when wired (fix-38).
+- **Fix (for later):** the grade's fix-38.
+- **RED row:** `TestBughuntSh238ScriptTypeMismatch`, skipped with `t.Skip("deferred-minor: sh-ur-script-type-mismatch")`.
+- **Why deferred:** graded M; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies fix-38, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-codex32-newseed-length` — NewSeed emits lengths that New refuses; add a library check behind F-116 (fix-47). (repo: **seedhammer fork**; owning phase: **F-116**)
+
+- **Surfaced:** sh2 bug hunt, finding 47; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `codex32`
+- **What:** NewSeed emits lengths that New refuses; add a library check behind F-116 (fix-47).
+- **Fix (for later):** the grade's fix-47.
+- **RED row:** `TestBughuntSh247NewSeedOutputRejectedByNew`, skipped with `t.Skip("deferred-minor: sh-codex32-newseed-length")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-md1-single-chunk-error` — A lone md1 chunk reports "not supported" instead of "chunk set incomplete" (fix-52). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 52; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/policyprobe`
+- **What:** A lone md1 chunk reports "not supported" instead of "chunk set incomplete" (fix-52).
+- **Fix (for later):** the grade's fix-52.
+- **RED row:** `TestBughuntSh252OneChunkOfSetKeepsRealError`, skipped with `t.Skip("deferred-minor: sh-md1-single-chunk-error")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-type2-large-tag` — A Type 2 read stops at 848 bytes with a clean EOF; return an error or read it all (fix-08). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 8; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `nfc/type2`
+- **What:** A Type 2 read stops at 848 bytes with a clean EOF; return an error or read it all (fix-08).
+- **Fix (for later):** the grade's fix-08.
+- **RED row:** `TestBughuntSh208Type2LargeTag`, skipped with `t.Skip("deferred-minor: sh-type2-large-tag")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ndef-empty-record` — Minimal or zero-length Text/URI records are mis-sized (fix-18). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 18; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `nfc/ndef`
+- **What:** Minimal or zero-length Text/URI records are mis-sized (fix-18).
+- **Fix (for later):** the grade's fix-18.
+- **RED row:** `TestBughuntSh218NdefEmptyTextURIRecord`, skipped with `t.Skip("deferred-minor: sh-ndef-empty-record")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-uf2-payload-size` — A uf2 payload size of 477..479 panics; refuse (fix-19). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 19; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `uf2`
+- **What:** A uf2 payload size of 477..479 panics; refuse (fix-19).
+- **Fix (for later):** the grade's fix-19.
+- **RED row:** `TestBughuntSh219PayloadSizeOverData`, skipped with `t.Skip("deferred-minor: sh-uf2-payload-size")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-uf2-start-addr-zero` — A uf2 at address 0 is reported as non-contiguous (fix-20). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 20; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `uf2`
+- **What:** A uf2 at address 0 is reported as non-contiguous (fix-20).
+- **Fix (for later):** the grade's fix-20.
+- **RED row:** `TestBughuntSh220StartAddrZero`, skipped with `t.Skip("deferred-minor: sh-uf2-start-addr-zero")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-alpha4-wide-span` — alpha4.New panics on very wide bounds (fix-25). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 25; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `image/alpha4`
+- **What:** alpha4.New panics on very wide bounds (fix-25).
+- **Fix (for later):** the grade's fix-25.
+- **RED row:** `TestBughuntSh225Alpha4WideSpan`, skipped with `t.Skip("deferred-minor: sh-alpha4-wide-span")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bspline-nil` — InterpolatePoints(nil) panics (fix-26). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 26; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bspline`
+- **What:** InterpolatePoints(nil) panics (fix-26).
+- **Fix (for later):** the grade's fix-26.
+- **RED row:** `TestBughuntSh226InterpolateNil`, skipped with `t.Skip("deferred-minor: sh-bspline-nil")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-golden-roundtrip` — The golden test encoder does not round-trip (fix-27a). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 27a; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `internal/golden`
+- **What:** The golden test encoder does not round-trip (fix-27a).
+- **Fix (for later):** the grade's fix-27a.
+- **RED row:** `TestBughuntSh227aRoundTrip`, `27aCompareBSplineUpdateThenCheck`, skipped with `t.Skip("deferred-minor: sh-golden-roundtrip")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-golden-zero-count` — The golden decoder accepts a zero-count header (fix-27b). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 27b; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `internal/golden`
+- **What:** The golden decoder accepts a zero-count header (fix-27b).
+- **Fix (for later):** the grade's fix-27b.
+- **RED row:** `TestBughuntSh227bZeroCountHeader`, skipped with `t.Skip("deferred-minor: sh-golden-zero-count")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-golden-svg-aspect` — The golden SVG width is 0 from integer aspect math (fix-27c). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 27c; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `internal/golden`
+- **What:** The golden SVG width is 0 from integer aspect math (fix-27c).
+- **Fix (for later):** the grade's fix-27c.
+- **RED row:** `TestBughuntSh227cVectorizeAspect`, skipped with `t.Skip("deferred-minor: sh-golden-svg-aspect")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-biptool-short-seed` — biptool derive -path m bip39 -words 12 panics (fix-28). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 28; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/biptool`
+- **What:** biptool derive -path m bip39 -words 12 panics (fix-28).
+- **Fix (for later):** the grade's fix-28.
+- **RED row:** `TestBughuntSh228Bip39ShortSeed`, skipped with `t.Skip("deferred-minor: sh-biptool-short-seed")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-assets-palette-256` — The assets tool accepts 256 colours (fix-29). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 29; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/assets`
+- **What:** The assets tool accepts 256 colours (fix-29).
+- **Fix (for later):** the grade's fix-29.
+- **RED row:** `TestBughuntSh229AssetsPalette256`, skipped with `t.Skip("deferred-minor: sh-assets-palette-256")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-vectorfont-first-line` — vectorfont panics on a path starting with a line (fix-30a). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 30a; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/vectorfont`
+- **What:** vectorfont panics on a path starting with a line (fix-30a).
+- **Fix (for later):** the grade's fix-30a.
+- **RED row:** `TestBughuntSh230aSpliceFirstLine`, skipped with `t.Skip("deferred-minor: sh-vectorfont-first-line")`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-vectorfont-missing-input` — vectorfont reports EOF for a missing input file (fix-30b). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 30b; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/vectorfont`
+- **What:** vectorfont reports EOF for a missing input file (fix-30b).
+- **Fix (for later):** the grade's fix-30b.
+- **RED row:** `TestBughuntSh230bRunMissingInput`, skipped with `t.Skip("deferred-minor: sh-vectorfont-missing-input")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bezier-degenerate-sample` — A degenerate bezier samples the origin (fix-41). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 41; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bezier`
+- **What:** A degenerate bezier samples the origin (fix-41).
+- **Fix (for later):** the grade's fix-41.
+- **RED row:** `TestBughuntSh241SampleNoOrigin`, skipped with `t.Skip("deferred-minor: sh-bezier-degenerate-sample")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-bounds-empty-inverted` — Bounds.Empty is wrong for an inverted y (fix-43). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 43; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `bezier`
+- **What:** Bounds.Empty is wrong for an inverted y (fix-43).
+- **Fix (for later):** the grade's fix-43.
+- **RED row:** `TestBughuntSh243BoundsEmpty`, skipped with `t.Skip("deferred-minor: sh-bounds-empty-inverted")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-glyphtrace-short-channel` — glyphtrace ranks a short channel worst (fix-46). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding 46; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `cmd/glyphtrace`
+- **What:** glyphtrace ranks a short channel worst (fix-46).
+- **Fix (for later):** the grade's fix-46.
+- **RED row:** `TestBughuntSh246ShortChannelNotWorst`, skipped with `t.Skip("deferred-minor: sh-glyphtrace-short-channel")`.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-supply-reask` — Back in supply multisig could re-ask the passphrase question instead of returning to the menu. (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 bug hunt, finding S1-Q2; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `gui`
+- **What:** Back in supply multisig could re-ask the passphrase question instead of returning to the menu.
+- **RED row:** none; no host row.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-needs-seam-tinygo-drivers` — pio, st25r3916 and clrc663 reports are UNRESOLVED and need a host seam or a device test. (repo: **seedhammer fork**; owning phase: **device-test work**)
+
+- **Surfaced:** sh2 bug hunt, finding 15, 16, 17, 44; grade `design/agent-reports/bughunt-grade-sh2.md`.
+- **Where:** `driver/pio`, `driver/st25r3916`, `driver/clrc663`
+- **What:** pio, st25r3916 and clrc663 reports are UNRESOLVED and need a host seam or a device test.
+- **RED row:** none; no host row.
+- **Why deferred:** graded UNRESOLVED.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-me-refusal-device-claim` — `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed) (repo: **mnemonic-engrave**; owning phase: **next me FIX**)
+
+- **Surfaced:** architect S3; FIX `design/FIX_bughunt_sh2.md`.
+- **What:** `refusal.rs:744`, `:779` say "the device's parser accepts" these shapes; true of released firmware, false after fix-06a/06c (fails closed)
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-selfcheck-refusal-row` — the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** architect S2; FIX `design/FIX_bughunt_sh2.md`.
+- **What:** the "without two distinct fingerprints" arm (composer_selfcheck.go:237) has no row left after the S2 retarget; check whether a fault-injection row (two seated st.assigned at one origin, same fingerprint) is cheap
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-50a-single-guard-row` — No row isolates a single 50a guard: planting the no-keys guard alone or the policy guard alone leaves row 50a GREEN; only removing all four fails it. Add one row per guard (FIX review r1, M-1). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** FIX review r1, M-1; report `design/agent-reports/bughunt-sh2-fix-review-r1.md`.
+- **What:** No row isolates a single 50a guard: planting the no-keys guard alone or the policy guard alone leaves row 50a GREEN; only removing all four fails it. Add one row per guard (FIX review r1, M-1).
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-item6-comment-text` — FIX §8 item 6 says to update the `cmd/emu/confinement_test.go:89-96` comment but gives no new comment text; comment-only, no behaviour change (FIX review r1, M-2). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** FIX review r1, M-2; report `design/agent-reports/bughunt-sh2-fix-review-r1.md`.
+- **What:** FIX §8 item 6 says to update the `cmd/emu/confinement_test.go:89-96` comment but gives no new comment text; comment-only, no behaviour change (FIX review r1, M-2).
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-fix21-path-notation` — The fix-21 error string mixes path notations: the declared origin prints as `m/48h/0h/2h/2h`, the default as `m/48'/0'/0'/2'` (FIX review r1, N-1). (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** FIX review r1, N-1; report `design/agent-reports/bughunt-sh2-fix-review-r1.md`.
+- **What:** The fix-21 error string mixes path notations: the declared origin prints as `m/48h/0h/2h/2h`, the default as `m/48'/0'/0'/2'` (FIX review r1, N-1).
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-me-canonical-depth` — me's promotion canonical rebuilds xpub depth/child from the origin; the fixed fork keeps the key's own (repo: **mnemonic-engrave**; owning phase: **next me FIX**)
+
+- **Surfaced:** architect S3. **Where:** `cascade.rs:262-277`, `gate.rs:336-349`, `cascade_tests.rs:249-272`, spec 405/663-666/1059. **What:** after fix-01, me's and the device's canonical differ for a key whose depth/child disagree with its origin. **Seam:** row `sh-wsh-sortedmulti-16-keys` uses `canonical_from`/`origin_serialised` until this lands. **Status:** `open` **Tier:** v1
+
+### `sh-ur-hdkey-depth-noop` — The UR HD key decoder treats depth as a no-op. Ungraded; needs a RED row when wired. (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, architect notes 3 and 4; FIX `design/FIX_bughunt_sh2.md`.
+- **Where:** `bc/urtypes/urtypes.go` `hdkeyFor` (from line 86)
+- **What:** The UR HD key decoder treats depth as a no-op. Ungraded; needs a RED row when wired.
+- **RED row:** none yet; one is written when `bc/*` is wired.
+- **Why deferred:** ungraded; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies the fix, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh-ur-multisig-threshold-unbounded` — `desc.Threshold = m.Threshold` is unbounded (the UR counterpart of 6a). Ungraded; needs a RED row when wired. (repo: **seedhammer fork**; owning phase: **UR wiring (trigger below)**)
+
+- **Surfaced:** sh2 bug hunt, architect notes 3 and 4; FIX `design/FIX_bughunt_sh2.md`.
+- **Where:** `bc/urtypes/urtypes.go`, around line 403
+- **What:** `desc.Threshold = m.Threshold` is unbounded (the UR counterpart of 6a). Ungraded; needs a RED row when wired.
+- **RED row:** none yet; one is written when `bc/*` is wired.
+- **Why deferred:** ungraded; owned by the first change that imports `seedhammer.com/bc/` from outside `bc/` (a UR scan door, or F-234 choosing UR); that change applies the fix, un-skips the row and regrades to I first.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-selfcheck-fixture-comment` — fixture comment names the wrong refusal arm after fix-21 (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s1, -M-1; report `design/agent-reports/whole-diff-bughunt-sh2-s1.md`.
+- **Where:** `gui/composer_selfcheck_test.go:147-150`, comment at `:256-266`
+- **What:** the fix-21 arm (unseated slot at a non-default origin) now fires before the "two distinct fingerprints" arm; the fixture comment still names the latter. Fails closed. The missing row for that arm is `sh2-selfcheck-refusal-row`.
+- **Why deferred:** graded M.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-06c-error-type-number` — 06c error prints the multisig type as a number (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s1, N-1; report `design/agent-reports/whole-diff-bughunt-sh2-s1.md`.
+- **Where:** `bip380/bip380.go:352`
+- **What:** the message reads "does not take a 0 expression"; it matches the FIX text, cosmetic.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-bluewallet-spec-order` — spec BlueWallet amendment omits the key-count check and misnames the dropped note (repo: **mnemonic-engrave**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s1, N-2; report `design/agent-reports/whole-diff-bughunt-sh2-s1.md`.
+- **Where:** me spec, §4 S3 BlueWallet amendment
+- **What:** the refusal order leaves out the existing key-count check that runs first, and it says the "narrowed" covers note was dropped where `device_probe` was.
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+
+### `sh2-21b-guard-only` — row 21b passes on base code (guard only) (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+- **Surfaced:** sh2 whole-diff s2, N-1; report `design/agent-reports/whole-diff-bughunt-sh2-s2.md`.
+- **Where:** fork row 21b
+- **What:** the row cannot fail on base; it only catches a later regression (also in the build report).
+- **Why deferred:** graded N.
+- **Status:** `deferred-minor`
+- **Tier:** v1
+### F-713 — cut-release rm-guards FIX review r1: 7 Minors and 2 Nits (owning phase: none; ownerless residue)
+
+**Status:** OPEN — deferred-minor (RULES.md). Filed from `design/agent-reports/cut-release-rm-guards-fix-review-r1.md` (r1, single Opus review: 0C/2I/7M/2N on cc6ab02b; I2 folded; I1 downgraded to Minor (Brian 2026-11-01: S3's `${VAR:?}` and R3 already bound the delete to `/<tag>`).
+
+- **I1 (downgraded)** R1's `cache_root_check` is lexical: it accepts `/.`, `/usr/..` and a symlink to `/`, so verify runs `rm -rf -- /./<tag>` (deletes `/<tag>`, never `/`). The `readlink -m` fix text is in the review report's I1.
+- **M1** S1/R1 (FIX doc line 104, C2): with `XDG_CACHE_HOME` relative (the XDG Base Directory spec calls it invalid and says to ignore it) and `CUT_RELEASE_CACHE` unset, every `--push`/`--verify` now refuses with "CUT_RELEASE_CACHE must be an absolute path ..." although the operator never set that variable (executed). It fails closed, the parenthetical shows the effective `<x>/cut-release`, and setting `CUT_RELEASE_CACHE` to an absolute path, the remedy the text implies, works. S1 decides a relative default is refused, so the builder has nothing to choose. Optional: S1 adds "(a relative `XDG_CACHE_HOME` gives a relative default and is refused the same way)".
+- **M2** H2 `rm_below_T` (FIX doc ~line 410): `rm_below_T "$T//"` passes both checks (`"${T:?}"/?*` matches with `?` = `/`) and `rm -rf -- "$T//"` deletes `T` itself (executed: rc 0, T gone). Contained to `T`; no caller builds such a path (all arguments are `$T/<literal>`). Conditions: a future caller with a doubled trailing slash, and a wish to keep `T`. Optional: add `*//*` to the R5 case with the text "it has a '..' or '//' component".
+- **M3** H2 `t_check`: the pattern's `*` crosses `/`, so `T=<x>/cut-release-test/run-1/../../outside` passes and `rm_T` deleted `outside` (executed in the sandbox). Unreachable: `T` is `$(readlink -f "$CACHEROOT")/run-$$`, which has no `..`. Conditions: `T` built some other way, and with `..`. Optional: apply R5's `..` case in `t_check` too (or see the design line).
+- **M4** S6/H7 row 76 versus S3: three plants, one per S3 clause and none in the author's ten, survive all seven rows (`7 passed, 0 failed` for each). Plant B: `t_check` pattern `*/run-*` (accepts a `run-*` directory outside `cut-release-test`). Plant C: `"${T:?}"/*` (accepts `$T/`, which deletes `T`). Plant D: the delete moved inside the check loop, so a refusal of a later argument comes after earlier ones were deleted, breaking "A refusal deletes nothing". The guards as written are right and their inputs come only from harness literals, so a regression needs the plant plus a new caller (two conditions). The appendix's row 76 additions catch each plant (`6 passed, 1 failed`, `FAIL cr_harness_rm_guards`) and pass on the document as written.
+- **M5** F1 / S3 last sentence / S4: fake-gh's guard is a tautology, because `scratch=$(mktemp -d "$T/merge.XXXXXX")` (fake-gh line 171) always matches `"${T:?}"/merge.?*`. Plant E (guard deleted) survives the seven rows, and the coverage map gives the S3 fake-gh sentence no row. Fails closed and cannot be reached. Optional: the coverage map adds the line "S3 fake-gh refusal (R7) | none: unreachable, `scratch` is `mktemp -d "$T/merge.XXXXXX"`".
+- **M6** S6/H7 row 77: the regex (run on 9 spellings) catches `rm -r -f`, `rm -fr --`, `rm -Rf`, `rm --recursive` and `rm  -rf`, but misses `rm -f -r -- "$d"`, `"rm" -rf "$d"`, `find "$d" -delete` and `git clean -fdx`. So S3's "Every recursive delete ... is `rm -rf -- "${VAR:?}"`" is only partly enforced against future edits. Conditions: a future edit uses one of those spellings, and its path is unsafe. Optional: S6 row 77's column 3 names the spellings it does not catch.
+- **M7** S3 "T is deleted on full success" / "A refusal deletes nothing" versus H2: a refusal in the main shell (any `rm_below_T` from `fresh`, `mk_eng` or `fx_init`) exits 2, then the EXIT trap runs `cleanup` with `KEEP=0` and deletes `T`, so the run that hit the refusal is not kept (executed with the harness's own lines 33-66: T gone; with `KEEP=1` first in `rm_refuse`: `cut-release.test: kept <T>`, T left). Fails closed (the refused path survives and is named). Optional fix text in the appendix.
+- **N1** S3 does not say that deleting another path is also refused when `T` fails the `*/cut-release-test/run-*` test (R4 from `rm_below_T`). Row 76 expects it and the R-table lists it; S3 should add "(and, first, `T` matches as above)".
+- **N2** The spec's Harness setup formula (`SPEC_cut_release.md` line 673) still reads `T=${XDG_CACHE_HOME:-$HOME/.cache}/cut-release-test/run-$$`. The harness resolves the cache root with `readlink -f`, and the new R4 refusal depends on that resolved form (the author's point 6 is the consequence). S3 should name the resolved `T`.
+- Design (ungraded, for the architect): the report's Design section (line 225) suggests `t_check` use `[[ $T =~ /cut-release-test/run-[0-9]+$ ]]`, which closes M3 and plant B.
+
+### F-714 — cut-release rm-guards whole-diff: 1 Minor and 1 Nit (owning phase: none; ownerless residue)
+
+Source: `design/agent-reports/whole-diff-cut-release-rm-guards.md` (5909af53), deferred-minor.
+
+- **M1** No row exercises fake gh's `"${T:?}"/merge.?*` refusal (`scripts/test/fixtures/cut-release/fake-gh`): with it removed the offline suite still passes 77/0 (controller-planted). Fails closed: `scratch` is always `$T/merge.XXXXXX` from `mktemp -d`. Fix text (spec, replace "Rows 76 and 77 test this."): "Row 76 tests the harness deletes; row 77 checks that every recursive delete has the guarded shape (fake gh's refusal itself is not exercised)."
+- **N1** Each failed or `CUT_RELEASE_TEST_ONLY` run leaves `~/.cache/cut-release-test/run-<pid>` (kept by design); reviewer and controller plant runs left about 31.
+
+Source: `design/agent-reports/review-ci-userns-me.md` (f64933de), deferred-minor, owner: next phase that touches me CI.
+
+- **M1** `bughunt_me_01` skips on GitHub-hosted runners (no /etc/subuid range); nothing sets `ME_REQUIRE_USERNS=1`, so the FIX #1 regression runs only locally. Fix: run it with `ME_REQUIRE_USERNS=1` on a job where /etc/subuid is provisioned.
+- **N1** The skip is an `eprintln!` only; nextest reports it as PASS (same as `ME_REQUIRE_GO`).
+
+### engrave#37 review r1 — 1 Minor and 1 Nit deferred (owning phase: none; ownerless residue)
+
+Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports/review-engrave37-checksum.md`, deferred-minor.
+
+- **engrave37-arm64-verify-path** (M3) Linux arm64 users, listed in the page's table, have no verify path: md arm64 is in `SHA256SUMS.portable`, but ms and the toolkit need `SHA256SUMS.aarch64`. Add a sentence or a block.
+- **engrave37-spine-links-unchecked** (N2) `demo/sh2/check-install-links.sh` covers only `src/index.html`, not the URLs in `demo/sh2/CLI_SPINE.md`; a wrong sums name there would not be caught (the spine's ms `SHA256SUMS.portable` URL is not in its list).
+
+### engrave#37 review r2 — 1 Minor and 1 Nit deferred (owning phase: none; ownerless residue)
+
+Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports/review-engrave37-r2.md`, deferred-minor.
+
+- **engrave37-r2-minors** (M-1) The moved note contradicts the toolkit note just above it. demo/sh2/src/index.html, the note after the Linux verify block: "Of these, only `mnemonic-engrave` is signed." The fold moved it to follow the `mnemonic` note, which says "The musl builds are signed and reproducible". The toolkit release also ships `SHA256SUMS.*.minisig` (asset list above). The sentence was already loose before the move. Now it sits two paragraphs from the opposite claim, and "Of these" lists md, ms and mnemonic, none of which is `mnemonic-engrave`. Fix wording: "A checksum proves the file arrived <em>intact</em> &mdash; it does not prove who made it. The checksum files above are not themselves signature-checked here; the releases also ship <code>.minisig</code> files for them." If the signing story is not settled, reword to "A checksum proves the file arrived intact; it does not prove who made it." and drop the "Of these" sentence.
+- **engrave37-r2-minors** (N-1) Under the verify heading, a user who skipped `mnemonic` gets a failing line. The heading says "(md, ms and mnemonic)". A user who installed only md and ms runs the tk lines, and the check prints "no file was verified" with rc=1. Fix: add "skip the `tk` lines if you did not install `mnemonic`". The spine's bare "Linux:" lead also lacks "x86-64". The arm64 case is M3, already filed.
+- [me-checklist-gate-ok-after-fail] status=open grade=N kind=tooling owner=fix-me-checklist-partial-keys filed=2026-11-22 refs=me-checklist-partial-keys repo=me :: scripts/fix-me-checklist-partial-keys-gate.sh:51-60 prints "ok <case>" after "FAIL <case>: NOTE lines differ" when only the NOTE lines differ; print ok only when both checks pass.
+- [me-partial-note-sibling-md1] status=open grade=N kind=ux owner=none filed=2026-11-22 refs=me-checklist-partial-keys repo=me :: The bh-me-C1 partial-keys note says "the wallet cannot be restored without them" even when a second md1 card in the same bundle carries those xpubs (k1 plus k3 of one wallet); fail-safe over-warning, and its last sentence disclaims mk1 cards only.
+- [me-checklist-two-singles-plate-numbers] status=open grade=M kind=test owner=none filed=2026-11-22 src=agent-reports/review-me39-checklist.md#m1 repo=me :: Plant first_pos=0 at the unchunked note_missing_keys site survives every bh-me-C1 row; add the two-unchunked-templates test (text in the review) and its name to the gate step D list.
+- [me-checklist-fix-doc-count] status=open grade=N kind=docs owner=none filed=2026-11-22 src=agent-reports/review-me39-checklist.md#n2 repo=me :: design/FIX_me_recovery_checklist_partial_keys.md section 8 says "eleven named tests"; the gate lists twelve (N3 row added).
+- [sh-scan-door-other-conjuncts-audit] status=open grade=M kind=funds owner=none filed=2026-11-22 src=coordinator/agent-reports/architect-sweep-1122-questions.md :: NFC scan door runs only useSitesOK after the row-20 fix; audit admitDescriptor's other six conjuncts (sysw/descriptor.go:326-334) for a wrong result at that door.
+- [me-spec-descriptor-input-hardened-device-note] status=open grade=N kind=docs owner=none filed=2026-11-22 src=seedhammer:design/FIX_sh_address_hardened_usesite.md :: SPEC_descriptor_input.md conjunct 7 (L772-776) says the device does not refuse a hardened use-site; after FIX-sh-address-hardened-usesite it refuses at every door (address errUnsupported, scan door UseSitesOK).
+- [sh-address-supported-non-bip380-usesite] status=open grade=N kind=input owner=none filed=2026-11-22 src=coordinator/agent-reports/review-sh8-s1.md#n1 :: address.Supported is true and derivePubKey derives K/i/i for /*/* and K/0/0/i for /<0;1>/<0;1>/* (BIP-380 L82 wildcard is a final step; BIP-389 L42 zero or one multipath); every door refuses them via UseSitesOK, so the deriver alone does not.
+- [sh-fix-probe-diff-stale] status=open grade=M kind=docs owner=none filed=2026-11-22 src=coordinator/agent-reports/review-fix-sh-hardened-usesite-r2.md#m1 :: seedhammer design/FIX_sh_address_hardened_usesite-probe.diff predates the r1 fold: it checks in-loop, lacks shape 11 and the §4.1 pre-scan, so it fails shape 11; add to the §4 probe paragraph "the probe diff predates the fold: it checks in-loop and lacks shape 11 and the §4.1 pre-scan; it fails shape 11 until §4.1 is applied." or regenerate the diff
+- [iolib-plan-t1-red1-wording] status=open grade=M kind=docs owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#m1 :: PLAN T1 says gate red1 fails with zero rows found; it runs the 2 existing rows; pin the three FAIL lines instead.
+- [iolib-gate-red1-reason-uncovered] status=open grade=M kind=test owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#m2 :: gate red1 passes W1-W4 stubs that panic for any reason; add the failure reason to both NOT-covered lists.
+- [iolib-gate-no-timeout] status=open grade=M kind=tooling owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#m3 :: gate nextest has no timeout; a hanging W9 hangs the gate; wrap in timeout 1800.
+- [iolib-gate-notcovered-go-codedocs] status=open grade=M kind=tooling owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#m4 :: gate NOT-covered list omits the skipped Go oracles (ME_REQUIRE_GO) and ci/code-docs-check.sh.
+- [iolib-plan-vendor-command] status=open grade=M kind=docs owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#m5 :: PLAN C1 C2 C3 C5 say refresh vendor/ without the command; name cargo vendor --locked vendor/.
+- [iolib-gate-doc-sentence-weak] status=open grade=M kind=test owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#m6 :: gate checks lib.rs for the word inputs only and not the write.rs module-doc sentence.
+- [iolib-plan-tk-test-paths] status=open grade=N kind=docs owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#n1 :: PLAN names tests/p3_*.rs; the files are crates/mnemonic-toolkit/tests/p3_*.rs.
+- [iolib-plan-tk-stop-cannot-fire] status=open grade=N kind=docs owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r1.md#n2 :: PLAN C5 STOP if tk tests refuse 0.1.2 cannot fire on the pin alone; the tests change only with #14.
+- [iolib-plan-crates-index-lag] status=open grade=M kind=docs owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r3.md#m1 :: PLAN R4 and C1-C5 do not allow for crates.io index lag after publish; add a retry note before a STOP.
+- [iolib-plan-r3-vendor-lock-staging] status=owed-to-build grade=I kind=docs owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r3.md#i1 :: PLAN C3 now stages vendor/ with git add -A and re-runs vendor-freshness from a fresh clone (fold 3066bab5); the C3 build shows the fresh-clone freshness run 4/4 OK.
+- [iolib-plan-r3-rustup-toolchain] status=owed-to-build grade=I kind=tooling owner=io-lib-safe-write filed=2026-11-22 src=coordinator/agent-reports/review-plan-io-lib-safe-write-r3.md#i2 :: PLAN step order now exports RUSTUP_TOOLCHAIN=1.85.0 (fold 3066bab5); the build report shows cargo --version printing 1.85.0 outside the gate.
+- [sh-biptool-rand-unbounded-buffer] status=open grade=M kind=perf owner=none filed=2026-11-22 src=coordinator:agent-reports/review-sh9-s1.md#m1 repo=sh :: seedhammer#9 genRand reads all of rand -n N into one N-byte buffer (was streamed); rand -n 100000000000 took the host to 61 of 62 GB before it was killed. Stream with io.Copy(outputWriter{stdout}, io.LimitReader(rand.Reader, int64(n))) where outputWriter wraps write errors in outputErr.
+- [sh-output-sink-closed-fd-doc] status=open grade=M kind=secret owner=none filed=2026-11-22 src=coordinator:agent-reports/review-sh9-s1.md#m2 repo=sh :: biptool and picosign with stdout closed (>&-) exit 0 with no stderr: the Go runtime (runtime/fds_unix.go checkfds) reopens fd 1 on /dev/null, so a seed is written nowhere and reported as success; md --version behaves the same. FIX_sh_go_cli_output_sink §2/§3 do not state this case; add it as a known limit (exit 0, same as > /dev/null).
+- [sh-output-sink-fix-doc-scope-drift] status=open grade=N kind=docs owner=none filed=2026-11-22 src=coordinator:agent-reports/review-sh9-s1.md#n1 repo=sh :: FIX_sh_go_cli_output_sink §9 FOLLOWUPS line lists glyphtrace, plateview and policyprobe only; the build report's line adds gaterecord, buildpayloadcards and buildpayloadcomposer. Direct-push the build report's line, not §9's.
+- [sh-output-sink-test-devfull-skip] status=open grade=N kind=test owner=none filed=2026-11-22 src=coordinator:agent-reports/review-sh9-s2.md#nits repo=sh :: FullDiskExit tests t.Fatalf when /dev/full is absent (non-Linux); skip instead.
+- [sh-output-sink-closedpipe-stderr] status=open grade=N kind=test owner=none filed=2026-11-22 src=coordinator:agent-reports/review-sh9-s2.md#nits repo=sh :: not checked: ClosedPipe rows prove exit 0 and silent stderr only; no row asserts that a partial write is not reported by a later verb (acceptable: payload write is last act).
+- [sh-rand-short-read-silent] status=open grade=N kind=crypto owner=none filed=2026-11-22 src=coordinator:agent-reports/review-sh9-fold-r1.md#nits repo=sh :: genRand: io.Copy over io.LimitReader returns nil if rand.Reader ever returned io.EOF early, so a short output would exit 0; crypto/rand.Reader never EOFs in practice, and io.ReadFull-style count check (compare n written to N) would close it.
+- [me-argv-non-utf8-panics] status=open grade=M kind=input owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build5-me-cli-arg-contract.md#m1 :: Non-UTF-8 argv panics (exit 101) in every invocation: std::env::args() at main.rs:855 (argv_secret_guard, pre-existing) and the new call at :860 unwrap-panic; fails closed but makes the non-UTF-8 branch of shell_word unreachable. Fix: std::env::args_os().map(|a| a.to_string_lossy().into_owned()) at both sites.
+- [me-seal-out-missing-silent-usage-exit] status=open grade=M kind=ux owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build5-me-cli-arg-contract.md#m2 :: Seal --out-missing fallback (apply_root_options end, and the unreachable let-else in run()) returns EXIT_USAGE with no stderr text if the clap re-parse ever succeeds; not reachable today (A10 pins the clap text). Fix: eprintln!("me: seal needs --out") before the return Err(EXIT_USAGE).
+- [me-v2-titles-refusals-flaky-200ms] status=open grade=M kind=test owner=none filed=2026-11-22 src=coordinator/agent-reports/fix-land-me50-tk193-1122.md :: seal::v2_tests::v2_titles_refusals asserts a refusal returns in under 200 ms (before any KDF); this timing assertion fails under load (first nextest run 827/828, rerun green). Make the check structural (no KDF reached) or widen the bound.
+- [sh-nfkd-norm-tables-toolchain-tag] status=open grade=M kind=funds owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build-sec-sh-nfkd-s1.md#m1 refs=r1nfkd-m1-unicode-version-skew repo=seedhammer :: x/text v0.37.0 norm selects tables15.0.0.go under go:build !go1.27 and tables17.0.0.go under go1.27, so a Go or TinyGo toolchain bump to 1.27 silently changes MnemonicSeed for passphrases with code points assigned after Unicode 15.0 (e.g. U+16D68, U+1CCD6, U+11383); FIX R1 states 15.0.0 as fixed. Add a bip39 test pinning norm.Version and name the toolchain dependency in FIX R1.
+- [sh-nfkd-appendnfkd-residue] status=open grade=M kind=secret owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build-sec-sh-nfkd-s1.md#m2 refs=sweep1122-sh-seed-residue-unwiped-class repo=seedhammer :: appendNFKD makes unwiped heap copies of a non-ASCII passphrase (per-rune norm.NFKD.String results, the []rune run and string(run) in flush, and the salt backing arrays abandoned on growth); fold into the seed-residue wipe class.
+- [sh-nfkd-appendnfkd-doc-wrap] status=open grade=N kind=docs owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build-sec-sh-nfkd-s1.md#n1 repo=seedhammer :: bip39/bip39.go appendNFKD doc comment (~line 288-291) is one line of 139-150+ columns while neighbours wrap near 80; wrap it (also s2 N1).
+- [sh-nfkd-prefix-pass-release-note] status=open grade=N kind=docs owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build-sec-sh-nfkd-s1.md#n2 repo=seedhammer :: An xpub derived on pre-fix firmware from a non-NFKD pass: record now yields a different (correct, primary-matching) wallet; FIX says visible change none. Add a release-note line if any pre-fix pass: build left alpha.
+- [sh-nfkd-fix-doc-timing-and-control] status=open grade=M kind=docs owner=none filed=2026-11-22 src=coordinator/agent-reports/review-build-sec-sh-nfkd-s2.md#minor repo=seedhammer :: FIX section 6 says LongRunFast is about 21 ms (head measures 14.7 ms), and AsciiUnchanged passes on base by design (control row; catches only P13-type faults). Correct the timing and label the control row in the FIX doc.
+- [sh19-s1-m1-kit-door-after-load-anyway] status=open grade=M kind=test owner=none filed=2026-11-23 src=coordinator/agent-reports/review-build-sh19-s1.md#m-1 repo=seedhammer :: Under -tags refugium no row drives a kit payload holding a secret through LOAD ANYWAY into Kit Refused and the payload menu; the nine skipped tests cover it only in the default build.
+- [sh19-s1-n1-sealed-public-no-f1] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/agent-reports/review-build-sh19-s1.md#n-1 repo=seedhammer :: After LOAD ANYWAY on a sealed payload's public-section secret, Payload Warnings omits F1 although the record is unencrypted in flash; only the override lead says so.
+- [sh19-s2-m2-boot-load-anyway-undriven] status=open grade=M kind=test owner=none filed=2026-11-23 src=coordinator/agent-reports/review-build-sh19-s2.md#minor-nit repo=seedhammer :: The boot route's LOAD ANYWAY (boot=true, then Down+Button3) is driven by no row; only boot's DO NOT LOAD is.
+- [sh19-fix-n1-r8-route-omitted] status=open grade=N kind=docs owner=none filed=2026-11-23 src=coordinator/agent-reports/review-fix-sec-sh-sysw-override-r1.md#n-1 repo=seedhammer :: design/FIX_sec-sh-sysw-plaintext-refuse.md L79-80 omits "and after LOAD ANYWAY (R8)".
+- [sh19-fix-n2-title-refuses-by-default] status=open grade=N kind=docs owner=none filed=2026-11-23 src=coordinator/agent-reports/review-fix-sec-sh-sysw-override-r1.md#n-2 repo=seedhammer :: FIX title (L1) should say "refuses by default".
+- [sh19-fix-n3-r8-order-unit-only] status=open grade=N kind=test owner=none filed=2026-11-23 src=coordinator/agent-reports/review-fix-sec-sh-sysw-override-r1.md#n-3 repo=seedhammer :: R8 flow test asserts F1 and the 14f line present, not their order; order pinned only at unit level.
+- [sweep1123-out-replaces-existing-file] status=wontfix@operator-2026-08-26 grade=M kind=input owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B019.md repo=mnemonic-engrave :: --out replaces an existing file with exit 0 (mnemonic-io-lib write.rs replace + rename), so re-running me sysw pack or ms encode --out over the only copy of a backup destroys it; ruled "--out should overwrite files" (2026-11-23: pending product point P2 of grade-security-sweep-engrave-1).
+- [sweep1123-restore-doc-no-origins] status=open grade=M kind=funds owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B023.md repo=seedhammer :: The multisig restore document prints [fp/path] origins only when the md1 carries a master fingerprint (bip380.go:235 mfp != 0), so a keyless-fingerprint md1 gives a descriptor with no origins; addresses are right, signers need the plates.
+- [sweep1123-passphrase-dedupe-unpinned] status=open grade=M kind=test owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B023.md repo=seedhammer :: passphraseFacts groups seeds by (mnemonic, passphrase) and no test pins it: a change to the 4-byte MasterFP key would merge two masters and drop a passphrase statement (proposed TestFingerprintCollisionDoesNotDropAPassphrase absent).
+- [sweep1123-shot-server-hardening] status=open grade=N kind=tooling owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B023.md repo=mnemonic-engrave :: design/journeys/shot_server.py: a symlink planted between safe_path() and open() is not covered, a non-dict JSON body raises AttributeError at body.get, and the Origin check does not bind a non-browser local client (127.0.0.1 dev tool).
+- [sweep1123-nfc-secret-no-integrity] status=open grade=N kind=input owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B025.md repo=seedhammer :: A secret record from an NFC tag has no digest or authentication (SPEC_systemwide_payloads F4 says so on screen); the default build has no mitigation beyond the flag, the Refugium build reads no tag.
+- [sweep1123-sh2-redundant-guards] status=open grade=N kind=test owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B025.md repo=seedhammer :: The SH2 descriptor-input zero-keys and missing-Policy-header checks are each shadowed by the threshold-range check, so planting either out leaves the suite green; not located at head by the grader.
+- [sweep-b030-06-keyed-conformance-dup-index] status=open grade=N kind=test owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B030.md repo=seedhammer :: md/conformance_keyed_test.go:326-333 recByIndex overwrites a repeated keys[].index silently, so the ambiguity refusal misses a duplicate index in one direction; refuse a repeated index in the helper.
+- [sweep-b031-05-msencode-no-provenance-pin] status=open grade=N kind=supply owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B031.md repo=seedhammer :: codex32/msencode.go cites a design recipe but no ms-codec version or sha, and mk/mk.go:5 still says family_token "mk-codec 0.2"; pin the source and fix the comment.
+- [sweep-b031-06-supply-md1-dup-keys-unchecked] status=open grade=M kind=funds owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B031.md repo=seedhammer :: supplyMultisigPolicyFlow engraves an operator-supplied md1 with repeated keys unchecked (SPEC 4.1 scoping, gui/multisig_supply_tail.go:82); duplicateSlotPair runs only on device-minted md1.
+- [sweep-eng-verify-claim-coarse] status=open grade=N kind=funds owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: gui/multisig_verify.go:572-590 verifyClaimPlate pairs on xpub only while acceptance also needs fp, origin and stub; safe only while the readback-count precheck stays unrelaxed and unpinned.
+- [sweep-eng-supply-nomatched-unasserted] status=open grade=N kind=test owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: errSupplyNoMatchedSlot (gui/multisig_supply_tail.go:161) has no test; deleting the check would let a supply build engrave an md1 with no key plate.
+- [sweep-eng-origin-parse-before-dup] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: gui/multisig_build.go:1480 parses a card origin before the duplicate-key check at :1507, so an unparseable origin gives the generic "Couldn't assemble the wallet policy" instead of the named modal.
+- [sweep-eng-singlesig-verify-ok-text] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: gui/singlesig_verify.go:244 "Verify OK / The engraved bundle matches the seed." is the same for watch-only and passphrase runs; the document pass line was fixed, the modal was not.
+- [sweep-eng-template-plate-mislabelled] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: template inventory names a keyless plate "wallet policy descriptor" (gui/singlesig_engrave.go:41, gui/multisig_engrave.go:54).
+- [sweep-eng-singlesig-passphrase-plate-ungated] status=open grade=N kind=docs owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: gui/singlesig.go:302-316 comment says the passphrase plate is offered only for a set already known good, but the offer also runs after a skipped or failed verify; fix the comment or gate the offer.
+- [sweep-eng-cut-arm-drops-money-sentence] status=open grade=N kind=docs owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: restore-doc passphrase paragraph for a CUT passphrase plate (gui/multisig_build_census.go:340-352) drops "Without it, these plates do not reach the money", which the not-cut arm (:361-363) keeps.
+- [sweep-eng-derived-footer-empty-policyid] status=open grade=N kind=input owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: Derived:true with PolicyID "" renders "POLICY   DERIVED" (backup/passphrase.go:230-234, GroupFingerprint returns its input); no producer passes empty today.
+- [sweep-eng-verify-wallet-type-mismatch-blames-plates] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: a wrong purpose or script type at single-sig verify still says "Check the engraved plates." (gui/singlesig_verify.go:236 default arm) on correct steel; fails closed.
+- [sweep-eng-wpid-missing-explicit-origin-gate] status=open grade=N kind=input owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: md/walletpolicyid.go:49-70,172-185 lacks Rust's MissingExplicitOrigin and falls through when no canonical origin exists; unreachable while decode refuses (md/md.go errMissingExplicitOrigin).
+- [sweep-eng-passphrase-plate-fp-unvalidated] status=open grade=M kind=input owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: EngravePassphrase (backup/passphrase.go:105-120) trusts SeedFP/CombinedFP to be 8-hex and GroupFingerprint fails open; a 32-hex value draws an 82 mm top line over the screw-hole bands. Both live callers validate (gui/passphrase_flow.go:225,282).
+- [sweep-eng-passphrase-qr-quiet-zone] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: worst-case passphrase QR quiet zone is reported under 4 modules; unmeasured at f36f786c, needs a module-size computation or a hardware scan.
+- [sweep-eng-confusable-case-pairs] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: ppPassProofConfusables is "rnm" only (gui/passphrase_passproof.go:70); case-only pairs (C/c O/o S/s U/u V/v W/w X/x Z/z K/k) are left to the codepoint sweep.
+- [sweep-eng-md-use-site-canonical-validator] status=open grade=N kind=input owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B032.md repo=seedhammer :: the fork md decoder has no counterpart of md 0.37 validateUseSiteOverridesCanonical, so non-canonical use-site override forms are accepted; no wrong-address path shown.
+- [sweep-b033-01-slip39-default-bip39] status=open grade=M kind=funds owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B033.md repo=seedhammer :: SLIP-39 recovery routing screen defaults to Choices[0] "BIP-39 seed" (gui/slip39_polish.go:410-432); a user who skips the Lead takes the seed path and must notice the fingerprint mismatch.
+- [sweep-b033-06-old-device-new-kind-text] status=open grade=N kind=ux owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B033.md repo=seedhammer :: an old device meeting a new hash-kind token says "No hash record in the payload." after "1 payload record was not understood." (gui/composer_copy.go:604,815); refusal outcome, contradictory wording.
+- [sweep-b033-17-emu-ms1-unattributed] status=open grade=N kind=test owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-B033.md repo=seedhammer :: walk-harness census puts an ms1 cut through the standalone codex32 flows in "unattributed" (cmd/emu/engraved.go:9-15,62-66), so a walk can false-pass on "no ms1 cut"; documented limit.
+- [sweep-r005-derivekey-iterations-guard] status=open grade=M kind=crypto owner=none filed=2026-11-23 src=coordinator/reports/security-sweep/judge-R005.md repo=seedhammer :: seal.DeriveKey (seal/crypto.go:54-61) lost its iterations<1 nil return; NewDeriver clamps to 1, so a bad count reads as a wrong passphrase. Unreachable behind ParseHeader's 100000..2000000 bound (only caller sysw/open.go:55).
+- [f-137] status=closed@75faec94 grade=I kind=input owner=none filed=2026-08-11 :: md encoder depth guard: encode refuses depth >= 126 (DecodeRecursionDepthExceeded) in descriptor-mnemonic (2026-11-23: closed, GONE at 75faec94; security sweep step 3 grade).
+- [f-355] status=closed@e3bb7e2d grade=M kind=supply owner=none filed=2026-08-27 :: reproducible-build miniscript rev realigned to ff4732e5 in mnemonic-toolkit (F-371 doc leg stays open) (2026-11-23: closed, GONE at e3bb7e2d; security sweep step 3 grade).
+- [f-443] status=closed@127cf04 grade=I kind=input owner=none filed=2026-08-29 :: sysw DecodeBody truncated pass:/text: record now ErrUnexpectedEOF in the seedhammer fork (#17) (2026-11-23: closed, GONE at 127cf04; security sweep step 3 grade).
+- [f-529] status=closed@a126070 grade=M kind=test owner=none filed=2026-09-13 :: fork vendored vector corpus re-vendored, three named vectors hash equal to descriptor-mnemonic e2c99fca (2026-11-23: closed, GONE at a126070; security sweep step 3 grade).
+- [sh-biptool-short-seed] status=closed@60ef81f grade=M kind=input owner=none filed=2026-11-02 :: biptool derive -path m bip39 -words 12 panic fixed, test runs (seedhammer#11) (2026-11-23: closed, GONE at 60ef81f; security sweep step 3 grade).
+- [sh-lockboot-default-removed] status=closed@65717c55 grade=I kind=input owner=none filed=2026-11-23 src=coordinator/agent-reports/grade-security-sweep-engrave-1.md#r49 repo=seedhammer :: The fork's default build no longer carries command: lock-boot (Brian 2026-11-23 P19 "remove it"); a scanned lock-boot reads "Unknown format" and TinyGo links no OTP writer into either ELF (seedhammer design/FIX_lockboot_default_remove.md).
+- [engrave-runbook-lockboot-fork-note] status=open grade=N kind=docs owner=none filed=2026-11-23 refs=sh-lockboot-default-removed :: RUNBOOK_custom_boot_key.md:234-237 still calls NFC lock-boot the provisioning path without saying the fork's builds no longer carry it; text in seedhammer design/FIX_lockboot_default_remove.md §9. (Closed by engrave#51 once merged.)
+- [sh-elf-check-inlined-otp-write] status=open grade=M kind=test owner=none filed=2026-11-23 src=coordinator/agent-reports/review-fix-lockboot-default-remove.md#q3 repo=seedhammer :: refugium-elf-check.sh misses an OTP write whose driver/otp primitives TinyGo inlined: a Refugium init calling otp.WriteWhiteLabelAddr through a method value links (+704 B) and both the ELF check and the source gate pass, at f36f786 and on the FIX probe.
+- [sh-seal-record-test-lockboot-comment] status=closed@65717c55 grade=M kind=docs owner=none filed=2026-11-23 src=coordinator/agent-reports/review-fix-lockboot-default-remove.md#m4 repo=seedhammer :: seal/record_test.go:65-68 still said command: lock-boot reaches Platform.LockBoot from gui/debugcmd_default.go; fixed in the FIX_lockboot_default_remove PR (seedhammer#20).
+- [sh-elf-check-writeeccrow] status=open grade=M kind=test owner=none filed=2026-11-23 src=coordinator/agent-reports/review-build-sh20-s1.md#m1 repo=seedhammer :: refugium-elf-check.sh ABSENT_SYMBOLS omits otp.writeECCRow, a write primitive defined in f36f786's default ELF; the "OTP write primitives it reaches are asserted absent" wording over-claims until it is added.
+- [sh-fix-lockboot-doc-stale] status=open grade=M kind=docs owner=none filed=2026-11-23 src=coordinator/agent-reports/review-build-sh20-s1.md#m2 repo=seedhammer :: design/FIX_lockboot_default_remove-probe.diff, §6 line numbers and §9 RUNBOOK text predate the r1 folds (pre-M2 over-claims, stale :207/:210/:170, no M5 qualifier).
+- [engrave-runbook-lockboot-older-builds] status=open grade=M kind=docs owner=none filed=2026-11-23 src=coordinator/agent-reports/review-build-sh20-s1.md#m4 :: RUNBOOK_custom_boot_key.md lock-boot note says older Refugium builds carried lock-boot and limits the cannot-waste-a-slot reassurance to retail though older fork default builds share signKeyHash.
+- [sh20-s2-m1] status=open grade=M kind=docs owner=none filed=2026-11-23 src=coordinator:agent-reports/review-build-sh20-s2.md#m1 repo=seedhammer :: design/FIX_lockboot_default_remove.md §9 "new:" block still prints the pre-M5 runbook text; engrave#51 carries a rewrap plus the older-fork-builds sentence; replace the block with the engrave#51 lines.
+- [sh20-s2-m2] status=open grade=M kind=test owner=none filed=2026-11-23 src=coordinator:agent-reports/review-build-sh20-s2.md#m2 repo=seedhammer :: gui/refugium_build_test.go R2 sees only LockBoot/"lock-boot" spelled in source; a reflect MethodByName("LockBoot") or a direct writeOTPValues/otp.EnableSecureBoot caller in cmd/controller is invisible to it, and the ELF check misses it if inlined (known limit, not made worse by this diff).
+- [sh20-s2-m3] status=open grade=M kind=docs owner=none filed=2026-11-23 src=coordinator:agent-reports/review-build-sh20-s2.md#m3 repo=seedhammer :: FIX §6 GOTMPDIR advice breaks TestEngraveSinkCanKeepRawWords under the shard script; §6 also pins go1.26.4 at ~/.local/go/bin while the nix shell has go1.26.3 (both passed).
+- [sh20-s2-n1] status=open grade=N kind=docs owner=none filed=2026-11-23 src=coordinator:agent-reports/review-build-sh20-s2.md#n1 repo=seedhammer :: design/FIX_lockboot_default_remove.md §6 quotes line numbers (:67, :70, :207, :210, :213) from the pre-fold test file while R2 now reports :219/:222/:225; refresh them or say approximate.
