@@ -39,3 +39,6 @@ mutants.out*/
 # Python bytecode from the design/journeys build scripts.
 __pycache__/
 *.pyc
+
+# Go build artifact (firmware/descriptor-canonical)
+descriptorcanonical

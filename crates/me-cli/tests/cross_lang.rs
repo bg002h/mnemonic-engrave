@@ -86,3 +86,58 @@ fn rust_ndef_parses_in_seedhammer_go_reader() {
         assert_eq!(decoded, text, "synthetic len={len} round-trip mismatch");
     }
 }
+
+/// Parse `input` with SeedHammer's own Go descriptor path
+/// (`firmware/descriptor-canonical`: `nonstandard.OutputDescriptor` then
+/// `Descriptor.Encode`, hermetic against the pinned submodule).
+fn go_canonical(input: &str) -> String {
+    let harness = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../firmware/descriptor-canonical"
+    );
+    let mut child = Command::new("go")
+        .args(["run", "."])
+        .current_dir(harness)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn go harness");
+    child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "go descriptor harness failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    String::from_utf8(out.stdout).expect("harness stdout is UTF-8")
+}
+
+/// FIX_sec_canonical_keeps_xpub_depth §1: a depth-4 key under a depth-3 origin.
+/// `me`'s canonical and the pinned fork's `OutputDescriptor`+`Encode` must be
+/// byte-identical. Auto-skips without `go` UNLESS `ME_REQUIRE_GO=1`.
+#[test]
+fn descriptor_canonical_keeps_xpub_depth_cross_lang() {
+    if Command::new("go").arg("version").output().is_err() {
+        assert!(
+            !go_required(),
+            "ME_REQUIRE_GO=1 but `go` is not on PATH: the cross-language descriptor oracle \
+             cannot run (install Go + init the seedhammer submodule, or unset ME_REQUIRE_GO)"
+        );
+        eprintln!("skipping cross-language descriptor canonical: `go` is not on PATH");
+        return;
+    }
+    const D4: &str = "xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan";
+    let input = format!("[4bbaa801/44h/0h/0h]{D4}");
+    let parsed = mnemonic_engrave::descriptor::cascade::cascade(
+        &mnemonic_engrave::descriptor::cascade::normalise(&input),
+    )
+    .unwrap_or_else(|e| panic!("me refused {input}: {e:?}"));
+    let mine = parsed.encode();
+    assert_eq!(
+        mine,
+        format!("pkh([4bbaa801/44h/0h/0h]{D4})#57c9a380"),
+        "me's own canonical moved"
+    );
+    assert_eq!(go_canonical(&input), mine, "Go canonical differs from me's");
+}
