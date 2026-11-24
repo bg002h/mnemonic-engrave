@@ -3254,8 +3254,10 @@ fn read_records(
     as_present: bool,
 ) -> Result<Records, (String, i32)> {
     if let Some(p) = in_path.filter(|_| argv.is_empty()) {
-        let raw = std::fs::read_to_string(p)
-            .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?;
+        let raw = strip_leading_bom(
+            std::fs::read_to_string(p)
+                .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?,
+        );
         // R7, and it applies to THIS channel too -- see `no_records`.
         let records =
             no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE))?;
@@ -3459,6 +3461,16 @@ fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
     Ok(split_record_stream(&read_stdin_raw()?))
 }
 
+/// Remove exactly one U+FEFF at the very start of a stream's raw text
+/// (FIX_me_admission_canonical §2 item 3). Nothing else is removed: a second
+/// one, or one later, stays and is refused by the existing `Unrecognised` text.
+fn strip_leading_bom(raw: String) -> String {
+    match raw.strip_prefix('\u{feff}') {
+        Some(rest) => rest.to_string(),
+        None => raw,
+    }
+}
+
 /// The stdin channel's bytes, before any splitting. Split out so the record
 /// stream and the whole-input document are the SAME read — stdin can only be
 /// read once, and two readers of one channel is how `--in` and stdin came to
@@ -3481,7 +3493,7 @@ fn read_stdin_raw() -> Result<String, (String, i32)> {
     std::io::stdin()
         .read_to_string(&mut raw)
         .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
-    Ok(raw)
+    Ok(strip_leading_bom(raw))
 }
 
 /// **`kind` is its own parameter, and F-259 is why.** It used to travel in the
@@ -3688,6 +3700,44 @@ fn mr_sentence(
             "an mr1 refusal ({}) with a detail that does not fit it",
             r.name()
         ),
+    }
+}
+
+/// SPEC §5.3.3's refusal sentences (FIX_me_admission_canonical §4). None names
+/// any part of the record. The `pass:` sentence carries NO remedy line: that
+/// line would invite typing the passphrase into a shell command.
+fn canonical_sentence(i: usize, why: mnemonic_engrave::sysw::Spelling) -> String {
+    use mnemonic_engrave::sysw::Spelling as S;
+    match why {
+        S::LineBreak => format!(
+            "record {i}, as given (records count from 0) contains a line break (LF or CR). A record is one \
+             line, and records are stored separated by LF, so this one would be read back as several records. Put the \
+             record on one line and delete any stray CR (it does not show on screen; \"$(cat file)\" of a CRLF file keeps \
+             one), one record per line (--in or stdin) or per argument, and re-run; to pack a whole descriptor document, \
+             pass it with --as."
+        ),
+        S::Padding => format!(
+            "record {i}, as given (records count from 0) begins or ends with whitespace. Records are stored \
+             exactly as given, so the whitespace would be engraved as part of this one. Remove it and re-run."
+        ),
+        S::MnemonicSeparator => format!(
+            "record {i}, as given (records count from 0) is a BIP-39 mnemonic whose words are not separated \
+             by single spaces (a doubled space, a tab or another space character). The device reads a seed only in that \
+             spelling and would not recognise this record as one. Separate the words with one ordinary space each and re-run."
+        ),
+        S::NotUtf8Body(prefix) => {
+            let head = format!(
+                "record {i}, as given (records count from 0) begins `{prefix}` and its body is lowercase hex, \
+                 but the bytes it decodes to are not UTF-8 text (§5.3.1)."
+            );
+            if prefix == "text:" {
+                format!(
+                    "{head} Encode the text's own UTF-8 bytes:\n      printf '%s' 'your text here' | xxd -p -c 256"
+                )
+            } else {
+                head
+            }
+        }
     }
 }
 
@@ -3926,6 +3976,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
             .into(),
         E::Crypto => "the passphrase did not open this payload".into(),
         E::NotUtf8 => "the records are not valid UTF-8".into(),
+        E::NotCanonical(i, why) => canonical_sentence(*i, *why),
         E::MrSet(r) => mr_sentence(r.reason, &r.detail, &[]),
         E::Wire(w) => format!("malformed container: {w:?}"),
     }
@@ -3933,6 +3984,24 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// FIX_me_admission_canonical §2 item 3: exactly one leading U+FEFF goes.
+    #[test]
+    fn strip_leading_bom_removes_exactly_one() {
+        assert_eq!(strip_leading_bom("abc".to_string()), "abc");
+        assert_eq!(strip_leading_bom("\u{feff}abc".to_string()), "abc");
+        assert_eq!(
+            strip_leading_bom("\u{feff}\u{feff}abc".to_string()),
+            "\u{feff}abc"
+        );
+        assert_eq!(strip_leading_bom("a\u{feff}bc".to_string()), "a\u{feff}bc");
+        assert_eq!(
+            strip_leading_bom(" \u{feff}abc".to_string()),
+            " \u{feff}abc"
+        );
+        assert_eq!(strip_leading_bom(String::new()), "");
+    }
+
+    use super::strip_leading_bom;
     use super::{is_plate_artifact, shell_word, write_block, PayloadKind, WriteBlock};
     // `destination` and `Destination` are the library half's now, and only
     // this test module consults them directly.
