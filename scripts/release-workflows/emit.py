@@ -1,3 +1,6 @@
+import sys
+sys.stderr.write("retired 2026-11-24 (alpha mode): the deployed .github/workflows/release.yml files are the source of truth; this template is stale and would revert them\n")
+raise SystemExit(2)
 import sys, pathlib
 sys.path.insert(0, '.')
 from gen import gen
