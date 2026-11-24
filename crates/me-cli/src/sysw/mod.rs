@@ -108,6 +108,25 @@ pub enum SyswError {
     /// `--phrase-looks-like-digest-ok` (F-677; `ms hashlock`'s F-539 stop).
     /// Carries the width, never the phrase: the phrase is SECRET.
     PhraseLooksLikeDigest(usize, usize),
+    /// A record that classifies but whose SPELLING is not the one `pack` would
+    /// write (FIX_me_admission_canonical; SPEC §5.3.3). Carries the index and
+    /// which rule, never any content of the record.
+    NotCanonical(usize, Spelling),
+}
+
+/// Which spelling rule (SPEC §5.3.3) refused a record. First match wins, in
+/// declaration order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Spelling {
+    /// The record contains LF or CR.
+    LineBreak,
+    /// The record begins or ends with whitespace (`char::is_whitespace`).
+    Padding,
+    /// A BIP-39 mnemonic whose words are not separated by single U+0020.
+    MnemonicSeparator,
+    /// A `text:` or `pass:` record whose body does not decode to UTF-8; carries
+    /// the prefix.
+    NotUtf8Body(&'static str),
 }
 
 /// The 4-character id of a kind-`0x03` record, as far as admission cares.
@@ -577,6 +596,34 @@ pub fn pack_deterministic_with(
     seal_with(payload, pub_bytes, header, pass, iterations, salt, iv)
 }
 
+/// SPEC §5.3.3 spelling rules for one record that classified; see [`admit_check`].
+fn spelling_fault(r: &str, class: record::Class) -> Option<Spelling> {
+    if r.contains(['\n', '\r']) {
+        return Some(Spelling::LineBreak);
+    }
+    if r.chars().next().is_some_and(char::is_whitespace)
+        || r.chars().next_back().is_some_and(char::is_whitespace)
+    {
+        return Some(Spelling::Padding);
+    }
+    match class {
+        record::Class::Mnemonic => {
+            let canonical = r.split_whitespace().collect::<Vec<_>>().join(" ");
+            (r != canonical).then_some(Spelling::MnemonicSeparator)
+        }
+        record::Class::FreeText | record::Class::Passphrase => {
+            record::decode_text(r).is_err().then(|| {
+                Spelling::NotUtf8Body(if r.starts_with(record::PASS_PREFIX) {
+                    record::PASS_PREFIX
+                } else {
+                    record::TEXT_PREFIX
+                })
+            })
+        }
+        _ => None,
+    }
+}
+
 /// Admission, and **the only place it is decided** (F-246).
 ///
 /// Split out of [`split`] so a caller can run it BEFORE anything expensive or
@@ -595,6 +642,12 @@ pub fn admit_check(records: &[String], adm: Admission) -> Result<(), SyswError> 
         let class = classify_with(r, adm);
         if matches!(class, record::Class::Unknown) {
             return Err(SyswError::Unclassifiable(i, unknown_reason(r)));
+        }
+        // SPEC §5.3.3: the spelling that will be WRITTEN, not only its class.
+        // Admission only; `classify_with` keeps its broad reading. First match
+        // wins; no refusal names any content of the record.
+        if let Some(why) = spelling_fault(r, class) {
+            return Err(SyswError::NotCanonical(i, why));
         }
         // H6 §3.2 item 2. A SECOND refusal rule, beside the `Unknown` one and
         // deliberately NOT a `Class::Unknown` / `UnknownReason`: the record is
@@ -1407,5 +1460,192 @@ mod tests {
     #[test]
     fn empty_is_below() {
         assert!(!cliff_above(""));
+    }
+
+    // ---- FIX_me_admission_canonical §6 (SPEC §5.3.3): admission spelling ----
+
+    const M: &str = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    const D: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
+    const MS1: &str = "ms10entrsqq3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zym4y84zxyuwtkl";
+    const MT1: &str =
+        "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax";
+
+    fn adm() -> Admission {
+        Admission::default()
+    }
+
+    /// The trimmed bluewallet-sh document (L1): a multi-line text that classifies
+    /// `Descriptor`.
+    fn bluewallet_doc() -> String {
+        let raw = include_str!("../../testdata/descriptor_seam_vectors.json");
+        let doc: serde_json::Value = serde_json::from_str(raw).unwrap();
+        let input = doc["vectors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"] == "formats-happy/bluewallet-sh-fixture")
+            .expect("row formats-happy/bluewallet-sh-fixture")["input"]
+            .as_str()
+            .unwrap()
+            .trim()
+            .to_string();
+        assert!(input.contains('\n'), "the fixture must be multi-line");
+        input
+    }
+
+    fn refused(records: &[&str]) -> SyswError {
+        let v: Vec<String> = records.iter().map(|s| s.to_string()).collect();
+        admit_check(&v, adm()).expect_err("must be refused")
+    }
+
+    fn is_nc(e: &SyswError, idx: usize, want: Spelling) -> bool {
+        matches!(e, SyswError::NotCanonical(i, w) if *i == idx && *w == want)
+    }
+
+    /// R4, L1.
+    #[test]
+    fn admission_refuses_a_record_with_a_line_break() {
+        let m_wrapped = format!("{}\n{}", &M[..47], &M[48..]);
+        let doc = bluewallet_doc();
+        for r in [format!("{D}\r"), format!("\n{D}"), m_wrapped, doc] {
+            assert!(
+                !matches!(classify_with(&r, adm()), record::Class::Unknown),
+                "precondition: classifies"
+            );
+            let e = refused(&[&r]);
+            assert!(is_nc(&e, 0, Spelling::LineBreak), "{e:?}");
+        }
+        // Mid-record breaks in an md1 stay Unclassifiable (§7 item 3).
+        for mid in [
+            format!("{}\n{}", &D[..10], &D[10..]),
+            format!("{}\r{}", &D[..10], &D[10..]),
+        ] {
+            let e = refused(&[&mid]);
+            assert!(
+                matches!(e, SyswError::Unclassifiable(0, UnknownReason::Unrecognised)),
+                "{e:?}"
+            );
+        }
+    }
+
+    /// R7-R10, L2, L3.
+    #[test]
+    fn admission_refuses_a_padded_record() {
+        for pad in [" ", "\t", "\u{a0}"] {
+            for r in [format!("{pad}{D}"), format!("{D}{pad}")] {
+                let e = refused(&[&r]);
+                assert!(is_nc(&e, 0, Spelling::Padding), "{pad:?}: {e:?}");
+            }
+        }
+        for plain in [MS1, MT1] {
+            for r in [format!(" {plain}"), format!("{plain} ")] {
+                assert!(
+                    !matches!(classify_with(&r, adm()), record::Class::Unknown),
+                    "precondition: {r} classifies"
+                );
+                let e = refused(&[&r]);
+                assert!(is_nc(&e, 0, Spelling::Padding), "{e:?}");
+            }
+        }
+        for r in [format!("{D} "), format!(" {D}")] {
+            let e = pack(vec![r], None, ITER).unwrap_err();
+            assert!(is_nc(&e, 0, Spelling::Padding), "{e:?}");
+        }
+        // An Unknown record keeps its more specific sentence (§7 item 3).
+        let e = refused(&["text:6869 "]);
+        assert!(
+            matches!(
+                e,
+                SyswError::Unclassifiable(0, UnknownReason::NonHexBody("text:"))
+            ),
+            "{e:?}"
+        );
+    }
+
+    /// R1-R3, L4.
+    #[test]
+    fn admission_refuses_a_mnemonic_without_single_space_separators() {
+        let m2 = M.replacen(' ', "  ", 1);
+        let mt = M.replacen(' ', "\t", 1);
+        let mn = M.replacen(' ', "\u{a0}", 1);
+        let all_doubled = M.replace(' ', "  ");
+        for r in [m2, mt, mn, all_doubled] {
+            assert!(matches!(classify_with(&r, adm()), record::Class::Mnemonic));
+            let e = refused(&[&r]);
+            assert!(is_nc(&e, 0, Spelling::MnemonicSeparator), "{e:?}");
+        }
+        admit_check(&[M.to_string()], adm()).expect("M itself is admitted");
+    }
+
+    /// R5, R6, L5, L6.
+    #[test]
+    fn admission_refuses_a_text_or_pass_body_that_is_not_utf8() {
+        let e = refused(&["text:ff"]);
+        assert!(is_nc(&e, 0, Spelling::NotUtf8Body("text:")), "{e:?}");
+        let e = refused(&["pass:ff"]);
+        assert!(is_nc(&e, 0, Spelling::NotUtf8Body("pass:")), "{e:?}");
+        let e = refused(&["text:c0af"]);
+        assert!(is_nc(&e, 0, Spelling::NotUtf8Body("text:")), "{e:?}");
+        let six = record::encode_pass("abandon abandon abandon abandon abandon abandon");
+        admit_check(&["text:c3a9".to_string(), (*six).clone()], adm())
+            .expect("valid UTF-8 admitted");
+        let tx = format!("tx:{}", TX_HEX);
+        admit_check(&[tx], adm()).expect("a tx: record is bytes and stays admitted");
+    }
+
+    const TX_HEX: &str = "020000000001017c8da925af70e49a12b0cea7b639df5037c87b7fa61f262b86ac32c47aa3ba1a0000000000fdffffff02404b4c0000000000160014c1de0dd435d1d4ad97ed1f51d63f91c800cc4eab3ea1b92901000000160014751097c299d6354fbb2c5a84512dd708f2902f5e0247304402207debc7d89984c7717940b622504318d2c184966a618b32cf8b700d0f125b3ffa02206ef875f9c0b5931e0ea1cf0c109bdb8512835c8e51526f99b3419929a2ea7259012103718f5fd45b926226357e2b0400574b41a32d0bf0ae69a02eebea5fbc542ff52060000000";
+
+    /// Rule order: LF, padding, separator, UTF-8; first failing record reported.
+    #[test]
+    fn admission_rule_order_is_line_break_padding_separator_utf8() {
+        let m2 = M.replacen(' ', "  ", 1);
+        let e = refused(&[&format!(" {m2}")]);
+        assert!(is_nc(&e, 0, Spelling::Padding), "{e:?}");
+        let e = refused(&[&format!("{m2}\n")]);
+        assert!(is_nc(&e, 0, Spelling::LineBreak), "{e:?}");
+        let e = refused(&[D, "text:c3a9", &m2]);
+        assert!(is_nc(&e, 2, Spelling::MnemonicSeparator), "{e:?}");
+    }
+
+    /// L1 through `pack`.
+    #[test]
+    fn pack_refuses_a_multi_line_descriptor_document() {
+        let e = pack(vec![bluewallet_doc()], None, ITER).unwrap_err();
+        assert!(is_nc(&e, 0, Spelling::LineBreak), "{e:?}");
+    }
+
+    /// L2, L3 refused; L7's plain records on the wire.
+    #[test]
+    fn pack_refuses_a_padded_card_and_writes_the_plain_one() {
+        for r in [format!("{D} "), format!(" {D}")] {
+            let e = pack(vec![r], None, ITER).unwrap_err();
+            assert!(is_nc(&e, 0, Spelling::Padding), "{e:?}");
+        }
+        let recs = vec![D.to_string(), "text:c3a9".to_string()];
+        let blob = pack(recs.clone(), None, ITER).unwrap();
+        let p = open(&blob, None).unwrap();
+        assert_eq!(p.public, recs);
+        assert!(
+            blob.windows(D.len()).any(|w| w == D.as_bytes()),
+            "the plain card is on the wire byte for byte"
+        );
+    }
+
+    /// L8.
+    #[test]
+    fn classification_of_non_canonical_spellings_is_unchanged() {
+        let m2 = M.replacen(' ', "  ", 1);
+        let mt = M.replacen(' ', "\t", 1);
+        let mn = M.replacen(' ', "\u{a0}", 1);
+        for r in [&m2, &mt, &mn] {
+            assert!(matches!(classify(r), record::Class::Mnemonic), "{r:?}");
+        }
+        assert!(matches!(classify(&format!("{D} ")), record::Class::MdMk));
+        assert!(matches!(
+            classify(&bluewallet_doc()),
+            record::Class::Descriptor
+        ));
+        assert!(matches!(classify("text:ff"), record::Class::FreeText));
+        assert!(matches!(classify("pass:ff"), record::Class::Passphrase));
     }
 }

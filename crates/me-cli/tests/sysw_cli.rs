@@ -3212,3 +3212,212 @@ fn sysw_show_names_mr1_string() {
         .success()
         .stdout(predicate::str::contains("an md1/mk1/mr1/ms1/mt1 string"));
 }
+
+// ---- FIX_me_admission_canonical §6 (SPEC §5.3.3): admission spelling, CLI rows ----
+
+const ADM_D: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
+const ADM_M: &str =
+    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+const T_SEP: &str = "me: record 0, as given (records count from 0) is a BIP-39 mnemonic whose words are not separated by single spaces (a doubled space, a tab or another space character). The device reads a seed only in that spelling and would not recognise this record as one. Separate the words with one ordinary space each and re-run.";
+const T_LF: &str = "me: record 0, as given (records count from 0) contains a line break (LF or CR). A record is one line, and records are stored separated by LF, so this one would be read back as several records. Put the record on one line and delete any stray CR (it does not show on screen; \"$(cat file)\" of a CRLF file keeps one), one record per line (--in or stdin) or per argument, and re-run; to pack a whole descriptor document, pass it with --as.";
+const T_PAD: &str = "me: record 0, as given (records count from 0) begins or ends with whitespace. Records are stored exactly as given, so the whitespace would be engraved as part of this one. Remove it and re-run.";
+const T_UNREC_HEAD: &str =
+    "me: record 0, as given (records count from 0) is not a form this container can place";
+
+fn adm_t_utf8(prefix: &str) -> String {
+    let head = format!("me: record 0, as given (records count from 0) begins `{prefix}` and its body is lowercase hex, but the bytes it decodes to are not UTF-8 text (§5.3.1).");
+    if prefix == "text:" {
+        format!("{head} Encode the text's own UTF-8 bytes:")
+    } else {
+        head
+    }
+}
+
+/// `me sysw pack --no-passphrase` with `stdin` and `args`; returns (exit code,
+/// stderr, the records on the wire if a file was written).
+fn adm_pack(stdin: &[u8], args: &[&str]) -> (i32, String, Option<Vec<u8>>) {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("o.bin");
+    let mut cmd = me();
+    cmd.args(["sysw", "pack", "--no-passphrase"])
+        .args(args)
+        .arg("--out")
+        .arg(&out);
+    if !stdin.is_empty() {
+        cmd.write_stdin(stdin.to_vec());
+    }
+    let o = cmd.output().unwrap();
+    let wire = out
+        .exists()
+        .then(|| std::fs::read(&out).unwrap()[52..].to_vec());
+    (
+        o.status.code().unwrap(),
+        String::from_utf8_lossy(&o.stderr).into_owned(),
+        wire,
+    )
+}
+
+fn assert_refused(row: &str, got: (i32, String, Option<Vec<u8>>), sentence: &str) {
+    let (rc, err, wire) = got;
+    assert_eq!(rc, 4, "{row}: exit; stderr:\n{err}");
+    assert!(
+        err.lines().any(|l| l == sentence),
+        "{row}: whole-line sentence missing; stderr:\n{err}"
+    );
+    assert!(wire.is_none(), "{row}: an output file was written");
+    assert!(
+        !err.contains("write this down"),
+        "{row}: the passphrase ceremony ran"
+    );
+}
+
+fn assert_packed(row: &str, got: (i32, String, Option<Vec<u8>>), want: &[u8]) {
+    let (rc, err, wire) = got;
+    assert_eq!(rc, 0, "{row}: exit; stderr:\n{err}");
+    assert_eq!(wire.as_deref(), Some(want), "{row}: records on the wire");
+}
+
+/// R1-R3.
+#[test]
+fn pack_refuses_a_mnemonic_without_single_space_separators() {
+    for (row, m) in [
+        ("R1", ADM_M.replacen(' ', "  ", 1)),
+        ("R2", ADM_M.replacen(' ', "\t", 1)),
+        ("R3", ADM_M.replacen(' ', "\u{a0}", 1)),
+    ] {
+        let got = adm_pack(format!("{m}\n").as_bytes(), &["--expect", "mnemonic"]);
+        assert_refused(row, got, T_SEP);
+    }
+    let got = adm_pack(format!("{ADM_M}\n").as_bytes(), &["--expect", "mnemonic"]);
+    assert_packed("C1", got, ADM_M.as_bytes());
+}
+
+/// R4.
+#[test]
+fn pack_refuses_a_wrapped_mnemonic_on_argv() {
+    let w6 = format!("{}\n{}", &ADM_M[..47], &ADM_M[48..]);
+    let got = adm_pack(b"", &["--allow-argv-secret", "--expect", "mnemonic", &w6]);
+    assert_refused("R4", got, T_LF);
+    let (rc, err, wire) = adm_pack(b"", &["--expect", "mnemonic", &w6]);
+    assert_eq!(rc, 3, "without --allow-argv-secret: exit; stderr:\n{err}");
+    assert!(err.contains("SECRET"), "{err}");
+    assert!(wire.is_none());
+}
+
+/// R5, R6, C2.
+#[test]
+fn pack_refuses_text_and_pass_bodies_that_are_not_utf8() {
+    assert_refused("R5", adm_pack(b"text:ff\n", &[]), &adm_t_utf8("text:"));
+    let (rc, err, wire) = adm_pack(b"pass:ff\n", &[]);
+    assert_eq!(rc, 4, "{err}");
+    assert!(
+        err.lines().any(|l| l == adm_t_utf8("pass:")),
+        "R6 sentence:\n{err}"
+    );
+    assert!(
+        !err.contains("Encode the text") && !err.contains("xxd"),
+        "R6: no remedy line:\n{err}"
+    );
+    assert!(wire.is_none());
+    assert_packed("C2", adm_pack(b"text:c3a9\n", &[]), b"text:c3a9");
+}
+
+/// R7-R10, plus `--in` with a padded line.
+#[test]
+fn pack_refuses_padded_records_on_every_channel() {
+    assert_refused("R7", adm_pack(b"", &[&format!("{ADM_D} ")]), T_PAD);
+    assert_refused("R8", adm_pack(b"", &[&format!(" {ADM_D}")]), T_PAD);
+    assert_refused("R9", adm_pack(format!("{ADM_D} \n").as_bytes(), &[]), T_PAD);
+    assert_refused(
+        "R10",
+        adm_pack(format!(" {ADM_D}\n").as_bytes(), &[]),
+        T_PAD,
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let inp = dir.path().join("in.txt");
+    std::fs::write(&inp, format!("{ADM_D} \n")).unwrap();
+    assert_refused(
+        "--in",
+        adm_pack(b"", &["--in", inp.to_str().unwrap()]),
+        T_PAD,
+    );
+}
+
+/// R11, C3, C7.
+#[test]
+fn pack_refuses_a_lone_carriage_return() {
+    assert_refused(
+        "R11",
+        adm_pack(format!("{ADM_D}\r\r\n").as_bytes(), &[]),
+        T_LF,
+    );
+    assert_packed(
+        "C3",
+        adm_pack(format!("{ADM_D}\r\n").as_bytes(), &[]),
+        ADM_D.as_bytes(),
+    );
+    assert_packed(
+        "C7",
+        adm_pack(format!("{ADM_D}\r\n\r\n{ADM_D}\r\n").as_bytes(), &[]),
+        format!("{ADM_D}\n{ADM_D}").as_bytes(),
+    );
+}
+
+/// R12-R14, C5, C6.
+#[test]
+fn pack_strips_one_leading_byte_order_mark_from_a_stream() {
+    let bom = "\u{feff}";
+    assert_packed(
+        "R12",
+        adm_pack(format!("{bom}{ADM_D}\n").as_bytes(), &[]),
+        ADM_D.as_bytes(),
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let inp = dir.path().join("in.txt");
+    std::fs::write(&inp, format!("{bom}{ADM_D}\n")).unwrap();
+    assert_packed(
+        "R13",
+        adm_pack(b"", &["--in", inp.to_str().unwrap()]),
+        ADM_D.as_bytes(),
+    );
+    assert_packed(
+        "R14",
+        adm_pack(format!("{bom}{ADM_D}\n").as_bytes(), &["-", "text:6869"]),
+        format!("{ADM_D}\ntext:6869").as_bytes(),
+    );
+    assert_refused_prefix(
+        "C5",
+        adm_pack(format!("{bom}{bom}{ADM_D}\n").as_bytes(), &[]),
+    );
+    assert_refused_prefix("C6", adm_pack(b"", &[&format!("{bom}{ADM_D}")]));
+}
+
+fn assert_refused_prefix(row: &str, got: (i32, String, Option<Vec<u8>>)) {
+    let (rc, err, wire) = got;
+    assert_eq!(rc, 4, "{row}: exit; stderr:\n{err}");
+    assert!(
+        err.lines().any(|l| l.starts_with(T_UNREC_HEAD)),
+        "{row}: Unrecognised sentence:\n{err}"
+    );
+    assert!(wire.is_none(), "{row}: file written");
+}
+
+/// R16: the refusal comes before the passphrase ceremony.
+#[test]
+fn pack_refuses_before_the_passphrase_ceremony_on_a_spelling_fault() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("o.bin");
+    let m2 = ADM_M.replacen(' ', "  ", 1);
+    let o = me()
+        .args(["sysw", "pack", "--passphrase-words", "6", "--out"])
+        .arg(&out)
+        .write_stdin(format!("{m2}\n"))
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(4), "{err}");
+    assert!(err.lines().any(|l| l == T_SEP), "{err}");
+    assert!(!err.contains("write this down"), "{err}");
+    assert!(!out.exists());
+}

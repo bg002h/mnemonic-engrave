@@ -669,6 +669,7 @@ transaction-engraving cycle raised it; the 2× argument held at either value.)
 **Decoding is normative too:** a `ClassFreeText` record's body is hex-decoded
 back to UTF-8 before it reaches Engrave Text, and a `ClassPassphrase` body before
 it reaches the KDF. R0 round 6 found journey (b) had no stated step doing this.
+`me sysw pack` refuses a `text:` or `pass:` record whose body does not decode to UTF-8 (§5.3.3).
 
 **Classification order is normative:** the reserved prefixes are matched **before**
 the existing sniffers in `Classify`. Free text is the universal fallback — any
@@ -736,6 +737,14 @@ item the operator chooses — not the automatic wiping machinery decision 2
 rejects — so a warning has something to do besides be dismissed. *(The erase
 item is unbuilt as of 2026-08-12 — the device tree has no flash-write path at
 all yet; plan stage 11 owns it.)*
+
+#### 5.3.3 Admission spelling — NORMATIVE (bughunt-1119 B1, 2026-11-23)
+
+`me sysw pack` writes each record exactly as admitted, so admission checks the spelling that will be written,
+not only its class. A record that classifies is still refused, exit 4, when (first match wins): it contains LF or
+CR; it begins or ends with whitespace; it is a BIP-39 mnemonic whose words are not separated by single U+0020
+spaces; or it is a `text:` or `pass:` record whose decoded body is not UTF-8 (`tx:` bodies are bytes).
+Classification itself is unchanged, and readers keep reading. The only changes to a record's SPELLING are one byte-order mark removed from the start of an `--in` file or of stdin, and CRLF line ends in those streams; whitespace-only lines in a stream are skipped, as before. Nothing is trimmed. (The `hash:` producer rule, SPEC_hashlock_kinds §6, and `--as`'s canonical re-encode rewrite a record's form, not its spelling, and are unchanged.)
 
 ### 5.4 Flash-delivered input is digest-verified, once per payload — operator ruling 2026-08-11
 

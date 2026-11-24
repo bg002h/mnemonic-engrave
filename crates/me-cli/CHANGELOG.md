@@ -56,6 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fails, and prints no identity or digest. `region_image` padded a container shorter than its header declares into
   a full region image the reader then refused; it now returns the `TooShort` error `open` returns. Exit codes
   elsewhere are unchanged.
+- **`me sysw pack` refuses a record whose spelling differs from the one it would write**
+(bughunt-1119 bh-me-I1, I6, I9 and I17, all Important; closes F-245). A record with a line break, leading or
+trailing whitespace, a BIP-39 mnemonic whose words are not separated by single spaces, or a `text:`/`pass:` body
+that is not UTF-8 used to pack at exit 0 and was written as given: padding was engraved, a wrapped record came back
+as several, and the device did not recognise the seed. Each now exits 4 with a sentence naming the rule, before any
+passphrase is generated. One byte-order mark at the start of `--in` or stdin is now removed (it used to be refused).
+Classification and readers are unchanged.
 
 ## [0.13.0] - 2026-11-04
 
