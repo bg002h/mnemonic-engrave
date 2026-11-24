@@ -103,7 +103,12 @@ fn go_canonical(input: &str) -> String {
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn go harness");
-    child.stdin.take().unwrap().write_all(input.as_bytes()).unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
     let out = child.wait_with_output().unwrap();
     assert!(
         out.status.success(),
