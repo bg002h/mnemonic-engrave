@@ -30,6 +30,7 @@ on:
   push:
     tags:
       - 'v*'
+    branches: [master]
   # A NON-PUBLISHING release rehearsal: the full matrix builds, `assemble`
   # packs, writes SHA256SUMS, minisign-signs it and VERIFIES the signature,
   # and the attest + publish steps (tag-only) are skipped. It proves the
