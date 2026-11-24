@@ -332,11 +332,10 @@ pub fn remedy_no_wildcard(d: &Parsed) -> String {
 /// §4.5, NORMATIVE: promotion is **announced, not silent**. The operator
 /// supplied one line and is getting a whole wallet.
 ///
-/// It prints BOTH forms (R0's I5): the canonical re-encoding rebuilds an xpub's
-/// depth and child-number bytes from the invented origin path, so for any key
-/// whose true depth is not 3 the inferred descriptor contains a base58 string
-/// the operator has never seen — and the one check the announcement exists for
-/// is "is that my key?".
+/// It prints BOTH forms (R0's I5): the canonical re-encoding keeps the key's own
+/// depth and child number, so the two forms differ only by version bytes
+/// (`zpub` to `xpub`), `'` to `h` and the checksum, and the one check the
+/// announcement exists for is "is that my key?".
 pub fn promotion_announcement(d: &Parsed) -> Option<String> {
     if !d.promoted {
         return None;
@@ -346,8 +345,8 @@ pub fn promotion_announcement(d: &Parsed) -> Option<String> {
         "this is a single extended key, and `me` inferred a whole wallet from it:\n      \
          key as supplied: {}\n      \
          inferred wallet: {}\n      \
-         The key's serialisation was normalised (version and depth bytes rebuilt from \
-         the origin path); the key material itself is unchanged.",
+         The key's version bytes may be normalised (`zpub` becomes `xpub`); its depth, \
+         child number and key material are unchanged.",
         k.as_supplied,
         d.encode()
     ))
