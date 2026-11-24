@@ -97,8 +97,9 @@ Each is one stderr line prefixed `me: `, `{i}` the record's index as given; exit
 passphrase is generated. None names any part of the record.
 
 - **T-LF** (A-LF): `record {i}, as given (records count from 0) contains a line break (LF or CR). A record is one
-  line, and records are stored separated by LF, so this one would be read back as several records. Give each
-  record its own line (--in or stdin) or its own argument; to pack a whole descriptor document, pass it with --as.`
+  line, and records are stored separated by LF, so this one would be read back as several records. Put the record on
+  one line and delete any stray CR (it does not show on screen; "$(cat file)" of a CRLF file keeps one), one record
+  per line (--in or stdin) or per argument, and re-run; to pack a whole descriptor document, pass it with --as.`
 - **T-PAD** (A-PAD): `record {i}, as given (records count from 0) begins or ends with whitespace. Records are stored
   exactly as given, so the whitespace would be engraved as part of this one. Remove it and re-run.`
 - **T-SEP** (A-SEP): `record {i}, as given (records count from 0) is a BIP-39 mnemonic whose words are not separated
