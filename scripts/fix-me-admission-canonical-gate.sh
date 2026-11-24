@@ -45,7 +45,7 @@ export ME D M M2 MT MN W6 BOM
 T_SEP='me: record 0, as given (records count from 0) is a BIP-39 mnemonic whose words are not separated by single spaces (a doubled space, a tab or another space character). The device reads a seed only in that spelling and would not recognise this record as one. Separate the words with one ordinary space each and re-run.'
 T_LF='me: record 0, as given (records count from 0) contains a line break (LF or CR). A record is one line, and records are stored separated by LF, so this one would be read back as several records. Give each record its own line (--in or stdin) or its own argument; to pack a whole descriptor document, pass it with --as.'
 T_PAD='me: record 0, as given (records count from 0) begins or ends with whitespace. Records are stored exactly as given, so the whitespace would be engraved as part of this one. Remove it and re-run.'
-t_utf8() { printf 'me: record 0, as given (records count from 0) begins `%s` and its body is lowercase hex, but the bytes it decodes to are not UTF-8 text (§5.3.1). Encode the text'"'"'s own UTF-8 bytes:' "$1"; }
+t_utf8() { printf 'me: record 0, as given (records count from 0) begins `%s` and its body is lowercase hex, but the bytes it decodes to are not UTF-8 text (§5.3.1).' "$1"; [ "$1" = text: ] && printf ' Encode the text'"'"'s own UTF-8 bytes:'; return 0; }
 T_UNREC_HEAD='me: record 0, as given (records count from 0) is not a form this container can place'
 
 # run <row> <snippet>: run the snippet in $W with o.bin removed first.
@@ -87,6 +87,7 @@ accept C1  "$M"      'printf "%s\n" "$M" | "$ME" sysw pack --no-passphrase --exp
 refuse R4  "$T_LF"   '"$ME" sysw pack --no-passphrase --allow-argv-secret --expect mnemonic --out o.bin "$W6"'
 refuse R5  "$(t_utf8 text:)" 'printf "text:ff\n" | "$ME" sysw pack --no-passphrase --out o.bin'
 refuse R6  "$(t_utf8 pass:)" 'printf "pass:ff\n" | "$ME" sysw pack --no-passphrase --out o.bin'
+grep -qE "Encode the text|xxd" "$W/R6.err" && bad "R6: the pass: refusal printed the remedy line"
 accept C2  'text:c3a9' 'printf "text:c3a9\n" | "$ME" sysw pack --no-passphrase --out o.bin'
 refuse R7  "$T_PAD"  '"$ME" sysw pack --no-passphrase --out o.bin "$D "'
 refuse R8  "$T_PAD"  '"$ME" sysw pack --no-passphrase --out o.bin " $D"'

@@ -104,10 +104,12 @@ passphrase is generated. None names any part of the record.
 - **T-SEP** (A-SEP): `record {i}, as given (records count from 0) is a BIP-39 mnemonic whose words are not separated
   by single spaces (a doubled space, a tab or another space character). The device reads a seed only in that
   spelling and would not recognise this record as one. Separate the words with one ordinary space each and re-run.`
-- **T-UTF8BODY** (A-UTF8), two lines, the second indented six spaces exactly as `NonHexBody`'s remedy (main.rs, the
-  `U::NonHexBody` arm): `record {i}, as given (records count from 0) begins `{prefix}` and its body is lowercase hex,
-  but the bytes it decodes to are not UTF-8 text (§5.3.1). Encode the text's own UTF-8 bytes:` then
-  `      printf '%s' 'your text here' | xxd -p -c 256`. `{prefix}` is `text:` or `pass:`.
+- **T-UTF8BODY** (A-UTF8), option (b), final (coordinator ruling): for `text:`, two lines, the second indented six
+  spaces exactly as `NonHexBody`'s remedy (main.rs, the `U::NonHexBody` arm): `record {i}, as given (records count
+  from 0) begins `text:` and its body is lowercase hex, but the bytes it decodes to are not UTF-8 text (§5.3.1).
+  Encode the text's own UTF-8 bytes:` then `      printf '%s' 'your text here' | xxd -p -c 256`. For `pass:`,
+  one line and NO remedy line: `record {i}, as given (records count from 0) begins `pass:` and its body is lowercase
+  hex, but the bytes it decodes to are not UTF-8 text (§5.3.1).`
 
 (The sentences in the gate script are the same strings with `{i}` = 0; the script is the authority for spacing.)
 Unchanged: every other refusal and its exit code; a BOM-prefixed stream that used to exit 4 now packs (exit 0).
@@ -226,14 +228,12 @@ both clippy runs on 1.85.0). Its header states what it does not cover.
    (R9, R10). This is a behaviour change for any operator file with trailing spaces; today those spaces are engraved.
 7. **`--expect` still runs before admission** (main.rs:1786). For R1, `--expect mnemonic` is met and the run then
    exits 4 on T-SEP; `--expect` prints nothing when met, so no line vouches for the refused record.
-8. **T-UTF8BODY reuses `NonHexBody`'s remedy line for both prefixes**, for one vocabulary. For `pass:` that line
-   invites typing the passphrase into a shell command, which shell history keeps; the existing `NonHexBody` sentence
-   (main.rs:3748-3754) already does the same. Options: (a) keep it, as here; (b) print the remedy line for `text:`
-   only and end the `pass:` sentence after "(§5.3.1)."; (c) change both sentences to (b) together. Recommendation
-   (c), as a separate small item, because the existing sentence has the same exposure; this row keeps (a) so that
-   it does not change an existing sentence. Filed as a Nit secret-handling line in C/agent-reports/fix-doc-bh-me-admission-canonical.md.
+8. **T-UTF8BODY prints the remedy line for `text:` only.** For `pass:` that line would invite typing the passphrase
+   into a shell command, which shell history keeps; the `pass:` sentence therefore ends after "(§5.3.1)." with no
+   remedy line. The existing `NonHexBody` sentence (main.rs:3748-3754) has the same exposure; changing it is a
+   separate small item, filed as a Nit secret-handling line in C/agent-reports/fix-doc-bh-me-admission-canonical.md.
 
-§7 items 1-7: confirmed as the review r1 recommends. Item 8: option (b).
+§7 items 1-7: confirmed as the review r1 recommends. Item 8: option (b), final (coordinator ruling, E9b).
 
 ## 8. T29 (I1, secret half): run, not a question
 
