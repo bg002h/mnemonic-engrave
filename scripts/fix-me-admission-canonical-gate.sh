@@ -43,7 +43,7 @@ BOM=$'\xef\xbb\xbf'
 export ME D M M2 MT MN W6 BOM
 
 T_SEP='me: record 0, as given (records count from 0) is a BIP-39 mnemonic whose words are not separated by single spaces (a doubled space, a tab or another space character). The device reads a seed only in that spelling and would not recognise this record as one. Separate the words with one ordinary space each and re-run.'
-T_LF='me: record 0, as given (records count from 0) contains a line break (LF or CR). A record is one line, and records are stored separated by LF, so this one would be read back as several records. Give each record its own line (--in or stdin) or its own argument; to pack a whole descriptor document, pass it with --as.'
+T_LF='me: record 0, as given (records count from 0) contains a line break (LF or CR). A record is one line, and records are stored separated by LF, so this one would be read back as several records. Put the record on one line and delete any stray CR (it does not show on screen; "$(cat file)" of a CRLF file keeps one), one record per line (--in or stdin) or per argument, and re-run; to pack a whole descriptor document, pass it with --as.'
 T_PAD='me: record 0, as given (records count from 0) begins or ends with whitespace. Records are stored exactly as given, so the whitespace would be engraved as part of this one. Remove it and re-run.'
 t_utf8() { printf 'me: record 0, as given (records count from 0) begins `%s` and its body is lowercase hex, but the bytes it decodes to are not UTF-8 text (§5.3.1).' "$1"; [ "$1" = text: ] && printf ' Encode the text'"'"'s own UTF-8 bytes:'; return 0; }
 T_UNREC_HEAD='me: record 0, as given (records count from 0) is not a form this container can place'

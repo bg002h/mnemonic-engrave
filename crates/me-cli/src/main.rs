@@ -3711,8 +3711,10 @@ fn canonical_sentence(i: usize, why: mnemonic_engrave::sysw::Spelling) -> String
     match why {
         S::LineBreak => format!(
             "record {i}, as given (records count from 0) contains a line break (LF or CR). A record is one \
-             line, and records are stored separated by LF, so this one would be read back as several records. Give each \
-             record its own line (--in or stdin) or its own argument; to pack a whole descriptor document, pass it with --as."
+             line, and records are stored separated by LF, so this one would be read back as several records. Put the \
+             record on one line and delete any stray CR (it does not show on screen; \"$(cat file)\" of a CRLF file keeps \
+             one), one record per line (--in or stdin) or per argument, and re-run; to pack a whole descriptor document, \
+             pass it with --as."
         ),
         S::Padding => format!(
             "record {i}, as given (records count from 0) begins or ends with whitespace. Records are stored \
