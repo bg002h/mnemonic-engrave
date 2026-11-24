@@ -86,8 +86,7 @@ Insert after §5.3.2 (before `### 5.4`, line 740) a new subsection, verbatim:
 > not only its class. A record that classifies is still refused, exit 4, when (first match wins): it contains LF or
 > CR; it begins or ends with whitespace; it is a BIP-39 mnemonic whose words are not separated by single U+0020
 > spaces; or it is a `text:` or `pass:` record whose decoded body is not UTF-8 (`tx:` bodies are bytes).
-> Classification itself is unchanged, and readers keep reading. The only input normalisations are one byte-order
-> mark at the start of an `--in` file or of stdin, and CRLF line ends in those streams. Nothing is trimmed.
+> Classification itself is unchanged, and readers keep reading. The only changes to a record's SPELLING are one byte-order mark removed from the start of an `--in` file or of stdin, and CRLF line ends in those streams; whitespace-only lines in a stream are skipped, as before. Nothing is trimmed. (The `hash:` producer rule, SPEC_hashlock_kinds §6, and `--as`'s canonical re-encode rewrite a record's form, not its spelling, and are unchanged.)
 
 And in §5.3.1, after the paragraph beginning "**Decoding is normative too:**", append one sentence:
 "`me sysw pack` refuses a `text:` or `pass:` record whose body does not decode to UTF-8 (§5.3.3)."
@@ -164,9 +163,8 @@ Library rows (run on master with a scratch test, 6 of 7 failed as expected; they
 New (each doc comment names its row; names are the gate's):
 
 - `crates/me-cli/src/sysw/mod.rs` `mod tests`:
-  - `admission_refuses_a_record_with_a_line_break` (A-LF: an LF and a lone CR inside an `md1`, and L1's document).
-  - `admission_refuses_a_padded_record` (A-PAD: leading and trailing space, TAB and U+00A0 on `D`; a padded `ms1`
-    and `text:6869 `; L2, L3).
+  - `admission_refuses_a_record_with_a_line_break` (A-LF: `D` followed by a lone CR, `D` preceded by an LF, `W6`, and L1's document; an LF or a CR in the MIDDLE of an `md1` is asserted to stay `Unclassifiable(0, UnknownReason::Unrecognised)`, §7 item 3).
+  - `admission_refuses_a_padded_record` (A-PAD: leading and trailing space, TAB and U+00A0 on `D`; a padded `ms1` and a padded `mt1`; L2, L3; `text:6869 ` is asserted to stay `Unclassifiable(0, UnknownReason::NonHexBody("text:"))`, §7 item 3).
   - `admission_refuses_a_mnemonic_without_single_space_separators` (A-SEP: `M2`, `MT`, `MN`, and `M` with every
     separator doubled; `M` itself admitted; L4).
   - `admission_refuses_a_text_or_pass_body_that_is_not_utf8` (A-UTF8: L5, L6, `text:c0af` overlong; `text:c3a9` and
@@ -234,6 +232,8 @@ both clippy runs on 1.85.0). Its header states what it does not cover.
    only and end the `pass:` sentence after "(§5.3.1)."; (c) change both sentences to (b) together. Recommendation
    (c), as a separate small item, because the existing sentence has the same exposure; this row keeps (a) so that
    it does not change an existing sentence. Filed as a Nit secret-handling line in C/agent-reports/fix-doc-bh-me-admission-canonical.md.
+
+§7 items 1-7: confirmed as the review r1 recommends. Item 8: option (b).
 
 ## 8. T29 (I1, secret half): run, not a question
 
