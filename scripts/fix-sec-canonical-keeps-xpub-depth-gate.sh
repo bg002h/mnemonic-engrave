@@ -17,7 +17,7 @@
 #      record the device measured.
 #   C. the full nextest suite ONCE to a log (Go on PATH, ME_REQUIRE_GO=1, as CI);
 #      each named FIX test must PASS exactly once, and no FAIL line may appear.
-#   D. doc-tests, cargo fmt --check, and both clippy runs of the CI `test` job on
+#   D. doc-tests, cargo fmt --check, the code-docs check, and both clippy runs of the CI `test` job on
 #      the CI-pinned toolchain (1.85.0, release.yml RUST_TOOLCHAIN).
 #   E. (only with FORK_WT) the fork's vendored seam file is byte-identical to me's,
 #      its pin equals me's, and `go test ./nonstandard -run DescriptorSeam` passes.
@@ -115,6 +115,7 @@ done
 echo "== D. doc-tests and lints"
 cargo test --locked --doc >"$LOG/doctest.log" 2>&1 || bad "D: doc-tests (see $LOG/doctest.log)"
 cargo fmt --check >"$LOG/fmt.log" 2>&1 || bad "D: cargo fmt --check (see $LOG/fmt.log)"
+bash ci/code-docs-check.sh >"$LOG/code-docs.log" 2>&1 || bad "D: code-docs check (see $LOG/code-docs.log)"
 cargo +1.85.0 clippy --all-targets --locked -- -D warnings >"$LOG/clippy.log" 2>&1 || bad "D: clippy (see $LOG/clippy.log)"
 cargo +1.85.0 clippy -p mnemonic-engrave --lib --no-default-features --locked -- -D warnings >"$LOG/clippy-nodef.log" 2>&1 \
     || bad "D: no-default-features clippy (see $LOG/clippy-nodef.log)"
