@@ -243,6 +243,12 @@ pub struct Key {
     pub version: KeyVersion,
     pub network: Network,
     pub parent_fingerprint: u32,
+    /// The depth byte of the extended key as parsed (BIP-32 serialisation
+    /// byte 4); the fork's `xpubDepth`.
+    pub depth: u8,
+    /// The child number of the extended key as parsed (BIP-32 serialisation
+    /// bytes 9..13); the fork's `xpubChildNumber`.
+    pub child_number: u32,
     pub chain_code: [u8; 32],
     pub key_data: [u8; 33],
 }
@@ -256,21 +262,19 @@ impl Key {
     }
 
     /// `Key.String()` — `ExtendedKey()` with the version normalised to the
-    /// network's public id, `depth` rebuilt from `len(DerivationPath)` and
-    /// `childNum` from its last element. This is why the canonical string can
-    /// carry a base58 payload the operator has never seen.
+    /// network's public id. Depth and child number are the key's own, as
+    /// `Key.ExtendedKey()` takes them from the parsed key (`xpubMeta`), not
+    /// rebuilt from the origin path.
     pub fn canonical_string(&self) -> String {
         let version: u32 = match self.network {
             Network::Mainnet => 0x0488_b21e,
             Network::Testnet => 0x0435_87cf,
         };
-        let depth = self.origin.len() as u8;
-        let child = self.origin.last().copied().unwrap_or(0);
         let mut b = Vec::with_capacity(78);
         b.extend_from_slice(&version.to_be_bytes());
-        b.push(depth);
+        b.push(self.depth);
         b.extend_from_slice(&self.parent_fingerprint.to_be_bytes());
-        b.extend_from_slice(&child.to_be_bytes());
+        b.extend_from_slice(&self.child_number.to_be_bytes());
         b.extend_from_slice(&self.chain_code);
         b.extend_from_slice(&self.key_data);
         base58::encode_check(&b)
@@ -687,6 +691,8 @@ fn parse_bluewallet(input: &str) -> Result<Parsed, BlueWalletError> {
                     version: ext.version,
                     network: ext.version.network(),
                     parent_fingerprint: ext.parent_fingerprint,
+                    depth: ext.depth,
+                    child_number: ext.child_number,
                     chain_code: ext.chain_code,
                     key_data: ext.key_data,
                 });
@@ -1071,7 +1077,9 @@ fn is_account_shaped(path: &[u32]) -> bool {
 
 struct ExtendedKey {
     version: KeyVersion,
+    depth: u8,
     parent_fingerprint: u32,
+    child_number: u32,
     chain_code: [u8; 32],
     key_data: [u8; 33],
 }
@@ -1114,7 +1122,9 @@ fn parse_extended_key(s: &str) -> Result<ExtendedKey, KeyError> {
     chain_code.copy_from_slice(&raw[13..45]);
     Ok(ExtendedKey {
         version: v,
+        depth: raw[4],
         parent_fingerprint: u32::from_be_bytes([raw[5], raw[6], raw[7], raw[8]]),
+        child_number: u32::from_be_bytes([raw[9], raw[10], raw[11], raw[12]]),
         chain_code,
         key_data,
     })
@@ -1193,6 +1203,8 @@ fn parse_key(implied: Option<&[u32]>, enc: &str) -> Result<Key, KeyError> {
         version: ext.version,
         network: ext.version.network(),
         parent_fingerprint: ext.parent_fingerprint,
+        depth: ext.depth,
+        child_number: ext.child_number,
         chain_code: ext.chain_code,
         key_data: ext.key_data,
     })

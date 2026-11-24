@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The packed descriptor keeps an extended key's own depth and child number** (security sweep
+  canonical-keeps-xpub-depth, Important; FOLLOWUPS sh2-me-canonical-depth). `me` rebuilt them from
+  the origin path, so a key whose depth or child number differed from its path (a depth-4 key
+  promoted to `pkh(…)`, or `pkh(<depth-4 xpub>)` with no origin) was packed as an xpub string the
+  holder had never seen, and the device encoded the same input differently. The key material and
+  addresses were never affected. The promotion announcement's last line now reads "The key's version
+  bytes may be normalised (`zpub` becomes `xpub`); its depth, child number and key material are
+  unchanged." Exit codes are unchanged.
 - **`me bundle --preview` trusts the sidecar's version probe only when it exits 0 and prints exactly `me-preview <version>`** (bughunt-1119 bh-me-I19, Important). A probe that exits non-zero is refused with exit 2 and the sidecar's stderr; any other output shape is refused as before for an unreadable version; no plate is rendered. `scripts/build-preview.sh --check` no longer approves a sidecar whose probe exits non-zero, and compares the probe's stdout only. The developer gates bh-me-I12, I13 and I14 (mt1 vector generator, SH2 demo build) are fixed alongside.
 - **A converter option typed before a subcommand is honoured or refused, printed
   commands quote their path, and `me-preview` refuses a stray operand**

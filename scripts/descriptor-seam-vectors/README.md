@@ -62,3 +62,8 @@ fingerprint guard and P3.4's `ypubVer` case — S2 measures two `device_admits`
 booleans from it before either fix reaches fork `main`) ·
 `descriptor-mnemonic` **6c4a56fd** (debug `md`) ·
 published **md-codec 0.42.0** · Go **1.26.3**.
+
+Re-pinned 2026-11-23 (FIX_sec_canonical_keeps_xpub_depth): the one changed line
+(`accepted/sh-wsh-sortedmulti-16-keys`, `canonical`) is measured against fork
+**65717c5** and `descriptor-mnemonic` **e11b4ce1** (debug `md`); sha256
+`71bba6f2…b227`.

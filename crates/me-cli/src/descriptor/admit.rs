@@ -485,6 +485,8 @@ mod conjunct_reachability {
             version,
             network: Network::Mainnet,
             parent_fingerprint: 0,
+            depth: 0,
+            child_number: 0,
             chain_code: [7u8; 32],
             key_data: [2u8; 33],
         }

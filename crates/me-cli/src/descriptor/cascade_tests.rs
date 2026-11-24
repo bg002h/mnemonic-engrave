@@ -20,6 +20,12 @@ const XPUB: &str = "xpub6C9j4wAxxkWN4cq8G4N2mkV6NrGGhnLFCGdh8GsYY1xreEveW5YEXJMj
 /// for them would test a mainnet wallet the operator does not hold.
 const TPUB: &str = "tpubDCXMbAzeg2TpLR1yiFM7yfpThyMvhAqJjuDzUpvgsvikPXbMaJPKfk2ZTbb7h7jnp1Vk7FPwnsWEeaDa2D83Nr1ehUyc6wpTYpNURb6Qt26";
 
+/// The `zpub` spelling of `XPUB` (the vector file's `promotion/07-origin-84h-zpub` key).
+const ZPUB_OF_XPUB: &str = "zpub6qpFgGWoG7bKmDDMvmwHBvg6inZAb2KF2Vg8h4fKJ2ickSZ71PsMmRg1FyRWAS6PqPCSzd5CB6PHixx64k6q5svZNZd9bEoCWJuMSkSRzJx";
+
+/// The `dc567276` fixture cosigner key: depth 4, child number 2h.
+const D4: &str = "xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan";
+
 fn ok(input: &str) -> Parsed {
     cascade(&normalise(input)).unwrap_or_else(|e| panic!("{input}: {e:?}"))
 }
@@ -382,14 +388,15 @@ fn path_element_admits_2147483647_unhardened_and_hardened() {
 
 // ── §4.5 ───────────────────────────────────────────────────────────────────
 
-/// §4.5, R0's I5: the announcement prints BOTH forms, and the second assertion
-/// is why. `XPUB` is a depth-3 key, so its canonical re-serialisation is
-/// byte-identical and printing one form would look sufficient. `COSIGNER` is
-/// the depth-4 fixture key: promoted to `pkh(…)`, `Key.ExtendedKey()` rebuilds
-/// depth from the INVENTED `44h/0h/0h` and the canonical is a base58 string the
-/// operator has never seen. The one check the announcement exists for is "is
-/// that my key?", and on this input printing only the canonical makes that
-/// check fail on a correct result.
+/// §4.5, R0's I5: the announcement prints BOTH forms. `XPUB` is a depth-3 key
+/// promoted under a depth-3 origin, so its canonical is byte-identical and one
+/// form would look sufficient. `COSIGNER` is the depth-4 fixture key promoted
+/// under `44h/0h/0h`: the canonical keeps the key's own depth and child number
+/// (FIX_sec_canonical_keeps_xpub_depth), so the two forms differ only by `'`
+/// to `h`, `zpub` to `xpub` and the checksum. The third leg keeps the test's
+/// original purpose, a spelling that really does change (`zpub` to `xpub`):
+/// the announcement must carry the input verbatim and the canonical, and they
+/// differ.
 #[test]
 fn promotion_announces_both_the_supplied_key_and_the_inferred_wallet() {
     const COSIGNER: &str = "xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan";
@@ -404,15 +411,26 @@ fn promotion_announces_both_the_supplied_key_and_the_inferred_wallet() {
 
     let deep = ok(&format!("[4bbaa801/44h/0h/0h]{COSIGNER}"));
     let canonical = deep.encode();
-    assert!(
-        !canonical.contains(COSIGNER),
-        "a depth-4 key promoted to a depth-3 origin must RE-SERIALISE: {canonical}"
+    assert_eq!(
+        canonical,
+        format!("pkh([4bbaa801/44h/0h/0h]{COSIGNER})#57c9a380")
     );
     let a = crate::descriptor::gate::promotion_announcement(&deep).expect("promoted");
     assert!(
-        a.contains(COSIGNER) && a.contains(&canonical),
+        a.contains(&format!("[4bbaa801/44h/0h/0h]{COSIGNER}")) && a.contains(&canonical),
         "both forms, or the operator cannot answer \"is that my key?\": {a}"
     );
+
+    let zpub = ZPUB_OF_XPUB;
+    let input = format!("[4bbaa801/84'/0'/0']{zpub}");
+    let spelled = ok(&input);
+    let canonical = spelled.encode();
+    let a = crate::descriptor::gate::promotion_announcement(&spelled).expect("promoted");
+    assert!(
+        a.contains(&input) && a.contains(&canonical),
+        "both forms: {a}"
+    );
+    assert_ne!(input, canonical);
 }
 
 #[test]
@@ -674,5 +692,42 @@ fn an_unrecognised_purpose_names_no_script() {
     assert_eq!(
         checked, 2,
         "both `None` arms of the purpose map are exercised"
+    );
+}
+
+// ── FIX_sec_canonical_keeps_xpub_depth ─────────────────────────────────────
+
+#[test]
+fn canonical_keeps_a_promoted_keys_own_depth_and_child() {
+    assert_eq!(
+        ok(&format!("[4bbaa801/44h/0h/0h]{D4}")).encode(),
+        format!("pkh([4bbaa801/44h/0h/0h]{D4})#57c9a380")
+    );
+}
+
+#[test]
+fn canonical_keeps_a_coldcard_keys_own_depth_and_child() {
+    let input = format!(
+        "Name: x\nPolicy: 1 of 1\nDerivation: m/48h/0h/0h\nFormat: P2WSH\ndc567276: {D4}\n"
+    );
+    assert_eq!(
+        ok(&input).encode(),
+        format!("wsh(sortedmulti(1,[dc567276/48h/0h/0h]{D4}))#8nt5gkve")
+    );
+}
+
+#[test]
+fn canonical_keeps_the_keys_own_child_number_when_the_origin_ends_elsewhere() {
+    assert_eq!(
+        ok(&format!("pkh([4bbaa801/44h/0h/5h]{XPUB})")).encode(),
+        format!("pkh([4bbaa801/44h/0h/5h]{XPUB})#vxseckva")
+    );
+}
+
+#[test]
+fn canonical_keeps_the_keys_own_depth_with_no_origin_block() {
+    assert_eq!(
+        ok(&format!("pkh({D4})")).encode(),
+        format!("pkh({D4})#0dksumg9")
     );
 }

@@ -676,16 +676,19 @@ one line and is getting a wallet, and §5.4's host-side-first rule means they se
 it first.
 
 **The announcement echoes the operator's key AS SUPPLIED, alongside the
-inferred descriptor — R0's I5.** The canonical re-encoding rebuilds an xpub's
-depth and child-number bytes from the (invented) origin path
-(`Key.ExtendedKey()`, `bip380/bip380.go:94–105`), so for any key whose true
-depth is not 3 the inferred descriptor contains a base58 string the operator
-has never seen — measured: a depth-4 cosigner xpub promoted to `pkh(…)`
-re-serialises to a different `xpub6Bq…`. The one check the announcement exists
-for is "is that my key?", and printing only the normalised form makes that
-check fail on a correct result. So the announcement prints both — `key as
-supplied: <verbatim>` and `inferred wallet: <canonical>` — with one line
-stating the serialisation was normalised and the key material is unchanged.
+inferred descriptor — R0's I5.** The canonical re-encoding keeps the key's own
+depth and child-number bytes, as the device does since the sh2 bug hunt
+(`Key.ExtendedKey()` uses the parsed key's `xpubDepth` and `xpubChildNumber`,
+`bip380/bip380.go:102-118` at fork `65717c5`), but it rewrites a `zpub`'s
+version bytes as `xpub` and `'` as `h`, so the inferred descriptor can still
+differ from what the operator typed. *(AMENDED 2026-11-23,
+FIX_sec_canonical_keeps_xpub_depth: until then `me` rebuilt depth and child
+number from the origin path, so a depth-4 cosigner xpub promoted to `pkh(…)`
+was packed as a different `xpub6Bq…`.)* The one check the announcement exists
+for is "is that my key?", so the announcement prints both — `key as supplied:
+<verbatim>` and `inferred wallet: <canonical>` — with one line stating that
+only the version bytes may be normalised and that the depth, child number and
+key material are unchanged.
 
 ### 4.6 Whitespace — where the host is deliberately more forgiving
 
@@ -1073,10 +1076,13 @@ with its BIP-380 checksum — as one record of class `Descriptor`.
 The record is the canonical form, not the operator's bytes: it is single-line by
 construction (§4.6), it is what the device's own parser round-trips, and it is
 what §7's vectors are stated over. "Canonical" is a real transformation,
-measured four ways (R0's C5): SLIP-132 versions normalise (`zpub` → `xpub`),
-`'` → `h` (`bip32.Path.Encode`), the checksum is recomputed, and an xpub's
-depth/child-number bytes are rebuilt from the origin path — so the base58
-string itself can change. §5.1's help text says so: the operator is choosing
+measured three ways (R0's C5): SLIP-132 versions normalise (`zpub` → `xpub`),
+`'` → `h` (`bip32.Path.Encode`), and the checksum is recomputed — so the base58
+string itself can change, in its version bytes only. An xpub's own depth and
+child-number bytes are kept, as the device keeps them. *(AMENDED 2026-11-23,
+FIX_sec_canonical_keeps_xpub_depth: R0's C5 measured a fourth transformation,
+depth and child number rebuilt from the origin path; the device dropped it in
+the sh2 bug hunt and `me` drops it here.)* §5.1's help text says so: the operator is choosing
 between two artefacts and must not be told one of them is their bytes.
 
 **This path requires a device change, and the spec says so rather than
