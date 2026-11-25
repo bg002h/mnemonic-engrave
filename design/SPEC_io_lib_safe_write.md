@@ -197,8 +197,8 @@ delete sharing, which is a refusal with the old file kept. `same_file` per secti
 6. A target that is itself a mount point (one file bind-mounted, for example `docker run -v "$PWD/card.txt:/out/card.txt"`)
    is refused with `Device or resource busy (os error 16)`; today it is overwritten in place. The old file is kept.
    Write to a path inside a mounted directory instead.
-No wrapper text changes; the OS error inside it is new for items 3 and 6 (and an absent parent directory `x/` now
-reads `Not a directory (os error 20)` where today it reads `Is a directory (os error 21)`).
+No wrapper text changes; the OS error inside it is new for items 3 and 6. A target with a trailing slash (`x/`) is
+DIRECT and reads `Is a directory (os error 21)`, as today, with no temp written.
 Exit codes are unchanged.
 
 ## 8. Test rows (TRACE)

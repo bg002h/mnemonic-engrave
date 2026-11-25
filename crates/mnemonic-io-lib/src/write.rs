@@ -337,6 +337,12 @@ fn classify(path: &Path) -> Option<(PathBuf, bool)> {
     if is_stdio_alias(path) {
         return None;
     }
+    // A trailing slash names a directory, never a file: DIRECT, so the open
+    // fails `Is a directory` before any secret byte is written or synced
+    // (iolib-trailing-slash-secret-fsync).
+    if path.as_os_str().as_encoded_bytes().last() == Some(&b'/') {
+        return None;
+    }
     #[cfg(unix)]
     let mut ident = None;
     let replace = match fs::metadata(path) {
@@ -1821,5 +1827,19 @@ mod tests {
         let r = same_file(Endpoint::Path(&x), &[Endpoint::Path(&x)]);
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
         assert_eq!(r, None);
+    }
+
+    /// iolib-trailing-slash-secret-fsync: an absent `x/` is refused before any
+    /// temp is created, so no secret byte is written or synced; the OS error is
+    /// today's `Is a directory (os error 21)`, not the rename's ENOTDIR (20).
+    #[cfg(unix)]
+    #[test]
+    fn a_trailing_slash_target_is_refused_before_any_temp_is_written() {
+        let d = tempfile::tempdir().unwrap();
+        let t = d.path().join("x/");
+        assert!(classify(&t).is_none(), "a trailing slash must be DIRECT");
+        let e = write_private(&t, b"SECRET").unwrap_err();
+        assert_eq!(e.raw_os_error(), Some(21), "got {e}");
+        assert!(names(d.path()).is_empty());
     }
 }
