@@ -87,6 +87,11 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [W11] | RED-1 passes (guard) | always suffix the name, so 250 bytes exceeds NAME_MAX |
 | [W17] | RED-1 passes (guard) | no stdio-alias rule: ATOMIC on `/dev/stdout` replaces the redirected file's inode |
 | [W19] | GREEN | prefix rule off: ATOMIC on `/dev/fd/1` replaces the redirected file's inode |
+| [W20] | 0.1.3 RED | 0.1.2 DIRECT on an alias |
+| [W21] | 0.1.3 RED | `/dev/fd/` prefix off |
+| [W22] | 0.1.3 RED | O_APPEND reopen instead of the stream; or no stdout flush |
+| [W23] | 0.1.3 RED | alias checked on the given path only |
+| [W24] | 0.1.3 RED | no canonical-parent check |
 | [W12] | GREEN | limit 201 instead of 200 bytes; or the fallback name changed |
 | [W13] | GREEN | skip `remove_file` after one step; or swallow the step's error |
 | [W14] | GREEN | propagate the directory-sync error |
@@ -107,8 +112,8 @@ code that the row must turn red; the build report pastes each mutant's failing r
 
 A mutant that no row turns red is a STOP: paste it and report.
 
-Counts the gate checks: 17 W rows + 10 S rows + 2 existing rows + `child` = 33 tests in `write::tests::` at
-GREEN; 15 at RED-1 (W1-W11, W17, the 2 existing, `child`), 4 failing.
+Counts the gate checks: 24 W rows + 11 S rows + 2 existing rows + `child` = 38 tests in `write::tests::` at
+GREEN (0.1.3); 15 at RED-1 (W1-W11, W17, the 2 existing, `child`), 4 failing.
 
 ## Existing tests and files that change (rule per file)
 

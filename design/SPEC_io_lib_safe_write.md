@@ -60,8 +60,9 @@ create on Unix, `set_permissions(0600)` on the open handle on Unix, `set_len(0)`
 `write_all`).
 
 1. **Classify** with `std::fs::metadata(path)` (follows symlinks):
-   - **Stdio alias (Unix).** If `path` as given is `/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes
-     (`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: DIRECT.
+   - **Stdio alias (Unix), checked first.** If `path` as given is `/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes
+     (`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: ALIAS (section 3a). So is a path whose canonical
+     parent joined with its name is one of those, or whose last component's symlink chain reaches one.
    - `Err` of kind `NotFound`: mode ABSENT.
    - any other `Err`: DIRECT (the open then reports its own error, as today).
    - `Ok` and not `is_file()` (FIFO, char or block device, socket, directory, a pipe or tty behind `/dev/stdout`):
@@ -106,6 +107,14 @@ Not done, on purpose: no cleanup of stale temps from earlier runs (another live 
 no preservation of the old file's owner, group, ACLs or xattrs (the new file is the writer's, 0600, as the F-244
 tightening already intends); no `sync_all` in DIRECT (today has none).
 
+## 3a. ALIAS (0.1.3; architect-io-lib-append-1124)
+
+An alias names a stream the process already holds: it is written into that stream, never truncated.
+Descriptors 0 to 2 (`/dev/stdin|stdout|stderr`, `/dev/fd/N`, `/proc/self|thread-self|<own pid>/fd/N`) are duplicated:
+the write lands at the stream's own offset and keeps its O_APPEND; for 1 it first flushes std's stdout, under its lock.
+Any other alias is opened append + create, 0600. Then 0600 on the handle and `write_all`: no `set_len`, no temp, no sync.
+A failed write can leave part of the bytes after the earlier contents.
+
 ## 4. Every case, decided
 
 | case | path | result for the holder |
@@ -128,9 +137,9 @@ tightening already intends); no `sync_all` in DIRECT (today has none).
 | directory fsync fails after the rename | step 10 | ignored; `Ok` |
 | FIFO | DIRECT | written through, as today |
 | char device (`/dev/null`, a tty) | DIRECT | as today: `/dev/null` as non-root refuses with `Operation not permitted (os error 1)` (measured); see section 11 |
-| `/dev/stdout` when stdout is a pipe or tty | DIRECT | written through, as today |
-| `/dev/stdout` (or `/dev/fd/N`, `/proc/...`, or a link to one) when stdout is a regular file | DIRECT | written through, as today: same inode, truncated, 0600 |
-| `/dev/stdout` when stdout is a deleted file | DIRECT (stdio alias) | as today |
+| `/dev/stdout` when stdout is a pipe or tty | ALIAS | written into descriptor 1 |
+| `/dev/stdout` (or `/dev/fd/N`, `/proc/...`, or a link to one) when stdout is a regular file | ALIAS | written into the stream at its offset; same inode, never truncated, 0600 (CHANGE in 0.1.3; 0.1.2 truncated it) |
+| `/dev/stdout` when stdout is a deleted file | ALIAS | written into descriptor 1 |
 | the path `-` | ATOMIC on a file named `-` | the library gives `-` no meaning; callers route `-` to stdout before calling (consumer FIX rows check theirs) |
 | file name over 200 bytes | ATOMIC, temp named `mnemonic-io-lib.<pid>.<n>.tmp` | written (a suffixed temp name would exceed NAME_MAX 255) |
 | 100 taken temp names | step 4 fails | `File exists (os error 17)`; old kept |
@@ -189,7 +198,7 @@ attribute becomes `#[cfg(test)]` (today `#[cfg(all(test, unix))]`); `use std::os
 and the two existing rows get `#[cfg(unix)]`. Rows marked (unix) are `#[cfg(unix)]`; the rest compile on every
 platform. Child rows re-execute the test binary
 (`std::env::current_exe()`, args `--exact write::tests::child --nocapture`) with `MNEMONIC_IO_LIB_CHILD=<row id>`
-(`W1`, `W2`, `W10`, `W17`, `S7`, `S8`) and `MNEMONIC_IO_LIB_TARGET=<path>` (unused by S8). `fn child()` is a `#[test]`
+(`W1`, `W2`, `W10`, `W17`, `W19`-`W24`, `S7`, `S8`, `S11`) and `MNEMONIC_IO_LIB_TARGET=<path>` (unused by S8). `fn child()` is a `#[test]`
 that returns at once when `MNEMONIC_IO_LIB_CHILD` is unset. The child reports on STDERR one line
 `child-result: <value>`, where `<value>` is `Ok`, `Some(<i>)`, `None` or `Err raw_os_error=<n>`; after an `Err` it
 calls `std::process::exit(3)`. The parent gives the child piped stdin and stderr, and the stdout the row names (piped
@@ -219,8 +228,13 @@ W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name functi
 | W9 `a_fifo_target_is_written_directly` (unix) | GREEN guard | `mkfifo` (std has none; `std::process::Command::new("mkfifo")`), reader thread | reader receives exactly the bytes; dir holds only the FIFO | GREEN |
 | W10 `dev_stdout_on_a_pipe_is_written_directly` (unix) | GREEN guard | child with piped stdout calls `write_private("/dev/stdout", b"via-dev-stdout")` | child stdout contains `via-dev-stdout`; child reports `child-result: Ok` | GREEN |
 | W11 `a_250_byte_file_name_is_written` | GREEN guard | target name of 250 `a` bytes | `Ok`; bytes; dir holds only the target | GREEN |
-| W17 `dev_stdout_on_a_regular_file_is_written_directly` (unix) | GREEN guard | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/stdout", b"via")` | `f` keeps its inode number, starts with `via` (not equal: libtest's own stdout lines may precede), mode 0600; dir holds only `f` | GREEN |
-| W19 `dev_fd_1_on_a_regular_file_is_written_directly` (unix) | new | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/fd/1", b"via")` | `f` keeps its inode number and starts with `via`; the child reports `child-result: Ok` | n/a |
+| W17 `dev_stdout_on_a_regular_file_is_written_directly` (unix) | GREEN guard | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/stdout", b"via")` | `f` keeps its inode number, contains `via` (libtest's own stdout lines may precede; never truncated), mode 0600; dir holds only `f` | GREEN |
+| W19 `dev_fd_1_on_a_regular_file_is_written_directly` (unix) | new | child with stdout = `File` of `f` (holding `OLD`, mode 0644) calls `write_private("/dev/fd/1", b"via")` | `f` keeps its inode number and contains `via`; the child reports `child-result: Ok` | n/a |
+| W20 `dev_stdout_appended_to_a_file_keeps_its_earlier_lines` (unix) | RED | stdout = APPEND File of `f` (`EARLIER\n`, 0644); `write_private("/dev/stdout", b"NEW\n")` | `f` starts `EARLIER\n`, contains `NEW\n`, 0600; dir holds only `f` | `NEW` only; RED |
+| W21 `dev_fd_1_appended_to_a_file_keeps_its_earlier_lines` (unix) | RED | stdout = APPEND File of `f` (`EARLIER\n`, 0644); `write_private("/dev/fd/1", b"NEW\n")` | `f` starts `EARLIER\n`, contains `NEW\n`; dir holds only `f` | `NEW` only; RED |
+| W22 `dev_stdout_keeps_the_stream_order_in_a_redirected_file` (unix) | RED | stdout = `File::create(f)`; child `print!`s `before-the-write|`, calls `write_private("/dev/stdout", b"via-dev-stdout\n")`, then `println!`s `after-the-write` | `f` holds all three, in that order; child reports `child-result: Ok` | order lost; RED |
+| W23 `a_link_to_dev_stdout_appended_to_a_file_keeps_its_earlier_lines` (unix) | RED | as W20 with the path a symlink `l` -> `/dev/stdout` | `f` starts `EARLIER\n`, contains `NEW\n`; `l` still a symlink; dir holds `f` and `l` only | `NEW` only; RED |
+| W24 `a_name_under_a_link_to_dev_fd_appended_to_a_file_keeps_its_earlier_lines` (unix) | RED | as W20 with the path `fd/1`, `fd` a symlink -> `/dev/fd` | `f` starts `EARLIER\n`, contains `NEW\n`; dir holds `f` and `fd` only | `NEW` only; RED |
 | W12 `the_temp_name_is_the_target_name_or_the_fallback` | new | calls the private temp-name function | 200-byte name -> `<name>.7.3.tmp` for pid 7, n 3; 201-byte name -> `mnemonic-io-lib.7.3.tmp` | n/a (new function) |
 | W13 `a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file` | new | old `card.txt` = `old`; for each step of the platform (unix: `CreateTemp`, `Preflight`, `Chmod`, `Write`, `Sync`, `Rename`; other: `CreateTemp`, `Preflight`, `Write`, `Sync`, `Rename`) inject an error | `Err` whose `Display` is `injected at <Step>`; bytes `old`; dir holds only the target | n/a (new branch) |
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |

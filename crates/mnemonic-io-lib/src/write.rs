@@ -83,14 +83,31 @@ fn fault(step: Step) -> io::Result<()> {
 /// replaced at the given name only. Symlinks are resolved on the last
 /// component and the target is replaced; the link stays a link. A rename that
 /// fails (cross-device, bind mount, busy) is a refusal: there is no copy
-/// fallback. A FIFO, a device, a directory, a standard-stream alias
-/// (`/dev/stdout`, `/dev/fd/N`, `/proc/...`) or anything the library cannot
-/// classify is written directly, as before: open, `0o600` on the handle,
-/// truncate if a regular file, write.
+/// fallback.
+///
+/// A standard-stream alias (Unix: `/dev/stdin`, `/dev/stdout`, `/dev/stderr`,
+/// `/dev/fd/N`, `/proc/...`, spelled so after its parent is canonicalised, or
+/// reached by a symlink hop) names a stream the process already holds, so the
+/// bytes go INTO that stream and nothing is truncated: `--out /dev/stdout >> f`
+/// appends to `f`, and `{ a; tool --out /dev/stdout; b; } > f` keeps all three
+/// in order. Descriptors 0 to 2 are duplicated (the stream's own offset and
+/// `O_APPEND`); stdout is flushed and locked first. Any other alias is opened
+/// for append. `0o600` is set on the handle first. A failed write can leave
+/// part of `bytes` after the earlier contents.
+///
+/// A FIFO, a device, a directory or anything the library cannot classify is
+/// written directly, as before: open, `0o600` on the handle, truncate if a
+/// regular file, write.
 ///
 /// Errors are the `std::io::Error` of the system call that failed, unmodified.
 /// On non-Unix there are no mode calls and no directory sync.
 pub fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        if let Some(alias) = stdio_alias_of(path) {
+            return write_alias(&alias, bytes);
+        }
+    }
     match classify(path) {
         Some((final_path, replace)) => write_atomic(&final_path, replace, bytes),
         None => write_direct(path, bytes),
@@ -139,6 +156,99 @@ fn is_stdio_alias(path: &Path) -> bool {
         let _ = path;
         false
     }
+}
+
+/// `p` as an alias: as given, or its canonical parent joined with its name
+/// (`/dev/./stdout`, or `d/1` with `d` -> `/dev/fd`).
+#[cfg(unix)]
+fn spelled_alias(p: &Path) -> Option<PathBuf> {
+    if is_stdio_alias(p) {
+        return Some(p.to_path_buf());
+    }
+    let dir = match p.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d,
+        _ => Path::new("."),
+    };
+    let q = fs::canonicalize(dir).ok()?.join(p.file_name()?);
+    is_stdio_alias(&q).then_some(q)
+}
+
+/// The alias `path` reaches: itself, or a hop of its last component's symlink
+/// chain (the walk of `resolve_final`, at most 40 hops). `None` if neither.
+#[cfg(unix)]
+fn stdio_alias_of(path: &Path) -> Option<PathBuf> {
+    let mut p = path.to_path_buf();
+    for _ in 0..=40 {
+        if let Some(a) = spelled_alias(&p) {
+            return Some(a);
+        }
+        if !fs::symlink_metadata(&p).ok()?.file_type().is_symlink() {
+            return None;
+        }
+        let link = fs::read_link(&p).ok()?;
+        p = if link.is_absolute() {
+            link
+        } else {
+            p.parent()?.join(link)
+        };
+    }
+    None
+}
+
+/// The descriptor of THIS process an alias names: 0, 1, 2 for
+/// `/dev/stdin|stdout|stderr`; N for `/dev/fd/N`, `/proc/self/fd/N`,
+/// `/proc/thread-self/fd/N` and `/proc/<this pid>/fd/N`. `None` otherwise.
+#[cfg(unix)]
+fn alias_fd(alias: &Path) -> Option<u32> {
+    let s = alias.to_str()?;
+    match s {
+        "/dev/stdin" => return Some(0),
+        "/dev/stdout" => return Some(1),
+        "/dev/stderr" => return Some(2),
+        _ => {}
+    }
+    let n = match s.strip_prefix("/dev/fd/") {
+        Some(n) => n,
+        None => {
+            let (who, n) = s.strip_prefix("/proc/")?.split_once("/fd/")?;
+            if who != "self"
+                && who != "thread-self"
+                && who.parse::<u32>().ok() != Some(std::process::id())
+            {
+                return None;
+            }
+            n
+        }
+    };
+    if n.is_empty() || !n.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    n.parse().ok()
+}
+
+/// ALIAS: into the stream, never truncated (spec section 3a).
+#[cfg(unix)]
+fn write_alias(alias: &Path, bytes: &[u8]) -> io::Result<()> {
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    use std::os::unix::io::AsFd;
+    // Held across the write: nothing else here prints to stdout in between.
+    let mut out = io::stdout().lock();
+    let mut f = match alias_fd(alias) {
+        Some(0) => File::from(io::stdin().as_fd().try_clone_to_owned()?),
+        Some(1) => {
+            // What the caller already printed lands before the bytes.
+            out.flush()?;
+            File::from(out.as_fd().try_clone_to_owned()?)
+        }
+        Some(2) => File::from(io::stderr().as_fd().try_clone_to_owned()?),
+        _ => OpenOptions::new()
+            .append(true)
+            .create(true)
+            .mode(0o600)
+            .open(alias)?,
+    };
+    f.set_permissions(fs::Permissions::from_mode(0o600))?;
+    f.write_all(bytes)
 }
 
 #[cfg(unix)]

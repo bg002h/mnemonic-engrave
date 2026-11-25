@@ -22,7 +22,7 @@
 22	3	FIFO, char or block device, socket, directory, a pipe or tty behind `/dev/stdout`	W9
 23	3	`Ok` and `is_file()`: mode REPLACE.	W3
 24	3	`/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes	CODE
-25	3	(`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: DIRECT.	W19
+25	3	(`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: ALIAS (section 3a).	W19
 26	3	At most 40 hops; a 41st hop	CODE
 27	3	same `(dev, ino)` as step 1; otherwise DIRECT (this sends any race to today's path).	CODE
 28	3	ABSENT: `symlink_metadata(final)` must be `NotFound`; otherwise	CODE
@@ -46,9 +46,9 @@
 46	4	| directory fsync fails after the rename | step 10 | ignored; `Ok` |	W14
 47	4	| FIFO | DIRECT | written through, as today |	W9
 48	4	| char device (`/dev/null`, a tty) | DIRECT |	OUT:spec-s11-followup
-49	4	| `/dev/stdout` when stdout is a pipe or tty | DIRECT | written through, as today |	W10
-50	4	when stdout is a regular file | DIRECT | written through, as today: same inode, truncated, 0600 |	W17
-51	4	| `/dev/stdout` when stdout is a deleted file | DIRECT (stdio alias) | as today |	CODE
+49	4	| `/dev/stdout` when stdout is a pipe or tty | ALIAS | written into descriptor 1 |	W10
+50	4	when stdout is a regular file | ALIAS | written into the stream at its offset; same inode, never truncated, 0600	W17
+51	4	| `/dev/stdout` when stdout is a deleted file | ALIAS | written into descriptor 1 |	CODE
 52	4	| the path `-` | ATOMIC on a file named `-` |	CODE
 53	4	| file name over 200 bytes | ATOMIC, temp named `mnemonic-io-lib.<pid>.<n>.tmp` | written	W11
 54	4	| 100 taken temp names | step 4 fails | `File exists (os error 17)`; old kept |	W16
@@ -104,3 +104,8 @@
 104	2	**The library authors no error text**	CODE
 105	3	On Apple targets a `sync_all` error with `raw_os_error() == Some(45)` (ENOTSUP) is followed by a plain `fsync(2)`, whose result is step 7's result (section 6, macOS).	W18
 106	2	`Stdin` covers `--out X < X`	S11
+107	3a	An alias names a stream the process already holds: it is written into that stream, never truncated.	W20
+108	3a	An alias names a stream the process already holds: it is written into that stream, never truncated.	W21
+109	3a	for 1 it first flushes std's stdout, under its lock.	W22
+110	3a	parent joined with its name is one of those, or whose last component's symlink chain reaches one.	W23
+111	3a	parent joined with its name is one of those, or whose last component's symlink chain reaches one.	W24
