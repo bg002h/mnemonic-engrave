@@ -1521,6 +1521,10 @@ rather than only on hardware.
   bytes of anything, seed entropy included, in a BCH-valid mr1 string, and it
   loads as `ClassMr`: not secret, no flag beyond F3. The kit door refuses a
   broken or mixed card; it does not prove a card is a card.
+- **A `tx:` record sits in the public section; it is engraved in plaintext**
+  (architect ruling 2026-11-24, E3). A `tx:` record is a transaction engraved
+  in plaintext steel, so the public section adds no reader; the transaction
+  cycle's own spec governs it.
 - It does not claim the operator-compared hash detects tampering unless the
   operator actually compares it.
 - It does not change what protects the operator, which remains **physical
