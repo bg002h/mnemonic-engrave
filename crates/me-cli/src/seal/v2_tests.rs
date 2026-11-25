@@ -851,7 +851,8 @@ fn v2_titles_refusals() {
     assert_eq!(
         e.to_string(),
         "record 0 (records count from 0) in the public section: unrecognised record: \
-         unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)"
+         unrecognized HRP (expected md, mk, ms, or mt; the text before the \
+         first '1' is not shown, because it may be secret)"
     );
     assert!(t.elapsed() < Duration::from_millis(200), "before any KDF");
 }
@@ -864,7 +865,8 @@ fn v1_open_treats_text_records_as_records() {
     assert_eq!(
         e.to_string(),
         "record 1 (records count from 0) in the secret section: unrecognised record: \
-         unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)"
+         unrecognized HRP (expected md, mk, ms, or mt; the text before the \
+         first '1' is not shown, because it may be secret)"
     );
     // Vector C of the v1 file opens with no titles.
     let raw = std::fs::read_to_string(V1_VECTORS_PATH).unwrap();
