@@ -137,6 +137,14 @@ pub fn sidecar_version(path: &Path) -> io::Result<String> {
     ))
 }
 
+/// The path `render_plate` writes plate `idx` to: `DIR/plate-<idx>.svg`
+/// (`.png` under `png`). The one place the name is built, so the manifest check
+/// in `me bundle` (bh-me-I10) plans exactly the paths the render loop writes.
+pub fn plate_path(dir: &Path, idx: usize, png: bool) -> PathBuf {
+    let ext = if png { "png" } else { "svg" };
+    dir.join(format!("plate-{idx}.{ext}"))
+}
+
 /// Render one plate via the sidecar.
 ///
 /// Spawns `<sidecar> render --format <svg|png> --out <dir>/plate-<idx>.<ext>`,
@@ -153,9 +161,8 @@ pub fn render_plate(
     idx: usize,
     png: bool,
 ) -> Result<String, PreviewError> {
-    let ext = if png { "png" } else { "svg" };
     let format = if png { "png" } else { "svg" };
-    let out_path = dir.join(format!("plate-{idx}.{ext}"));
+    let out_path = plate_path(dir, idx, png);
     match std::fs::remove_file(&out_path) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}

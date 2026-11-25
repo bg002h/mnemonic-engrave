@@ -55,6 +55,11 @@ The sidecar **replicates these exact constants** in a host-side `params.go`, wit
 
 ## 6. Error handling / exit codes (consistent with Phase A: 0/2/3/4)
 - `--preview` + version mismatch, or `--preview <DIR>` unwritable/not-a-dir → exit 2. Sidecar render failure (e.g. string too large for any plate) → surface the sidecar's stderr, exit 4. `me-preview` absent + `--preview` → exit 0 (degrade, with note). `ms1`/validation/integrity failures are unchanged from Phase A (3/4) and happen BEFORE any render.
+- **The manifest is never a plate preview (bh-me-I10, 2026-11-24).** With `--preview DIR` and `--manifest M`,
+  M that is the same file as a plate preview this run would write (the same path, a symlink to it, a path through a
+  symlinked directory, or a hard link) is refused (before anything is rendered or written when the names show it; otherwise after the plates are rendered and before the manifest is written), also when no sidecar is
+  installed: `me: --manifest <M> is the same file as the plate preview <P>; write the manifest to a new name`,
+  exit 2.
 
 ## 7. File structure
 - **New** `third_party/seedhammer` — git submodule (`https://github.com/seedhammer/seedhammer.git` @ v1.4.2 / `713aee2`), `.gitmodules` committed.

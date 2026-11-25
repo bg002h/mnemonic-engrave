@@ -1,12 +1,25 @@
 //! `me` — convert a single md1/mk1 string to an NDEF payload (refuses ms1).
 
 use std::fmt::Write as _;
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use mnemonic_engrave::{convert, ConvertError};
 use zeroize::Zeroizing;
+
+mod stdout_out;
+
+/// `println!` for stdout, through the one checked writer (FIX_me_output_integrity
+/// S1): a failed write never panics and never reads as success.
+macro_rules! outln {
+    () => {
+        $crate::stdout_out::write(b"\n")
+    };
+    ($($arg:tt)*) => {
+        $crate::stdout_out::write(format!("{}\n", format_args!($($arg)*)).as_bytes())
+    };
+}
 
 /// Prepare wallet backups and signed transactions for a SeedHammer II.
 ///
@@ -483,6 +496,8 @@ const EXIT_OK: i32 = 0;
 const EXIT_USAGE: i32 = 2;
 const EXIT_REFUSED: i32 = 3;
 const EXIT_INVALID: i32 = 4;
+/// A write the destination refused (ruling T6; FIX_me_output_integrity).
+const EXIT_WRITE: i32 = stdout_out::EXIT_WRITE;
 
 /// Every string a token could plausibly BE, normalised for classification.
 ///
@@ -845,6 +860,20 @@ fn shell_word(path: &std::path::Path) -> String {
     }
 }
 
+/// What `Cli::parse()` did on a parse error, with the stdout case (`--help`,
+/// `<verb> --help`, `help <verb>`, `--version`) written through the checked
+/// writer (S1, S1f): usage errors keep clap's stderr text and exit 2; help and
+/// version text is byte-identical when the write succeeds.
+fn clap_exit(e: &clap::Error) -> i32 {
+    use std::io::IsTerminal;
+    if e.use_stderr() || std::io::stdout().is_terminal() {
+        let _ = e.print();
+    } else {
+        stdout_out::write(e.render().to_string().as_bytes());
+    }
+    e.exit_code()
+}
+
 fn run() -> i32 {
     // §6d, and the ORDERING IS THE FIX. This must decide before
     // `Cli::parse()`: clap names the offending VALUE in its error for every
@@ -856,7 +885,10 @@ fn run() -> i32 {
         eprintln!("me: {msg}");
         return EXIT_REFUSED;
     }
-    let mut cli = Cli::parse();
+    let mut cli = match Cli::try_parse() {
+        Ok(c) => c,
+        Err(e) => return clap_exit(&e),
+    };
     if let Err(code) = apply_root_options(&mut cli, &std::env::args().collect::<Vec<_>>()) {
         return code;
     }
@@ -1014,9 +1046,8 @@ fn run() -> i32 {
 
     // Emit per the selected output mode. Human guidance -> stderr only.
     if let Some(path) = &cli.out {
-        if let Err(e) = write_private(path, &bytes) {
-            eprintln!("me: cannot write {}: {e}", path.display());
-            return EXIT_USAGE;
+        if let Err(code) = write_out(path, &bytes) {
+            return code;
         }
         eprintln!("me: wrote {} NDEF bytes to {}", bytes.len(), path.display());
     } else if cli.hex || cli.base64 || cli.stdout {
@@ -1032,11 +1063,11 @@ fn run() -> i32 {
                 let _ = write!(acc, "{b:02x}");
                 acc
             });
-            println!("{s}");
+            outln!("{s}");
         } else if cli.base64 {
-            println!("{}", base64_encode(&bytes));
-        } else if std::io::stdout().write_all(&bytes).is_err() {
-            return EXIT_USAGE;
+            outln!("{}", base64_encode(&bytes));
+        } else {
+            stdout_out::write(&bytes);
         }
     } else {
         eprintln!("me: choose an output mode: --out <file>, --stdout, --hex, or --base64");
@@ -1076,8 +1107,39 @@ fn run_bundle_cli(
     // Phase B: optional plate previews via the `me-preview` sidecar. Without
     // --preview this block is skipped entirely → byte-for-byte Phase A output.
     if let Some(dir) = preview_dir {
+        // P1b (bh-me-I10): the manifest is never a plate preview. Decided from the
+        // flags, before the sidecar is located, the directory is checked or
+        // anything is rendered or written.
+        if let Some(m) = manifest_path {
+            let planned = planned_plate_paths(&manifest, dir, png);
+            let eps: Vec<Endpoint<'_>> = planned
+                .iter()
+                .map(|(_, p)| Endpoint::Path(p.as_path()))
+                .collect();
+            if let Some(i) = same_file(Endpoint::Path(m), &eps) {
+                refuse_manifest_is_plate(m, &planned[i].1);
+                return EXIT_USAGE;
+            }
+        }
         if let Some(code) = wire_previews(&mut manifest, dir, png) {
             return code; // a non-zero outcome (version mismatch / render fail).
+        }
+        // P1f: the plates now exist, so identity is by file; this also catches an
+        // alias that appeared during rendering. No manifest is written.
+        if let Some(m) = manifest_path {
+            let rendered: Vec<std::path::PathBuf> = manifest
+                .plates
+                .iter()
+                .filter_map(|pl| pl.preview.as_ref().map(std::path::PathBuf::from))
+                .collect();
+            let eps: Vec<Endpoint<'_>> = rendered
+                .iter()
+                .map(|p| Endpoint::Path(p.as_path()))
+                .collect();
+            if let Some(i) = same_file(Endpoint::Path(m), &eps) {
+                refuse_manifest_is_plate(m, &rendered[i]);
+                return EXIT_USAGE;
+            }
         }
     }
 
@@ -1089,13 +1151,12 @@ fn run_bundle_cli(
         }
     };
     if let Some(path) = manifest_path {
-        if let Err(e) = write_private(path, json.as_bytes()) {
-            eprintln!("me: cannot write {}: {e}", path.display());
-            return EXIT_USAGE;
+        if let Err(code) = write_out(path, json.as_bytes()) {
+            return code;
         }
         eprintln!("me: wrote manifest to {}", path.display());
     } else {
-        println!("{json}");
+        outln!("{json}");
     }
     eprint!("{}", manifest.checklist());
     EXIT_OK
@@ -1213,9 +1274,8 @@ fn run_seal_cli(
     };
 
     let uf2 = seal::uf2::to_uf2(&sealed.blob);
-    if let Err(e) = write_private(out, &uf2) {
-        eprintln!("me: cannot write {}: {e}", out.display());
-        return EXIT_USAGE;
+    if let Err(code) = write_out(out, &uf2) {
+        return code;
     }
 
     // STDERR, always (§2.3).
@@ -1290,11 +1350,43 @@ fn run_hash_cli(records: &[String], sealed: bool) -> i32 {
         eprintln!("me: {e}");
         return EXIT_INVALID;
     }
-    println!(
+    outln!(
         "{}",
         pubhash::format_hash(&pubhash::public_data_hash(&refs, sealed))
     );
     EXIT_OK
+}
+
+/// P1a: the paths the render loop would write, one `(plate number, path)` per
+/// plate it renders (not `ms1`, and carrying a string), built by the same
+/// helper `preview::render_plate` uses.
+fn planned_plate_paths(
+    manifest: &mnemonic_engrave::manifest::Manifest,
+    dir: &std::path::Path,
+    png: bool,
+) -> Vec<(usize, std::path::PathBuf)> {
+    use mnemonic_engrave::manifest::PlateKind;
+    manifest
+        .plates
+        .iter()
+        .filter(|pl| pl.kind != PlateKind::Ms1 && pl.string.is_some())
+        .map(|pl| {
+            (
+                pl.plate,
+                mnemonic_engrave::preview::plate_path(dir, pl.plate, png),
+            )
+        })
+        .collect()
+}
+
+/// P1c: the refusal, `M` as typed and `P` as `me: rendered plate <n> → <P>`
+/// would print it. Exit code 2 is the caller's.
+fn refuse_manifest_is_plate(m: &std::path::Path, plate: &std::path::Path) {
+    eprintln!(
+        "me: --manifest {} is the same file as the plate preview {}; write the manifest to a new name",
+        m.display(),
+        plate.display()
+    );
 }
 
 /// Wire `--preview` into the manifest, rendering each public plate via the
@@ -1464,7 +1556,110 @@ fn is_plate_artifact(name: &str) -> bool {
 // multi-user host their at-rest copies must not be world- or group-readable.
 // The crate is told to create a file owner-only; it is not told what is in it.
 use mnemonic_engrave::io::observation::PayloadKind;
-use mnemonic_engrave::io::write::write_private;
+use mnemonic_engrave::io::write::{same_file, write_private, Endpoint};
+
+/// What `--out` named, seen before and after a failed write (W2).
+#[derive(PartialEq)]
+enum OutState {
+    /// A regular file: (dev, ino, len, mtime seconds, mtime nanoseconds).
+    Regular(u64, u64, u64, i64, i64),
+    /// `NotFound`, including a dangling symlink.
+    Absent,
+    /// Anything else, and every path that names a standard stream.
+    Other,
+}
+
+/// True if `p` as typed, or its canonical parent joined with its name, starts
+/// with `/dev/` or `/proc/`.
+fn names_device_dir(p: &std::path::Path) -> bool {
+    let starts = |q: &std::path::Path| {
+        let t = q.to_string_lossy();
+        t.starts_with("/dev/") || t.starts_with("/proc/")
+    };
+    if starts(p) {
+        return true;
+    }
+    let parent = match p.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d,
+        _ => std::path::Path::new("."),
+    };
+    match (std::fs::canonicalize(parent), p.file_name()) {
+        (Ok(c), Some(name)) => starts(&c.join(name)),
+        _ => false,
+    }
+}
+
+/// W2: a path that names a standard stream: the path, or a hop of its symlink
+/// chain (`read_link`, repeated), starts with `/dev/` or `/proc/`.
+fn names_standard_stream(path: &std::path::Path) -> bool {
+    let mut cur = path.to_path_buf();
+    for _ in 0..40 {
+        if names_device_dir(&cur) {
+            return true;
+        }
+        let Ok(target) = std::fs::read_link(&cur) else {
+            return false;
+        };
+        cur = if target.is_absolute() {
+            target
+        } else {
+            match cur.parent() {
+                Some(d) => d.join(target),
+                None => target,
+            }
+        };
+    }
+    false
+}
+
+fn out_state(path: &std::path::Path) -> OutState {
+    if names_standard_stream(path) {
+        return OutState::Other;
+    }
+    match std::fs::metadata(path) {
+        Ok(m) if m.is_file() => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                OutState::Regular(m.dev(), m.ino(), m.len(), m.mtime(), m.mtime_nsec())
+            }
+            #[cfg(not(unix))]
+            {
+                let t = m
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or((0, 0), |d| {
+                        (d.as_secs() as i64, i64::from(d.subsec_nanos()))
+                    });
+                OutState::Regular(0, 0, m.len(), t.0, t.1)
+            }
+        }
+        Ok(_) => OutState::Other,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => OutState::Absent,
+        Err(_) => OutState::Other,
+    }
+}
+
+/// `--out`, `--manifest`, `seal --out`: `write_private`, and on failure the W2
+/// line (ruling T6 with R5 as amended): one last stderr line, exit 1. The state
+/// sentence is said only when a second look confirms it.
+fn write_out(path: &std::path::Path, bytes: &[u8]) -> Result<(), i32> {
+    let before = out_state(path);
+    let Err(e) = write_private(path, bytes) else {
+        return Ok(());
+    };
+    let after = out_state(path);
+    let tail = match (&before, &after) {
+        (OutState::Regular(..), OutState::Regular(..)) if before == after => {
+            format!(". {} is unchanged.", path.display())
+        }
+        (OutState::Absent, OutState::Absent) => ". Nothing was written.".to_string(),
+        _ => String::new(),
+    };
+    eprintln!("me: cannot write the output: {}: {e}{tail}", path.display());
+    Err(EXIT_WRITE)
+}
 use mnemonic_engrave::io::{no_records_guard, split_record_stream, write_block, WriteBlock};
 
 /// **`me`'s POLICY, over `io::fd`'s MECHANISM — and the mask is the whole of
@@ -2225,9 +2420,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     return EXIT_INVALID;
                 }
             };
-            println!("sealed:   {}", h.sealed());
-            println!("pub_len:  {}", h.pub_len);
-            println!("ct_len:   {}", h.ct_len);
+            outln!("sealed:   {}", h.sealed());
+            outln!("pub_len:  {}", h.pub_len);
+            outln!("ct_len:   {}", h.ct_len);
 
             // Truncation is decided BEFORE anything derived from the header is
             // printed. `identity` clamps to what is present, so on a short file
@@ -2260,7 +2455,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     return EXIT_INVALID;
                 }
             };
-            println!(
+            outln!(
                 "identity: {}",
                 hex(&sysw::identity::identity(&blob[..h.total_len()]))
             );
@@ -2568,13 +2763,13 @@ fn print_records(s: &str) {
                 let state = confirmation_state(why.is_some());
                 match why.and_then(|w| w.version_note()) {
                     // F-449 stage 4a (SPEC §6a): the same state, with the reason.
-                    Some(note) => println!("public record {i}: md1/mk1 — {state}; {note}"),
-                    None => println!("public record {i}: md1/mk1 — {state}"),
+                    Some(note) => outln!("public record {i}: md1/mk1 — {state}; {note}"),
+                    None => outln!("public record {i}: md1/mk1 — {state}"),
                 }
             }
             sysw::record::Class::Mt => {
                 let state = confirmation_state(mt_unconfirmed.contains(&i));
-                println!("public record {i}: mt1 chunk — {state}");
+                outln!("public record {i}: mt1 chunk — {state}");
             }
             sysw::record::Class::Descriptor => print_descriptor_line(i, r),
             other => print_classified_line(i, r, other),
@@ -2602,21 +2797,22 @@ fn confirmation_state(unconfirmed: bool) -> &'static str {
 fn print_tx_line(i: usize, r: &str) {
     use mnemonic_engrave::sysw;
     let Ok(b) = sysw::record::decode_body(r) else {
-        println!("public record {i}: `tx:` record whose body is not lowercase hex");
+        outln!("public record {i}: `tx:` record whose body is not lowercase hex");
         return;
     };
     let Ok(t) = sysw::tx::parse(&b) else {
-        println!("public record {i}: `tx:` record whose body is not a transaction");
+        outln!("public record {i}: `tx:` record whose body is not a transaction");
         return;
     };
     if t.every_input_signed {
-        println!(
+        outln!(
             "public record {i}: raw signed transaction — txid {}, {} bytes",
-            t.txid_display, t.size
+            t.txid_display,
+            t.size
         );
         return;
     }
-    println!(
+    outln!(
         "public record {i}: raw transaction with UNSIGNED input(s) — txid {}, {} \
          bytes; {} carr{} neither a scriptSig nor a witness, so a plate cut from \
          this can never be broadcast. It was packed with --allow-unsigned-inputs.",
@@ -2649,10 +2845,10 @@ fn print_descriptor_line(i: usize, r: &str) {
     // `Some` here; the `else` is a total function rather than an `unwrap`
     // on an operator path.
     let Some(block) = mnemonic_engrave::descriptor::identification_block(r, None) else {
-        println!("public record {i}: descriptor — this build could not re-read it");
+        outln!("public record {i}: descriptor — this build could not re-read it");
         return;
     };
-    println!("public record {i}: descriptor — complete in one record\n      {block}");
+    outln!("public record {i}: descriptor — complete in one record\n      {block}");
 }
 
 /// Every remaining class: the composer's `key:`/`hash:`/`now:`/`phrase:`, and
@@ -2679,12 +2875,12 @@ fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::recor
             let Some(Ok(rec)) = parse(r) else {
                 // Classified as a composer record but unparseable: say so
                 // rather than printing nothing.
-                println!("public record {i}: {}", class_name(class));
+                outln!("public record {i}: {}", class_name(class));
                 return;
             };
             match rec {
                 ComposerRecord::Key(k) => {
-                    println!("public record {i}: cosigner key (key:) — {}", k.text)
+                    outln!("public record {i}: cosigner key (key:) — {}", k.text)
                 }
                 ComposerRecord::Hash(h) => {
                     // NAME THE KIND. This said "sha256 hashlock" under every
@@ -2701,20 +2897,20 @@ fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::recor
                     // ONLY payload reader and the full value appeared nowhere.
                     // A `hash:` record is PUBLIC; the secret is the preimage.
                     let hx = hex(h.digest());
-                    println!(
+                    outln!(
                         "public record {i}: {} hashlock (hash:) — {}..{}",
                         h.kind().token(),
                         &hx[..8],
                         &hx[hx.len() - 8..]
                     );
-                    println!("    {}:{}", h.kind().token(), hx);
+                    outln!("    {}:{}", h.kind().token(), hx);
                 }
                 ComposerRecord::Phrase(_) => {
                     // SECRET and BEARER. `show` names the class and the method
                     // and NEVER the phrase, the derived preimage or its digest:
                     // a confirmation line goes to a terminal whose scrollback
                     // outlives the run.
-                    println!("secret record {i}: hashlock phrase (phrase:) — not shown");
+                    outln!("secret record {i}: hashlock phrase (phrase:) — not shown");
                 }
                 ComposerRecord::Now { seconds, height } => {
                     // `show` cannot tell an auto-appended pack time from an
@@ -2723,7 +2919,7 @@ fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::recor
                         Some(h) => format!("{seconds} (seconds), height {h}"),
                         None => format!("{seconds} (seconds)"),
                     };
-                    println!(
+                    outln!(
                         "public record {i}: pack time (now:) — {when}: a lower bound on the \
                          present the device echoes beside a time lock; never a locktime"
                     );
@@ -2731,10 +2927,10 @@ fn print_classified_line(i: usize, r: &str, class: mnemonic_engrave::sysw::recor
             }
         }
         C::Mnemonic | C::Codex32Secret | C::Passphrase | C::Preimage => {
-            println!("secret record {i}: {} — not shown", class_name(class));
+            outln!("secret record {i}: {} — not shown", class_name(class));
         }
         C::FreeText | C::Mr | C::Tx | C::Address | C::Unknown => {
-            println!("public record {i}: {}", class_name(class));
+            outln!("public record {i}: {}", class_name(class));
         }
     }
 }
@@ -2754,7 +2950,7 @@ fn print_mt_sets(records: &[String]) {
                 let Some((_, t)) = sysw::mt::decode_confirmed(&set) else {
                     continue;
                 };
-                println!(
+                outln!(
                     "  mt set {csid:05x}: txid {} — {} bytes, {} input(s), {} output(s), \
                      {} string(s)",
                     t.txid_display,
@@ -2764,7 +2960,7 @@ fn print_mt_sets(records: &[String]) {
                     set.len()
                 );
             }
-            Some(p) => println!(
+            Some(p) => outln!(
                 "  mt set {csid:05x}: INCOMPLETE — {} string(s) present. {}",
                 set.len(),
                 describe_set_problem(&p)
@@ -3508,7 +3704,7 @@ fn emit(
     kind: PayloadKind,
     allow_world_readable: bool,
 ) -> i32 {
-    use std::io::{IsTerminal, Write};
+    use std::io::IsTerminal;
     // F-244: this used to be `std::fs::write`, which creates at 0o666 & ~umask
     // -- so an UNSEALED container holding a BIP-39 mnemonic landed at 0644 while
     // `write_private` sat one screen away, documented for exactly this threat,
@@ -3536,19 +3732,17 @@ fn emit(
     ) {
         return code;
     }
-    let r = match out {
-        Some(p) => write_private(p, bytes).map_err(|e| format!("{}: {e}", p.display())),
-        None => std::io::stdout()
-            .write_all(bytes)
-            .map_err(|e| format!("stdout: {e}")),
-    };
-    match r {
-        Ok(()) => EXIT_OK,
-        Err(e) => {
+    match out {
+        Some(p) => match write_out(p, bytes) {
+            Ok(()) => EXIT_OK,
             // A write that failed is the environment, not the artifact: a
-            // read-only directory, a full disk, a closed pipe. USAGE.
-            eprintln!("me: {e}");
-            EXIT_USAGE
+            // read-only directory or a full disk. Exit 1 (ruling T6).
+            Err(code) => code,
+        },
+        // A failed stdout write ends the verb inside the writer (S1a-S1d).
+        None => {
+            stdout_out::write(bytes);
+            EXIT_OK
         }
     }
 }
