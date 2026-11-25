@@ -565,6 +565,15 @@ mod tests {
                 .map(|()| "Ok".to_string()),
             "W17" => write_private(Path::new("/dev/stdout"), b"via").map(|()| "Ok".to_string()),
             "W19" => write_private(Path::new("/dev/fd/1"), b"via").map(|()| "Ok".to_string()),
+            "W20" => write_private(Path::new("/dev/stdout"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W21" => write_private(Path::new("/dev/fd/1"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W22" => {
+                print!("before-the-write|");
+                let r = write_private(Path::new("/dev/stdout"), b"via-dev-stdout\n");
+                println!("after-the-write");
+                r.map(|()| "Ok".to_string())
+            }
+            "W23" | "W24" => write_private(&target, b"NEW\n").map(|()| "Ok".to_string()),
             "S7" => Ok(show(same_file(
                 Endpoint::Path(&target),
                 &[Endpoint::Stdout],
@@ -811,7 +820,7 @@ mod tests {
         assert_eq!(names(d.path()), vec![name]);
     }
 
-    /// W17: `/dev/stdout` on a regular file is written directly (same inode).
+    /// W17: `/dev/stdout` on a regular file is written into the open stream (same inode, 0600; since 0.1.3 never truncated, so libtest's own lines may come first).
     #[cfg(unix)]
     #[test]
     fn dev_stdout_on_a_regular_file_is_written_directly() {
@@ -826,12 +835,12 @@ mod tests {
         let se = String::from_utf8_lossy(&out.stderr).to_string();
         assert!(se.contains("child-result: Ok"), "child stderr: {se}");
         assert_eq!(std::fs::metadata(&f).unwrap().ino(), ino);
-        assert!(std::fs::read(&f).unwrap().starts_with(b"via"));
+        assert!(String::from_utf8_lossy(&std::fs::read(&f).unwrap()).contains("via"));
         assert_eq!(mode_of(&f), 0o600);
         assert_eq!(names(d.path()), vec!["f".to_string()]);
     }
 
-    /// W19: `/dev/fd/1` on a regular file is written directly (same inode).
+    /// W19: `/dev/fd/1` on a regular file is written into the open stream (same inode; never truncated).
     #[cfg(unix)]
     #[test]
     fn dev_fd_1_on_a_regular_file_is_written_directly() {
@@ -849,7 +858,90 @@ mod tests {
             ino,
             "inode replaced via /dev/fd/1"
         );
-        assert!(std::fs::read(&f).unwrap().starts_with(b"via"));
+        assert!(String::from_utf8_lossy(&std::fs::read(&f).unwrap()).contains("via"));
+    }
+
+    /// W20-W24 helper: `row` with stdout = `f` opened for APPEND (the shell's
+    /// `>>`), `f` holding `EARLIER\n` at 0644; returns `f`'s text.
+    #[cfg(unix)]
+    fn appended_run(row: &str, target: &Path, f: &Path) -> String {
+        std::fs::write(f, b"EARLIER\n").unwrap();
+        std::fs::set_permissions(f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let sf = std::fs::OpenOptions::new().append(true).open(f).unwrap();
+        let out = run_child(row, target, Stdio::from(sf), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        String::from_utf8_lossy(&std::fs::read(f).unwrap()).to_string()
+    }
+
+    /// W20: `--out /dev/stdout >> f` keeps f's earlier lines (triage-io-lib-dev-stdout-append).
+    #[cfg(unix)]
+    #[test]
+    fn dev_stdout_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let s = appended_run("W20", &f, &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(mode_of(&f), 0o600);
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W21: the same through `/dev/fd/1`.
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_1_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let s = appended_run("W21", &f, &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W22: `{ printf before; tool --out /dev/stdout; echo after; } > f` keeps all three, in order.
+    #[cfg(unix)]
+    #[test]
+    fn dev_stdout_keeps_the_stream_order_in_a_redirected_file() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let sf = std::fs::File::create(&f).unwrap();
+        let out = run_child("W22", &f, Stdio::from(sf), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
+        let at = |m: &str| s.find(m).unwrap_or_else(|| panic!("{m:?} missing from {s:?}"));
+        assert!(at("before-the-write|") < at("via-dev-stdout\n"), "{s:?}");
+        assert!(at("via-dev-stdout\n") < at("after-the-write\n"), "{s:?}");
+    }
+
+    /// W23: a symlink to `/dev/stdout` is the alias, not a file to truncate.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_to_dev_stdout_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let l = d.path().join("l");
+        std::os::unix::fs::symlink("/dev/stdout", &l).unwrap();
+        let s = appended_run("W23", &l, &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert!(std::fs::symlink_metadata(&l).unwrap().file_type().is_symlink());
+        assert_eq!(names(d.path()), vec!["f".to_string(), "l".to_string()]);
+    }
+
+    /// W24: `d/1` with `d` -> `/dev/fd` is the alias it spells, not ATOMIC over stdout's file.
+    #[cfg(unix)]
+    #[test]
+    fn a_name_under_a_link_to_dev_fd_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let fd = d.path().join("fd");
+        std::os::unix::fs::symlink("/dev/fd", &fd).unwrap();
+        let s = appended_run("W24", &fd.join("1"), &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(names(d.path()), vec!["f".to_string(), "fd".to_string()]);
     }
 
     /// **THE GATE, and the pre-existing target is the whole of it.**
