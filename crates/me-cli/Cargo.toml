@@ -30,8 +30,11 @@ mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 # SPEC_liana_unspendable_internal_key §9a). md-codec is unpublishable while it
 # depends on the rust-miniscript git patch below, so crates.io stopped at 0.42
 # -- which reads no wire version but 4, and fails every version-8 plate.
-# c8bb97a5 is tag `md-codec-v0.48.5`. A rev, not the tag: a tag can be moved, a
-# rev cannot. Same shape as mnemonic-toolkit.
+# c8cde234 is descriptor-mnemonic `main` after tag `md-codec-v0.48.7` (md-codec
+# 0.48.7: 0.48.6's out-of-order template fix and 0.48.7's encode-decodes-its-own
+# output check; bug hunt 2026-11-25 X7). A rev, not a tag: a tag can be moved, a
+# rev cannot. Same shape as mnemonic-toolkit. The miniscript patch rev below is
+# descriptor-mnemonic's own at this rev (unchanged, ff4732e5).
 #
 # F-700 (Refugium plan phase E2): this rev EQUALS mnemonic-refugium's workspace
 # pin, so the Refugium app, which links both, holds ONE md-codec. md-codec moves
@@ -41,7 +44,7 @@ mnemonic-io-lib = { path = "../mnemonic-io-lib" }
 #
 # NEEDS the root `[patch.crates-io]` miniscript override: md-codec 0.47+ calls
 # APIs that exist only at that rev (`derive_at_index`, `Terminal::SortedMultiA`).
-md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "c8bb97a5e2feccded5f05caf4c79c2458756c1c2" }
+md-codec = { git = "https://github.com/bg002h/descriptor-mnemonic", rev = "c8cde2346114ae461cbeb3be93ed9b46b00cc31b" }
 # §5.4's `address 0:` line -- the executable check the operator makes before
 # anything is engraved. `md_codec::Descriptor::derive_address` is the derivation
 # (md-codec's `derive` feature is default-on and already in this tree), and its
