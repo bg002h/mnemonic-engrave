@@ -974,6 +974,16 @@ without a passphrase. A container with no public section has nothing to check.
   …`, and `seal`'s `load:  picotool load --verify …`) is one shell word: plain paths print as is, a leading `-`
   gets `./`, anything else is single-quoted, and a path that is not UTF-8 or carries a control character or a backslash prints
   the placeholder `<the file you just wrote>`.
+- **Failed writes (bh-me-I4, ruling T6, 2026-11-24).** This holds for every `me` command, not only `sysw`.
+  Every stdout write is flushed and checked. A reader that closes the pipe early only stops the output; the exit
+  code is the command's own. Any other stdout write error (a full disk, a read-only stdout), from a command or
+  from `--help`/`--version`, prints `me: cannot write the output: <error>` as the last stderr line and exits 1;
+  nothing the command would print after it is printed, so no digest card follows a failed write. An `--out` (or
+  `--manifest`) write that fails prints `me: cannot write the output: <path>: <error>` and exits 1. `me` then
+  looks at the path again: if a regular file was there and is still the same file with the same size and
+  modification time, the line ends `. <path> is unchanged.`; if nothing was there and nothing is there now, it
+  ends `. Nothing was written.`; otherwise (a device, or a standard-stream name such as `/dev/stdout`, which is
+  written into the open stream) it says nothing about the disk. These replace exit 2 for a failed write.
 
 Subcommands sit under `sysw` rather than beside `seal` so that no invocation can
 produce a systemwide container while the operator believes they are producing a

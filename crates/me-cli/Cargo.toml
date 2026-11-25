@@ -104,6 +104,12 @@ ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "62b4d9dc9
 mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "eec7910b06b6f6bc528de5731708c29cf7e37acd" }
 rpassword = { version = "7.5.4", optional = true }
 
+# FIX_me_output_integrity S1d: `fcntl(1, F_GETFL)` tells a read-only stdout
+# (`1</dev/null`), which std's stdout reports as a successful write. libc is
+# already in Cargo.lock (0.2.186); this adds only this package's edge to it.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 # F-700 (Refugium plan phase E2): the library carries no CLI crate. clap and
 # rpassword are used only by `src/main.rs`, so they sit behind `cli`, which is
 # on by default so `cargo build`, `cargo install` and the release builds are

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A write the destination refused is no longer reported as success** (bughunt-1119 bh-me-I4, Important;
+  ruling T6). `me sysw pack` and the converter's `--stdout` exited 0, with the pack card and its digest, when
+  stdout was a full disk or a read-only descriptor and nothing reached it; `--hex`, `--base64`, `me bundle`,
+  `me hash` and `me sysw show` panicked (exit 101), also on a closed pipe. Every stdout write is now flushed
+  and checked: a closed pipe only stops the output, any other error prints `me: cannot write the output:
+  <error>` and exits 1, and no card follows. A failed `--out`/`--manifest` write now prints `me: cannot write
+  the output: <path>: <error>` and says whether the file is unchanged, and exits 1 (was exit 2). Through
+  mnemonic-io-lib 0.1.3, `--out /dev/stdout` writes into the open stream and never empties the file behind it.
+- **`me bundle --manifest` can no longer overwrite a plate preview** (bughunt-1119 bh-me-I10, Important).
+  A manifest path that is one of the `--preview` plates (also through a symlink or a hard link) is refused
+  with exit 2 before anything is rendered or written; it used to replace the rendered plate at exit 0.
 - **The packed descriptor keeps an extended key's own depth and child number** (security sweep
   canonical-keeps-xpub-depth, Important; FOLLOWUPS sh2-me-canonical-depth). `me` rebuilt them from
   the origin path, so a key whose depth or child number differed from its path (a depth-4 key

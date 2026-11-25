@@ -12,6 +12,8 @@
 //! | `read_records`, stdin error | 2 → 3 | green, missed |
 //! | `emit`, write failure | 2 → 3 | green, missed |
 //!
+//! Since FIX_me_output_integrity (T6) a failed write is exit 1, not 2; the row now pins that digit.
+//!
 //! **Exit 2 is a usage error; exit 3 is a policy refusal.** They mean different
 //! things to a script — *fix your command line* versus *this tool will never do
 //! that* — and five of `me`'s refusals could swap one for the other undetected.
@@ -139,9 +141,11 @@ fn unreadable_stdin_is_usage_two() {
 
 /// **Site 5 — `emit`'s write failure.** A write that failed is the
 /// environment, not the artifact: a read-only directory, a full disk, a closed
-/// pipe. Here, a parent directory that does not exist.
+/// pipe. Here, a parent directory that does not exist. Since
+/// FIX_me_output_integrity (T6) a failed write is exit 1, not 2; this row pins
+/// that digit.
 #[test]
-fn a_failed_write_is_usage_two() {
+fn a_failed_write_is_exit_one() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("no-such-dir").join("p.bin");
 
@@ -154,12 +158,15 @@ fn a_failed_write_is_usage_two() {
 
     assert_eq!(
         o.status.code(),
-        Some(USAGE),
+        Some(1),
         "a write that failed is the environment, not a policy refusal: {}",
         err_of(&o)
     );
     assert!(
-        err_of(&o).contains("No such file or directory"),
+        err_of(&o).contains(&format!(
+            "me: cannot write the output: {}: No such file or directory (os error 2). Nothing was written.",
+            out.display()
+        )),
         "and it must be THIS refusal: {}",
         err_of(&o)
     );

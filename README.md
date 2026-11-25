@@ -133,7 +133,7 @@ echo "mk1..."                   | me --out wallet.ndef   # raw NDEF to a file
 echo "ms1..."                   | me --stdout
 ```
 
-Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**.
+Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**. If an output cannot be written (a full disk), `me` prints `me: cannot write the output: ...` and exits 1, and an existing `--out` file is left as it was; a reader that closes the pipe early only stops the output.
 
 ### Plate previews
 
@@ -149,7 +149,7 @@ ME_PREVIEW_BIN=/path/to/me-preview me bundle --preview ./plates
 ```
 
 If no sidecar is found, previews are skipped (a note is printed) and the manifest
-is still emitted. A set-but-missing `ME_PREVIEW_BIN` is a hard error (exit 2).
+is still emitted. A set-but-missing `ME_PREVIEW_BIN` is a hard error (exit 2). A `--manifest` that is one of the plate previews is refused (exit 2).
 
 ## Verifying releases
 
