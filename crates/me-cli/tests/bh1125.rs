@@ -117,3 +117,52 @@ fn bh1125_x7_md1_strings_never_returns_a_card_the_decoder_refuses() {
         "md-codec minted a card its own decoder refuses"
     );
 }
+
+/// The `even` mt1 corpus vector (mnemonic-transaction
+/// design/vectors/mt1_v1_vectors.md): a 222-byte signed transaction in 6
+/// chunks of 37 bytes.
+const EVEN_MT1: [&str; 6] = [
+    "mt1p9h8jqq9qqqqgqqqqqqqyqherdfykhhpey6z2cvafak8804qd7g0dl6v8ex9wr2cvky023skwkeud2229sax",
+    "mt1p9h8jqq9qqphgdqqqqqqqq0mllllupyqj6vqqqqqqqqzcqpfsw7ph2rt5w54kt768636cls8zxg0najlzunp",
+    "mt1p9h8jqq9qqzj8yqpnzw4vl2rwffqyqqqqqkqq282yyhc2vavd20hvk94pz39hts3u5s9a0qd8pwskxfl7ju5",
+    "mt1p9h8jqq9qqrqfrnq3qzyp77h37cnxzvwutegzmzy5zrrrfvrpykdfsckvk03dcq6rcjtvlsfcglv7zx43yaz",
+    "mt1p9h8jqq9qqylgpzqmhcwhuupdvnrc82rncvzzdahpgjsdwgu52jd7vmxsve9x3w5ujeqyssuvddxvwqze4ve",
+    "mt1p9h8jqq9qq9qdcc7h75twfxyf340c4sgqzhfdq6xtgt7zhxngpwa049l0z59l6jqcqqqqqq5k5y2ye5nv8yf",
+];
+
+/// E5: `me`'s mt-codec pin predated mnemonic-transaction 95c39a3 (bh-mt-I18),
+/// whose decode refuses a set that is not §3b's balanced split. The `even`
+/// vector re-cut 38/36/37/37/37/37 under its own set id decodes, in index
+/// order, to the true transaction on the old codec -- so `me` confirmed a set
+/// no conforming encoder writes. It must not confirm it.
+#[test]
+fn bh1125_e5_a_set_that_is_not_the_balanced_split_is_not_confirmed() {
+    use mnemonic_engrave::sysw::mt::decode_confirmed;
+    use mt_codec::string_layer::bch::{bytes_to_5bit, encode_5bit_to_string};
+
+    let even: Vec<String> = EVEN_MT1.iter().map(|s| s.to_string()).collect();
+    let (bytes, _) = decode_confirmed(&even).expect("the corpus set confirms");
+    let set = mt_codec::decode(&even).unwrap().chunks[0]
+        .header
+        .chunk_set_id;
+
+    let sizes = [38usize, 36, 37, 37, 37, 37];
+    let mut at = 0;
+    let recut: Vec<String> = sizes
+        .iter()
+        .enumerate()
+        .map(|(i, &n)| {
+            let mut syms = mt_codec::ChunkHeader::new(set, sizes.len(), i)
+                .unwrap()
+                .to_symbols()
+                .to_vec();
+            syms.extend(bytes_to_5bit(&bytes[at..at + n]));
+            at += n;
+            encode_5bit_to_string(&syms).unwrap()
+        })
+        .collect();
+    assert!(
+        decode_confirmed(&recut).is_none(),
+        "me confirmed an mt1 set that is not §3b's balanced split"
+    );
+}

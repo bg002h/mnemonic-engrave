@@ -100,11 +100,11 @@ ms-codec = { git = "https://github.com/bg002h/mnemonic-secret", rev = "62b4d9dc9
 # the point -- keeps `cargo publish mt-codec` DEFERRED. Publishing is
 # irreversible; pinning a rev is not.
 #
-# Pinned to origin/main rather than the local HEAD, and that is checked rather
-# than assumed: `git diff origin/main..HEAD -- crates/mt-codec/` is EMPTY. The
-# six unpushed commits touch `mt-cli` and the spec only, and `me` depends on
-# `mt-codec`. So this needs no push -- an outward-facing act -- to build.
-mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "eec7910b06b6f6bc528de5731708c29cf7e37acd" }
+# Pinned to a commit on mnemonic-transaction's `main`: 9b094e0b, which carries
+# 95c39a3 ("decode refuses a set that is not §3b's balanced split", bh-mt-I18;
+# bug hunt 2026-11-25 E5). Before it, `sysw::mt` could confirm an mt1 set no
+# conforming encoder writes.
+mt-codec = { git = "https://github.com/bg002h/mnemonic-transaction", rev = "9b094e0b0a6b2160e41690bd1ea13aa07d095f1b" }
 rpassword = { version = "7.5.4", optional = true }
 
 # FIX_me_output_integrity S1d: `fcntl(1, F_GETFL)` tells a read-only stdout
