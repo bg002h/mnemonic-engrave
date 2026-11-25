@@ -16,8 +16,11 @@
 #   1. It is `me sysw pack`, NOT `me seal`. SPEC §9 step 2 prescribes
 #      `me seal --plaintext key:... --out demo.uf2`. That does not work, on
 #      either channel:
-#          me: unrecognised record: unrecognized HRP 'key:6' (expected md, mk,
-#          ms, or mt)
+#          me: unrecognised record: unrecognized HRP (expected md, mk, ms,
+#          or mt; the text before the first '1' is not shown, because it may
+#          be secret)
+#      (Before 2026-11-25, bug hunt E1, it echoed the opening characters,
+#      'key:6'.)
 #      `me seal` carries constellation STRINGS (md1/mk1/ms1/mt1) only. Composer
 #      records (`key:`/`hash:`/`now:`) are a `sysw pack` surface. §8 measured the
 #      seal route with mk1 chunks and generalised to `key:` records without

@@ -2405,8 +2405,11 @@ title <T> LF            (one line per seed record, in section order; at least on
   `25abe8e` on 2026-11-22: 0 changed). A lettered
   title is one of the 32 `SEED <L>` / `HOT SEED <L>` forms; its letter is `<L>`.
 - In a v1 payload, and in the public section of any payload, a `text:` record is not a titles record: it is refused
-  as today (v1 encrypted section: §10.2.1's allow-list; public section: `unrecognised record: unrecognized HRP
-  '<the record's opening characters>' (expected md, mk, ms, or mt)` (the exact text for N-public-titles is in §14.9), measured with `seal_public_only` at `aa1bc2db`).
+  as today (v1 encrypted section: §10.2.1's allow-list; public section: `unrecognised record: unrecognized HRP (expected md, mk, ms, or mt; the text before the first '1' is not shown, because it may be secret)` (the exact text for N-public-titles is in §14.9)). *Amended 2026-11-25
+  (bug hunt E1):* the refusal no longer prints the record's opening characters, which may be secret (here, hex of
+  free text); before the amendment it read `unrecognized HRP '<the record's opening characters>' (expected md, mk,
+  ms, or mt)`, measured with `seal_public_only` at `aa1bc2db`. Only a known public HRP that `me` does not take
+  (today `mr`) is still named.
 
 **Seed records and their letters.** The *seed records* of a v2 encrypted section are its records that classify as a
 secret (a `codex32` secret `ms1` or a BIP-39 mnemonic), in section order; the titles record is not one, and neither is
@@ -2599,7 +2602,7 @@ Inputs. The ms1 strings are `ms encode --hex -` (ms 0.20.4) of test entropies: `
 | N-not-hex | `beef` × 6 (6) | — | `A16`, then the record `text:zz` | `NotHex`: `the titles record is not text: followed by lower-case hex of UTF-8`, T-1 |
 | N-mnemonic | `beef` × 6 (6) | — | the BIP-39 mnemonic `abandon` × 11 `about`, titles `SEED A` | `NonMs1Secret(0)`: `titles apply only to ms1 entr records; secret record 0 (records count from 0) is not one`, T-1 (a mnemonic is a secret record, so it is a seed record, but it is not an ms1 entr record: check 8) |
 | N-v1-text | `beef` × 12 (v1) | — | `A16`, titles `SEED A` | `Record { index: 1, .. }` (a v1 `text:` record is a record, §14.4) |
-| N-public-titles | `beef` × 6 (6) | titles `SEED A` | `A16` | `Public(..)`, before any KDF: `record 0 (records count from 0) in the public section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; device `Payload unreadable.` |
+| N-public-titles | `beef` × 6 (6) | titles `SEED A` | `A16` | `Public(..)`, before any KDF: `record 0 (records count from 0) in the public section: unrecognised record: unrecognized HRP (expected md, mk, ms, or mt; the text before the first '1' is not shown, because it may be secret)` (amended 2026-11-25, bug hunt E1: no longer echoes the record's opening characters); device `Payload unreadable.` |
 
 Salts and IVs: V2-A `feed`×8 / `face`×6; V2-B `deaf`×8 / `fade`×6; V2-C `dead`×8 / `beef`×6; every N vector salt
 `0bad`×8 (N-floor-599999: `0bee`×8), IV `0c01`×6 … `0c0a`×6, N-v1-text `0c0b`×6 (N-floor-599999: `0c0c`×6) N-share `0c0d`×6, N-not-hex `0c0e`×6 and N-mnemonic `0c0f`×6. Every
@@ -2732,7 +2735,7 @@ TRACE rows: the Rule cell is binding. Every row names the plausible wrong implem
 | `v2_pw_form_0_keeps_the_checksum` | ME `seal/mod.rs` | `open(V2-C, "zoo" × 12)`: `Passphrase` before any KDF; `open(V2-B, "zoo" × 12)` opens | checksum applied by version, not by `pw_form` | RED (absent) |
 | `v2_wrong_password_fails_authentication` | ME `seal/mod.rs` | `open(V2-A, "beef beef beef beef beef bacon")`: `Authentication`, `wrong password, or this payload has been altered` | partial plaintext on failure | RED (absent) |
 | `v2_titles_refusals` | ME `seal/mod.rs` | each N vector: the variant and Display of §14.9's last column, and `Opened` never returned. Plan leg (owed row `s1br3-nothex-nonms1-vectors`, S1b r3 I-2): N-not-hex gives `NotHex`, `the titles record is not text: followed by lower-case hex of UTF-8`, T-1; N-mnemonic gives `NonMs1Secret(0)`, `titles apply only to ms1 entr records; secret record 0 (records count from 0) is not one`, T-1 | dropping any one of checks 1-10 (one mutant per check; each N vector kills one) | RED (absent) |
-| `v1_open_treats_text_records_as_records` | ME `seal/mod.rs` | `open(N-v1-text, "beef" × 12)`: `Record { index: 1, .. }`, `record 1 (records count from 0) in the secret section: unrecognised record: unrecognized HRP 'text:726566756769756d2d706c6' (expected md, mk, ms, or mt)`; `open(C, "beef" × 12)` opens with `titles: None` | titles parsing applied to v1 | RED (absent) |
+| `v1_open_treats_text_records_as_records` | ME `seal/mod.rs` | `open(N-v1-text, "beef" × 12)`: `Record { index: 1, .. }`, `record 1 (records count from 0) in the secret section: unrecognised record: unrecognized HRP (expected md, mk, ms, or mt; the text before the first '1' is not shown, because it may be secret)` (amended 2026-11-25, bug hunt E1: no longer echoes the record's opening characters); `open(C, "beef" × 12)` opens with `titles: None` | titles parsing applied to v1 | RED (absent) |
 | `seal_v2_refuses_what_open_refuses` | ME `seal/mod.rs` | `seal_v2` with N-count's, N-letter's and N-hot-letter's inputs: `SealError::Titles(..)` with the same inner variant; nothing returned | a writer that emits a payload the reader refuses | RED (absent) |
 | `me_seal_still_writes_version_1` | ME `tests/` (CLI) | `me seal --seal-secret --in <file holding A16 and a newline> --out <tmp>.uf2` exits 0; the first UF2 block's payload (block bytes 32..) has byte 8 = `0x01`, byte 11 = `0x00` | `me seal` switched to v2 | GREEN today; must stay |
 | Go parity rows | fork `seal/` | the Go port (`errors.Is(err, ErrIterations)` for N-floor-599999 included) passes every vector and refusal above from the vendored `seal_v2_vectors.json` with a provenance pin (ME commit) | Go leading Rust | planned in S2 |
