@@ -98,7 +98,7 @@ lines; `emit`'s container or image (`sysw pack`, `sysw wipe` without `--out`); c
   `O_RDWR`) is error EBADF at the first stdout write: `me: cannot write the output: Bad file descriptor (os error
   9)`, exit 1. A verb that writes nothing to stdout never checks. A closed fd 1 (`>&-`) is not detected (fcntl
   fails; md's `md-cli/src/out.rs` `read_only` precedent). Implementation note: `libc` is already in
-  `Cargo.lock` (0.2.186); the builder adds it as a direct unix dependency of me-cli, or reads the same flag
+  `Cargo.lock` (0.2.186); the builder adds it as a direct unix dependency of me-cli (that changes the package's dependency list in `Cargo.lock`: commit the regenerated `Cargo.lock`; no new crate version), or reads the same flag
   another way; the behaviour is what is specified.
 - **S1e** stderr is unchanged by this FIX: `eprintln!` still panics if stderr cannot be written (out of scope;
   section 7 files it).
@@ -111,7 +111,7 @@ wipe --out` keep calling `mnemonic_io_lib::write::write_private` and add no writ
 io-lib's (0.1.3, `crates/mnemonic-io-lib/src/write.rs` on build/io-lib-0.1.3): an absent path or an existing
 regular file (symlinks followed) is written to a sibling temporary and renamed over it, so a failed write leaves an
 existing file's bytes as they were and creates nothing at a new name; a FIFO or device is written directly; a
-standard-stream alias (`/dev/stdout`, `/dev/fd/N`, `/proc/...`, or a symlink into one) is written into the open
+standard-stream alias (`/dev/stdin`/`stdout`/`stderr`, `/dev/fd/N`, `/proc/{self,thread-self,<own pid>}/fd/N`, or a symlink into one; any other `/proc/` path is an ordinary file name) is written into the open
 stream at its own offset and never truncated, so a failed write can leave part of the output after the earlier
 contents.
 
@@ -141,7 +141,7 @@ M`:
   Identity is io-lib's: a regular file by (dev, ino) (so a hard link matches), an absent path by its canonical
   directory plus its name after following M's symlink chain (so `./p/./plate-1.svg`, a dangling symlink to a
   planned plate, and a directory symlink to DIR all match).
-- **P1c** A match refuses: stderr exactly one line, the P1 text (section 3), naming M as typed and the first
+- **P1c** A match refuses: the P1 text (section 3) is the last stderr line and the only line this check prints; lines printed before the check stay (with `b.txt`, MK1_A's `warning: this key card's stamped chunk-set id (12345) was not derived from its content, ...`), naming M as typed and the first
   matching planned plate `P` as `me: rendered plate <n> → <P>` would print it; exit **2**; stdout empty; nothing
   rendered; nothing written; no checklist.
 - **P1d** The check runs whenever `--preview` and `--manifest` are both given, also when no sidecar is installed
@@ -150,6 +150,7 @@ M`:
 - **P1e** A manifest elsewhere in DIR, including at a plate-shaped name no plate takes (`p/plate-9.svg` for a
   3-plate bundle), is not refused (unchanged). A hard link of an existing M at a planned plate name now gets the P1
   text instead of F8's dirty-directory text (both exit 2).
+- **P1f** After `wire_previews` returns with plates rendered, and before the manifest is serialised or written, `me` calls `same_file(Endpoint::Path(M), &rendered)` a second time. `rendered` is the `plate.preview` path of every plate just written. Those files now exist, so identity is (dev, ino) on Unix and the canonical path on Windows. That also catches a name that differs only in letter case on a case-insensitive filesystem, and an alias that appears during rendering. A match prints the P1 text as the last stderr line and exits 2. No manifest is written, and the rendered plates stay (their `rendered plate` lines were printed). No checklist follows.
 - Without `--manifest` the manifest goes to stdout; `> DIR/plate-1.svg` is already refused by F8 (the shell creates
   the file first) and is unchanged.
 
@@ -176,7 +177,7 @@ M`:
 - **Spec, `design/SPEC_me_bundle_phaseB_preview.md` §6, a new bullet at the end (PROPOSED):**
   `- **The manifest is never a plate preview (bh-me-I10, 2026-11-24).** With \`--preview DIR\` and \`--manifest M\`,
   M that is the same file as a plate preview this run would write (the same path, a symlink to it, a path through a
-  symlinked directory, or a hard link) is refused before anything is rendered or written, also when no sidecar is
+  symlinked directory, or a hard link) is refused (before anything is rendered or written when the names show it; otherwise after the plates are rendered and before the manifest is written), also when no sidecar is
   installed: \`me: --manifest <M> is the same file as the plate preview <P>; write the manifest to a new name\`,
   exit 2.`
 - **README (PROPOSED)**, after the sentence ending "all human-readable text goes to **stderr**." (`README.md:136`):
@@ -238,15 +239,16 @@ fixed results are the rules of section 2 (no prototype was built, except o7's io
 | o7_stdio_alias_onto_a_file_names_no_state | s.txt = `OLD BACKUP\n` (11 B); `FSIZE0 me sysw pack --no-passphrase text:6869 --out /dev/stdout >> s.txt` | rc 2, `me: /dev/stdout: File too large (os error 27)`, **s.txt 0 B** | rc 1, LAST == `me: cannot write the output: /dev/stdout: File too large (os error 27)` (no state sentence), s.txt == `OLD BACKUP\n`. **Needs io-lib 0.1.3** |
 | o8_seal_out_missing_dir | `me seal md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3 --out nodir/x.uf2` | rc 2, `me: cannot write nodir/x.uf2: No such file or directory (os error 2)` | rc 1, LAST == `me: cannot write the output: nodir/x.uf2: No such file or directory (os error 2). Nothing was written.`, no `wrote` line |
 | o9_pack_out_device_names_no_state | `me sysw pack --no-passphrase text:6869 --out /dev/full` | rc 2, `me: /dev/full: Operation not permitted (os error 1)` | rc 1, LAST starts `me: cannot write the output: /dev/full: `, ends `)`, no `unchanged`, no `Nothing was written` |
-| p1_manifest_is_svg_plate_refused | p empty; `me bundle --in b.txt --preview p --manifest p/plate-1.svg` | rc 0, p/plate-1.svg starts `{` | rc 2, stderr exactly `me: --manifest p/plate-1.svg is the same file as the plate preview p/plate-1.svg; write the manifest to a new name`, stdout empty, p empty |
-| p2_manifest_is_png_plate_refused | same with `--png` and `--manifest p/plate-1.png` | rc 0, p/plate-1.png starts `{` | rc 2, stderr exactly the P1 text with M = P = `p/plate-1.png`, p empty |
-| p3_manifest_dot_slash_spelling_refused | `--manifest ./p/./plate-1.svg` | rc 0, p/plate-1.svg starts `{` | rc 2, stderr exactly the P1 text with M = `./p/./plate-1.svg`, P = `p/plate-1.svg`, p empty |
-| p4_manifest_symlink_to_plate_refused | `ln -s p/plate-2.svg L`; `--manifest L` | rc 0, p/plate-2.svg starts `{` | rc 2, stderr exactly the P1 text with M = `L`, P = `p/plate-2.svg`, p empty, L still a dangling symlink |
-| p5_manifest_through_dir_symlink_refused | `ln -s p q`; `--manifest q/plate-3.svg` | rc 0, p/plate-3.svg starts `{` | rc 2, stderr exactly the P1 text with M = `q/plate-3.svg`, P = `p/plate-3.svg`, p empty |
-| p6_manifest_hard_link_at_plate_name_refused | m.json = `X`; `ln m.json p/plate-1.svg`; `--manifest m.json` | rc 2, `me: preview directory p already contains plate artifacts (e.g. plate-1.svg); use an empty/clean directory` | rc 2, stderr exactly the P1 text with M = `m.json`, P = `p/plate-1.svg`, m.json == `X` |
-| p7_manifest_on_plate_refused_without_sidecar | `ME_PREVIEW_BIN` unset, no sidecar beside `me`; p9 empty; `--preview p9 --manifest p9/plate-1.svg` | rc 0, `me: preview skipped (install me-preview)`, p9/plate-1.svg starts `{` | rc 2, stderr exactly the P1 text with M = P = `p9/plate-1.svg`, p9 empty |
+| p1_manifest_is_svg_plate_refused | p empty; `me bundle --in b.txt --preview p --manifest p/plate-1.svg` | rc 0, p/plate-1.svg starts `{` | rc 2, LAST == `me: --manifest p/plate-1.svg is the same file as the plate preview p/plate-1.svg; write the manifest to a new name`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, stdout empty, p empty |
+| p2_manifest_is_png_plate_refused | same with `--png` and `--manifest p/plate-1.png` | rc 0, p/plate-1.png starts `{` | rc 2, LAST == the P1 text with M = P = `p/plate-1.png`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, p empty |
+| p3_manifest_dot_slash_spelling_refused | `--manifest ./p/./plate-1.svg` | rc 0, p/plate-1.svg starts `{` | rc 2, LAST == the P1 text with M = `./p/./plate-1.svg`, P = `p/plate-1.svg`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, p empty |
+| p4_manifest_symlink_to_plate_refused | `ln -s p/plate-2.svg L`; `--manifest L` | rc 0, p/plate-2.svg starts `{` | rc 2, LAST == the P1 text with M = `L`, P = `p/plate-2.svg`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, p empty, L still a dangling symlink |
+| p5_manifest_through_dir_symlink_refused | `ln -s p q`; `--manifest q/plate-3.svg` | rc 0, p/plate-3.svg starts `{` | rc 2, LAST == the P1 text with M = `q/plate-3.svg`, P = `p/plate-3.svg`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, p empty |
+| p6_manifest_hard_link_at_plate_name_refused | m.json = `X`; `ln m.json p/plate-1.svg`; `--manifest m.json` | rc 2, `me: preview directory p already contains plate artifacts (e.g. plate-1.svg); use an empty/clean directory` | rc 2, LAST == the P1 text with M = `m.json`, P = `p/plate-1.svg`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, m.json == `X` |
+| p7_manifest_on_plate_refused_without_sidecar | `ME_PREVIEW_BIN` unset, no sidecar beside `me`; p9 empty; `--preview p9 --manifest p9/plate-1.svg` | rc 0, `me: preview skipped (install me-preview)`, p9/plate-1.svg starts `{` | rc 2, LAST == the P1 text with M = P = `p9/plate-1.svg`, and no stderr line contains `rendered plate`, `wrote manifest`, `preview skipped` or `backup needs`, p9 empty |
 | p8_distinct_manifest_still_written | `--preview p --manifest m.json` | rc 0, 3 SVG plates, m.json is the JSON | same (control, GREEN on base) |
 | p9_unplanned_plate_name_still_written | `--preview p --manifest p/plate-9.svg` | rc 0, p/plate-1..3.svg are `<svg/>`, p/plate-9.svg is the JSON | same (control, GREEN on base; P1e) |
+| p10_manifest_alias_made_during_render_refused | the fake sidecar also runs `if [ -n "$FAKE_ALIAS" ] && [ ! -e "$FAKE_ALIAS" ]; then ln -s "$PWD/$out" "$FAKE_ALIAS"; fi` after writing `--out`; `FAKE_ALIAS=M me bundle --in b.txt --preview p --manifest M` | rc 0, p/plate-1.svg starts `{` | rc 2, LAST == `me: --manifest M is the same file as the plate preview p/plate-1.svg; write the manifest to a new name`, p/plate-1.svg == `<svg/>`, stdout empty, no line containing `wrote manifest` or `backup needs` (stands in for the case-folding spelling, which CI cannot reach: CI tests run on Linux only) |
 
 `FSIZE0`, `MD1`, `m.txt`, `b.txt`, `c.bin` and the fake sidecar are as in section 1. The `p` rows set
 `ME_PREVIEW_BIN` to the fake sidecar except p7; a p7 run where a real `me-preview` sits beside the test's `me`
@@ -305,7 +307,7 @@ an input file (Q2, not in this row's keys).
 `bash scripts/fix-me-output-integrity-gate.sh` (the builder commits it with its coordinator catalog row; shape of
 `scripts/fix-me-inspection-fail-open-gate.sh`; every cargo call with `CARGO_BUILD_JOBS=6`): step A builds `me`
 (`--locked`) and runs w1, w2, w4, w5, w11, w12, w14, o1, o2, o7, p1, p4 and p7 as printed commands against the
-built binary (exit code, stdout, the exact stderr line and the file bytes compared to the fixed column; FSIZE0 by
+built binary (exit code, stdout, the exact stderr line (the last stderr line for p1, p4 and p7) and the file bytes compared to the fixed column; FSIZE0 by
 `ulimit`); step B the full nextest suite once to a log (Go on PATH, `ME_REQUIRE_GO=1`, as CI;
 `cargo nextest run --locked --workspace --all-targets --no-fail-fast --build-jobs 6 -j 6`), each named row PASS
 exactly once and no FAIL line; step C doc-tests, `cargo fmt --all --check`, `bash ci/code-docs-check.sh` and both
