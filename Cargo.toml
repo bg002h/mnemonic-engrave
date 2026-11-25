@@ -7,9 +7,11 @@ exclude = ["crates/me-cli/fuzz", "design/measurements/mt-size-probe", "harnesses
 
 [profile.test]
 opt-level = 2
+debug = "line-tables-only"
 
 [profile.dev]
 opt-level = 2
+debug = "line-tables-only"
 
 # md-codec (crates/me-cli/Cargo.toml) is built against rust-miniscript at this
 # rev, not a crates.io release: it carries PR #953 (taptree Display) and #915
