@@ -83,14 +83,34 @@ fn fault(step: Step) -> io::Result<()> {
 /// replaced at the given name only. Symlinks are resolved on the last
 /// component and the target is replaced; the link stays a link. A rename that
 /// fails (cross-device, bind mount, busy) is a refusal: there is no copy
-/// fallback. A FIFO, a device, a directory, a standard-stream alias
-/// (`/dev/stdout`, `/dev/fd/N`, `/proc/...`) or anything the library cannot
-/// classify is written directly, as before: open, `0o600` on the handle,
-/// truncate if a regular file, write.
+/// fallback.
+///
+/// A standard-stream alias (Unix) names a descriptor N of THIS process:
+/// `/dev/stdin`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/N`, or
+/// `/proc/{self,thread-self,<own pid>}/fd/N` (also `.../task/T/fd/N`), spelled
+/// so as given, after its parent is canonicalised, or at a symlink hop. The
+/// bytes go INTO that stream and nothing is truncated: `--out /dev/stdout >> f`
+/// appends to `f`, and `{ a; tool --out /dev/fd/3; b; } 3> f` keeps all three
+/// in order. Descriptor N is duplicated (its own offset and `O_APPEND`);
+/// stdout is flushed and locked first. `0o600` is set on the handle first. A
+/// failed write can leave part of `bytes` in the stream at its offset (after
+/// the earlier contents when it appends). Any
+/// other `/proc/` path (`/proc/self/cwd/x`, another process's `/proc/<pid>/`)
+/// is a file name like any other: a regular file there is replaced ATOMIC.
+///
+/// A FIFO, a device, a directory or anything the library cannot classify is
+/// written directly, as before: open, `0o600` on the handle, truncate if a
+/// regular file, write.
 ///
 /// Errors are the `std::io::Error` of the system call that failed, unmodified.
 /// On non-Unix there are no mode calls and no directory sync.
 pub fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    #[cfg(unix)]
+    {
+        if let Some(fd) = stdio_alias_of(path) {
+            return write_alias(fd, bytes);
+        }
+    }
     match classify(path) {
         Some((final_path, replace)) => write_atomic(&final_path, replace, bytes),
         None => write_direct(path, bytes),
@@ -121,24 +141,157 @@ fn write_direct(path: &Path, bytes: &[u8]) -> io::Result<()> {
     f.write_all(bytes)
 }
 
-/// True when `path` as given is a standard-stream alias (Unix only).
+/// True when `path` as given names a descriptor of this process (Unix only).
 fn is_stdio_alias(path: &Path) -> bool {
     #[cfg(unix)]
     {
-        if path == Path::new("/dev/stdin")
-            || path == Path::new("/dev/stdout")
-            || path == Path::new("/dev/stderr")
-        {
-            return true;
-        }
-        let b = path.as_os_str().as_encoded_bytes();
-        b.starts_with(b"/dev/fd/") || b.starts_with(b"/proc/")
+        alias_fd(path).is_some()
     }
     #[cfg(not(unix))]
     {
         let _ = path;
         false
     }
+}
+
+/// The descriptor `p` names: as given, or as its canonical parent joined with
+/// its name (`/dev/./stdout`, or `d/1` with `d` -> `/dev/fd`).
+#[cfg(unix)]
+fn spelled_alias(p: &Path) -> Option<i32> {
+    if let Some(n) = alias_fd(p) {
+        return Some(n);
+    }
+    let dir = match p.parent() {
+        Some(d) if !d.as_os_str().is_empty() => d,
+        _ => Path::new("."),
+    };
+    // The name itself must exist: `/dev/fd/1/.` has file_name `1` but is
+    // ENOTDIR to the kernel.
+    fs::symlink_metadata(p).ok()?;
+    alias_fd(&fs::canonicalize(dir).ok()?.join(p.file_name()?))
+}
+
+/// The descriptor `path` reaches: itself, or a hop of its last component's
+/// symlink chain (the walk of `resolve_final`, at most 40 hops).
+#[cfg(unix)]
+fn stdio_alias_of(path: &Path) -> Option<i32> {
+    let mut p = path.to_path_buf();
+    for _ in 0..=40 {
+        if let Some(n) = spelled_alias(&p) {
+            return Some(n);
+        }
+        if !fs::symlink_metadata(&p).ok()?.file_type().is_symlink() {
+            return None;
+        }
+        let link = fs::read_link(&p).ok()?;
+        p = if link.is_absolute() {
+            link
+        } else {
+            p.parent()?.join(link)
+        };
+    }
+    None
+}
+
+/// The descriptor of THIS process `p` names as spelled (spec section 3a): 0,
+/// 1, 2 for `/dev/stdin|stdout|stderr`; N for `/dev/fd/N` and `/proc/W/fd/N`,
+/// W = `self`, `thread-self`, this pid, `self/task/T` or `<this pid>/task/T`
+/// (`thread-self` canonicalises to `<pid>/task/<tid>`). N and T are digits,
+/// and the name must exist, so a closed N, another process's thread T or
+/// `/dev/fd/01` is `None`. So is every other path: `/proc/self/cwd/x` and
+/// `/proc/<another pid>/fd/N` are file names.
+#[cfg(unix)]
+fn alias_fd(p: &Path) -> Option<i32> {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let s = p.to_str()?;
+    match s {
+        "/dev/stdin" => return Some(0),
+        "/dev/stdout" => return Some(1),
+        "/dev/stderr" => return Some(2),
+        _ => {}
+    }
+    let n = match s.strip_prefix("/dev/fd/") {
+        Some(n) => n,
+        None => {
+            let (who, n) = s.strip_prefix("/proc/")?.rsplit_once("/fd/")?;
+            let who = match who.split_once("/task/") {
+                Some((w, t)) if digits(t) && w != "thread-self" => w,
+                Some(_) => return None,
+                None => who,
+            };
+            // This process's pid as THIS /proc numbers it: getpid() differs in a
+            // pid namespace that kept its parent's /proc.
+            let me = fs::read_link("/proc/self").ok()?;
+            if who != "self" && who != "thread-self" && Path::new(who) != me {
+                return None;
+            }
+            n
+        }
+    };
+    if !digits(n) {
+        return None;
+    }
+    let fd = n.parse().ok()?;
+    fs::symlink_metadata(p).ok()?;
+    Some(fd)
+}
+
+/// ALIAS: into the stream, never truncated (spec section 3a). Descriptor `fd`
+/// is duplicated, so the write lands at the stream's own offset and keeps its
+/// `O_APPEND`, whatever `fd` is.
+#[cfg(unix)]
+fn write_alias(fd: i32, bytes: &[u8]) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::io::{AsFd, BorrowedFd};
+    // Held across the write: nothing else here prints to stdout in between.
+    let mut out = io::stdout().lock();
+    if fd != 1 {
+        // N may share stdout's file (`>f 3>&1`): what the caller already
+        // printed lands first. A broken stdout is the caller's own print's
+        // error to report, not this write's.
+        let _ = out.flush();
+    }
+    let owned = match fd {
+        0 => io::stdin().as_fd().try_clone_to_owned()?,
+        1 => {
+            // What the caller already printed lands before the bytes.
+            out.flush()?;
+            out.as_fd().try_clone_to_owned()?
+        }
+        2 => io::stderr().as_fd().try_clone_to_owned()?,
+        // SAFETY: `alias_fd` saw `fd`'s name exist, so it was open; the borrow
+        // lives for this one fcntl(F_DUPFD_CLOEXEC), which closes nothing. If
+        // another thread closed `fd` since, the dup fails with EBADF, or, if the
+        // number was reused, duplicates the new file (as std's own stdio would).
+        n => unsafe { BorrowedFd::borrow_raw(n) }.try_clone_to_owned()?,
+    };
+    let mut f = File::from(owned);
+    // A descriptor not open for writing (an input, `/dev/stdin < f`) is
+    // refused before its file's mode is touched.
+    if !open_for_writing(&f)? {
+        return Err(io::Error::from_raw_os_error(9)); // EBADF, as write(2) says
+    }
+    f.set_permissions(fs::Permissions::from_mode(0o600))?;
+    f.write_all(bytes)
+}
+
+/// `fcntl(F_GETFL)` access mode is `O_WRONLY` or `O_RDWR`. Declared against
+/// the C library std already links (no dependency; spec section 2 item 4).
+/// `F_GETFL` = 3, `O_ACCMODE` = 3, `O_RDONLY` = 0 on Linux and Apple.
+#[cfg(unix)]
+fn open_for_writing(f: &File) -> io::Result<bool> {
+    use std::os::raw::c_int;
+    use std::os::unix::io::AsRawFd;
+    extern "C" {
+        fn fcntl(fd: c_int, cmd: c_int, ...) -> c_int;
+    }
+    // SAFETY: the descriptor belongs to `f`, which outlives the call; F_GETFL
+    // takes no third argument and only reads the descriptor's flags.
+    let fl = unsafe { fcntl(f.as_raw_fd(), 3) };
+    if fl < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(fl & 3 != 0)
 }
 
 #[cfg(unix)]
@@ -565,6 +718,34 @@ mod tests {
                 .map(|()| "Ok".to_string()),
             "W17" => write_private(Path::new("/dev/stdout"), b"via").map(|()| "Ok".to_string()),
             "W19" => write_private(Path::new("/dev/fd/1"), b"via").map(|()| "Ok".to_string()),
+            "W20" => write_private(Path::new("/dev/stdout"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W21" => write_private(Path::new("/dev/fd/1"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W22" => {
+                print!("before-the-write|");
+                let r = write_private(Path::new("/dev/stdout"), b"via-dev-stdout\n");
+                println!("after-the-write");
+                r.map(|()| "Ok".to_string())
+            }
+            "W23" | "W24" | "W29" => write_private(&target, b"NEW\n").map(|()| "Ok".to_string()),
+            "W25" => {
+                std::env::set_current_dir(target.parent().unwrap()).unwrap();
+                write_private(
+                    &Path::new("/proc/self/cwd").join(target.file_name().unwrap()),
+                    b"NEW\n",
+                )
+                .map(|()| "Ok".to_string())
+            }
+            "W28" => write_private(Path::new("/dev/fd/3"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W30" => write_private(Path::new("/dev/fd/01"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W31" => write_private(Path::new("/dev/fd/3"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W32" => write_private(&target, b"NEW\n").map(|()| "Ok".to_string()),
+            "W33" => {
+                print!("before-the-write|");
+                let r = write_private(Path::new("/dev/fd/3"), b"NEW\n");
+                println!("after-the-write");
+                r.map(|()| "Ok".to_string())
+            }
+            "W34" => write_private(Path::new("/dev/fd/1/."), b"NEW\n").map(|()| "Ok".to_string()),
             "S7" => Ok(show(same_file(
                 Endpoint::Path(&target),
                 &[Endpoint::Stdout],
@@ -811,7 +992,7 @@ mod tests {
         assert_eq!(names(d.path()), vec![name]);
     }
 
-    /// W17: `/dev/stdout` on a regular file is written directly (same inode).
+    /// W17: `/dev/stdout` on a regular file is written into the open stream (same inode, 0600; since 0.1.3 never truncated, so libtest's own lines may come first).
     #[cfg(unix)]
     #[test]
     fn dev_stdout_on_a_regular_file_is_written_directly() {
@@ -826,12 +1007,12 @@ mod tests {
         let se = String::from_utf8_lossy(&out.stderr).to_string();
         assert!(se.contains("child-result: Ok"), "child stderr: {se}");
         assert_eq!(std::fs::metadata(&f).unwrap().ino(), ino);
-        assert!(std::fs::read(&f).unwrap().starts_with(b"via"));
+        assert!(String::from_utf8_lossy(&std::fs::read(&f).unwrap()).contains("via"));
         assert_eq!(mode_of(&f), 0o600);
         assert_eq!(names(d.path()), vec!["f".to_string()]);
     }
 
-    /// W19: `/dev/fd/1` on a regular file is written directly (same inode).
+    /// W19: `/dev/fd/1` on a regular file is written into the open stream (same inode; never truncated).
     #[cfg(unix)]
     #[test]
     fn dev_fd_1_on_a_regular_file_is_written_directly() {
@@ -849,7 +1030,420 @@ mod tests {
             ino,
             "inode replaced via /dev/fd/1"
         );
-        assert!(std::fs::read(&f).unwrap().starts_with(b"via"));
+        assert!(String::from_utf8_lossy(&std::fs::read(&f).unwrap()).contains("via"));
+    }
+
+    /// W20-W24 helper: `row` with stdout = `f` opened for APPEND (the shell's
+    /// `>>`), `f` holding `EARLIER\n` at 0644; returns `f`'s text.
+    #[cfg(unix)]
+    fn appended_run(row: &str, target: &Path, f: &Path) -> String {
+        std::fs::write(f, b"EARLIER\n").unwrap();
+        std::fs::set_permissions(f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let sf = std::fs::OpenOptions::new().append(true).open(f).unwrap();
+        let out = run_child(row, target, Stdio::from(sf), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        String::from_utf8_lossy(&std::fs::read(f).unwrap()).to_string()
+    }
+
+    /// W20: `--out /dev/stdout >> f` keeps f's earlier lines (triage-io-lib-dev-stdout-append).
+    #[cfg(unix)]
+    #[test]
+    fn dev_stdout_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let s = appended_run("W20", &f, &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(mode_of(&f), 0o600);
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W21: the same through `/dev/fd/1`.
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_1_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let s = appended_run("W21", &f, &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W22: `{ printf before; tool --out /dev/stdout; echo after; } > f` keeps all three, in order.
+    #[cfg(unix)]
+    #[test]
+    fn dev_stdout_keeps_the_stream_order_in_a_redirected_file() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let sf = std::fs::File::create(&f).unwrap();
+        let out = run_child("W22", &f, Stdio::from(sf), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
+        let at = |m: &str| {
+            s.find(m)
+                .unwrap_or_else(|| panic!("{m:?} missing from {s:?}"))
+        };
+        assert!(at("before-the-write|") < at("via-dev-stdout\n"), "{s:?}");
+        assert!(at("via-dev-stdout\n") < at("after-the-write\n"), "{s:?}");
+    }
+
+    /// W23: a symlink to `/dev/stdout` is the alias, not a file to truncate.
+    #[cfg(unix)]
+    #[test]
+    fn a_link_to_dev_stdout_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let l = d.path().join("l");
+        std::os::unix::fs::symlink("/dev/stdout", &l).unwrap();
+        let s = appended_run("W23", &l, &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert!(std::fs::symlink_metadata(&l)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(names(d.path()), vec!["f".to_string(), "l".to_string()]);
+    }
+
+    /// W24: `d/1` with `d` -> `/dev/fd` is the alias it spells, not ATOMIC over stdout's file.
+    #[cfg(unix)]
+    #[test]
+    fn a_name_under_a_link_to_dev_fd_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let fd = d.path().join("fd");
+        std::os::unix::fs::symlink("/dev/fd", &fd).unwrap();
+        let s = appended_run("W24", &fd.join("1"), &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(names(d.path()), vec!["f".to_string(), "fd".to_string()]);
+    }
+
+    /// W25-W27 helper: `f` holds `OLD_CARD` at 0644; returns its inode.
+    #[cfg(target_os = "linux")]
+    fn old_card(f: &Path) -> u64 {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::write(f, OLD_CARD).unwrap();
+        std::fs::set_permissions(f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::metadata(f).unwrap().ino()
+    }
+
+    /// W25-W27 helper: `f` is exactly the new bytes, 0600, and a new inode (temp+rename).
+    #[cfg(target_os = "linux")]
+    fn assert_replaced(f: &Path, ino: u64) {
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(
+            String::from_utf8_lossy(&std::fs::read(f).unwrap()),
+            "NEW\n",
+            "not replaced by exactly the new bytes"
+        );
+        assert_eq!(mode_of(f), 0o600);
+        assert_ne!(
+            std::fs::metadata(f).unwrap().ino(),
+            ino,
+            "written in place, not temp+rename"
+        );
+    }
+
+    /// W25: a `/proc/self/cwd/...` path is a file name, not an alias: ATOMIC.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_proc_self_cwd_path_onto_a_file_is_replaced_atomically() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let ino = old_card(&f);
+        let out = run_child("W25", &f, Stdio::null(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        assert_replaced(&f, ino);
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W26: a `/proc/self/root/...` path is a file name, not an alias: ATOMIC.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_proc_self_root_path_onto_a_file_is_replaced_atomically() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let ino = old_card(&f);
+        write_private(
+            &Path::new("/proc/self/root").join(f.strip_prefix("/").unwrap()),
+            b"NEW\n",
+        )
+        .unwrap();
+        assert_replaced(&f, ino);
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W27: a link to a `/proc/self/root/...` path is walked to the real file, which is replaced.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_link_to_a_proc_self_root_path_is_written_through_and_stays_a_link() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let l = d.path().join("l");
+        let ino = old_card(&f);
+        std::os::unix::fs::symlink(
+            Path::new("/proc/self/root").join(f.strip_prefix("/").unwrap()),
+            &l,
+        )
+        .unwrap();
+        write_private(&l, b"NEW\n").unwrap();
+        assert_replaced(&f, ino);
+        assert!(std::fs::symlink_metadata(&l)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(names(d.path()), vec!["f".to_string(), "l".to_string()]);
+    }
+
+    /// W28: `{ echo a >&3; tool --out /dev/fd/3; echo b >&3; } 3> f` keeps all three, in order.
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_3_keeps_the_stream_order_in_a_redirected_file() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, b"EARLIER\n").unwrap();
+        std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg("{ echo a >&3; \"$0\" --exact write::tests::child --nocapture; echo b >&3; } 3>\"$1\"")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W28")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        assert_eq!(
+            String::from_utf8_lossy(&std::fs::read(&f).unwrap()),
+            "a\nNEW\nb\n"
+        );
+        assert_eq!(mode_of(&f), 0o600);
+    }
+
+    /// W29: `d/1` with `d` -> `/proc/thread-self/fd` is the alias it spells (guard).
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_name_under_a_link_to_proc_thread_self_fd_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let fd = d.path().join("fd");
+        std::os::unix::fs::symlink("/proc/thread-self/fd", &fd).unwrap();
+        let s = appended_run("W29", &fd.join("1"), &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(names(d.path()), vec!["f".to_string(), "fd".to_string()]);
+    }
+
+    /// W30: a descriptor name the kernel lacks (`/dev/fd/01`) is not an alias: the normal path's ENOENT.
+    #[cfg(unix)]
+    #[test]
+    fn a_descriptor_name_the_kernel_lacks_is_refused() {
+        let out = run_child("W30", Path::new(""), Stdio::piped(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(
+            se.contains("child-result: Err raw_os_error=2"),
+            "child stderr: {se}"
+        );
+        assert!(!String::from_utf8_lossy(&out.stdout).contains("NEW"));
+    }
+
+    /// W31: a descriptor open read-only (`3< f`) is refused before its file's mode changes.
+    #[cfg(unix)]
+    #[test]
+    fn a_read_only_descriptor_is_refused_before_its_mode_changes() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, OLD_CARD).unwrap();
+        std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg("\"$0\" --exact write::tests::child --nocapture 3<\"$1\"")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W31")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(
+            se.contains("child-result: Err raw_os_error=9"),
+            "child stderr: {se}"
+        );
+        assert_eq!(std::fs::read(&f).unwrap(), OLD_CARD);
+        assert_eq!(mode_of(&f), 0o644, "an input's mode was changed");
+    }
+
+    /// W32: in a pid namespace that kept its parent's `/proc` (getpid() is 1,
+    /// `/proc/self` is the outer pid), `d/1` with `d` -> `/dev/fd` is still the
+    /// alias. Needs unprivileged user namespaces; says SKIP when they are off.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_name_under_a_link_to_dev_fd_in_a_pid_namespace_keeps_its_earlier_lines() {
+        let ok = Command::new("unshare")
+            .args(["-Urpf", "--kill-child", "true"])
+            .status()
+            .is_ok_and(|s| s.success());
+        if !ok {
+            eprintln!("W32 SKIP: unshare -Urpf unavailable");
+            return;
+        }
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let fd = d.path().join("fd");
+        std::os::unix::fs::symlink("/dev/fd", &fd).unwrap();
+        std::fs::write(&f, b"EARLIER\n").unwrap();
+        let out = Command::new("unshare")
+            .args(["-Urpf", "--kill-child", "sh", "-c"])
+            .arg("\"$0\" --exact write::tests::child --nocapture >>\"$1\"")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W32")
+            .env("MNEMONIC_IO_LIB_TARGET", fd.join("1"))
+            .stdin(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+    }
+
+    /// W33: `tool --out /dev/fd/3 >f 3>&1` keeps the stream order: stdout is flushed for every N.
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_3_onto_stdouts_file_keeps_the_stream_order() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg("\"$0\" --exact write::tests::child --nocapture >\"$1\" 3>&1")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W33")
+            .stdin(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
+        assert!(
+            s.contains("before-the-write|NEW\nafter-the-write"),
+            "order lost: {s:?}"
+        );
+    }
+
+    /// W34: `/dev/fd/1/.`, a name the kernel lacks (ENOTDIR), is not an alias.
+    #[cfg(unix)]
+    #[test]
+    fn a_descriptor_name_with_a_trailing_dot_is_refused() {
+        let out = run_child("W34", Path::new(""), Stdio::piped(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(
+            se.contains("child-result: Err raw_os_error=20"),
+            "child stderr: {se}"
+        );
+        assert!(!String::from_utf8_lossy(&out.stdout).contains("NEW"));
+    }
+
+    /// W35: another process's `/proc/<pid>/fd/N` is a file name, never this process's descriptor N.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn another_processs_descriptor_path_is_not_an_alias() {
+        use std::io::{BufRead, BufReader};
+        use std::os::unix::io::AsRawFd;
+        let d = tempfile::tempdir().unwrap();
+        let (f, g) = (d.path().join("f"), d.path().join("g"));
+        std::fs::write(&f, OLD_CARD).unwrap();
+        let h = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&g)
+            .unwrap();
+        let n = h.as_raw_fd();
+        assert!(n <= 9, "sh redirects only 0-9, got {n}");
+        let mut c = Command::new("sh")
+            .arg("-c")
+            .arg(format!("exec {n}>>\"$0\"; echo ready >&2; read x"))
+            .arg(&f)
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(c.stderr.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        assert_eq!(line, "ready\n");
+        let r = write_private(Path::new(&format!("/proc/{}/fd/{n}", c.id())), b"NEW\n");
+        let _ = c.kill();
+        let _ = c.wait();
+        assert!(r.is_ok(), "{r:?}");
+        assert_eq!(
+            std::fs::read(&g).unwrap(),
+            b"",
+            "this process's fd {n} was written"
+        );
+        assert_eq!(
+            std::fs::read(&f).unwrap(),
+            b"NEW\n",
+            "the file behind the name was not replaced"
+        );
+    }
+
+    /// W36: write_private through `/dev/fd/N` leaves the caller's descriptor open (a dup, never a close).
+    #[cfg(unix)]
+    #[test]
+    fn an_alias_write_leaves_the_callers_descriptor_open() {
+        use std::os::unix::io::AsRawFd;
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let h = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&f)
+            .unwrap();
+        let n = h.as_raw_fd();
+        let mut spellings = vec![format!("/dev/fd/{n}")];
+        #[cfg(target_os = "linux")]
+        {
+            let pid = std::process::id();
+            let ts = std::fs::read_link("/proc/thread-self").unwrap();
+            spellings.extend([
+                format!("/proc/self/fd/{n}"),
+                format!("/proc/thread-self/fd/{n}"),
+                format!("/proc/{pid}/fd/{n}"),
+                format!(
+                    "/proc/self/task/{}/fd/{n}",
+                    ts.file_name().unwrap().to_str().unwrap()
+                ),
+                format!("/proc/{}/fd/{n}", ts.display()),
+            ]);
+        }
+        let mut want = Vec::new();
+        for p in spellings {
+            write_private(Path::new(&p), p.as_bytes()).unwrap();
+            want.extend_from_slice(p.as_bytes());
+            assert!(
+                h.metadata().is_ok(),
+                "descriptor closed by write_private via {p}"
+            );
+            assert_eq!(std::fs::read(&f).unwrap(), want, "{p}");
+        }
     }
 
     /// **THE GATE, and the pre-existing target is the whole of it.**
