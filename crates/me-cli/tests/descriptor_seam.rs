@@ -43,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "683ccd3df8d02c0af977b5f51e6ec6730e7aee0c1b67aa902bb6136cf820e5cd";
+    "e2a2308d30149a5231c81df17f7063b9031f3d50bd52d7d9ec579e1d960596b6";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -917,7 +917,11 @@ fn the_md1_column_matches_the_representability_rules() {
                     mnemonic_engrave::descriptor::Path::Md1,
                 )
                 .is_ok()
-                    && mnemonic_engrave::descriptor::admit::md1_offenders(p).is_empty()
+                    // EVERY md1 refusal, not only §5.3's `md1_offenders`: review
+                    // r2 of the 2026-11-25 bug hunt found E3's new
+                    // `md1-origin-mismatch` row falsifying this column while the
+                    // narrower predicate still passed.
+                    && mnemonic_engrave::descriptor::admit::md1_refusals(p, "", "").is_empty()
             }
             Err(_) => false,
         };
