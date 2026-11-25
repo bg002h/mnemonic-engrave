@@ -869,7 +869,16 @@ fn clap_exit(e: &clap::Error) -> i32 {
     if e.use_stderr() || std::io::stdout().is_terminal() {
         let _ = e.print();
     } else {
-        stdout_out::write(e.render().to_string().as_bytes());
+        // Colour exactly when clap's own `print()` would colour a pipe:
+        // CLICOLOR_FORCE set (and not 0) and NO_COLOR unset.
+        let force = std::env::var_os("CLICOLOR_FORCE").is_some_and(|v| !v.is_empty())
+            && std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
+        let text = if force {
+            e.render().ansi().to_string()
+        } else {
+            e.render().to_string()
+        };
+        stdout_out::write(text.as_bytes());
     }
     e.exit_code()
 }
