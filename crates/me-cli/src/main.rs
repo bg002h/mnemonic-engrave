@@ -2201,11 +2201,11 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // is the "none given" case, and the DEFAULT is to generate rather
             // than to leave a payload unprotected by omission.
             let generated;
-            let passphrase: Option<String> = if !sealing {
+            let passphrase: Option<Zeroizing<String>> = if !sealing {
                 None
             } else if *passphrase_ask {
                 match rpassword::prompt_password("passphrase: ") {
-                    Ok(p) => Some(p),
+                    Ok(p) => Some(Zeroizing::new(p)),
                     Err(e) => {
                         eprintln!("me: reading the passphrase: {e}");
                         return EXIT_USAGE;
@@ -2222,7 +2222,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                         eprintln!();
                         eprintln!("    {}", &*generated);
                         eprintln!();
-                        Some((*generated).clone())
+                        Some(container_passphrase(&generated))
                     }
                     Err(e) => {
                         eprintln!("me: {e:?}");
@@ -2272,7 +2272,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
 
             // The strength line is printed whatever the choice: the operator is
             // told, never blocked (spec decision 8).
-            report_strength(passphrase.as_deref(), &recs);
+            report_strength(passphrase.as_ref().map(|p| p.as_str()), &recs);
             // `[mdmk-decode]` (§12.6). Indices are the OPERATOR'S — argv order,
             // or the order of `--in`'s lines — because that is the list they can
             // act on. Nothing here refuses: §13 D6 demoted the refusal, and a
@@ -2285,7 +2285,12 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // engraves such a payload through its other doors.
             report_kit(&recs, &unconfirmed);
 
-            let blob = match sysw::pack_with(recs, passphrase.as_deref(), *iterations, admission) {
+            let blob = match sysw::pack_with(
+                recs,
+                passphrase.as_ref().map(|p| p.as_str()),
+                *iterations,
+                admission,
+            ) {
                 Ok(b) => b,
                 Err(e) => {
                     // On the WRITE path "malformed container" is the wrong
@@ -3360,16 +3365,19 @@ fn report_preimage_admission(records: &[String]) {
 /// Deriving is what makes §8.2.3's phrase half possible at all, and it is the
 /// reason the check lives on the host: PBKDF2 at 100,000 iterations is
 /// milliseconds here and about ten seconds on the SH2.
-fn preimage_of(record: &str, class: mnemonic_engrave::sysw::record::Class) -> Option<[u8; 32]> {
+fn preimage_of(
+    record: &str,
+    class: mnemonic_engrave::sysw::record::Class,
+) -> Option<Zeroizing<[u8; 32]>> {
     use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
     use mnemonic_engrave::sysw::record::Class as C;
     match class {
         C::Phrase => match parse(record) {
-            Some(Ok(ComposerRecord::Phrase(p))) => Some(*p.method.preimage(p.phrase.as_bytes())),
+            Some(Ok(ComposerRecord::Phrase(p))) => Some(p.method.preimage(p.phrase.as_bytes())),
             _ => None,
         },
         C::Preimage => match ms_codec::decode(record.trim()) {
-            Ok((_, ms_codec::Payload::Preimage(x))) => Some(*x),
+            Ok((_, ms_codec::Payload::Preimage(x))) => Some(Zeroizing::new(*x)),
             _ => None,
         },
         _ => None,
@@ -3666,14 +3674,22 @@ fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
     Ok(split_record_stream(&read_stdin_raw()?))
 }
 
+/// The container passphrase made from the generated one: a `Zeroizing` clone,
+/// never a bare `String` (s3-gen-clone).
+fn container_passphrase(generated: &Zeroizing<String>) -> Zeroizing<String> {
+    generated.clone()
+}
+
 /// Remove exactly one U+FEFF at the very start of a stream's raw text
 /// (FIX_me_admission_canonical §2 item 3). Nothing else is removed: a second
 /// one, or one later, stays and is refused by the existing `Unrecognised` text.
-fn strip_leading_bom(raw: String) -> String {
-    match raw.strip_prefix('\u{feff}') {
-        Some(rest) => rest.to_string(),
-        None => raw,
+fn strip_leading_bom(mut raw: String) -> String {
+    // Drained IN PLACE: `rest.to_string()` would copy the text and drop the
+    // original allocation unzeroized (me53-bom-copy).
+    if raw.starts_with('\u{feff}') {
+        raw.drain(..'\u{feff}'.len_utf8());
     }
+    raw
 }
 
 /// The stdin channel's bytes, before any splitting. Split out so the record
@@ -4205,6 +4221,37 @@ mod tests {
     }
 
     use super::strip_leading_bom;
+
+    /// me53-bom-copy: the BOM is removed IN PLACE. A copy (`to_string`) leaves
+    /// the original allocation behind, dropped unzeroized; the same allocation
+    /// coming back proves nothing was copied.
+    #[test]
+    fn me53_bom_copy_strips_in_place_without_reallocating() {
+        let raw = String::from("\u{feff}secret words");
+        let before = raw.as_ptr();
+        let out = strip_leading_bom(raw);
+        assert_eq!(out, "secret words");
+        assert_eq!(out.as_ptr(), before, "the BOM strip copied the text");
+    }
+
+    /// sweep-engrave-preimage-copies-unzeroized: `preimage_of` hands back the
+    /// preimage still inside its `Zeroizing` wrapper, never a bare array.
+    #[test]
+    fn preimage_copies_unzeroized_preimage_of_returns_zeroizing() {
+        use mnemonic_engrave::sysw::record::Class;
+        let got: Option<zeroize::Zeroizing<[u8; 32]>> =
+            super::preimage_of("phrase:7368613235362c636f727265637420686f727365206261747465727920737461706c65", Class::Phrase);
+        assert!(got.is_some());
+    }
+
+    /// s3-gen-clone: the container passphrase made from the generated one is
+    /// itself `Zeroizing`.
+    #[test]
+    fn s3_gen_clone_container_passphrase_stays_zeroizing() {
+        let generated = zeroize::Zeroizing::new(String::from("one two three"));
+        let got: zeroize::Zeroizing<String> = super::container_passphrase(&generated);
+        assert_eq!(&*got, "one two three");
+    }
     use super::{is_plate_artifact, shell_word, write_block, PayloadKind, WriteBlock};
     // `destination` and `Destination` are the library half's now, and only
     // this test module consults them directly.
