@@ -286,23 +286,12 @@ fn the_guard_refuses_nothing_it_should_not() {
 }
 
 /// **WHAT THE GUARD CANNOT REACH, asserted so the residue is a fact and not a
-/// hope.** Both are consequences of asking a classifier rather than
-/// prefix-matching, and the alternative is worse in both cases.
+/// hope.** It is a consequence of asking a classifier rather than
+/// prefix-matching, and the alternative is worse. (The unquoted twelve-word
+/// phrase left this list: see `an_unquoted_run_of_twelve_words_is_refused`.)
 #[test]
-fn the_two_shapes_out_of_reach_are_pinned() {
+fn the_path_shape_out_of_reach_is_pinned() {
     let dir = tempfile::tempdir().unwrap();
-
-    // An UNQUOTED twelve-word mnemonic is twelve tokens, each `Unknown`. The
-    // guard does not refuse it; only the quoted, single-token phrase is in its
-    // reach. Refusing per-word would refuse `me bundle`.
-    let mut args = vec!["sysw", "pack", "--no-passphrase"];
-    args.extend(MNEMONIC.split(' '));
-    let o = run(&args);
-    assert!(
-        !is_guard_refusal(&o),
-        "the guard is not expected to reach an unquoted phrase; if it now does, \
-         check what else a per-word rule started refusing"
-    );
 
     // F-267: a secret embedded in a PATH is out of reach, because it IS a
     // filename -- and refusing it would refuse every legitimate path.
@@ -324,4 +313,61 @@ fn the_two_shapes_out_of_reach_are_pinned() {
         "F-267 residue: a path carrying a secret is still read: {}",
         stderr_of(&o)
     );
+}
+
+/// sweep-engrave-unquoted-phrase-argv (architect-secret-mn-decisions-1124 E6):
+/// twelve or more CONSECUTIVE argv tokens that are each a word of the shipped
+/// BIP-39 list (after trim and lowercase) are refused. The refusal names the
+/// positions and never a word.
+#[test]
+fn an_unquoted_run_of_twelve_words_is_refused() {
+    for surface in [
+        &["sysw", "pack", "--no-passphrase"][..],
+        &["bundle"][..],
+        &["seal"][..],
+    ] {
+        let mut args: Vec<&str> = surface.to_vec();
+        let first = args.len() + 1;
+        args.extend(MNEMONIC.split(' '));
+        let o = run(&args);
+        assert!(is_guard_refusal(&o), "{surface:?}: {}", stderr_of(&o));
+        let err = stderr_of(&o);
+        // `bundle` is itself a BIP-39 word, so on that surface the run starts at
+        // the subcommand: the ruling counts every token.
+        let (first, last) = if surface[0] == "bundle" {
+            (1, 13)
+        } else {
+            (first, first + 11)
+        };
+        assert!(
+            err.contains(&format!("arguments {first} through {last} on ARGV")),
+            "positions only: {err}"
+        );
+        assert!(!err.contains("abandon"), "a word was echoed: {err}");
+    }
+    // Normalisation is the guard's own: case and surrounding space do not hide a word.
+    let mut args = vec!["sysw", "pack", "--no-passphrase"];
+    let spelled: Vec<String> = MNEMONIC
+        .split(' ')
+        .map(|w| format!(" {}", w.to_uppercase()))
+        .collect();
+    args.extend(spelled.iter().map(String::as_str));
+    assert!(is_guard_refusal(&run(&args)));
+}
+
+/// The window never refuses a single word or a short run: `bundle` and `help`
+/// are BIP-39 words and subcommands, and eleven words are not a phrase.
+#[test]
+fn a_run_shorter_than_twelve_words_is_not_refused() {
+    let mut args = vec!["sysw", "pack", "--no-passphrase"];
+    args.extend(MNEMONIC.split(' ').take(11));
+    assert!(!is_guard_refusal(&run(&args)));
+    // A non-word in the middle splits the run into two short ones.
+    let mut args = vec!["sysw", "pack", "--no-passphrase"];
+    args.extend(MNEMONIC.split(' ').take(6));
+    args.push("--no-such-word");
+    args.extend(MNEMONIC.split(' ').take(6));
+    assert!(!is_guard_refusal(&run(&args)));
+    assert!(!is_guard_refusal(&run(&["bundle"])));
+    assert!(!is_guard_refusal(&run(&["help"])));
 }

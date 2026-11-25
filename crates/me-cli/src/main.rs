@@ -587,6 +587,67 @@ fn argv_surface(argv: &[String]) -> String {
     s
 }
 
+/// The refusal text, shared by the single-token and the unquoted-run shapes.
+/// `subject` names the position(s) and ends in the verb; `what` names the material.
+fn argv_refusal(argv: &[String], subject: &str, what: &str) -> String {
+    let purge = mnemonic_engrave::io::remedy::history_purge_block(&argv_surface(argv));
+    format!(
+        "{subject} {what}.\n      \
+         Refused BEFORE the command line was parsed; nothing was read and \
+         nothing was written.\n      \
+         argv is public: /proc, `ps` and your shell history all keep a \
+         copy, so the argument parser must not be allowed to echo it \
+         back in an error message.\n      \
+         Use a private channel instead:\n      \
+         \x20   me sysw pack --in records.txt --out p.bin\n\n      \
+         {purge}\n      \
+         If argv is safe where you are -- a single-user air-gapped box, \
+         an amnesic Tails session -- `me sysw pack --allow-argv-secret` \
+         proceeds. That flag is declared on `sysw pack` alone, so it \
+         does not buy past this refusal anywhere else."
+    )
+}
+
+/// The shortest run of consecutive argv tokens taken as an unquoted phrase.
+const ARGV_PHRASE_RUN: usize = 12;
+
+/// The first run of at least [`ARGV_PHRASE_RUN`] consecutive tokens that are each
+/// a word of the English BIP-39 list (the only list this build ships), after
+/// the guard's trim and lowercase. Returns the first and last argv positions.
+fn argv_word_run(argv: &[String]) -> Option<(usize, usize)> {
+    let mut start = 0usize;
+    let mut len = 0usize;
+    for (i, t) in argv.iter().enumerate() {
+        let is_word = bip39::Language::English
+            .find_word(&t.trim().to_ascii_lowercase())
+            .is_some();
+        if is_word {
+            if len == 0 {
+                start = i;
+            }
+            len += 1;
+            if len >= ARGV_PHRASE_RUN {
+                // Extend to the end of the run.
+                let mut end = i;
+                while let Some(n) = argv.get(end + 1) {
+                    if bip39::Language::English
+                        .find_word(&n.trim().to_ascii_lowercase())
+                        .is_some()
+                    {
+                        end += 1;
+                    } else {
+                        break;
+                    }
+                }
+                return Some((start, end));
+            }
+        } else {
+            len = 0;
+        }
+    }
+    None
+}
+
 /// **THE PRE-PARSER argv GUARD (§6d, F-266).** Returns the refusal, or `None`.
 ///
 /// **It runs before `Cli::parse()`, and that ordering is NORMATIVE.** A guard
@@ -608,9 +669,10 @@ fn argv_surface(argv: &[String]) -> String {
 /// knowingly.** A classifier DECODES rather than prefix-matches, so
 /// `mt1-2026-08-23-transfer.txt` is a filename and is not refused, and a single
 /// word is not a mnemonic — which is what keeps `bundle` and `help`, both BIP-39
-/// words, from being refused as subcommands. The cost: an UNQUOTED twelve-word
-/// mnemonic is twelve tokens, each `Unknown`, so the guard does not reach it.
-/// Only the quoted, single-token phrase is in its reach. A secret embedded in a
+/// words, from being refused as subcommands. An UNQUOTED twelve-word
+/// mnemonic is twelve tokens, each `Unknown`, so the classifier does not reach
+/// it; `argv_word_run` does (a window of twelve or more consecutive BIP-39
+/// words, never a single word). A secret embedded in a
 /// PATH is out of reach for the same reason and is filed as **F-267**, not
 /// papered over: `--in /tmp/<ms1>.txt` classifies as `Unknown` because it IS a
 /// filename, and refusing it would refuse every legitimate path.
@@ -622,6 +684,20 @@ fn argv_surface(argv: &[String]) -> String {
 fn argv_secret_guard(argv: &[String]) -> Option<String> {
     if argv_override_applies(argv) {
         return None;
+    }
+    // E6: twelve or more consecutive tokens that are each a word of the shipped
+    // BIP-39 list (the same trim + lowercase as `argv_candidates`) are an
+    // unquoted phrase. A window, never a single word, so `bundle` and `help`
+    // are untouched. Positions are named; no word ever is.
+    if let Some((first, last)) = argv_word_run(argv) {
+        return Some(argv_refusal(
+            argv,
+            &format!(
+                "arguments {first} through {last} on ARGV (arguments count from 0, and 0 is \
+                 `me` itself) are"
+            ),
+            "SECRET key material. It can spend everything derived from it, forever",
+        ));
     }
     for (i, token) in argv.iter().enumerate() {
         for cand in argv_candidates(token) {
@@ -650,22 +726,10 @@ fn argv_secret_guard(argv: &[String]) -> Option<String> {
                 }
                 _ => "SECRET key material. It can spend everything derived from it, forever",
             };
-            let purge = mnemonic_engrave::io::remedy::history_purge_block(&argv_surface(argv));
-            return Some(format!(
-                "argument {i} on ARGV (arguments count from 0, and 0 is `me` \
-                 itself) is {what}.\n      \
-                 Refused BEFORE the command line was parsed; nothing was read and \
-                 nothing was written.\n      \
-                 argv is public: /proc, `ps` and your shell history all keep a \
-                 copy, so the argument parser must not be allowed to echo it \
-                 back in an error message.\n      \
-                 Use a private channel instead:\n      \
-                 \x20   me sysw pack --in records.txt --out p.bin\n\n      \
-                 {purge}\n      \
-                 If argv is safe where you are -- a single-user air-gapped box, \
-                 an amnesic Tails session -- `me sysw pack --allow-argv-secret` \
-                 proceeds. That flag is declared on `sysw pack` alone, so it \
-                 does not buy past this refusal anywhere else."
+            return Some(argv_refusal(
+                argv,
+                &format!("argument {i} on ARGV (arguments count from 0, and 0 is `me` itself) is"),
+                what,
             ));
         }
     }
