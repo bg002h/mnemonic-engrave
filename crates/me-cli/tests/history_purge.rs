@@ -163,3 +163,99 @@ fn history_d_is_named_as_a_warning_and_offered_as_no_recipe() {
         );
     }
 }
+
+// ---- bash (sweep-engrave-bash-purge-untested) -------------------------------
+//
+// The bash recipe was printed for as long as the zsh one and only the zsh one
+// was ever RUN. Same shape as above: a pty, an interactive shell, the shell
+// exits before the file is read, and a control that purges nothing.
+
+fn bash_bin() -> String {
+    let p = "/usr/bin/bash";
+    assert!(
+        std::path::Path::new(p).exists(),
+        "{p} is required: the emitted bash recipe must be RUN under a real interactive bash. \
+         This is deliberately a FAILURE and not a skip."
+    );
+    p.to_string()
+}
+
+/// Plant `COMMAND SECRET` in an interactive bash's history, run `recipe`, let
+/// the shell exit, and return `HISTFILE`. bash writes its in-memory history
+/// at exit only with `histappend`/default overwrite, so the file is read AFTER
+/// the shell has exited, as for zsh.
+fn bash_history_after(recipe: &str) -> String {
+    let dir = tempfile::tempdir().unwrap();
+    let d = dir.path();
+    let hist = d.join("histfile");
+    std::fs::write(&hist, "").unwrap();
+    let rc = d.join("bashrc");
+    std::fs::write(
+        &rc,
+        format!(
+            "HISTFILE='{}'\nHISTSIZE=1000\nHISTFILESIZE=1000\nPROMPT_COMMAND=\nset -o history\n",
+            hist.display()
+        ),
+    )
+    .unwrap();
+    let input = d.join("in.bash");
+    std::fs::write(&input, format!("{COMMAND} {SECRET}\n{recipe}\nexit\n")).unwrap();
+
+    let st = Command::new("script")
+        .arg("-qec")
+        .arg(format!(
+            "{} --noprofile --rcfile '{}' -i < '{}'",
+            bash_bin(),
+            rc.display(),
+            input.display()
+        ))
+        .arg("/dev/null")
+        .env("HOME", d)
+        .env_remove("HISTFILE")
+        .output()
+        .expect("`script` (util-linux) is required to give bash a pty");
+    assert!(
+        st.status.code().is_some(),
+        "the bash session was killed rather than exiting; nothing can be concluded"
+    );
+    std::fs::read_to_string(&hist).unwrap()
+}
+
+/// The control: with no purge the planted secret must reach disk.
+#[test]
+fn the_bash_harness_records_history_at_all() {
+    let h = bash_history_after("true nothing-was-purged-here");
+    assert!(
+        h.contains(SECRET),
+        "with NO purge attempt the planted secret must reach disk, or this test is \
+         measuring itself rather than the recipe. HISTFILE was:\n{h}"
+    );
+}
+
+/// The emitted bash recipe, run under a real interactive bash, removes the entry.
+#[test]
+fn the_emitted_bash_recipe_actually_purges_the_entry() {
+    let recipes = remedy::history_purge_recipes(COMMAND);
+    let (_, bash) = recipes
+        .iter()
+        .find(|(s, _)| *s == "bash")
+        .expect("a bash recipe must exist");
+    const MS1: &str = "ms10entrsqqqqqqqqqqqqqqqqqqqqqqqqqqqqcj9sxraq34v7f";
+    let out = Command::new(assert_cmd::cargo::cargo_bin("me"))
+        .args(["sysw", "pack", MS1])
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains(bash.as_str()),
+        "the test must run the recipe the operator is given, byte for byte.\n\
+         expected to find:\n{bash}\nin:\n{err}"
+    );
+
+    let h = bash_history_after(bash);
+    assert!(
+        !h.contains(SECRET),
+        "the emitted bash recipe reported success and purged nothing. HISTFILE after \
+         the session exited was:\n{h}"
+    );
+}

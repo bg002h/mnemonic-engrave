@@ -180,6 +180,8 @@ fi
 ok "key matches the burned OTP fingerprint (${KEY_FP%"${KEY_FP#????????}"}…)"
 
 SIGN="$SH2_ENGRAVE/scripts/sign-firmware.sh"
+# shellcheck source=lib/seal-check.sh
+. "$SH2_ENGRAVE/scripts/lib/seal-check.sh"
 [ -x "$SIGN" ] || die "signing script not found or not executable: $SIGN"
 ok "signing script present"
 
@@ -291,6 +293,13 @@ if [ "$DRY" = 0 ]; then
           && grep -q 'signature:.*verified' <<<"$SIGINFO"; } \
         || die "$SIGNED does not carry a signature picotool will verify -- refusing to flash"
     ok "signature verified on the artifact to be flashed"
+    # SPX-M3: a verified signature is not enough (see scripts/sign-firmware.sh,
+    # F-701). An input that is already *.signed.uf2 skips sign-firmware.sh, so
+    # the Clear load-map entry is checked here, on the artifact to be flashed.
+    seal_has_clear_entry "$SIGINFO" \
+        || die "$SIGNED is signed, but picotool does not report 'load map entry 0: Clear 0x20000000->0x20082000' for it:
+its load map does not make the bootrom wipe main SRAM before it runs. Rebuild and seal it with 'picotool seal --clear' -- refusing to flash"
+    ok "load map entry 0 is Clear 0x20000000->0x20082000 (bootrom wipes main SRAM)"
     ok "flashing $(basename "$SIGNED")"
     printf '     sha256 %s\n' "$(sha256sum "$SIGNED" | cut -d' ' -f1)"
 fi

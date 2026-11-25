@@ -232,6 +232,19 @@ else
   bad "sign-firmware.sh is not wired to the shared Clear check (source + seal_has_clear_entry \"\$INFO\" || die)"
 fi
 
+# sweep-engrave-spx-m3-signed-uf2-as-is: sh2-flash flashes an input that is
+# already *.signed.uf2 as-is, so ITS final `picotool info -a` capture must also
+# go through the shared Clear check, and die when it fails.
+SH="$REPO/scripts/sh2-flash"
+if grep -qE '^[^#]*\. "\$SH2_ENGRAVE/scripts/lib/seal-check\.sh"' "$SH" \
+   && grep -qE '^[^#]*seal_has_clear_entry "\$SIGINFO"' "$SH" \
+   && SHW="$(grep -A2 -E '^[^#]*seal_has_clear_entry "\$SIGINFO"' "$SH")" \
+   && grep -qE '\|\|[[:space:]]*die ' <<<"$SHW"; then
+  ok "sh2-flash sources seal-check.sh and dies when seal_has_clear_entry fails"
+else
+  bad "sh2-flash is not wired to the shared Clear check (source + seal_has_clear_entry \"\$SIGINFO\" || die)"
+fi
+
 echo
 echo "seal-clear-test: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
