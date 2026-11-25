@@ -60,9 +60,10 @@ create on Unix, `set_permissions(0600)` on the open handle on Unix, `set_len(0)`
 `write_all`).
 
 1. **Classify** with `std::fs::metadata(path)` (follows symlinks):
-   - **Stdio alias (Unix), checked first.** If `path` as given is `/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes
-     (`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: ALIAS (section 3a). So is a path whose canonical
+   - **Stdio alias (Unix), checked first.** If `path` as given names a descriptor of this process (section 3a:
+     `/dev/stdin`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/N` or `/proc/self/fd/N` and its variants): ALIAS. So is a path whose canonical
      parent joined with its name is one of those, or whose last component's symlink chain reaches one.
+     Any other `/proc/` path is a name like any other (section 3a).
    - `Err` of kind `NotFound`: mode ABSENT.
    - any other `Err`: DIRECT (the open then reports its own error, as today).
    - `Ok` and not `is_file()` (FIFO, char or block device, socket, directory, a pipe or tty behind `/dev/stdout`):
@@ -107,13 +108,17 @@ Not done, on purpose: no cleanup of stale temps from earlier runs (another live 
 no preservation of the old file's owner, group, ACLs or xattrs (the new file is the writer's, 0600, as the F-244
 tightening already intends); no `sync_all` in DIRECT (today has none).
 
-## 3a. ALIAS (0.1.3; architect-io-lib-append-1124)
+## 3a. ALIAS (0.1.3; architect-io-lib-append-1124, narrowed by architect-io-lib-proc-alias-1124)
 
 An alias names a stream the process already holds: it is written into that stream, never truncated.
-Descriptors 0 to 2 (`/dev/stdin|stdout|stderr`, `/dev/fd/N`, `/proc/self|thread-self|<own pid>/fd/N`) are duplicated:
-the write lands at the stream's own offset and keeps its O_APPEND; for 1 it first flushes std's stdout, under its lock.
-Any other alias is opened append + create, 0600. Then 0600 on the handle and `write_all`: no `set_len`, no temp, no sync.
+The aliases (Unix) name a descriptor N of THIS process: `/dev/stdin|stdout|stderr` (0, 1, 2), `/dev/fd/N`, and
+`/proc/W/fd/N` with W = `self`, `thread-self`, the own pid, `self/task/T` or `<own pid>/task/T`; N and T are ASCII digits.
+Except for `/dev/stdin|stdout|stderr`, the name must exist (`symlink_metadata`): `/dev/fd/01` or a closed N is not an alias.
+Every N is duplicated (`F_DUPFD_CLOEXEC`): the write lands at the stream's own offset and keeps its O_APPEND;
+for 1 it first flushes std's stdout, under its lock. Then 0600 on the handle and `write_all`: no `set_len`, no temp, no sync.
 A failed write can leave part of the bytes after the earlier contents.
+Any other `/proc/` path (`/proc/self/cwd/x`, `/proc/self/root/...`, `/proc/<another pid>/...`) is not an alias:
+it is classified by steps 1 to 3 like any other name, so a regular file there is replaced ATOMIC, never appended to.
 
 ## 4. Every case, decided
 
@@ -138,8 +143,11 @@ A failed write can leave part of the bytes after the earlier contents.
 | FIFO | DIRECT | written through, as today |
 | char device (`/dev/null`, a tty) | DIRECT | as today: `/dev/null` as non-root refuses with `Operation not permitted (os error 1)` (measured); see section 11 |
 | `/dev/stdout` when stdout is a pipe or tty | ALIAS | written into descriptor 1 |
-| `/dev/stdout` (or `/dev/fd/N`, `/proc/...`, or a link to one) when stdout is a regular file | ALIAS | written into the stream at its offset; same inode, never truncated, 0600 (CHANGE in 0.1.3; 0.1.2 truncated it) |
+| `/dev/stdout` (or `/dev/fd/N`, `/proc/self/fd/N`, or a link to one) when stdout is a regular file | ALIAS | written into the stream at its offset; same inode, never truncated, 0600 (CHANGE in 0.1.3; 0.1.2 truncated it) |
 | `/dev/stdout` when stdout is a deleted file | ALIAS | written into descriptor 1 |
+| `/dev/fd/N` (N > 2) on a regular file (`3>f`, `3>>f`) | ALIAS | written into descriptor N at its offset, as the shell left it; never reopened |
+| `/proc/self/cwd/x`, `/proc/self/root/...` or another process's `/proc/<pid>/...` onto a regular file | ATOMIC (a file name, not an alias) | replaced: exactly the new bytes, 0600 (CHANGE from the 0.1.3 draft bfa9a0a2, which appended) |
+| a descriptor name the kernel lacks (`/dev/fd/01`, a closed N) | not an alias | the ATOMIC path's error, `No such file or directory (os error 2)` (measured) |
 | the path `-` | ATOMIC on a file named `-` | the library gives `-` no meaning; callers route `-` to stdout before calling (consumer FIX rows check theirs) |
 | file name over 200 bytes | ATOMIC, temp named `mnemonic-io-lib.<pid>.<n>.tmp` | written (a suffixed temp name would exceed NAME_MAX 255) |
 | 100 taken temp names | step 4 fails | `File exists (os error 17)`; old kept |
@@ -198,7 +206,7 @@ attribute becomes `#[cfg(test)]` (today `#[cfg(all(test, unix))]`); `use std::os
 and the two existing rows get `#[cfg(unix)]`. Rows marked (unix) are `#[cfg(unix)]`; the rest compile on every
 platform. Child rows re-execute the test binary
 (`std::env::current_exe()`, args `--exact write::tests::child --nocapture`) with `MNEMONIC_IO_LIB_CHILD=<row id>`
-(`W1`, `W2`, `W10`, `W17`, `W19`-`W24`, `S7`, `S8`, `S11`) and `MNEMONIC_IO_LIB_TARGET=<path>` (unused by S8). `fn child()` is a `#[test]`
+(`W1`, `W2`, `W10`, `W17`, `W19`-`W25`, `W28`-`W30`, `S7`, `S8`, `S11`) and `MNEMONIC_IO_LIB_TARGET=<path>` (unused by S8). `fn child()` is a `#[test]`
 that returns at once when `MNEMONIC_IO_LIB_CHILD` is unset. The child reports on STDERR one line
 `child-result: <value>`, where `<value>` is `Ok`, `Some(<i>)`, `None` or `Err raw_os_error=<n>`; after an `Err` it
 calls `std::process::exit(3)`. The parent gives the child piped stdin and stderr, and the stdout the row names (piped
@@ -235,6 +243,12 @@ W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name functi
 | W22 `dev_stdout_keeps_the_stream_order_in_a_redirected_file` (unix) | RED | stdout = `File::create(f)`; child `print!`s `before-the-write|`, calls `write_private("/dev/stdout", b"via-dev-stdout\n")`, then `println!`s `after-the-write` | `f` holds all three, in that order; child reports `child-result: Ok` | order lost; RED |
 | W23 `a_link_to_dev_stdout_appended_to_a_file_keeps_its_earlier_lines` (unix) | RED | as W20 with the path a symlink `l` -> `/dev/stdout` | `f` starts `EARLIER\n`, contains `NEW\n`; `l` still a symlink; dir holds `f` and `l` only | `NEW` only; RED |
 | W24 `a_name_under_a_link_to_dev_fd_appended_to_a_file_keeps_its_earlier_lines` (unix) | RED | as W20 with the path `fd/1`, `fd` a symlink -> `/dev/fd` | `f` starts `EARLIER\n`, contains `NEW\n`; dir holds `f` and `fd` only | `NEW` only; RED |
+| W25 `a_proc_self_cwd_path_onto_a_file_is_replaced_atomically` (linux) | RED | `f` = `OLD-VALID-CARD\n` (0644); child sets its cwd to `f`'s directory and calls `write_private("/proc/self/cwd/f", b"NEW\n")` | `child-result: Ok`; `f` is exactly `NEW\n`, 0600, a new inode; dir holds only `f` | `OLD-VALID-CARD\nNEW\n`; RED |
+| W26 `a_proc_self_root_path_onto_a_file_is_replaced_atomically` (linux) | RED | `f` as W25; `write_private("/proc/self/root" + f, b"NEW\n")` | `Ok`; `f` is exactly `NEW\n`, 0600, a new inode; dir holds only `f` | `OLD-VALID-CARD\nNEW\n`; RED |
+| W27 `a_link_to_a_proc_self_root_path_is_written_through_and_stays_a_link` (linux) | RED | `f` as W25; `l` a symlink -> the W26 path; `write_private(l, b"NEW\n")` | `Ok`; `f` is exactly `NEW\n`, 0600, a new inode; `l` still a symlink; dir holds `f` and `l` only | `OLD-VALID-CARD\nNEW\n`; RED |
+| W28 `dev_fd_3_keeps_the_stream_order_in_a_redirected_file` (unix) | RED | `f` = `EARLIER\n` (0644); `sh -c '{ echo a >&3; child; echo b >&3; } 3>f'`, child calls `write_private("/dev/fd/3", b"NEW\n")` | `child-result: Ok`; `f` is exactly `a\nNEW\nb\n`, 0600 | `a\nb\nW\n`; RED |
+| W29 `a_name_under_a_link_to_proc_thread_self_fd_appended_to_a_file_keeps_its_earlier_lines` (unix) | GREEN guard | as W24 with `fd` a symlink -> `/proc/thread-self/fd` | `f` starts `EARLIER\n`, contains `NEW\n`; dir holds `f` and `fd` only | passes |
+| W30 `a_descriptor_name_the_kernel_lacks_is_refused` (unix) | RED | child with piped stdout calls `write_private("/dev/fd/01", b"NEW\n")` | `child-result: Err raw_os_error=2`; child stdout does not contain `NEW` | `Ok`, `NEW` on stdout; RED |
 | W12 `the_temp_name_is_the_target_name_or_the_fallback` | new | calls the private temp-name function | 200-byte name -> `<name>.7.3.tmp` for pid 7, n 3; 201-byte name -> `mnemonic-io-lib.7.3.tmp` | n/a (new function) |
 | W13 `a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file` | new | old `card.txt` = `old`; for each step of the platform (unix: `CreateTemp`, `Preflight`, `Chmod`, `Write`, `Sync`, `Rename`; other: `CreateTemp`, `Preflight`, `Write`, `Sync`, `Rename`) inject an error | `Err` whose `Display` is `injected at <Step>`; bytes `old`; dir holds only the target | n/a (new branch) |
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |

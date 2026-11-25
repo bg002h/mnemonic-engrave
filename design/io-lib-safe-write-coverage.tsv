@@ -21,8 +21,8 @@
 21	3	`Err` of kind `NotFound`: mode ABSENT.	W8
 22	3	FIFO, char or block device, socket, directory, a pipe or tty behind `/dev/stdout`	W9
 23	3	`Ok` and `is_file()`: mode REPLACE.	W3
-24	3	`/dev/stdin`, `/dev/stdout` or `/dev/stderr`, or its bytes	CODE
-25	3	(`as_os_str().as_encoded_bytes()`) begin with `/dev/fd/` or `/proc/`: ALIAS (section 3a).	W19
+24	3	names a descriptor of this process (section 3a:	CODE
+25	3	`/dev/stdin`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/N` or `/proc/self/fd/N` and its variants): ALIAS.	W19
 26	3	At most 40 hops; a 41st hop	CODE
 27	3	same `(dev, ino)` as step 1; otherwise DIRECT (this sends any race to today's path).	CODE
 28	3	ABSENT: `symlink_metadata(final)` must be `NotFound`; otherwise	CODE
@@ -109,3 +109,9 @@
 109	3a	for 1 it first flushes std's stdout, under its lock.	W22
 110	3a	parent joined with its name is one of those, or whose last component's symlink chain reaches one.	W23
 111	3a	parent joined with its name is one of those, or whose last component's symlink chain reaches one.	W24
+112	3	Any other `/proc/` path is a name like any other (section 3a).	W25
+113	3a	Every N is duplicated (`F_DUPFD_CLOEXEC`): the write lands at the stream's own offset and keeps its O_APPEND;	W28
+114	3a	Except for `/dev/stdin|stdout|stderr`, the name must exist (`symlink_metadata`): `/dev/fd/01` or a closed N is not an alias.	W30
+115	3a	`/proc/W/fd/N` with W = `self`, `thread-self`, the own pid, `self/task/T` or `<own pid>/task/T`	W29
+116	3a	it is classified by steps 1 to 3 like any other name, so a regular file there is replaced ATOMIC, never appended to.	W26
+117	4	onto a regular file | ATOMIC (a file name, not an alias) | replaced: exactly the new bytes, 0600	W27

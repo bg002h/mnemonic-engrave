@@ -5,7 +5,7 @@
 #   scripts/io-lib-safe-write-gate.sh plan    spec/plan/coverage-map consistency (no build)
 #   scripts/io-lib-safe-write-gate.sh red1    after RED-1: 15 tests, exactly W1-W4 FAIL, 11 pass
 #   scripts/io-lib-safe-write-gate.sh red2    after RED-2: unit-test build fails with E0425 on same_file
-#   scripts/io-lib-safe-write-gate.sh green   after GREEN / version commit: 38 rows pass, workspace
+#   scripts/io-lib-safe-write-gate.sh green   after GREEN / version commit: 44 rows pass, workspace
 #                                              nextest, doctests, lint-gate, Windows+macOS compile
 #                                              checks, version 0.1.3, empty [dependencies]
 #
@@ -20,7 +20,7 @@
 # (3) the nightly clippy step of lint-gate.sh (WARN only, red on the base tree); the release steps R1-R4 and consumer steps C1-C5; (4) the BEHAVIOUR of the code against the
 # spec beyond what the spec's own rows assert; (5) quote checks use single-line fragments, so a
 # spec sentence that wraps is matched by a fragment within one line.
-# (8) red1 is #41's history; 0.1.3's RED is W20-W24 on e09d538d, by hand.
+# (8) red1 is #41's history; 0.1.3's RED is W20-W24 on e09d538d and W25-W28, W30 on bfa9a0a2, by hand.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 cd "$HERE" || exit 2
@@ -63,7 +63,7 @@ check_plan() {
       grep -qF "[$id]" "$PLAN" || bad "plan lacks row id $id"
     fi
   done < <(rows_from_spec)
-  [ "$total" -eq 37 ] && ok "37 spec rows (24 W + 11 S + 2 existing)" || bad "spec rows found: $total (expected 37)"
+  [ "$total" -eq 43 ] && ok "43 spec rows (30 W + 11 S + 2 existing)" || bad "spec rows found: $total (expected 43)"
   # coverage map
   local lines=0 missing=0 noowner=0 line owner quote
   while IFS=$'\t' read -r _ _ quote owner; do
@@ -122,7 +122,7 @@ mode_green() {
   need_toolchain; need_not_root
   nextest green-io -p mnemonic-io-lib -E "$IOFILTER"
   local sum; sum=$(grep -E 'Summary' "$OUT/green-io.txt" | tail -1); echo "$sum"
-  echo "$sum" | grep -qE ' 38 tests run: 38 passed' && ok "38 rows passed" || bad "not 38 run / 38 passed"
+  echo "$sum" | grep -qE ' 44 tests run: 44 passed' && ok "44 rows passed" || bad "not 44 run / 44 passed"
   local id name
   while read -r id name; do
     grep -qE "PASS .*write::tests::$name\$" "$OUT/green-io.txt" || bad "row $id $name did not PASS"

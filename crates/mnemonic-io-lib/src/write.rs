@@ -85,15 +85,17 @@ fn fault(step: Step) -> io::Result<()> {
 /// fails (cross-device, bind mount, busy) is a refusal: there is no copy
 /// fallback.
 ///
-/// A standard-stream alias (Unix: `/dev/stdin`, `/dev/stdout`, `/dev/stderr`,
-/// `/dev/fd/N`, `/proc/...`, spelled so after its parent is canonicalised, or
-/// reached by a symlink hop) names a stream the process already holds, so the
+/// A standard-stream alias (Unix) names a descriptor N of THIS process:
+/// `/dev/stdin`, `/dev/stdout`, `/dev/stderr`, `/dev/fd/N`, or
+/// `/proc/{self,thread-self,<own pid>}/fd/N` (also `.../task/T/fd/N`), spelled
+/// so as given, after its parent is canonicalised, or at a symlink hop. The
 /// bytes go INTO that stream and nothing is truncated: `--out /dev/stdout >> f`
-/// appends to `f`, and `{ a; tool --out /dev/stdout; b; } > f` keeps all three
-/// in order. Descriptors 0 to 2 are duplicated (the stream's own offset and
-/// `O_APPEND`); stdout is flushed and locked first. Any other alias is opened
-/// for append. `0o600` is set on the handle first. A failed write can leave
-/// part of `bytes` after the earlier contents.
+/// appends to `f`, and `{ a; tool --out /dev/fd/3; b; } 3> f` keeps all three
+/// in order. Descriptor N is duplicated (its own offset and `O_APPEND`);
+/// stdout is flushed and locked first. `0o600` is set on the handle first. A
+/// failed write can leave part of `bytes` after the earlier contents. Any
+/// other `/proc/` path (`/proc/self/cwd/x`, another process's `/proc/<pid>/`)
+/// is a file name like any other: a regular file there is replaced ATOMIC.
 ///
 /// A FIFO, a device, a directory or anything the library cannot classify is
 /// written directly, as before: open, `0o600` on the handle, truncate if a
@@ -104,8 +106,8 @@ fn fault(step: Step) -> io::Result<()> {
 pub fn write_private(path: &Path, bytes: &[u8]) -> io::Result<()> {
     #[cfg(unix)]
     {
-        if let Some(alias) = stdio_alias_of(path) {
-            return write_alias(&alias, bytes);
+        if let Some(fd) = stdio_alias_of(path) {
+            return write_alias(fd, bytes);
         }
     }
     match classify(path) {
@@ -138,18 +140,11 @@ fn write_direct(path: &Path, bytes: &[u8]) -> io::Result<()> {
     f.write_all(bytes)
 }
 
-/// True when `path` as given is a standard-stream alias (Unix only).
+/// True when `path` as given names a descriptor of this process (Unix only).
 fn is_stdio_alias(path: &Path) -> bool {
     #[cfg(unix)]
     {
-        if path == Path::new("/dev/stdin")
-            || path == Path::new("/dev/stdout")
-            || path == Path::new("/dev/stderr")
-        {
-            return true;
-        }
-        let b = path.as_os_str().as_encoded_bytes();
-        b.starts_with(b"/dev/fd/") || b.starts_with(b"/proc/")
+        alias_fd(path).is_some()
     }
     #[cfg(not(unix))]
     {
@@ -158,29 +153,28 @@ fn is_stdio_alias(path: &Path) -> bool {
     }
 }
 
-/// `p` as an alias: as given, or its canonical parent joined with its name
-/// (`/dev/./stdout`, or `d/1` with `d` -> `/dev/fd`).
+/// The descriptor `p` names: as given, or as its canonical parent joined with
+/// its name (`/dev/./stdout`, or `d/1` with `d` -> `/dev/fd`).
 #[cfg(unix)]
-fn spelled_alias(p: &Path) -> Option<PathBuf> {
-    if is_stdio_alias(p) {
-        return Some(p.to_path_buf());
+fn spelled_alias(p: &Path) -> Option<i32> {
+    if let Some(n) = alias_fd(p) {
+        return Some(n);
     }
     let dir = match p.parent() {
         Some(d) if !d.as_os_str().is_empty() => d,
         _ => Path::new("."),
     };
-    let q = fs::canonicalize(dir).ok()?.join(p.file_name()?);
-    is_stdio_alias(&q).then_some(q)
+    alias_fd(&fs::canonicalize(dir).ok()?.join(p.file_name()?))
 }
 
-/// The alias `path` reaches: itself, or a hop of its last component's symlink
-/// chain (the walk of `resolve_final`, at most 40 hops). `None` if neither.
+/// The descriptor `path` reaches: itself, or a hop of its last component's
+/// symlink chain (the walk of `resolve_final`, at most 40 hops).
 #[cfg(unix)]
-fn stdio_alias_of(path: &Path) -> Option<PathBuf> {
+fn stdio_alias_of(path: &Path) -> Option<i32> {
     let mut p = path.to_path_buf();
     for _ in 0..=40 {
-        if let Some(a) = spelled_alias(&p) {
-            return Some(a);
+        if let Some(n) = spelled_alias(&p) {
+            return Some(n);
         }
         if !fs::symlink_metadata(&p).ok()?.file_type().is_symlink() {
             return None;
@@ -195,12 +189,17 @@ fn stdio_alias_of(path: &Path) -> Option<PathBuf> {
     None
 }
 
-/// The descriptor of THIS process an alias names: 0, 1, 2 for
-/// `/dev/stdin|stdout|stderr`; N for `/dev/fd/N`, `/proc/self/fd/N`,
-/// `/proc/thread-self/fd/N` and `/proc/<this pid>/fd/N`. `None` otherwise.
+/// The descriptor of THIS process `p` names as spelled (spec section 3a): 0,
+/// 1, 2 for `/dev/stdin|stdout|stderr`; N for `/dev/fd/N` and `/proc/W/fd/N`,
+/// W = `self`, `thread-self`, this pid, `self/task/T` or `<this pid>/task/T`
+/// (`thread-self` canonicalises to `<pid>/task/<tid>`). N and T are digits,
+/// and the name must exist, so a closed N, another process's thread T or
+/// `/dev/fd/01` is `None`. So is every other path: `/proc/self/cwd/x` and
+/// `/proc/<another pid>/fd/N` are file names.
 #[cfg(unix)]
-fn alias_fd(alias: &Path) -> Option<u32> {
-    let s = alias.to_str()?;
+fn alias_fd(p: &Path) -> Option<i32> {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let s = p.to_str()?;
     match s {
         "/dev/stdin" => return Some(0),
         "/dev/stdout" => return Some(1),
@@ -210,43 +209,50 @@ fn alias_fd(alias: &Path) -> Option<u32> {
     let n = match s.strip_prefix("/dev/fd/") {
         Some(n) => n,
         None => {
-            let (who, n) = s.strip_prefix("/proc/")?.split_once("/fd/")?;
-            if who != "self"
-                && who != "thread-self"
-                && who.parse::<u32>().ok() != Some(std::process::id())
-            {
+            let (who, n) = s.strip_prefix("/proc/")?.rsplit_once("/fd/")?;
+            let who = match who.split_once("/task/") {
+                Some((w, t)) if digits(t) && w != "thread-self" => w,
+                Some(_) => return None,
+                None => who,
+            };
+            let me = std::process::id().to_string(); // a variable: clippy::cmp_owned
+            if who != "self" && who != "thread-self" && who != me {
                 return None;
             }
             n
         }
     };
-    if n.is_empty() || !n.bytes().all(|b| b.is_ascii_digit()) {
+    if !digits(n) {
         return None;
     }
-    n.parse().ok()
+    let fd = n.parse().ok()?;
+    fs::symlink_metadata(p).ok()?;
+    Some(fd)
 }
 
-/// ALIAS: into the stream, never truncated (spec section 3a).
+/// ALIAS: into the stream, never truncated (spec section 3a). Descriptor `fd`
+/// is duplicated, so the write lands at the stream's own offset and keeps its
+/// `O_APPEND`, whatever `fd` is.
 #[cfg(unix)]
-fn write_alias(alias: &Path, bytes: &[u8]) -> io::Result<()> {
-    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-    use std::os::unix::io::AsFd;
+fn write_alias(fd: i32, bytes: &[u8]) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::io::{AsFd, BorrowedFd};
     // Held across the write: nothing else here prints to stdout in between.
     let mut out = io::stdout().lock();
-    let mut f = match alias_fd(alias) {
-        Some(0) => File::from(io::stdin().as_fd().try_clone_to_owned()?),
-        Some(1) => {
+    let owned = match fd {
+        0 => io::stdin().as_fd().try_clone_to_owned()?,
+        1 => {
             // What the caller already printed lands before the bytes.
             out.flush()?;
-            File::from(out.as_fd().try_clone_to_owned()?)
+            out.as_fd().try_clone_to_owned()?
         }
-        Some(2) => File::from(io::stderr().as_fd().try_clone_to_owned()?),
-        _ => OpenOptions::new()
-            .append(true)
-            .create(true)
-            .mode(0o600)
-            .open(alias)?,
+        2 => io::stderr().as_fd().try_clone_to_owned()?,
+        // SAFETY: `alias_fd` saw `fd`'s name exist, so it was open; the borrow
+        // lives for this one fcntl(F_DUPFD_CLOEXEC), which fails with EBADF if
+        // another thread closed it since.
+        n => unsafe { BorrowedFd::borrow_raw(n) }.try_clone_to_owned()?,
     };
+    let mut f = File::from(owned);
     f.set_permissions(fs::Permissions::from_mode(0o600))?;
     f.write_all(bytes)
 }

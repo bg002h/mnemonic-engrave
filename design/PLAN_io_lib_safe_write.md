@@ -92,6 +92,12 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [W22] | 0.1.3 RED | O_APPEND reopen instead of the stream; or no stdout flush |
 | [W23] | 0.1.3 RED | alias checked on the given path only |
 | [W24] | 0.1.3 RED | no canonical-parent check |
+| [W25] | 0.1.3 RED | the bfa9a0a2 `/proc/` prefix alias (append); or `classify` keeps that prefix (DIRECT, same inode) |
+| [W26] | 0.1.3 RED | the same two plants |
+| [W27] | 0.1.3 RED | `resolve_final`'s hop check keeps the `/proc/` prefix |
+| [W28] | 0.1.3 RED | N > 2 reopened append; or N > 2 sent ATOMIC |
+| [W29] | 0.1.3 passes (guard) | no `task/T` arm |
+| [W30] | 0.1.3 RED | no existence check in `alias_fd` |
 | [W12] | GREEN | limit 201 instead of 200 bytes; or the fallback name changed |
 | [W13] | GREEN | skip `remove_file` after one step; or swallow the step's error |
 | [W14] | GREEN | propagate the directory-sync error |
@@ -112,7 +118,7 @@ code that the row must turn red; the build report pastes each mutant's failing r
 
 A mutant that no row turns red is a STOP: paste it and report.
 
-Counts the gate checks: 24 W rows + 11 S rows + 2 existing rows + `child` = 38 tests in `write::tests::` at
+Counts the gate checks: 30 W rows + 11 S rows + 2 existing rows + `child` = 44 tests in `write::tests::` at
 GREEN (0.1.3); 15 at RED-1 (W1-W11, W17, the 2 existing, `child`), 4 failing.
 
 ## Existing tests and files that change (rule per file)
