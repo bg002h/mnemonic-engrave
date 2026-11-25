@@ -686,8 +686,9 @@ fn a_plain_text_pass_body_is_refused_by_body_and_never_echoed() {
         "the refusal must name the real cause: {err}"
     );
     assert!(
-        err.contains("xxd -p"),
-        "and hand over the one-liner that fixes it: {err}"
+        !err.contains("xxd") && !err.contains("printf"),
+        "fixdoc28-n1-pass-remedy-history / s3-remedy-argv: a pass: refusal must not invite \
+         typing the passphrase into a shell command: {err}"
     );
     assert!(
         !err.contains("correct horse"),
@@ -697,6 +698,18 @@ fn a_plain_text_pass_body_is_refused_by_body_and_never_echoed() {
         !err.contains("Addresses are not classifiable here"),
         "and must not explain the gap that did not apply here: {err}"
     );
+}
+
+/// The `text:` prefix keeps its one-liner: only `pass:` is a passphrase.
+#[test]
+fn a_plain_text_text_body_still_gets_the_encode_remedy() {
+    let out = me()
+        .args(["sysw", "pack", "--no-passphrase", "text:hello world"])
+        .assert()
+        .failure();
+    let err = String::from_utf8_lossy(&out.get_output().stderr).into_owned();
+    assert!(err.contains("not lowercase hex"), "{err}");
+    assert!(err.contains("xxd -p"), "{err}");
 }
 
 /// Pre-flash conformance review, I3. Rust models "no passphrase" as `None`, so
