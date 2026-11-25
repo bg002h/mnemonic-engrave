@@ -700,6 +700,15 @@ mod tests {
             }
             "W28" => write_private(Path::new("/dev/fd/3"), b"NEW\n").map(|()| "Ok".to_string()),
             "W30" => write_private(Path::new("/dev/fd/01"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W31" => write_private(Path::new("/dev/fd/3"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W32" => write_private(&target, b"NEW\n").map(|()| "Ok".to_string()),
+            "W33" => {
+                print!("before-the-write|");
+                let r = write_private(Path::new("/dev/fd/3"), b"NEW\n");
+                println!("after-the-write");
+                r.map(|()| "Ok".to_string())
+            }
+            "W34" => write_private(Path::new("/dev/fd/1/."), b"NEW\n").map(|()| "Ok".to_string()),
             "S7" => Ok(show(same_file(
                 Endpoint::Path(&target),
                 &[Endpoint::Stdout],
@@ -1183,7 +1192,7 @@ mod tests {
     }
 
     /// W29: `d/1` with `d` -> `/proc/thread-self/fd` is the alias it spells (guard).
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     #[test]
     fn a_name_under_a_link_to_proc_thread_self_fd_appended_to_a_file_keeps_its_earlier_lines() {
         let d = tempfile::tempdir().unwrap();
@@ -1207,6 +1216,195 @@ mod tests {
             "child stderr: {se}"
         );
         assert!(!String::from_utf8_lossy(&out.stdout).contains("NEW"));
+    }
+
+    /// W31: a descriptor open read-only (`3< f`) is refused before its file's mode changes.
+    #[cfg(unix)]
+    #[test]
+    fn a_read_only_descriptor_is_refused_before_its_mode_changes() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, OLD_CARD).unwrap();
+        std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg("\"$0\" --exact write::tests::child --nocapture 3<\"$1\"")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W31")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(
+            se.contains("child-result: Err raw_os_error=9"),
+            "child stderr: {se}"
+        );
+        assert_eq!(std::fs::read(&f).unwrap(), OLD_CARD);
+        assert_eq!(mode_of(&f), 0o644, "an input's mode was changed");
+    }
+
+    /// W32: in a pid namespace that kept its parent's `/proc` (getpid() is 1,
+    /// `/proc/self` is the outer pid), `d/1` with `d` -> `/dev/fd` is still the
+    /// alias. Needs unprivileged user namespaces; says SKIP when they are off.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_name_under_a_link_to_dev_fd_in_a_pid_namespace_keeps_its_earlier_lines() {
+        let ok = Command::new("unshare")
+            .args(["-Urpf", "--kill-child", "true"])
+            .status()
+            .is_ok_and(|s| s.success());
+        if !ok {
+            eprintln!("W32 SKIP: unshare -Urpf unavailable");
+            return;
+        }
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let fd = d.path().join("fd");
+        std::os::unix::fs::symlink("/dev/fd", &fd).unwrap();
+        std::fs::write(&f, b"EARLIER\n").unwrap();
+        let out = Command::new("unshare")
+            .args(["-Urpf", "--kill-child", "sh", "-c"])
+            .arg("\"$0\" --exact write::tests::child --nocapture >>\"$1\"")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W32")
+            .env("MNEMONIC_IO_LIB_TARGET", fd.join("1"))
+            .stdin(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+    }
+
+    /// W33: `tool --out /dev/fd/3 >f 3>&1` keeps the stream order: stdout is flushed for every N.
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_3_onto_stdouts_file_keeps_the_stream_order() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg("\"$0\" --exact write::tests::child --nocapture >\"$1\" 3>&1")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W33")
+            .stdin(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
+        assert!(
+            s.contains("before-the-write|NEW\nafter-the-write"),
+            "order lost: {s:?}"
+        );
+    }
+
+    /// W34: `/dev/fd/1/.`, a name the kernel lacks (ENOTDIR), is not an alias.
+    #[cfg(unix)]
+    #[test]
+    fn a_descriptor_name_with_a_trailing_dot_is_refused() {
+        let out = run_child("W34", Path::new(""), Stdio::piped(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(
+            se.contains("child-result: Err raw_os_error=20"),
+            "child stderr: {se}"
+        );
+        assert!(!String::from_utf8_lossy(&out.stdout).contains("NEW"));
+    }
+
+    /// W35: another process's `/proc/<pid>/fd/N` is a file name, never this process's descriptor N.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn another_processs_descriptor_path_is_not_an_alias() {
+        use std::io::{BufRead, BufReader};
+        use std::os::unix::io::AsRawFd;
+        let d = tempfile::tempdir().unwrap();
+        let (f, g) = (d.path().join("f"), d.path().join("g"));
+        std::fs::write(&f, OLD_CARD).unwrap();
+        let h = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&g)
+            .unwrap();
+        let n = h.as_raw_fd();
+        assert!(n <= 9, "sh redirects only 0-9, got {n}");
+        let mut c = Command::new("sh")
+            .arg("-c")
+            .arg(format!("exec {n}>>\"$0\"; echo ready >&2; read x"))
+            .arg(&f)
+            .stdin(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(c.stderr.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        assert_eq!(line, "ready\n");
+        let r = write_private(Path::new(&format!("/proc/{}/fd/{n}", c.id())), b"NEW\n");
+        let _ = c.kill();
+        let _ = c.wait();
+        assert!(r.is_ok(), "{r:?}");
+        assert_eq!(
+            std::fs::read(&g).unwrap(),
+            b"",
+            "this process's fd {n} was written"
+        );
+        assert_eq!(
+            std::fs::read(&f).unwrap(),
+            b"NEW\n",
+            "the file behind the name was not replaced"
+        );
+    }
+
+    /// W36: write_private through `/dev/fd/N` leaves the caller's descriptor open (a dup, never a close).
+    #[cfg(unix)]
+    #[test]
+    fn an_alias_write_leaves_the_callers_descriptor_open() {
+        use std::os::unix::io::AsRawFd;
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let h = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&f)
+            .unwrap();
+        let n = h.as_raw_fd();
+        let mut spellings = vec![format!("/dev/fd/{n}")];
+        #[cfg(target_os = "linux")]
+        {
+            let pid = std::process::id();
+            let ts = std::fs::read_link("/proc/thread-self").unwrap();
+            spellings.extend([
+                format!("/proc/self/fd/{n}"),
+                format!("/proc/thread-self/fd/{n}"),
+                format!("/proc/{pid}/fd/{n}"),
+                format!(
+                    "/proc/self/task/{}/fd/{n}",
+                    ts.file_name().unwrap().to_str().unwrap()
+                ),
+                format!("/proc/{}/fd/{n}", ts.display()),
+            ]);
+        }
+        let mut want = Vec::new();
+        for p in spellings {
+            write_private(Path::new(&p), p.as_bytes()).unwrap();
+            want.extend_from_slice(p.as_bytes());
+            assert!(
+                h.metadata().is_ok(),
+                "descriptor closed by write_private via {p}"
+            );
+            assert_eq!(std::fs::read(&f).unwrap(), want, "{p}");
+        }
     }
 
     /// **THE GATE, and the pre-existing target is the whole of it.**
