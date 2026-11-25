@@ -293,6 +293,21 @@ fn md_verdict<T>(r: Result<T, md_codec::Error>) -> Option<Unconfirmed> {
 /// through `check` and once through `report_unconfirmed`, when every
 /// expectation is met.
 pub fn mdmk_unconfirmed_why(records: &[String]) -> Vec<(usize, Unconfirmed)> {
+    mdmk_walk(records, true)
+}
+
+/// [`mdmk_unconfirmed`] without the stamped chunk-set-id warning: the same
+/// verdicts, and nothing printed. For a caller that walks before the walk
+/// whose warning the operator should see once (bug hunt E4: the `pack`
+/// sealing line).
+pub fn mdmk_unconfirmed_quiet(records: &[String]) -> Vec<usize> {
+    mdmk_walk(records, false)
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect()
+}
+
+fn mdmk_walk(records: &[String], warn: bool) -> Vec<(usize, Unconfirmed)> {
     let mut out: Vec<(usize, Unconfirmed)> = Vec::new();
     let mut groups: Vec<(char, Option<u32>, Vec<usize>)> = Vec::new();
     for card in mdmk_cards(records) {
@@ -331,9 +346,11 @@ pub fn mdmk_unconfirmed_why(records: &[String]) -> Vec<(usize, Unconfirmed)> {
             // `warn_chunk_set_id_mismatch` line in the `Ok` arm.
             ('k', _) => match mk_codec::decode(&set) {
                 Ok(card) => {
-                    crate::csid_warn::warn_chunk_set_id_mismatch(
-                        crate::csid_warn::chunk_set_id_comparison(&set, &card),
-                    );
+                    if warn {
+                        crate::csid_warn::warn_chunk_set_id_mismatch(
+                            crate::csid_warn::chunk_set_id_comparison(&set, &card),
+                        );
+                    }
                     None
                 }
                 Err(_) => Some(Unconfirmed::Undecodable),

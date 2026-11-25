@@ -3024,14 +3024,40 @@ fn decide_sealing(
     } else {
         None
     };
+    // Bug hunt E4 (2026-11-25): an md1/mk1 this tool cannot confirm is not
+    // secret-class here, so `pack` never encrypts it, yet the device treats it
+    // as SECRET (§5.3.2, ruling D6). The sealing line names such records and
+    // says they stay unencrypted, so it agrees with `report_unconfirmed`'s
+    // lines. Wording only: the sealing decision and the container are unchanged.
+    // Quiet: `report_unconfirmed` walks again after this line and prints the
+    // chunk-set-id warning there, once.
+    let unconfirmed: Vec<usize> = sysw::record::mdmk_unconfirmed_quiet(records);
+    let unconfirmed_note = (!unconfirmed.is_empty()).then(|| {
+        let (noun, verb, pron) = match unconfirmed.len() {
+            1 => ("record", "is", "it is"),
+            _ => ("records", "are", "they are"),
+        };
+        format!(
+            "{noun} {} {verb} an md1/mk1 this tool cannot confirm, which \n      \
+             the device will treat as SECRET; {pron} not encrypted",
+            index_list(&unconfirmed)
+        )
+    });
     if secret.is_empty() {
         // THE CASE §2.4 EXISTS FOR, and the only honest verdict: there is
         // nothing this container would encrypt.
-        eprint!(
-            "sealing:  NOT SEALED — no record in this payload is secret material, so there \n      \
-             is nothing to encrypt. The container is cleartext: anyone holding the file \n      \
-             can read it."
-        );
+        match &unconfirmed_note {
+            None => eprint!(
+                "sealing:  NOT SEALED — no record in this payload is secret material, so there \n      \
+                 is nothing to encrypt. The container is cleartext: anyone holding the file \n      \
+                 can read it."
+            ),
+            Some(note) => eprint!(
+                "sealing:  NOT SEALED — no record in this payload is known secret material, \n      \
+                 but {note}. \n      \
+                 The container is cleartext: anyone holding the file can read it."
+            ),
+        }
         match asked {
             Some(flag) => eprintln!(
                 "\n      \
@@ -3046,22 +3072,45 @@ fn decide_sealing(
     if no_passphrase {
         eprintln!(
             "sealing:  NOT SEALED — you passed --no-passphrase, and this payload HOLDS \n      \
-             SECRET MATERIAL ({}). It will sit in flash in cleartext.",
-            secret.join(", ")
+             SECRET MATERIAL ({}). It will sit in flash in cleartext.{}",
+            secret.join(", "),
+            match &unconfirmed_note {
+                Some(note) => format!(" Also, {note}."),
+                None => String::new(),
+            }
         );
         return false;
     }
     eprintln!(
         "sealing:  SEALED — this payload holds secret material ({}), so it is encrypted \n      \
          and opens only with the passphrase{}. Pass --no-passphrase to write it in \n      \
-         cleartext instead.",
+         cleartext instead.{}",
         secret.join(", "),
         match asked {
             Some(flag) => format!(" you chose with {flag}"),
             None => " below".into(),
+        },
+        match &unconfirmed_note {
+            Some(note) => format!(" Not sealed: {note}."),
+            None => String::new(),
         }
     );
     true
+}
+
+/// `0`, `0 and 1`, `0, 1 and 2`: record indices for a sentence.
+fn index_list(idx: &[usize]) -> String {
+    match idx {
+        [] => String::new(),
+        [one] => one.to_string(),
+        [init @ .., last] => format!(
+            "{} and {last}",
+            init.iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
 }
 
 /// Is this record SHAPED like a hashlock carrier, whether or not it classifies

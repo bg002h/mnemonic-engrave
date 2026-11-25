@@ -166,3 +166,112 @@ fn bh1125_e5_a_set_that_is_not_the_balanced_split_is_not_confirmed() {
         "me confirmed an mt1 set that is not §3b's balanced split"
     );
 }
+
+/// Two chunks of a three-chunk md1 set: each is a well-formed md1 string, but
+/// the set cannot be reassembled, so `me` cannot confirm it and the device
+/// treats both records as SECRET (SPEC_systemwide_payloads §5.3.2, D6).
+const MD1_PARTIAL_A: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
+const MD1_PARTIAL_B: &str = "md1fv9wjpqg0yq82l0czvx85ae43vtfd26hsmngjecmqy44k2pgttqh74qwxlawq374";
+
+/// E4: `me sysw pack` of an unconfirmed md1/mk1 printed "NOT SEALED -- no
+/// record in this payload is secret material" while the next lines said the
+/// device will treat those very records as SECRET. The sealing line must name
+/// the unconfirmed records and say they are NOT sealed, so the two lines
+/// agree. Ruling D6 stands: the pack still succeeds, unsealed, with the same
+/// container bytes.
+#[test]
+fn bh1125_e4_sealing_line_names_unconfirmed_records_as_not_sealed() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let res = me()
+        .args(["sysw", "pack", "--out", out.to_str().unwrap()])
+        .args([MD1_PARTIAL_A, MD1_PARTIAL_B])
+        .output()
+        .unwrap();
+    assert!(
+        res.status.success(),
+        "D6: an unconfirmed md1 warns, never refuses"
+    );
+    let err = String::from_utf8_lossy(&res.stderr);
+    let flat = err.split_whitespace().collect::<Vec<_>>().join(" ");
+    let sealing = flat
+        .split("sealing:")
+        .nth(1)
+        .expect("no sealing line")
+        .split("me:")
+        .next()
+        .unwrap();
+    assert!(sealing.contains("NOT SEALED"), "{flat}");
+    assert!(
+        !sealing.contains("no record in this payload is secret material"),
+        "the sealing line still says nothing is secret: {flat}"
+    );
+    assert!(
+        sealing.contains("records 0 and 1"),
+        "the sealing line does not name the unconfirmed records: {flat}"
+    );
+    assert!(
+        sealing.contains("will treat as SECRET") && sealing.contains("not encrypted"),
+        "the sealing line does not say the unconfirmed records stay unsealed: {flat}"
+    );
+}
+
+/// E4 control: a complete md1 is confirmed, so the plain no-secret sentence
+/// still applies and names no record.
+#[test]
+fn bh1125_e4_a_confirmed_md1_keeps_the_no_secret_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("p.bin");
+    let res = me()
+        .args(["sysw", "pack", "--out", out.to_str().unwrap(), MD1])
+        .output()
+        .unwrap();
+    assert!(res.status.success());
+    let flat = String::from_utf8_lossy(&res.stderr)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        flat.contains("NOT SEALED — no record in this payload is secret material"),
+        "{flat}"
+    );
+    assert!(!flat.contains("will treat as SECRET"), "{flat}");
+}
+
+/// E4, with secret material alongside: the sealed and the `--no-passphrase`
+/// lines also say that the unconfirmed md1/mk1 records are not encrypted,
+/// because `pack` encrypts only secret-class records.
+#[test]
+fn bh1125_e4_sealed_and_no_passphrase_lines_name_unconfirmed_records() {
+    for (extra, verdict) in [
+        (
+            vec!["--passphrase-words", "4"],
+            "Not sealed: records 1 and 2",
+        ),
+        (vec!["--no-passphrase"], "Also, records 1 and 2"),
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let out = dir.path().join("p.bin");
+        let res = me()
+            .args(["sysw", "pack", "--out", out.to_str().unwrap()])
+            .args(&extra)
+            .args([
+                "--allow-argv-secret",
+                MNEMONIC,
+                MD1_PARTIAL_A,
+                MD1_PARTIAL_B,
+            ])
+            .output()
+            .unwrap();
+        assert!(res.status.success(), "{extra:?}");
+        let flat = String::from_utf8_lossy(&res.stderr)
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(flat.contains(verdict), "{extra:?}: {flat}");
+        assert!(
+            flat.contains("will treat as SECRET; they are not encrypted"),
+            "{flat}"
+        );
+    }
+}
