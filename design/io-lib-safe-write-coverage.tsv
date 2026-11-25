@@ -82,14 +82,14 @@
 82	8	No row writes to `/dev/null` or any device	S9
 83	8	Windows and macOS run no row of this spec	T4
 84	8	`fn child()` is a `#[test]`	W1
-85	10	version 0.1.1 -> 0.1.2 and the `Cargo.lock` entry with it.	T5
-86	10	tag `mnemonic-io-lib-v0.1.2` on the merge commit and `cargo publish -p	R3
-87	10	tag `mnemonic-io-lib-v0.1.2` on the merge commit	R2
-88	10	0.1.1 is skipped on crates.io; 0.1.2 carries it.	R4
+85	10	version 0.1.1 -> 0.1.3 (0.1.2 is never published) and the `Cargo.lock` entry with it.	T5
+86	10	tag `mnemonic-io-lib-v0.1.3` on the merge commit and `cargo publish -p	R3
+87	10	tag `mnemonic-io-lib-v0.1.3` on the merge commit	R2
+88	10	0.1.1 and 0.1.2 are skipped on crates.io; 0.1.3 carries them.	R4
 89	10	me #13 can land with step 1 or after it (path dep); it needs no release.	OUT:#13
-90	10	md, mk, tk set `mnemonic-io-lib = "0.1.2"`	C1
+90	10	md, mk, tk set `mnemonic-io-lib = "0.1.3"`	C1
 91	10	ms and mt replace the git dependency with	C3
-92	10	`--precise 0.1.2` fails `revspec '0.1.2' not found`	C4
+92	10	`--precise 0.1.3` fails `revspec '0.1.3' not found`	C4
 93	10	deletes the	C3
 94	10	ms also edits `.github/workflows/man-release.yml`	C3
 95	10	must then print no ms workflow line other than comments.	C3
@@ -106,7 +106,7 @@
 106	2	`Stdin` covers `--out X < X`	S11
 107	3a	An alias names a stream the process already holds: it is written into that stream, never truncated.	W20
 108	3a	An alias names a stream the process already holds: it is written into that stream, never truncated.	W21
-109	3a	for 1 it first flushes std's stdout, under its lock.	W22
+109	3a	it first flushes std's stdout, under its lock (an error is returned only for N = 1).	W22
 110	3a	parent joined with its name is one of those, or whose last component's symlink chain reaches one.	W23
 111	3a	parent joined with its name is one of those, or whose last component's symlink chain reaches one.	W24
 112	3	Any other `/proc/` path is a name like any other (section 3a).	W25
@@ -115,3 +115,9 @@
 115	3a	`/proc/W/fd/N` with W = `self`, `thread-self`, the own pid, `self/task/T` or `<own pid>/task/T`	W29
 116	3a	it is classified by steps 1 to 3 like any other name, so a regular file there is replaced ATOMIC, never appended to.	W26
 117	4	onto a regular file | ATOMIC (a file name, not an alias) | replaced: exactly the new bytes, 0600	W27
+118	3a	The own pid is the one this `/proc` numbers (`readlink /proc/self`), not `getpid()`	W32
+119	3a	must exist as given too: `/dev/fd/1/.` is ENOTDIR to the kernel and is not an alias.	W34
+120	3a	it first flushes std's stdout, under its lock (an error is returned only for N = 1).	W33
+121	3a	A descriptor not open for writing (`fcntl(F_GETFL)` access mode `O_RDONLY`	W31
+122	3a	`/proc/<another pid>/...`) is not an alias:	W35
+123	3a	Every N is duplicated (`F_DUPFD_CLOEXEC`): the write lands at the stream's own offset	W36

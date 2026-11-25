@@ -5,7 +5,7 @@
 #   scripts/io-lib-safe-write-gate.sh plan    spec/plan/coverage-map consistency (no build)
 #   scripts/io-lib-safe-write-gate.sh red1    after RED-1: 15 tests, exactly W1-W4 FAIL, 11 pass
 #   scripts/io-lib-safe-write-gate.sh red2    after RED-2: unit-test build fails with E0425 on same_file
-#   scripts/io-lib-safe-write-gate.sh green   after GREEN / version commit: 44 rows pass, workspace
+#   scripts/io-lib-safe-write-gate.sh green   after GREEN / version commit: 50 tests (49 rows + child) pass, workspace
 #                                              nextest, doctests, lint-gate, Windows+macOS compile
 #                                              checks, version 0.1.3, empty [dependencies]
 #
@@ -20,7 +20,10 @@
 # (3) the nightly clippy step of lint-gate.sh (WARN only, red on the base tree); the release steps R1-R4 and consumer steps C1-C5; (4) the BEHAVIOUR of the code against the
 # spec beyond what the spec's own rows assert; (5) quote checks use single-line fragments, so a
 # spec sentence that wraps is matched by a fragment within one line.
-# (8) red1 is #41's history; 0.1.3's RED is W20-W24 on e09d538d and W25-W28, W30 on bfa9a0a2, by hand.
+# (8) red1 is #41's history; 0.1.3's RED is W20-W24 on e09d538d, W25-W28, W30 on bfa9a0a2 and W31-W34 on 1197928a, by hand;
+# W35 and W36 are guards, seen red only under their plants (plan table).
+# (9) W32 needs `unshare -Urpf` (unprivileged user namespaces); where it is off the row prints `W32 SKIP` and nextest
+# still reports it passed, so `green` re-runs it with --no-capture and prints a SKIP line instead of a PASS for it.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 cd "$HERE" || exit 2
@@ -63,7 +66,11 @@ check_plan() {
       grep -qF "[$id]" "$PLAN" || bad "plan lacks row id $id"
     fi
   done < <(rows_from_spec)
-  [ "$total" -eq 43 ] && ok "43 spec rows (30 W + 11 S + 2 existing)" || bad "spec rows found: $total (expected 43)"
+  [ "$total" -eq 49 ] && ok "49 spec rows (36 W + 11 S + 2 existing)" || bad "spec rows found: $total (expected 49)"
+  # the release and pin text names the crate version the PR carries (0.1.3), so it cannot drift again
+  if grep -nE 'mnemonic-io-lib-v0\.1\.2|--precise 0\.1\.2|mnemonic-io-lib = "0\.1\.2"|"0\.1\.2"' "$SPEC" "$PLAN"; then
+    bad "plan or spec release/pin text names 0.1.2 (lines above)"
+  else ok "no 0.1.2 release or pin text in plan or spec"; fi
   # coverage map
   local lines=0 missing=0 noowner=0 line owner quote
   while IFS=$'\t' read -r _ _ quote owner; do
@@ -122,11 +129,19 @@ mode_green() {
   need_toolchain; need_not_root
   nextest green-io -p mnemonic-io-lib -E "$IOFILTER"
   local sum; sum=$(grep -E 'Summary' "$OUT/green-io.txt" | tail -1); echo "$sum"
-  echo "$sum" | grep -qE ' 44 tests run: 44 passed' && ok "44 rows passed" || bad "not 44 run / 44 passed"
+  echo "$sum" | grep -qE ' 50 tests run: 50 passed' && ok "50 tests (49 rows + child) passed" || bad "not 50 run / 50 passed"
   local id name
   while read -r id name; do
+    [ "$id" = W32 ] && continue # judged below: a SKIP is not a pass
     grep -qE "PASS .*write::tests::$name\$" "$OUT/green-io.txt" || bad "row $id $name did not PASS"
   done < <(rows_from_spec)
+  local w32; w32=$(rows_from_spec | awk '$1=="W32"{print $2}')
+  nextest green-w32 -p mnemonic-io-lib -E "test(=write::tests::$w32)" --no-capture
+  if grep -q 'W32 SKIP' "$OUT/green-w32.txt"; then
+    echo "SKIP row W32 $w32: unshare -Urpf unavailable (not counted as a passed row; 48 of 49 rows ran)"
+  else
+    grep -qE "PASS .*write::tests::$w32\$" "$OUT/green-w32.txt" && ok "row W32 ran and passed" || bad "row W32 $w32 did not PASS"
+  fi
   nextest green-ws --workspace --all-targets
   grep -E 'Summary' "$OUT/green-ws.txt" | tail -1
   grep -qE 'Summary .* 0 failed|Summary .* [0-9]+ passed(, [0-9]+ skipped)?$' "$OUT/green-ws.txt" && ! grep -qE '^ +(FAIL|TIMEOUT|SIGABRT) ' "$OUT/green-ws.txt" \

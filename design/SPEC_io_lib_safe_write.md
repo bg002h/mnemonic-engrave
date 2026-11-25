@@ -113,10 +113,12 @@ tightening already intends); no `sync_all` in DIRECT (today has none).
 An alias names a stream the process already holds: it is written into that stream, never truncated.
 The aliases (Unix) name a descriptor N of THIS process: `/dev/stdin|stdout|stderr` (0, 1, 2), `/dev/fd/N`, and
 `/proc/W/fd/N` with W = `self`, `thread-self`, the own pid, `self/task/T` or `<own pid>/task/T`; N and T are ASCII digits.
+The own pid is the one this `/proc` numbers (`readlink /proc/self`), not `getpid()`: they differ in a pid namespace that kept its parent's `/proc`.
 Except for `/dev/stdin|stdout|stderr`, the name must exist (`symlink_metadata`): `/dev/fd/01` or a closed N is not an alias.
+A name whose alias is found only through its canonical parent must exist as given too: `/dev/fd/1/.` is ENOTDIR to the kernel and is not an alias.
 Every N is duplicated (`F_DUPFD_CLOEXEC`): the write lands at the stream's own offset and keeps its O_APPEND;
-for 1 it first flushes std's stdout, under its lock. Then 0600 on the handle and `write_all`: no `set_len`, no temp, no sync.
-A failed write can leave part of the bytes after the earlier contents.
+it first flushes std's stdout, under its lock (an error is returned only for N = 1). A descriptor not open for writing (`fcntl(F_GETFL)` access mode `O_RDONLY`, as `/dev/stdin < f`) is refused with EBADF before its file's mode is touched. Then 0600 on the handle and `write_all`: no `set_len`, no temp, no sync.
+A failed write can leave part of the bytes in the stream at its offset (after the earlier contents when it appends).
 Any other `/proc/` path (`/proc/self/cwd/x`, `/proc/self/root/...`, `/proc/<another pid>/...`) is not an alias:
 it is classified by steps 1 to 3 like any other name, so a regular file there is replaced ATOMIC, never appended to.
 
@@ -247,8 +249,14 @@ W12-W16 and W18 land in the GREEN commit, with the seam and the temp-name functi
 | W26 `a_proc_self_root_path_onto_a_file_is_replaced_atomically` (linux) | RED | `f` as W25; `write_private("/proc/self/root" + f, b"NEW\n")` | `Ok`; `f` is exactly `NEW\n`, 0600, a new inode; dir holds only `f` | `OLD-VALID-CARD\nNEW\n`; RED |
 | W27 `a_link_to_a_proc_self_root_path_is_written_through_and_stays_a_link` (linux) | RED | `f` as W25; `l` a symlink -> the W26 path; `write_private(l, b"NEW\n")` | `Ok`; `f` is exactly `NEW\n`, 0600, a new inode; `l` still a symlink; dir holds `f` and `l` only | `OLD-VALID-CARD\nNEW\n`; RED |
 | W28 `dev_fd_3_keeps_the_stream_order_in_a_redirected_file` (unix) | RED | `f` = `EARLIER\n` (0644); `sh -c '{ echo a >&3; child; echo b >&3; } 3>f'`, child calls `write_private("/dev/fd/3", b"NEW\n")` | `child-result: Ok`; `f` is exactly `a\nNEW\nb\n`, 0600 | `a\nb\nW\n`; RED |
-| W29 `a_name_under_a_link_to_proc_thread_self_fd_appended_to_a_file_keeps_its_earlier_lines` (unix) | GREEN guard | as W24 with `fd` a symlink -> `/proc/thread-self/fd` | `f` starts `EARLIER\n`, contains `NEW\n`; dir holds `f` and `fd` only | passes |
+| W29 `a_name_under_a_link_to_proc_thread_self_fd_appended_to_a_file_keeps_its_earlier_lines` (linux) | GREEN guard | as W24 with `fd` a symlink -> `/proc/thread-self/fd` | `f` starts `EARLIER\n`, contains `NEW\n`; dir holds `f` and `fd` only | passes |
 | W30 `a_descriptor_name_the_kernel_lacks_is_refused` (unix) | RED | child with piped stdout calls `write_private("/dev/fd/01", b"NEW\n")` | `child-result: Err raw_os_error=2`; child stdout does not contain `NEW` | `Ok`, `NEW` on stdout; RED |
+| W31 `a_read_only_descriptor_is_refused_before_its_mode_changes` (unix) | RED | `f` = `OLD-VALID-CARD\n` (0644); `sh -c '"$0" ... 3<"$1"'`, child calls `write_private("/dev/fd/3", b"NEW\n")` | `child-result: Err raw_os_error=9`; `f`'s bytes unchanged and its mode still 0644 | `f` mode 0600 (`left: 384`, `right: 420`); RED |
+| W32 `a_name_under_a_link_to_dev_fd_in_a_pid_namespace_keeps_its_earlier_lines` (linux) | RED | `fd` a symlink -> `/dev/fd`; `f` = `EARLIER\n`; `unshare -Urpf --kill-child sh -c '"$0" ... >>"$1"'` (a new pid namespace that keeps the outer `/proc`), child calls `write_private(<dir>/fd/1, b"NEW\n")`; prints `W32 SKIP: unshare -Urpf unavailable` and passes where user namespaces are off (the gate prints a SKIP line and does not count it as a passed row) | `child-result: Ok`; `f` starts `EARLIER\n` and contains `NEW\n` | `f` is exactly `NEW\n`; RED |
+| W33 `dev_fd_3_onto_stdouts_file_keeps_the_stream_order` (unix) | RED | `sh -c '"$0" ... >"$1" 3>&1'`; child prints `before-the-write|` (no newline), calls `write_private("/dev/fd/3", b"NEW\n")`, prints `after-the-write` | `child-result: Ok`; `f` contains `before-the-write|NEW\nafter-the-write` | `NEW` before `before-the-write|`; RED |
+| W34 `a_descriptor_name_with_a_trailing_dot_is_refused` (unix) | RED | child with piped stdout calls `write_private("/dev/fd/1/.", b"NEW\n")` | `child-result: Err raw_os_error=20`; child stdout does not contain `NEW` | `Ok`, `NEW` on stdout; RED |
+| W35 `another_processs_descriptor_path_is_not_an_alias` (linux) | GREEN guard | `f` = `OLD-VALID-CARD\n`; `g` open for writing in the test; a child `sh` holds `f` open on the same descriptor number N (`exec N>>f`); `write_private("/proc/<child pid>/fd/N", b"NEW\n")` | `Ok`; `f` is exactly `NEW\n` (replaced ATOMIC); `g` is empty | passes; under the plant "`who != me` arm removed" `g` holds `NEW\n` |
+| W36 `an_alias_write_leaves_the_callers_descriptor_open` (unix) | GREEN guard | the test opens `f` for writing as descriptor N; for each spelling of N (`/dev/fd/N`; on Linux also `/proc/self/fd/N`, `/proc/thread-self/fd/N`, `/proc/<pid>/fd/N`, `/proc/self/task/T/fd/N`, `/proc/<pid>/task/T/fd/N`) calls `write_private(spelling, spelling bytes)` | each `Ok`; the test's handle is still valid after each; `f` holds all writes in order | passes; under the plant "`from_raw_fd(N)` instead of a dup" the process aborts (`IO Safety violation`) |
 | W12 `the_temp_name_is_the_target_name_or_the_fallback` | new | calls the private temp-name function | 200-byte name -> `<name>.7.3.tmp` for pid 7, n 3; 201-byte name -> `mnemonic-io-lib.7.3.tmp` | n/a (new function) |
 | W13 `a_failure_at_each_step_removes_the_temp_and_keeps_the_old_file` | new | old `card.txt` = `old`; for each step of the platform (unix: `CreateTemp`, `Preflight`, `Chmod`, `Write`, `Sync`, `Rename`; other: `CreateTemp`, `Preflight`, `Write`, `Sync`, `Rename`) inject an error | `Err` whose `Display` is `injected at <Step>`; bytes `old`; dir holds only the target | n/a (new branch) |
 | W14 `a_directory_sync_failure_after_the_rename_is_not_reported` (unix) | new | inject at `DirSync` | `Ok`; bytes new; dir holds only the target | n/a |
@@ -283,11 +291,11 @@ Windows/macOS legs exercise `write_private` only through their own `--out` CLI t
 | repo | call sites (default head) | wrapper text today (unchanged by this spec) | pin after | then unblocks |
 | --- | --- | --- | --- | --- |
 | me | `crates/me-cli/src/main.rs:824` (`run`, NDEF `--out`), `:899` (`run_bundle_cli`, manifest), `:1023` (`run_seal_cli`, UF2), `:3318` (`emit`) | `me: cannot write <path>: <e>` exit `EXIT_USAGE` (824, 899, 1023); `<path>: <e>` (3318) | path dep (no bump) | #13 FIX-me-output-integrity (me-I10 through `same_file`; me-I5 is closed by this spec's W1 to W4; me-I4 is T6) |
-| md | `descriptor-mnemonic` `crates/md-cli/src/cmd/mod.rs:109-112` `write_artifact` | `--out <path>: <e>` (`CliError::BadArg`) | `"0.1.2"` | #9 FIX_bh1119_md_out_writes (md-C4; I1, I7 are T6/T7). md adopts `write_private` only; `tests/cli_p3_decline.rs` needs no change |
-| mk | `mnemonic-key` `crates/mk-cli/src/cmd/encode.rs:436` | `--out <path>: <e>` (`CliError::UsageError`) | `"0.1.2"` | #10 F-B output writes (mk-I1; mk-I6 through `same_file`) |
-| ms | `mnemonic-secret` `crates/ms-cli/src/out.rs:85-88` `write_artifact` (callers `crates/ms-cli/src/cmd/encode.rs:273`, `crates/ms-cli/src/cmd/hashlock.rs:426`, `crates/ms-cli/src/cmd/repair.rs:170`) | `failed to write --out <path>: <e>` (`CliError::BadInput`) | git rev -> registry `"0.1.2"` (ruling T25) | #11 FIX_bughunt1119_ms_out_writes (ms-I13; ms-I1 through `same_file`). `write_artifact_create_new` (`crates/ms-cli/src/out.rs:46`) is ms's own and not touched |
-| mt | `mnemonic-transaction` `crates/mt-cli/src/main.rs:848` | refusal `cannot write <path>` / `The file could not be created or written: <e>. Nothing was engraved and nothing was left behind.` | git rev -> registry `"0.1.2"` | #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`; mt-C2 is T6). Its "nothing was left behind" becomes true for every reported error. #12 revisits the remedy ("Check the directory exists and is writable, then re-run.", `crates/mt-cli/src/main.rs:859-860`): it names the directory only, and is wrong for item 6 of section 7 |
-| tk | none today (`argv_guard.rs` uses `remedy` only); bare `std::fs::write` at `crates/mnemonic-toolkit/src/cmd/seedqr.rs:309,337` and the other sites listed on line 18 of `coordinator/agent-reports/bughunt-1119/grade-tk.md` | n/a | `"0.1.2"` | #14 FIX-tk-secret-file-writes (tk-I3, tk-C1 per T38) adopts `write::write_private`; `tests/p3_declined_crate_items.rs` and `tests/p3_io_lib_pin.rs` change with it |
+| md | `descriptor-mnemonic` `crates/md-cli/src/cmd/mod.rs:109-112` `write_artifact` | `--out <path>: <e>` (`CliError::BadArg`) | `"0.1.3"` | #9 FIX_bh1119_md_out_writes (md-C4; I1, I7 are T6/T7). md adopts `write_private` only; `tests/cli_p3_decline.rs` needs no change |
+| mk | `mnemonic-key` `crates/mk-cli/src/cmd/encode.rs:436` | `--out <path>: <e>` (`CliError::UsageError`) | `"0.1.3"` | #10 F-B output writes (mk-I1; mk-I6 through `same_file`) |
+| ms | `mnemonic-secret` `crates/ms-cli/src/out.rs:85-88` `write_artifact` (callers `crates/ms-cli/src/cmd/encode.rs:273`, `crates/ms-cli/src/cmd/hashlock.rs:426`, `crates/ms-cli/src/cmd/repair.rs:170`) | `failed to write --out <path>: <e>` (`CliError::BadInput`) | git rev -> registry `"0.1.3"` (ruling T25) | #11 FIX_bughunt1119_ms_out_writes (ms-I13; ms-I1 through `same_file`). `write_artifact_create_new` (`crates/ms-cli/src/out.rs:46`) is ms's own and not touched |
+| mt | `mnemonic-transaction` `crates/mt-cli/src/main.rs:848` | refusal `cannot write <path>` / `The file could not be created or written: <e>. Nothing was engraved and nothing was left behind.` | git rev -> registry `"0.1.3"` | #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`; mt-C2 is T6). Its "nothing was left behind" becomes true for every reported error. #12 revisits the remedy ("Check the directory exists and is writable, then re-run.", `crates/mt-cli/src/main.rs:859-860`): it names the directory only, and is wrong for item 6 of section 7 |
+| tk | none today (`argv_guard.rs` uses `remedy` only); bare `std::fs::write` at `crates/mnemonic-toolkit/src/cmd/seedqr.rs:309,337` and the other sites listed on line 18 of `coordinator/agent-reports/bughunt-1119/grade-tk.md` | n/a | `"0.1.3"` | #14 FIX-tk-secret-file-writes (tk-I3, tk-C1 per T38) adopts `write::write_private`; `tests/p3_declined_crate_items.rs` and `tests/p3_io_lib_pin.rs` change with it |
 
 Toolkit-manual sentences that describe the old mechanism, each pin-bump PR updates these lines in the same PR (lockstep rule), as well as `42-md.md:219` and the source comments
 that describe the open-file chmod and truncate (md-cli `cmd/mod.rs:105-108`, mt-cli `main.rs:844-847`):
@@ -301,16 +309,16 @@ Outside the table: mnemonic-refugium (`6e2072e72`) has no `write_private` and no
 ## 10. Release and pin-bump order
 
 1. me PR (full track, this spec's plan): the rows of section 8, the implementation, `crates/mnemonic-io-lib/Cargo.toml`
-   version 0.1.1 -> 0.1.2 and the `Cargo.lock` entry with it. Merges to master through `ci/staging`.
-2. Release run (coordinator): tag `mnemonic-io-lib-v0.1.2` on the merge commit and `cargo publish -p
-   mnemonic-io-lib` (Brian 2026-11-22 "Go for any release"). 0.1.1 is skipped on crates.io; 0.1.2 carries it.
+   version 0.1.1 -> 0.1.3 (0.1.2 is never published) and the `Cargo.lock` entry with it. Merges to master through `ci/staging`.
+2. Release run (coordinator): tag `mnemonic-io-lib-v0.1.3` on the merge commit and `cargo publish -p
+   mnemonic-io-lib` (Brian 2026-11-22 "Go for any release"). 0.1.1 and 0.1.2 are skipped on crates.io; 0.1.3 carries them.
 3. me #13 can land with step 1 or after it (path dep); it needs no release.
-4. After 0.1.2 is on crates.io, each consumer's bughunt FIX PR makes the pin bump its FIRST commit
-   (**PROPOSED**: one PR per repo, not a separate bump PR): md, mk, tk set `mnemonic-io-lib = "0.1.2"` (the
-   requirement must name 0.1.2 so a lock cannot fall back to 0.1.0), `cargo update -p mnemonic-io-lib --precise
-   0.1.2`, refresh `vendor/` and pass `ci/repro/vendor-freshness.sh`; ms and mt replace the git dependency with
-   `mnemonic-io-lib = "0.1.2"` and run `cargo update -p mnemonic-io-lib` (no `--precise`: with the git entry still in
-   the lock, `--precise 0.1.2` fails `revspec '0.1.2' not found`); the lock must then show `version = "0.1.2"` with
+4. After 0.1.3 is on crates.io, each consumer's bughunt FIX PR makes the pin bump its FIRST commit
+   (**PROPOSED**: one PR per repo, not a separate bump PR): md, mk, tk set `mnemonic-io-lib = "0.1.3"` (the
+   requirement must name 0.1.3 so a lock cannot fall back to 0.1.0), `cargo update -p mnemonic-io-lib --precise
+   0.1.3`, refresh `vendor/` and pass `ci/repro/vendor-freshness.sh`; ms and mt replace the git dependency with
+   `mnemonic-io-lib = "0.1.3"` and run `cargo update -p mnemonic-io-lib` (no `--precise`: with the git entry still in
+   the lock, `--precise 0.1.3` fails `revspec '0.1.3' not found`); the lock must then show `version = "0.1.3"` with
    the crates.io source. ms also refreshes `vendor/`, deletes the
    `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line from
    `ci/repro/vendor-git-sources.txt`, and passes `ci/repro/vendor-freshness.sh`. ms also edits `.github/workflows/man-release.yml`: delete the `pins` job and `needs: pins`; delete `git_source_url` and `git_source_rev` from the `repro` job (an empty or absent pair makes the toolkit workflow skip its fourth `[source]` stanza); in both musl build steps delete the `IO_LIB_REV` and `IO_LIB_SRC` lines and the three `--config "source.\"${IO_LIB_SRC}\"..."` lines (and the `-e IO_LIB_REV="$IO_LIB_REV" \` line in the x86_64 `docker run` step), keeping the `source.crates-io.replace-with` and `vendored-sources` configs. `grep -n 'mnemonic-engrave\|IO_LIB\|pins' .github/workflows/*.yml` must then print no ms workflow line other than comments. Order among them is

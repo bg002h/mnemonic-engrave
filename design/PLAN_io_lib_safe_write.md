@@ -1,4 +1,4 @@
-# PLAN: mnemonic-io-lib 0.1.2 safe write (bughunt-1119 row 7, ruling T5)
+# PLAN: mnemonic-io-lib 0.1.3 safe write (bughunt-1119 row 7, ruling T5)
 
 Author: Claude Sonnet 5.5 (claude-sonnet-5-5), 2026-11-22, SLIM plan (no code blocks). Spec:
 `design/SPEC_io_lib_safe_write.md` (this branch; spec head e98d809a closed GREEN after r3, plus the commit
@@ -98,6 +98,12 @@ code that the row must turn red; the build report pastes each mutant's failing r
 | [W28] | 0.1.3 RED | N > 2 reopened append; or N > 2 sent ATOMIC |
 | [W29] | 0.1.3 passes (guard) | no `task/T` arm |
 | [W30] | 0.1.3 RED | no existence check in `alias_fd` |
+| [W31] | 0.1.3 RED | the `open_for_writing` check removed (the mode call runs on an input) |
+| [W32] | 0.1.3 RED | `std::process::id()` instead of `readlink /proc/self` in `alias_fd`; SKIP where `unshare -Urpf` is unavailable |
+| [W33] | 0.1.3 RED | the stdout flush kept for N = 1 only |
+| [W34] | 0.1.3 RED | the existence check on the name as given removed from `spelled_alias` |
+| [W35] | 0.1.3 passes (guard) | the `who != me` arm removed (every pid accepted) |
+| [W36] | 0.1.3 passes (guard) | `from_raw_fd(N)` instead of a dup (the caller's descriptor is closed) |
 | [W12] | GREEN | limit 201 instead of 200 bytes; or the fallback name changed |
 | [W13] | GREEN | skip `remove_file` after one step; or swallow the step's error |
 | [W14] | GREEN | propagate the directory-sync error |
@@ -118,7 +124,7 @@ code that the row must turn red; the build report pastes each mutant's failing r
 
 A mutant that no row turns red is a STOP: paste it and report.
 
-Counts the gate checks: 30 W rows + 11 S rows + 2 existing rows + `child` = 44 tests in `write::tests::` at
+Counts the gate checks: 36 W rows + 11 S rows + 2 existing rows + `child` = 50 tests (49 rows + `child`) in `write::tests::` at
 GREEN (0.1.3); 15 at RED-1 (W1-W11, W17, the 2 existing, `child`), 4 failing.
 
 ## Existing tests and files that change (rule per file)
@@ -142,7 +148,7 @@ only W13 and W14 set it; no release code carries it. Children get env vars `MNEM
 `MNEMONIC_IO_LIB_TARGET`. W9 shells out to `mkfifo`. Nothing touches a network, a node or a real device
 (no row writes `/dev/null`, spec section 8).
 
-## Phase 2: the release of mnemonic-io-lib 0.1.2 (coordinator; Brian 2026-11-22 "Go for any release")
+## Phase 2: the release of mnemonic-io-lib 0.1.3 (coordinator; Brian 2026-11-22 "Go for any release")
 
 The spec (section 10 step 2) puts the crates.io publish of mnemonic-io-lib in this release, so ms and mt can
 move from git to the registry. Who runs what: the coordinator runs all four steps; the builder runs none.
@@ -150,19 +156,19 @@ move from git to the registry. Who runs what: the coordinator runs all four step
 publish is a separate command.
 
 - [R1] On the merge commit of the T6 PR (local `master` equal to `origin/master`), from inside the me
-  checkout, with `$HOME/.cargo/bin` first: `bash scripts/cut-release.sh --dry-run mnemonic-io-lib-v0.1.2`
+  checkout, with `$HOME/.cargo/bin` first: `bash scripts/cut-release.sh --dry-run mnemonic-io-lib-v0.1.3`
   (path: this repo's script; spec `design/SPEC_cut_release.md` section 3 has the `mnemonic-io-lib-v` row).
-  Expected: `== mnemonic-io-lib is already 0.1.2 (crates/mnemonic-io-lib/Cargo.toml); no version edit` and
+  Expected: `== mnemonic-io-lib is already 0.1.3 (crates/mnemonic-io-lib/Cargo.toml); no version edit` and
   `DRY RUN: nothing to commit; would stage HEAD <12> as it is`. A refusal here is a STOP for the coordinator.
-- [R2] `bash scripts/cut-release.sh --push mnemonic-io-lib-v0.1.2`: pushes the annotated tag through staging.
+- [R2] `bash scripts/cut-release.sh --push mnemonic-io-lib-v0.1.3`: pushes the annotated tag through staging.
 - [R3] `cargo publish --locked -p mnemonic-io-lib --dry-run`, then `cargo publish --locked -p
   mnemonic-io-lib` (irreversible; the registry token stays in the operator's environment and is written to no
   file). Tag first, publish second, so the published crate matches a tag.
 - [R4] From a directory outside any Cargo workspace (for example `cd /scratch/cache`):
-  `cargo info mnemonic-io-lib@0.1.2` prints `version: 0.1.2` with no `(from ./...)` suffix, and
-  `cargo info mnemonic-io-lib@0.1.1` refuses `could not find`; and
+  `cargo info mnemonic-io-lib@0.1.3` prints `version: 0.1.3` with no `(from ./...)` suffix, and
+  `cargo info mnemonic-io-lib@0.1.1` and `cargo info mnemonic-io-lib@0.1.2` refuse `could not find`; and
   `curl -sf -A 'crate-version-check' https://crates.io/api/v1/crates/mnemonic-io-lib | jq -r '.versions[].num'`
-  prints `0.1.2` and `0.1.0` and no `0.1.1` (the spec: "0.1.1 is skipped on crates.io; 0.1.2 carries it").
+  prints `0.1.3` and `0.1.0` and no `0.1.1` or `0.1.2` (the spec: "0.1.1 and 0.1.2 are skipped on crates.io; 0.1.3 carries them").
 
 ## Phase 3: one pin-bump step per consumer (each is the FIRST commit of that repo's bughunt FIX PR)
 
@@ -175,11 +181,11 @@ mnemonic-toolkit: the C5 tk PR edits all of them, for md, mk, ms, mt and tk. C1-
 have none), and say so in their descriptions. The source comments of spec section 9 stay with their repo: md-cli
 `cmd/mod.rs:105-108` in C1, mt-cli `main.rs:844-847` in C4.
 
-- [C1] md (`descriptor-mnemonic`): `mnemonic-io-lib = "0.1.2"`; `cargo update -p mnemonic-io-lib --precise
-  0.1.2`; refresh `vendor/` (`cargo vendor --locked vendor/`); pass `ci/repro/vendor-freshness.sh`. Unblocks #9 FIX_bh1119_md_out_writes (md-C4).
+- [C1] md (`descriptor-mnemonic`): `mnemonic-io-lib = "0.1.3"`; `cargo update -p mnemonic-io-lib --precise
+  0.1.3`; refresh `vendor/` (`cargo vendor --locked vendor/`); pass `ci/repro/vendor-freshness.sh`. Unblocks #9 FIX_bh1119_md_out_writes (md-C4).
 - [C2] mk (`mnemonic-key`): same recipe (including `cargo vendor --locked vendor/`). Unblocks #10 F-B output writes (mk-I1; mk-I6 through `same_file`).
-- [C3] ms (`mnemonic-secret`): replace the git dependency by `"0.1.2"`; `cargo update -p mnemonic-io-lib` with
-  no `--precise`; the lock shows `version = "0.1.2"` with the crates.io source; refresh `vendor/` (`cargo vendor --locked vendor/`); delete the
+- [C3] ms (`mnemonic-secret`): replace the git dependency by `"0.1.3"`; `cargo update -p mnemonic-io-lib` with
+  no `--precise`; the lock shows `version = "0.1.3"` with the crates.io source; refresh `vendor/` (`cargo vendor --locked vendor/`); delete the
   `mnemonic-io-lib|https://github.com/bg002h/mnemonic-engrave|crates/mnemonic-io-lib` line of
   `ci/repro/vendor-git-sources.txt`; pass `ci/repro/vendor-freshness.sh`; then `git add -A vendor/ ci/repro/vendor-git-sources.txt` (the vendored crate gains a new untracked `Cargo.lock`; commit it, a clean checkout fails freshness without it) and run `bash ci/repro/vendor-freshness.sh` once more from a fresh clone of the branch; edit `.github/workflows/man-release.yml`
   as spec section 10 step 4 lists (delete the `pins` job and `needs: pins`; delete `git_source_url` and
@@ -188,15 +194,15 @@ have none), and say so in their descriptions. The source comments of spec sectio
   `grep -n 'mnemonic-engrave\|IO_LIB\|pins' .github/workflows/*.yml` must print only comment lines. This PR
   edits `.github/`; say so in its description (RULES allows it inside a reviewed PR). Unblocks #11
   FIX_bughunt1119_ms_out_writes (ms-I13; ms-I1 through `same_file`).
-- [C4] mt (`mnemonic-transaction`): replace the git dependency by `"0.1.2"`; `cargo update -p
-  mnemonic-io-lib`; the lock shows `0.1.2` from crates.io; mt is not vendored. The spec lists no
+- [C4] mt (`mnemonic-transaction`): replace the git dependency by `"0.1.3"`; `cargo update -p
+  mnemonic-io-lib`; the lock shows `0.1.3` from crates.io; mt is not vendored. The spec lists no
   `.github/` edit for mt; if mt's workflows reference the git source, that is a STOP for the mt builder.
   Unblocks #12 FIX-B output writes (mt-C3; mt-I4 through `same_file`).
-- [C5] tk (`mnemonic-toolkit`): `"0.1.2"`; `cargo update -p mnemonic-io-lib --precise 0.1.2`; refresh `vendor/` (`cargo vendor --locked vendor/`);
+- [C5] tk (`mnemonic-toolkit`): `"0.1.3"`; `cargo update -p mnemonic-io-lib --precise 0.1.3`; refresh `vendor/` (`cargo vendor --locked vendor/`);
   pass `ci/repro/vendor-freshness.sh`. Start only after C1-C4 have merged (see above). Unblocks #14 FIX-tk-secret-file-writes (tk-I3, tk-C1). The two tk tests
   `crates/mnemonic-toolkit/tests/p3_declined_crate_items.rs` and `crates/mnemonic-toolkit/tests/p3_io_lib_pin.rs` change with #14 (spec section 9), and the
   tk pin PR must keep them green or change them in the same PR: that choice is the tk builder's STOP if the
-  tests refuse `0.1.2`.
+  tests refuse `0.1.3`.
 - #13 FIX-me-output-integrity (me-I10 through `same_file`): the me path dependency needs no bump and no
   release; it can land with T6 or after (spec section 10 step 3). Not this plan's.
 

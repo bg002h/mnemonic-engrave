@@ -93,7 +93,8 @@ fn fault(step: Step) -> io::Result<()> {
 /// appends to `f`, and `{ a; tool --out /dev/fd/3; b; } 3> f` keeps all three
 /// in order. Descriptor N is duplicated (its own offset and `O_APPEND`);
 /// stdout is flushed and locked first. `0o600` is set on the handle first. A
-/// failed write can leave part of `bytes` after the earlier contents. Any
+/// failed write can leave part of `bytes` in the stream at its offset (after
+/// the earlier contents when it appends). Any
 /// other `/proc/` path (`/proc/self/cwd/x`, another process's `/proc/<pid>/`)
 /// is a file name like any other: a regular file there is replaced ATOMIC.
 ///
@@ -164,6 +165,9 @@ fn spelled_alias(p: &Path) -> Option<i32> {
         Some(d) if !d.as_os_str().is_empty() => d,
         _ => Path::new("."),
     };
+    // The name itself must exist: `/dev/fd/1/.` has file_name `1` but is
+    // ENOTDIR to the kernel.
+    fs::symlink_metadata(p).ok()?;
     alias_fd(&fs::canonicalize(dir).ok()?.join(p.file_name()?))
 }
 
@@ -215,8 +219,10 @@ fn alias_fd(p: &Path) -> Option<i32> {
                 Some(_) => return None,
                 None => who,
             };
-            let me = std::process::id().to_string(); // a variable: clippy::cmp_owned
-            if who != "self" && who != "thread-self" && who != me {
+            // This process's pid as THIS /proc numbers it: getpid() differs in a
+            // pid namespace that kept its parent's /proc.
+            let me = fs::read_link("/proc/self").ok()?;
+            if who != "self" && who != "thread-self" && Path::new(who) != me {
                 return None;
             }
             n
@@ -239,6 +245,12 @@ fn write_alias(fd: i32, bytes: &[u8]) -> io::Result<()> {
     use std::os::unix::io::{AsFd, BorrowedFd};
     // Held across the write: nothing else here prints to stdout in between.
     let mut out = io::stdout().lock();
+    if fd != 1 {
+        // N may share stdout's file (`>f 3>&1`): what the caller already
+        // printed lands first. A broken stdout is the caller's own print's
+        // error to report, not this write's.
+        let _ = out.flush();
+    }
     let owned = match fd {
         0 => io::stdin().as_fd().try_clone_to_owned()?,
         1 => {
@@ -248,13 +260,38 @@ fn write_alias(fd: i32, bytes: &[u8]) -> io::Result<()> {
         }
         2 => io::stderr().as_fd().try_clone_to_owned()?,
         // SAFETY: `alias_fd` saw `fd`'s name exist, so it was open; the borrow
-        // lives for this one fcntl(F_DUPFD_CLOEXEC), which fails with EBADF if
-        // another thread closed it since.
+        // lives for this one fcntl(F_DUPFD_CLOEXEC), which closes nothing. If
+        // another thread closed `fd` since, the dup fails with EBADF, or, if the
+        // number was reused, duplicates the new file (as std's own stdio would).
         n => unsafe { BorrowedFd::borrow_raw(n) }.try_clone_to_owned()?,
     };
     let mut f = File::from(owned);
+    // A descriptor not open for writing (an input, `/dev/stdin < f`) is
+    // refused before its file's mode is touched.
+    if !open_for_writing(&f)? {
+        return Err(io::Error::from_raw_os_error(9)); // EBADF, as write(2) says
+    }
     f.set_permissions(fs::Permissions::from_mode(0o600))?;
     f.write_all(bytes)
+}
+
+/// `fcntl(F_GETFL)` access mode is `O_WRONLY` or `O_RDWR`. Declared against
+/// the C library std already links (no dependency; spec section 2 item 4).
+/// `F_GETFL` = 3, `O_ACCMODE` = 3, `O_RDONLY` = 0 on Linux and Apple.
+#[cfg(unix)]
+fn open_for_writing(f: &File) -> io::Result<bool> {
+    use std::os::raw::c_int;
+    use std::os::unix::io::AsRawFd;
+    extern "C" {
+        fn fcntl(fd: c_int, cmd: c_int, ...) -> c_int;
+    }
+    // SAFETY: the descriptor belongs to `f`, which outlives the call; F_GETFL
+    // takes no third argument and only reads the descriptor's flags.
+    let fl = unsafe { fcntl(f.as_raw_fd(), 3) };
+    if fl < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(fl & 3 != 0)
 }
 
 #[cfg(unix)]
@@ -1332,6 +1369,7 @@ mod tests {
         std::fs::write(&f, OLD_CARD).unwrap();
         let h = std::fs::OpenOptions::new()
             .create(true)
+            .truncate(false)
             .write(true)
             .open(&g)
             .unwrap();
@@ -1375,6 +1413,7 @@ mod tests {
         let f = d.path().join("f");
         let h = std::fs::OpenOptions::new()
             .create(true)
+            .truncate(false)
             .write(true)
             .open(&f)
             .unwrap();
