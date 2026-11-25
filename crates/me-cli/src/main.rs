@@ -4014,13 +4014,25 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
         E::Unclassifiable(i, why) => {
             use mnemonic_engrave::sysw::UnknownReason as U;
             match why {
-                U::NonHexBody(prefix) => format!(
-                    "record {i}, as given (records count from 0) begins `{prefix}`, but its body is \
-                     not lowercase hex. That prefix is RESERVED, so a body it cannot \
-                     decode is refused rather than quietly engraved as free text \
-                     (§5.3.1). Encode the body first:\n      \
-                     printf '%s' 'your text here' | xxd -p -c 256"
-                ),
+                U::NonHexBody(prefix) => {
+                    let head = format!(
+                        "record {i}, as given (records count from 0) begins `{prefix}`, but its body is \
+                         not lowercase hex. That prefix is RESERVED, so a body it cannot \
+                         decode is refused rather than quietly engraved as free text \
+                         (§5.3.1)."
+                    );
+                    // A `pass:` body is a passphrase: no remedy line, because the
+                    // one-liner would invite typing it into a shell command, into
+                    // the shell's history (fixdoc28-n1, s3-remedy-argv).
+                    if prefix == "pass:" {
+                        head
+                    } else {
+                        format!(
+                            "{head} Encode the body first:\n      \
+                             printf '%s' 'your text here' | xxd -p -c 256"
+                        )
+                    }
+                }
                 U::NotATransaction(e) => format!(
                     "record {i}, as given (records count from 0) begins `tx:` and its body is hex, \
                      but the bytes are not one serialized Bitcoin transaction ({e}). The \
