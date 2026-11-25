@@ -21452,3 +21452,101 @@ Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports
 - [bh1125-e4-stale-comments] status=open grade=N kind=docs owner=none filed=2026-11-25 src=agent-reports/bughunt-2026-11-25-mnemonic-engrave-review-r2.md#n-2 repo=me :: main.rs:2191-2195 says `decide_sealing` is BYTE-UNCHANGED (the decision is; the function is not); sysw/record.rs:282-292 lists the walk's callers but not the new mdmk_unconfirmed_quiet caller.
 - [bh1125-e3-spec-row-counts] status=open grade=N kind=docs owner=none filed=2026-11-25 src=agent-reports/bughunt-2026-11-25-mnemonic-engrave-review-r2.md#n-3 repo=me :: SPEC_descriptor_input.md :1546 ("§6 is 35 data rows") and :2153 ("leaving 35") are not annotated for E3's 36th row; only :43 is.
 - [bh1125-e3-refusal-repeats-per-key] status=open grade=N kind=ux owner=none filed=2026-11-25 src=agent-reports/bughunt-2026-11-25-mnemonic-engrave-review-r2.md#n-4 repo=me :: md1-origin-mismatch repeats its full clause per key (about 3 KB on a 16-key wallet) and ends "this key was not made at" in the singular; group keys that share a clause.
+
+
+### `sh-bh1125-address-list-no-change-chain-toggle` — the address list leaves entirely when the operator toggles to change on a policy with no change chain (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — owning phase: end-of-project minors
+
+- **Surfaced:** review r1 of seedhammer PR #29, M-1 (bug hunt 2026-11-25 SH#6 follow-on).
+- **Where:** `gui/address_polish.go:69-77` (`addressListFlow`'s `recompute`): `showError(ctx, th, "Address", err.Error())`, then the flow returns.
+- **What:** After SH#6, `address.Change` and the complex route refuse a policy whose keys have no multipath step, returning `address.ErrNoChangeChain`. Toggling to change on the address list then shows the developer string `address: no change chain (no key has a <0;1> multipath step)` and leaves the screen, losing the receive list too. It can be reached in two ways:
+  - from `md1_inspect.go:173`, for md1 cards with `@N/*`;
+  - from `gui.go:3339`, for an imported descriptor with a fixed chain step such as `wpkh([fp/84h/0h/0h]xpub/0/*)`, a common export spelling.
+- **Grade:** Minor. It fails closed and is no funds risk. Before SH#6 the screen mislabelled the receive list as "Change addresses".
+- **Fix direction:** when `address.HasChangeChain` is false, disable the toggle or show "No change chain" in place, and keep the receive list. Add an emulator or flow test.
+- **Tier:** v1
+
+### `sh-bh1125-check-check-pkk-type-refusal` — the emitter pins `<K> CHECKSIG CHECKSIG` for `Check(Check(PkK))`, a tree Rust refuses at type-check (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** OPEN — owning phase: md port convergence
+
+- **Surfaced:** review r1 of seedhammer PR #29, M-2.
+- **Where:**
+  - `md/script_emit.go` `emitFragment`, `tagCheck` arm;
+  - `md/legacy_check_test.go:236-241` (`TestCheckIdempotenceIsOnlyForABareKey`), which asserts that exact output as the wanted result.
+- **What:**
+  - **The gap:** the Go md port has no miniscript type checker. Rust `to_miniscript.rs:777-779` refuses `Check(Check(PkK))` ("cannot wrap a fragment of type B"); Go emits an unsatisfiable script and shows its well-formed address. This existed before PR #29, which only changed `CHECKSIG CHECKSIG CHECKSIG` to `CHECKSIG CHECKSIG`, and it is disclosed in the `md/bits.go` provenance pin.
+  - **Reach:** only a hand-built or foreign-encoder card reaches it. No encoder writes it.
+  - **Test hazard:** the new test pins the wrong output as required, so a later convergence fix will look like a regression.
+- **Grade:** Minor.
+- **Fix direction:** port Rust's refusal first, under the Rust-primary rule; Rust already refuses. Two options:
+  - narrow: return `ErrScriptUnsupported` in the `tagCheck` arm when the child is itself `tagCheck`;
+  - fuller: a type-B check over `Check` children.
+
+  Change the test to assert the refusal, or at minimum assert "not the bare script" instead of exact bytes.
+- **Tier:** v1
+
+### `sh-bh1125-mk-encode-stale-comment` — `mk/encode.go` comment says Encode is "still the two-line composition at :39-45" (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — owning phase: end-of-project minors
+
+- **Surfaced:** review r1 of seedhammer PR #29, N-1.
+- **Where:** `mk/encode.go:129-131` (the `DerivedChunkSetID` docstring).
+- **What:** SH#4 made `Encode` call `checkKeyRules`, so "Encode itself is untouched: Encode is still the two-line composition at :39-45" is false, and the line numbers have moved.
+- **Grade:** Nit.
+- **Fix direction:** reword it, without line numbers.
+- **Tier:** v1
+
+### `sh-bh1125-derived-csid-vs-me-cli-mk-codec-060` — `DerivedChunkSetID` follows `encode_canonical_payload`, me-cli calls `encode_bytecode`; they diverge once me-cli moves to mk-codec 0.6.0 (repo: **seedhammer fork + mnemonic-engrave**; owning phase: **me-cli mk-codec 0.6 pin bump**)
+
+**Status:** OPEN — owning phase: me-cli mk-codec 0.6 pin bump
+
+- **Surfaced:** review r1 of seedhammer PR #29, N-2.
+- **Where:**
+  - fork `mk/encode.go:133-136` (the `DerivedChunkSetID` docstring cites me-cli's `derive_chunk_set_id(encode_bytecode(card))`);
+  - mnemonic-engrave `crates/me-cli/src/csid_warn.rs` (`derived_chunk_set_id`).
+- **What:**
+  - Under mk-codec 0.6.0, `encode_bytecode` applies the key-origin rules R2-R4, and `encode_canonical_payload` does not.
+  - The Go port, after SH#4, follows `encode_canonical_payload`, so a legacy card still gets a derived csid.
+  - me-cli is on mk-codec 0.5.0 today (its `Cargo.lock`). Once it moves to 0.6.0, its `.ok()?` returns None for a legacy card and silently skips the csid warning, so host and device would disagree.
+- **Grade:** Nit on the fork, where only the comment is wrong. A cross-repo item for me-cli.
+- **Companion:** mnemonic-engrave me-cli csid warning, at the mk-codec 0.6 bump.
+- **Fix direction:**
+  - fork: make the docstring name `encode_canonical_payload` (`KeyCard::canonical_payload_bytes`);
+  - me-cli: at the 0.6 bump, switch `derived_chunk_set_id` to the canonical payload, and add a legacy-card test.
+- **Tier:** v1
+
+### `sh-bh1125-pkh-tap-leaf-described-as-pk` — `describeTapLeaf` still describes a `PkH` / `Check(PkH)` leaf as `TapLeafPK` (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — owning phase: end-of-project minors
+
+- **Surfaced:** review r1 of seedhammer PR #29, N-3. Same defect as the existing deferred skip `sh-tapleaf-pkh-as-pk` (`md/bughunt_sh2_s3_test.go`, `TestBughuntSh234PkhLeafDescribedAsPk`). PR #29 extended it to `Check(PkH)`; it did not introduce it.
+- **Where:** `md/tapleaves.go:107-113`.
+- **What:** a pkh leaf is described as the shape that emits `<xonly> OP_CHECKSIG`. `TapLeavesChunks` and `tapLeafSpecs` have no production caller (tests only), so no address is affected today.
+- **Grade:** Nit.
+- **Fix direction:** refuse `PkH` in the describer (`errTapLeafUnsupported`), or add a `TapLeafPKH` kind. Unskip the existing test.
+- **Tier:** v1
+
+### `sh-bh1125-legacy-sh-pk-no-address` — legacy `sh(pk)` / `sh(pkh)` / `sh(wsh(pk))` cards get no address on the device (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** OPEN — owning phase: md port convergence
+
+- **Surfaced:** review r1 of seedhammer PR #29, N-4.
+- **Where:** `md/script_emit.go:105` (`EmitWitnessScriptChunks` refuses any root that is not `wsh`) and the gui complex-route probe.
+- **What:**
+  - The toolkit 0.55.0 changelog lists `sh(pk)`, `sh(pkh)` and `sh(wsh(pk))` among the legacy `Check(PkK/PkH)` shapes.
+  - Rust derives their addresses; the device shows "can't derive". This fails closed and predates PR #29.
+  - It is filed so that "legacy wire converged" (SH#1) is not read as covering these shapes: SH#1 covers wsh and tap-leaf positions only.
+- **Grade:** Nit (a fail-closed capability gap).
+- **Fix direction:** add sh and sh(wsh) roots to the emitter, with P2SH / P2SH-P2WSH addresses pinned to Rust `md address`, and include legacy-wire vectors for the three shapes.
+- **Tier:** v1
+
+### `sh-bh1125-composer-no-change-chain-untested` — the composer consent screen's no-change-chain path has no test (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — owning phase: end-of-project minors
+
+- **Surfaced:** fold review r2 of seedhammer PR #29, N-1 (`design/agent-reports/bughunt-2026-11-25-seedhammer-review-r2.md`).
+- **Where:** `gui/composer_consent.go:337-346` (via the shared `addressProofLines`).
+- **What:** unreachable today (the composer always writes `<0;1>/*`) and checked by hand; if the composer regains its own loop, a regression would go unnoticed. Add a `tr` subtest calling `composerConsentLinesFor`.
+- **Grade:** Nit. **Tier:** test-oracle.
