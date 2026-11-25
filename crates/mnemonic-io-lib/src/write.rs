@@ -1020,7 +1020,10 @@ mod tests {
         let se = String::from_utf8_lossy(&out.stderr).to_string();
         assert!(se.contains("child-result: Ok"), "child stderr: {se}");
         let s = String::from_utf8_lossy(&std::fs::read(&f).unwrap()).to_string();
-        let at = |m: &str| s.find(m).unwrap_or_else(|| panic!("{m:?} missing from {s:?}"));
+        let at = |m: &str| {
+            s.find(m)
+                .unwrap_or_else(|| panic!("{m:?} missing from {s:?}"))
+        };
         assert!(at("before-the-write|") < at("via-dev-stdout\n"), "{s:?}");
         assert!(at("via-dev-stdout\n") < at("after-the-write\n"), "{s:?}");
     }
@@ -1036,7 +1039,10 @@ mod tests {
         let s = appended_run("W23", &l, &f);
         assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
         assert!(s.contains("NEW\n"), "{s:?}");
-        assert!(std::fs::symlink_metadata(&l).unwrap().file_type().is_symlink());
+        assert!(std::fs::symlink_metadata(&l)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(names(d.path()), vec!["f".to_string(), "l".to_string()]);
     }
 
