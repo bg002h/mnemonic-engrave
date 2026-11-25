@@ -27,7 +27,7 @@ use super::cascade::{Branch, Derivation, Key, KeyVersion, Multi, Network, Parsed
 
 /// One row of §6's table.
 ///
-/// All 35 are named, and each has a test in `tests/descriptor_refusals.rs` that
+/// All 36 are named, and each has a test in `tests/descriptor_refusals.rs` that
 /// reaches it and asserts its TEXT: the vocabulary and the row tests are one
 /// set, and a half-vocabulary is what PLAN-r4's NEW-M6 predicted would drift.
 ///
@@ -71,6 +71,9 @@ pub enum Row {
     UseSiteOutOfSet,
     Md1NoWildcard,
     MultiRecordDescriptor,
+    /// Amended 2026-11-25 (bug hunt E3): under `--as md1`, a key whose origin
+    /// contradicts its own depth or child number.
+    Md1OriginMismatch,
 }
 
 impl Row {
@@ -110,6 +113,7 @@ impl Row {
         Row::UseSiteOutOfSet,
         Row::Md1NoWildcard,
         Row::MultiRecordDescriptor,
+        Row::Md1OriginMismatch,
     ];
 
     /// The slug the shared vector file names this row by.
@@ -150,6 +154,7 @@ impl Row {
             Row::UseSiteOutOfSet => "use-site-out-of-set",
             Row::Md1NoWildcard => "md1-no-wildcard",
             Row::MultiRecordDescriptor => "multi-record-descriptor",
+            Row::Md1OriginMismatch => "md1-origin-mismatch",
         }
     }
 }
@@ -1023,6 +1028,91 @@ pub fn md1_no_wildcard(slots: &[usize], keys: &[Key], remedy: &str) -> Refusal {
             offending_keys(slots, keys)
         ),
     )
+}
+
+/// §6's `md1-origin-mismatch` row (amended 2026-11-25, bug hunt E3; ruled
+/// by Brian). md1 keeps
+/// only a key's ORIGIN and rebuilds the xpub's depth and child number from it
+/// (the pubkeys TLV carries chain code and key data, no envelope), so a key
+/// whose origin contradicts its own depth -- or, at depth 1 or more, whose
+/// origin's last step is not its child number -- would be cut with a
+/// derivation it was not made at. `me` cannot tell which of the two is wrong,
+/// so it refuses and names the path that carries the key as given.
+///
+/// `slots` must be non-empty and every slot must fail [`origin_agrees`].
+pub fn md1_origin_mismatch(slots: &[usize], keys: &[Key], multi: Option<Multi>) -> Refusal {
+    let clauses = slots
+        .iter()
+        .map(|i| origin_clause(*i, &keys[*i]))
+        .collect::<Vec<_>>()
+        .join(", and ");
+    // `multi` is carried by `--as md1` alone (conjunct 1), so for it the
+    // descriptor remedy would be false; name the only fix that works.
+    let remedy = if multi == Some(Multi::Unsorted) {
+        "This is a `multi` policy, which only `--as md1` carries, so no `me` path \
+         engraves it as written: correct the origin, or re-export the key, so the two \
+         agree."
+    } else {
+        "Use `--as descriptor`, which carries the key exactly as given."
+    };
+    Refusal::new(
+        Row::Md1OriginMismatch,
+        format!(
+            "md1 cannot carry this wallet as written: {clauses}. md1 keeps only the \
+             origin and rebuilds each key's depth and child number from it, so the card \
+             would record a derivation this key was not made at -- a signer deriving \
+             there gets a DIFFERENT key. {remedy}"
+        ),
+    )
+}
+
+/// Whether a key's origin agrees with its own depth and child number: the
+/// origin has `depth` steps and, at depth 1 or more, its last step IS the
+/// child number (hardened bit included).
+pub fn origin_agrees(k: &Key) -> bool {
+    k.origin.len() == usize::from(k.depth)
+        && (k.depth == 0 || k.origin.last() == Some(&k.child_number))
+}
+
+fn origin_clause(i: usize, k: &Key) -> String {
+    let path = k
+        .origin
+        .iter()
+        .map(|e| step_string(*e))
+        .collect::<Vec<_>>()
+        .join("/");
+    let origin = if k.origin_explicit {
+        format!("`{path}`")
+    } else {
+        format!("`{path}` (implied by the script; the input gave no `[…]` origin)")
+    };
+    if k.origin.len() != usize::from(k.depth) {
+        let n = k.origin.len();
+        format!(
+            "key {} is an xpub at depth {}, but its origin {origin} has {n} step{}",
+            key_name(i, k),
+            k.depth,
+            if n == 1 { "" } else { "s" }
+        )
+    } else {
+        format!(
+            "key {} is an xpub at depth {} with child number {}, but its origin {origin} \
+             ends in {}",
+            key_name(i, k),
+            k.depth,
+            step_string(k.child_number),
+            step_string(*k.origin.last().unwrap_or(&0))
+        )
+    }
+}
+
+/// One BIP-32 step as `84h` / `0`.
+fn step_string(e: u32) -> String {
+    if e >= super::cascade::HARDENED {
+        format!("{}h", e & !super::cascade::HARDENED)
+    } else {
+        e.to_string()
+    }
 }
 
 /// `key @0 ([fp/path]xpub…) uses `/0/*`` — one clause per offender.

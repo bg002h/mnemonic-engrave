@@ -43,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "71bba6f24a4b3613d9d7ac7fafa7fc43ff35d1b557ec5b9189b3a3fc6ad5b227";
+    "683ccd3df8d02c0af977b5f51e6ec6730e7aee0c1b67aa902bb6136cf820e5cd";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -368,7 +368,7 @@ fn the_row_schema_holds_on_every_row() {
     }
     // Every slug in the vocabulary is spelled once, and the vocabulary covers
     // §6's 36 data rows.
-    assert_eq!(slugs.len(), 35, "the §6 refusal vocabulary is 35 rows");
+    assert_eq!(slugs.len(), 36, "the §6 refusal vocabulary is 36 rows");
 }
 
 #[test]
@@ -752,9 +752,10 @@ fn every_admitted_rows_canonical_classifies_as_a_descriptor_record() {
 
 /// The `refusal_row` vocabulary is one set, held in two places, and this is
 /// what stops them drifting: the file's `refusal_rows` map and the library's
-/// `Row` enum must name exactly the same 35 slugs (PLAN-r4's NEW-M6). §6's
+/// `Row` enum must name exactly the same 36 slugs (PLAN-r4's NEW-M6). §6's
 /// per-row text tests key to these. **S2 subtracted one** —
-/// `window-not-in-build`, whose build state no longer exists.
+/// `window-not-in-build`, whose build state no longer exists — and bug hunt
+/// 2026-11-25 E3 added `md1-origin-mismatch`.
 #[test]
 fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
     let d = doc();
@@ -768,7 +769,7 @@ fn the_refusal_row_vocabulary_is_the_same_set_on_both_sides() {
         .iter()
         .map(|r| r.slug())
         .collect();
-    assert_eq!(in_code.len(), 35, "the §6 vocabulary is 35 rows");
+    assert_eq!(in_code.len(), 36, "the §6 vocabulary is 36 rows");
     assert_eq!(
         on_disk, in_code,
         "the file's refusal_rows and `descriptor::Row` name different sets"
