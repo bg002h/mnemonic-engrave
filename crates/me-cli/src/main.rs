@@ -4024,7 +4024,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                     // A `pass:` body is a passphrase: no remedy line, because the
                     // one-liner would invite typing it into a shell command, into
                     // the shell's history (fixdoc28-n1, s3-remedy-argv).
-                    if prefix == "pass:" {
+                    if *prefix == "pass:" {
                         head
                     } else {
                         format!(
@@ -4251,8 +4251,10 @@ mod tests {
     #[test]
     fn preimage_copies_unzeroized_preimage_of_returns_zeroizing() {
         use mnemonic_engrave::sysw::record::Class;
-        let got: Option<zeroize::Zeroizing<[u8; 32]>> =
-            super::preimage_of("phrase:7368613235362c636f727265637420686f727365206261747465727920737461706c65", Class::Phrase);
+        let got: Option<zeroize::Zeroizing<[u8; 32]>> = super::preimage_of(
+            "phrase:7368613235362c636f727265637420686f727365206261747465727920737461706c65",
+            Class::Phrase,
+        );
         assert!(got.is_some());
     }
 
