@@ -683,7 +683,17 @@ mod tests {
                 println!("after-the-write");
                 r.map(|()| "Ok".to_string())
             }
-            "W23" | "W24" => write_private(&target, b"NEW\n").map(|()| "Ok".to_string()),
+            "W23" | "W24" | "W29" => write_private(&target, b"NEW\n").map(|()| "Ok".to_string()),
+            "W25" => {
+                std::env::set_current_dir(target.parent().unwrap()).unwrap();
+                write_private(
+                    &Path::new("/proc/self/cwd").join(target.file_name().unwrap()),
+                    b"NEW\n",
+                )
+                .map(|()| "Ok".to_string())
+            }
+            "W28" => write_private(Path::new("/dev/fd/3"), b"NEW\n").map(|()| "Ok".to_string()),
+            "W30" => write_private(Path::new("/dev/fd/01"), b"NEW\n").map(|()| "Ok".to_string()),
             "S7" => Ok(show(same_file(
                 Endpoint::Path(&target),
                 &[Endpoint::Stdout],
@@ -1058,6 +1068,139 @@ mod tests {
         assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
         assert!(s.contains("NEW\n"), "{s:?}");
         assert_eq!(names(d.path()), vec!["f".to_string(), "fd".to_string()]);
+    }
+
+    /// W25-W27 helper: `f` holds `OLD_CARD` at 0644; returns its inode.
+    #[cfg(target_os = "linux")]
+    fn old_card(f: &Path) -> u64 {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::write(f, OLD_CARD).unwrap();
+        std::fs::set_permissions(f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::metadata(f).unwrap().ino()
+    }
+
+    /// W25-W27 helper: `f` is exactly the new bytes, 0600, and a new inode (temp+rename).
+    #[cfg(target_os = "linux")]
+    fn assert_replaced(f: &Path, ino: u64) {
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(
+            String::from_utf8_lossy(&std::fs::read(f).unwrap()),
+            "NEW\n",
+            "not replaced by exactly the new bytes"
+        );
+        assert_eq!(mode_of(f), 0o600);
+        assert_ne!(
+            std::fs::metadata(f).unwrap().ino(),
+            ino,
+            "written in place, not temp+rename"
+        );
+    }
+
+    /// W25: a `/proc/self/cwd/...` path is a file name, not an alias: ATOMIC.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_proc_self_cwd_path_onto_a_file_is_replaced_atomically() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let ino = old_card(&f);
+        let out = run_child("W25", &f, Stdio::null(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        assert_replaced(&f, ino);
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W26: a `/proc/self/root/...` path is a file name, not an alias: ATOMIC.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_proc_self_root_path_onto_a_file_is_replaced_atomically() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let ino = old_card(&f);
+        write_private(
+            &Path::new("/proc/self/root").join(f.strip_prefix("/").unwrap()),
+            b"NEW\n",
+        )
+        .unwrap();
+        assert_replaced(&f, ino);
+        assert_eq!(names(d.path()), vec!["f".to_string()]);
+    }
+
+    /// W27: a link to a `/proc/self/root/...` path is walked to the real file, which is replaced.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_link_to_a_proc_self_root_path_is_written_through_and_stays_a_link() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let l = d.path().join("l");
+        let ino = old_card(&f);
+        std::os::unix::fs::symlink(
+            Path::new("/proc/self/root").join(f.strip_prefix("/").unwrap()),
+            &l,
+        )
+        .unwrap();
+        write_private(&l, b"NEW\n").unwrap();
+        assert_replaced(&f, ino);
+        assert!(std::fs::symlink_metadata(&l)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+        assert_eq!(names(d.path()), vec!["f".to_string(), "l".to_string()]);
+    }
+
+    /// W28: `{ echo a >&3; tool --out /dev/fd/3; echo b >&3; } 3> f` keeps all three, in order.
+    #[cfg(unix)]
+    #[test]
+    fn dev_fd_3_keeps_the_stream_order_in_a_redirected_file() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        std::fs::write(&f, b"EARLIER\n").unwrap();
+        std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let out = Command::new("sh")
+            .arg("-c")
+            .arg("{ echo a >&3; \"$0\" --exact write::tests::child --nocapture; echo b >&3; } 3>\"$1\"")
+            .arg(std::env::current_exe().unwrap())
+            .arg(&f)
+            .env("MNEMONIC_IO_LIB_CHILD", "W28")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(se.contains("child-result: Ok"), "child stderr: {se}");
+        assert_eq!(
+            String::from_utf8_lossy(&std::fs::read(&f).unwrap()),
+            "a\nNEW\nb\n"
+        );
+        assert_eq!(mode_of(&f), 0o600);
+    }
+
+    /// W29: `d/1` with `d` -> `/proc/thread-self/fd` is the alias it spells (guard).
+    #[cfg(unix)]
+    #[test]
+    fn a_name_under_a_link_to_proc_thread_self_fd_appended_to_a_file_keeps_its_earlier_lines() {
+        let d = tempfile::tempdir().unwrap();
+        let f = d.path().join("f");
+        let fd = d.path().join("fd");
+        std::os::unix::fs::symlink("/proc/thread-self/fd", &fd).unwrap();
+        let s = appended_run("W29", &fd.join("1"), &f);
+        assert!(s.starts_with("EARLIER\n"), "earlier lines lost: {s:?}");
+        assert!(s.contains("NEW\n"), "{s:?}");
+        assert_eq!(names(d.path()), vec!["f".to_string(), "fd".to_string()]);
+    }
+
+    /// W30: a descriptor name the kernel lacks (`/dev/fd/01`) is not an alias: the normal path's ENOENT.
+    #[cfg(unix)]
+    #[test]
+    fn a_descriptor_name_the_kernel_lacks_is_refused() {
+        let out = run_child("W30", Path::new(""), Stdio::piped(), None);
+        let se = String::from_utf8_lossy(&out.stderr).to_string();
+        assert!(
+            se.contains("child-result: Err raw_os_error=2"),
+            "child stderr: {se}"
+        );
+        assert!(!String::from_utf8_lossy(&out.stdout).contains("NEW"));
     }
 
     /// **THE GATE, and the pre-existing target is the whole of it.**
