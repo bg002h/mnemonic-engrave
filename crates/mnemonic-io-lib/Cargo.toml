@@ -1,8 +1,8 @@
 [package]
 name = "mnemonic-io-lib"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
-description = "Shared IO and safety mechanism for the m-format constellation CLIs: destination classification, stdout mode measurement, record-stream shaping, refusal decisions and remedy text. Mechanism only -- it publishes no exit code and no disqualifying permission mask, because those are each binary's policy."
+description = "Shared IO and safety mechanism for the m-format constellation CLIs: destination classification, stdout mode measurement, record-stream shaping, refusal decisions, remedy text, and the constellation exit-code numbers with the bit-set that sums them. Mechanism only -- which failure is which exit class, and the disqualifying permission mask, stay each binary's policy."
 license = "MIT OR Unlicense"
 repository = "https://github.com/bg002h/mnemonic-engrave"
 homepage = "https://github.com/bg002h/mnemonic-engrave"
