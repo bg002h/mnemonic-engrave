@@ -21566,3 +21566,299 @@ Source: `/scratch/code/shibboleth/refugium-coordinator/coordinator/agent-reports
 - [sh-bh1125-no-change-chain-one-helper] status=open grade=N kind=ux owner=none filed=2026-11-25 src=agent-reports/bughunt-2026-11-25-seedhammer-review-fable.md#n-3 repo=seedhammer :: gui/wallet_policy.go:370 noChangeChainLine and the literal at gui/multisig_restore.go:175 spell one statement two ways; use one helper, and consider "This wallet has no separate change addresses" over the jargon "No change chain".
 - [sh-bh1125-policyprobe-drops-receive] status=open grade=N kind=tooling owner=none filed=2026-11-25 src=agent-reports/bughunt-2026-11-25-seedhammer-review-fable.md#n-4 repo=seedhammer :: cmd/policyprobe/main.go:247-253 treats ErrNoChangeChain as a derive failure and returns no addresses, so the differential harness cannot compare an @N/* card's receive chain; record receive and report change as absent.
 - [sh-bh1125-change-keyless-total] status=open grade=N kind=input owner=none filed=2026-11-25 src=agent-reports/bughunt-2026-11-25-seedhammer-review-fable.md#n-5 repo=seedhammer :: address/address.go:24's `len(desc.Keys) > 0 &&` guard sends a keyless descriptor on to addressAt, which Find's own comment says panics on one; no caller does today. Return ErrUnsupported to make the exported address.Change total.
+
+### `sh-thresh-port-rust-followups` — port the Rust thresh follow-ups when they land (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** OPEN — owning phase: md port convergence (waits on descriptor-mnemonic)
+
+- **Surfaced:** seedhammer I-1 Go port (PR #29), which converges to md-codec 0.49.0's `policy_shape`.
+- **What:** three thresh shapes are "Cannot fully display on-device" in both languages by Brian's ruling of 2026-11-25 22:27Z, and each has an open Rust follow-up:
+  - `md-thresh-hashlock-children` (the compiler's `sjtv:sha256(H)` child);
+  - `md-thresh-multi-children-and-under-and` (`multi` children; `thresh` under `and_v`, which is the compiler's own output for `and(pk,thresh(…))`);
+  - `md-thresh-remedy-compound-alternatives` (md's `thresh(1,…)` remedy text; md-side only, no Go change unless the shape rule moves).
+- **Rule:** Rust-primary. Each lands in md-codec first, with vectors in `crates/md-codec/tests/fixtures/policy_shape/cases.json`; the Go port then re-vendors with `scripts/vendor-policy-shape-cases.sh`, updates `policyShapeCaseCount`, and adds device wording and goldens in `gui/policy_summary_anyof_test.go`. Re-run the exhaustive fit test (`TestAnyOfEntryFitsTheReviewScreen`) if the wording grows.
+- **Companion:** descriptor-mnemonic `design/FOLLOWUPS.md` lines `md-thresh-hashlock-children`, `md-thresh-multi-children-and-under-and`, `md-thresh-remedy-compound-alternatives`.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-thresh-anyof-counts-slots-not-signers` — "any 2 of these 3 keys" counts placeholders; nothing on the device warns when two are one signer (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — owning phase: end-of-project minors
+
+- **Surfaced:** DESIGN_thresh_summary open question 11 (review N-4), carried to the device by the I-1 port.
+- **Where:** `gui/template_engrave.go` `anyOfEntry` / `policySummaryLines`.
+- **What:** an any-of entry counts key PLACEHOLDERS. Two slots seated with one person's keys make "any 2 of these 3 keys" weaker than it reads (that person alone spends). For a keyed card `md`'s coordinator note covers it (rule L4, "a key used twice"); on the device nothing does. The template consent screen shows a template, so the device usually cannot know the seating; the composer cannot build a thresh. Same limitation as the existing `multi` k-of-n line.
+- **Grade:** Minor (disclosure). No false claim about the script.
+- **Fix direction:** decide whether a keyed-card consent path should compare fingerprints across an any-of entry's slots, as Liana's "one signer twice in a path" rule does, or record this as accepted.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-policy-shape-timelock-body-not-refused` — Go `collect` accepts an `after`/`older` node with a non-timelock body; Rust refuses it (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** OPEN — owning phase: md port convergence
+
+- **Surfaced:** seedhammer I-1 Go port (PR #29), reading `collect` against md-codec 0.49.0.
+- **Where:** `md/policy_shape.go` `collect`, `case tagAfter, tagOlder`: it sets `br.Timelock = true` and returns true even when `n.body` is not a `timelockBody` (it only skips the `Locks` entry). Rust `collect` returns `false` (incomplete) in that case.
+- **What:** pre-existing, not introduced by I-1. The decoder always builds a `timelockBody` for these tags, so no decoded card reaches it; only a hand-built tree does. The new thresh allowlist (`threshTimelock`) already requires the body, as Rust does.
+- **Grade:** Nit (unreachable from a card).
+- **Fix direction:** return false when the body is not a `timelockBody`, with a hand-built-tree test.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+<!-- Added from review r1 of a7b805f3 (design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md, 0C/1I/3m/3n).
+     I-1 (untyped context: or_b(pk, thresh(...)) summarised complete) is being fixed by porting md-codec's
+     policy_type_checks after Rust lands; m-1 is folded in that port's tests; m-3 is fixed there by vendoring
+     with `git show <sha>:path`. If either is not fixed by that commit, its entry below stays OPEN. -->
+
+### `sh-thresh-r1-m2-or-i-constant-arm-phantom-entry` — an `or_i(0|1, thresh)` root shows a "0 key(s), custom" entry beside the any-of (repo: **seedhammer fork**; owning phase: **md port convergence**, Rust first)
+
+**Status:** OPEN — owning phase: md port convergence (waits on descriptor-mnemonic md-r2 m-2)
+
+- **Surfaced:** review r1 of seedhammer PR #29 thresh port (`a7b805f3`), m-2.
+- **Where:** `md/policy_shape.go` `splitBranches` (splits `or_i` at a root) and `collect` (accepts `tagTrue`/`tagFalse`).
+- **What:** `wsh(or_i(0, thresh(2,…)))` (`l:thresh`) gives `Complete=true` with `{Keys:0}` plus the any-of; the device prints "1: 0 key(s), custom" for an arm that can never be satisfied. `or_i(1, thresh)` prints the same text for an arm ANYONE can spend. Predates the thresh change and is identical in Rust (md-r2 m-2); the any-of root only widens what reaches the summary.
+- **Grade:** Minor.
+- **Fix direction:** Rust first (a constant `0`/`1` arm at a split point is either dropped or refused, with vectors in `policy_shape/cases.json`), then re-vendor and converge.
+- **Companion:** descriptor-mnemonic md-r2 m-2.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-thresh-r1-m3-vendor-provenance-clean-flag` — `repo_clean_when_recorded` checks only the cases file, and no test reads it (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** RESOLVED in seedhammer `8181f17` — the script reads `git show <commit>:<path>` and the pin records `read_from` instead of the flag
+
+- **Surfaced:** review r1, m-3.
+- **Where:** `scripts/vendor-policy-shape-cases.sh` (`cp` from the working tree; `git status --porcelain -- "$REL"`).
+- **What:** the field claims a clean repo while the primary's tree may carry uncommitted changes to other files; the bytes were right at `a7b805f3` (sha equals the committed blob) but nothing ties them to the pinned commit.
+- **Fix direction:** vendor with `git show "$commit:$REL"`, so commit and bytes cannot disagree; drop or rename the flag.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-thresh-r1-n1-mixed-lock-kinds-no-key-needed` — "NO KEY NEEDED" for a height lock plus a time lock (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — accepted imprecision (owner-approved wording); record only
+
+- **Surfaced:** review r1, n-1.
+- **What:** `thresh(2,pk,sln:after(800000),sln:after(1700000000))` prints "NO KEY NEEDED", but one transaction cannot meet both locks, so a key is needed. Errs toward warning; `md` refuses to mint it, so foreign cards only. Same in Rust (`any_of_min_keys`).
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-thresh-r1-n2-fit-test-entry-number-bound` — the fit test covers entry numbers up to 999 without proving that bound (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN
+
+- **Surfaced:** review r1, n-2.
+- **Where:** `gui/policy_summary_anyof_test.go` `TestAnyOfEntryFitsTheReviewScreen`.
+- **What:** an entry number of 1000+ (a 6-character prefix) is in no measured group. Implausible within md1 size limits, but the test does not assert the bound it relies on.
+- **Fix direction:** derive the maximum branch count a card can carry and measure up to it, or assert it.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r1.md`; seedhammer#29.
+- **Tier:** v1
+
+(n-3, Go `collect` accepting a non-timelock `after`/`older` body, is the entry `sh-policy-shape-timelock-body-not-refused` above.)
+
+<!-- Added with the type-rule port, seedhammer 8181f17 (md review r2 I-1 / seedhammer r1 I-1). -->
+
+### `sh-typerule-revendor-after-r3` — re-vendor the policy-shape cases once Rust's r3 type-rule fix lands (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** RESOLVED in seedhammer `e1857e9` — re-vendored from 6ca7e05c (99 cases); within_resource_limits (ops, satisfaction limits) ported; "ahead of the pin" wording dropped
+
+- **Surfaced:** coordinator heads-up on md review r3: Rust's type check misses tap leaves whose root is not B (`tr(NUMS,v:pk(@0))` stays complete), and Rust is adding a per-leaf B check, documenting the timelock-range / script-size / fragment-placement refusals as normative, and possibly a per-path ops <= 201 check.
+- **State at `8181f17`:** Go already requires every tap leaf's root to be B (`md/policy_typecheck.go` `tapTreeTypeChecks`), so Go leads the a7680cf2 pin on exactly the non-B-leaf trees. No vendored case has one. A Go-vs-Rust differential over 61,159 cards (scratch only: 40,000 random trees plus all 27,880 enumerated thresh-child cards in wsh and tap-leaf roots) disagreed only on those trees (89 typed, 83 complete, all with a non-B tap leaf).
+- **To do:** `scripts/vendor-policy-shape-cases.sh ../descriptor-mnemonic <sha>`; update `policyShapeCaseCount` and the from-card count; drop the "ahead of the pin" wording in `md/policy_typecheck.go`, `md/bits.go` and `typeRuleCases`. If Rust adds the ops <= 201 check (`check_local_consensus_validity`, `ExtData::sat_op_count`), port it: Go has no `ops` / `sat_data` tracking today, so that is new code with its own tests.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-typerule-index-out-of-range-tree-only` — the Go type rule cannot see a placeholder index >= n (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — record only; no observable difference on a decoded card
+
+- **What:** Rust's `lookup_key` also fails for `@i` with i >= n. `treeTypeChecks` takes only the tree, so it cannot. Every tree it sees in production comes from `Reassemble`, which already refuses such an index (`validatePlaceholderUsage`), so the two agree on every card. Documented in the file comment.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r2.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-typerule-revendor-after-r4` — re-vendor once Rust's r4 fold lands (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** RESOLVED in seedhammer `c4e61a9` (vendored from 2d5c9935, 104 cases; every tap leaf needs a satisfaction; `tr(and_v(v:pk,0))` row flipped)
+
+- **What:** r4 has Rust add "some satisfaction exists" for each tap leaf. Today `tr(NUMS,and_v(v:pk(@0),0))` passes in both languages, and Go follows Rust: the `typeRuleCases` row `tr(and_v(v:pk,0))` asserts typed/complete true and must flip. r4 also makes the doc state rust-miniscript's thresh off-by-one (k+1 satisfied children). Go already ports `ExtData::threshold` as written (`i <= k`); the rows `thresh(2,pk,s:pk,s:pk,s:or_i(0,0))` (typed) and `thresh(2,pk,s:pk,s:or_i(0,0))` (refused) pin it, and both agreed with the 6ca7e05c probe.
+- **To do:** run `scripts/vendor-policy-shape-cases.sh ../descriptor-mnemonic <sha>`, update the case counts, add the tap-leaf satisfiability check to `msScriptOK` (ctxTap: `sat.ok` required), flip the row, and re-run the differential.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r4.md`; seedhammer#29.
+- **Tier:** v1
+
+<!-- Added from review r2 of the type-rule port (8181f17..c4e61a9; design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r2.md, 1C/1I/3m/2n).
+     C-1, I-1 (type check), m-3 and n-1 are fixed in c0ab433; the entries below stay open. -->
+
+### `sh-typerule-r2-m1-duplicate-slot-counted-as-signers` — a repeated placeholder is counted as distinct signers in "2-of-3" (repo: **seedhammer fork**, paired with **descriptor-mnemonic**; owning phase: **md port convergence**, Rust first)
+
+**Status:** OPEN — **not** at Rust parity for the bare spelling (corrected after the Fable final review, M-1; this entry said "Rust parity today", which was false). See `sh-fable-m1-plainmulti-repeated-slot-guard` for the Go lag.
+
+- **Surfaced:** review r2 m-1.
+- **What:** `wsh(multi(2,@0,@0,@1))` (or inside `or_d`) decodes, because `validatePlaceholderUsage` allows a repeat. It types, and the Go walk reports `{K:2 N:3 Keys:2}`, rendered "2-of-3". Rust at 1dac0e10 reports k = 0, n = 0 for this spelling: its `plain_multi` arm requires `nkeys == slots.len()` (`crates/md-codec/src/policy_shape.rs:615-619`), and Go's `plainMulti` arm has no such guard (`md/policy_shape.go:379-380`). The two agree only when a lock or hash sits beside the multi (the `soleMulti` arm, guarded in both). Rust's own remaining question, whether a repeated slot should show any summary at all, is the companion below. One CHECKMULTISIG accepts the same signature for both @0 positions, so @0 alone spends. Rust documents "Duplicate keys ... are NOT refused" (policy_shape.rs doc). The template consent screen (`multisig_build.go:808` → `templateConsentLines`) shows the summary without the `DuplicateKeySlotChunks` warning that `wallet_policy.go:313` uses.
+- **Fix direction:** when a slot repeats within one script, show no summary or a loud duplicate line. Decide this in md-codec `policy_shape` with vectors first, then re-vendor and converge. The GUI warning wiring is fork-native and can follow independently.
+- **Companion:** descriptor-mnemonic `bh1125-r5-dup-slot-summarised-as-k-of-n` (logged in 75474496).
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r2.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-typerule-r2-m2-witness-item-limit-vector` — no vector pins the 100-witness-item rule (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** RESOLVED `55d31dd` — re-vendored from descriptor-mnemonic 1dac0e10 (106 cases, 102 with cards); `TestWitnessItemLimitVectors` pins `untyped_witness_items_over_100` / `typed_witness_items_84` by name, and loosening the limit fails it
+
+- **Surfaced:** review r2 m-2.
+- **What:** neither cases.json nor `typeRuleCases` exercises `wsCount+1 <= 100` (`msScriptOK`, Segwitv0). The Go formula matches Rust by reading, but no test pins it; a bug would fail open for a non-standard script.
+- **To do:** re-vendor from the coordinator's SHA. Optionally add the same pair as a `typeRuleCases` row.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r2.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-typerule-r2-n2-selfcheck-refusal-text` — the composer self-check's refusal no longer names the likely cause (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — record only; the fail-closed behaviour is correct
+
+- **What:** `gui/composer_selfcheck.go:73` ("the decoded policy cannot be described") now also fires for a composed wallet over a standardness limit (3600 B, 201 ops, 100 items). The text could name the limit.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r2.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-md-decoder-and-walk-recursion-stack` — the decoder and the policy walk still recurse once per tree level (repo: **seedhammer fork**; owning phase: **pre-release hardening**)
+
+**Status:** RESOLVED `caa93e1` (review r3 I-P1) for the `Reassemble` and `PolicyShapeChunks` path, and `017357b` for every other exported card entry point (see `sh-md-script-emit-and-other-walks-recursion-stack`). Every tree walk they reach uses an explicit stack, and `TestMaxDepthCardsFitTheStack` runs all of them on every max-depth card under a 16 KiB `SetMaxStack`. A device or emulator measurement is still worth doing once TinyGo is reachable.
+
+- **Surfaced:** review r2 I-1 asked to check the walk's and the decoder's recursion. The type check is now iterative (constant stack); these two are not.
+- **Measured (host amd64, `debug.SetMaxStack` probe, smallest power of two that completes) on the six max-depth cards in `md/policy_typecheck_depth_test.go`:**
+  - decoder (`Reassemble` → `readNodeDepth`): ≤ 64 KB for every case;
+  - walk (`walkShape`): ≤ 64 KB, and ≤ 128 KB for the `or_d` chain (a `splitBranches` recursion);
+  - type check: ≤ 8 KB.
+- **gc GOARCH=arm frame proxies:** `readNodeDepth` ~260 B, `splitBranches` ~304 B, `branchOf` ~328 B, `collect` ~184 B, `walkTapTree` ~84 B. At depth 126–128 that is 10–40 KB per recursion, against the firmware's 16 KB goroutine stacks.
+- **Caveats:** TinyGo/LLVM Thumb frames are usually smaller, and TinyGo was not reachable from this session (nix flake inputs on github.com and nixos.org channels are denied by the network policy), so this is a proxy, not a device result.
+- **To do:**
+  - Measure on the device or emulator: load a max-depth card such as `wsh(n:^126 pk)` and call `PolicyShapeChunks`.
+  - If it overflows, either make `readNodeDepth` and the walk iterative (fork-native implementation; no normative change), or lower the decode depth in md-codec first (a normative change, Rust-primary).
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1 (device safety)
+
+### `sh-gui-test-32bit-int-overflow` — a gui test file does not compile for a 32-bit target (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — pre-existing (`e4ab97d`)
+
+- **What:** `GOARCH=arm go vet ./gui/` fails at `gui/singlesig_restore_test.go:179` (`hdkeychain.HardenedKeyStart` assigned to an `int`). Production code builds; only the test does not. The new CI step therefore vets `./md/` and builds `./md/ ./gui/` for arm, not vets gui.
+- **Fix:** use `uint32` in the test, then extend the CI step to `GOARCH=arm go vet ./md/ ./gui/`.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-md-script-emit-and-other-walks-recursion-stack` — the script emitters and four other card entry points still recurse once per tree level (repo: **seedhammer fork**; owning phase: **pre-release hardening**)
+
+**Status:** RESOLVED `017357b`. `emitFragment`, `guardNode`, `duplicateInTapTree`, `countKeySlots`, `tapBranchDepth`, `collectTapLeaves`, `emitTapLeaves` and `collectKeyOccurrences` are iterative (`describeTapLeaf` recurses at most once and is unchanged). `TestMaxDepthCardsFitTheStack` runs every exported card entry point under 16 KiB. The checks are the same as for the load path: a 1M-round old-vs-new differential, 12 mutations caught, and a 77,055-card corpus run with identical bytes and errors.
+
+- **What:** `caa93e1` made the `Reassemble` and `PolicyShapeChunks` path iterative. The other exported card entry points still call recursive helpers after decoding: `emitFragment` (`EmitWitnessScriptChunks`, `EmitTapLeavesChunks`), `guardNode` (`TemplateEngraveShapeGuardChunks`), `countKeySlots`/`duplicateInTapTree` (`DuplicateKeySlotChunks`), `tapBranchDepth` (`TapTreeDepthChunks`), `collectTapLeaves`/`emitTapLeaves`, `collectKeyOccurrences` (`LianaUnspendableKeyFor`), and the compose-side `rejectNestedUnspendable`/`containsSortedMultiA`.
+- **Measured** (scratch `scratchpad/zz_stack_others_test.go.txt`, the six max-depth cards, child process per entry point, smallest `SetMaxStack` power of two that completes):
+  - `EmitWitnessScriptChunks` and `EmitTapLeavesChunks`: 128 KB on amd64, **64 KB at GOARCH=386**, 4× the 16 KB budget. These are the address/script paths, so a hostile deep card asked for an address would overflow.
+  - `TemplateEngraveShapeGuardChunks`: 32 KB amd64, ≤ 8 KB on 386.
+  - `DuplicateKeySlotChunks`, `TapTreeDepthChunks`: 16 KB amd64, ≤ 8 KB on 386.
+  - `TapLeavesChunks`, `StripToTemplate`, `LianaUnspendableKeyFor`: ≤ 8 KB. Some of these refuse the cards early, so this says little about their worst case.
+- **Fix direction:** the same explicit-stack rewrite, with the same old-vs-new differential (`md/recursive_ref_test.go`, `md/iterative_equiv_test.go`) and an extension of `TestMaxDepthCardsFitTheStack`. `emitFragment` emits opcodes before and after its children, so it needs a post-order frame, not the pre-order pattern used for `writeNode`. Fork-native structure; no normative change.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1 (device safety)
+
+### `sh-typerule-r3-m2-repin-provenance-to-merged-commit` — the vendored cases pin a commit only on an unmerged descriptor-mnemonic branch (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** OPEN — waits on the descriptor-mnemonic merge (bg002h/descriptor-mnemonic#76; head `42d87dd0` at the Fable review, `cases.json` byte-identical to the vendored `1dac0e10` copy)
+
+- **Surfaced:** review r3 m-2.
+- **What:** `md/testdata/policy_shape_cases.provenance.json` pins 1dac0e10, which is reachable only from descriptor-mnemonic's `claude/project-thread-utm1aa`. A rebase or squash-merge there orphans the pin, and `scripts/vendor-policy-shape-cases.sh`'s `cat-file -e` guard would then refuse a re-vendor.
+- **To do:** when the Rust side merges, re-run the vendor script at the merged commit. The bytes and sha256 are unchanged, so only the commit moves. Update the provenance comments in `md/bits.go` and `md/policy_shape_cases_test.go` with it.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-typerule-r3-n2-workflow-skips-pr-branches` — the new arm and 32-bit steps do not run on a PR branch before merge (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — **MERGE GATE for PR #29** (raised from record-only by the Fable final review, I-1). This head has never been compiled by TinyGo, and the rewritten walks run on every card load.
+
+- **Surfaced:** review r3 n-2; promoted by the Fable final review I-1 (`design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`).
+- **Gate:** before merge, (1) the `workflow_dispatch` runs of `test.yml` and `image.yml` on `claude/project-thread-utm1aa` (dispatched by the coordinator) pass, with flash and RAM recorded from the image build; and (2) on the emulator or a device, load one max-depth card and one legacy `Check(PkK)` card and confirm the address shown equals Rust `md address`.
+- **What:** `.github/workflows/test.yml` triggers on a push to `main` and on `workflow_dispatch` only. The `GOARCH=arm` vet/build steps and `scripts/test-32bit.sh` (now including `./md/`) run on a PR branch only if someone dispatches the workflow.
+- **To do:** dispatch the workflow on PR branches before merge, or add a `pull_request` trigger (a fork-wide CI decision).
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1
+
+### Review r3 items closed in `caa93e1`
+
+- I-P1: see `sh-md-decoder-and-walk-recursion-stack`.
+- m-1: `msMaxPending` = 1024, fail closed. The coupling to the walk is documented at the constant and tested by `TestTypeCheckHeapIsCappedOnHostileTrees` and `TestTypeCheckCapLeavesWalkAcceptedTreesAlone`.
+- m-3: `scripts/test-32bit.sh` runs `./md/`.
+- n-1: `-test.run` is pinned to the test's own name, and the child must print a marker.
+- n-3: the type check is held to 8 KiB.
+- Also fixed in `aa366a2`: 55d31dd's re-vendor added a complete case with no gui summary golden, so `TestPolicySummaryLinesForEveryVendoredCase` failed at 55d31dd. I had not run the gui suite after the re-vendor.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+
+### `sh-host-vet-artifactdir-go125` — `go vet ./...` on the host fails on go1.25-versioned test files (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN — record only; pre-existing, output identical at `caa93e1`
+
+- **What:** host `go vet ./...` (go1.26.7) reports 10 `testing.ArtifactDir requires go1.26 or later (file is go1.25)` findings, in `bspline`, `backup`, `engrave` and `gui` test files (for example `gui/transaction_golden_test.go:104`). `go vet ./md/` is clean. This PR changes none of those files.
+- **To do:** raise the module's `go` line (or those files' build constraints) to 1.26, or stop using `testing.ArtifactDir` there.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r3.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-r4-m1-stack-test-misses-shallow-recursers` — the 16 KiB stack test does not distinguish eight walks (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN
+
+- **Surfaced:** review r4 Minor-1 (`md/policy_typecheck_depth_test.go:286`).
+- **What:** the recursive originals of `tapBranchDepth`, `duplicateInTapTree`, `countKeySlots`, `validateTapScriptTree`, `checkPlaceholderBounds`, `remapIndices`, `needsV8` and `soleMulti` still fit the host's 16 KiB at 128 levels, so `TestMaxDepthCardsFitTheStack` would not catch a regression back to recursion in them. `remapIndices` is never driven deep (decoded cards are canonical). The shipped code is iterative; TinyGo frames differ from the host's.
+- **To do:** add a smaller-stack child run, or a test that asserts no stack growth with depth, for these walks; drive `rebuildTree`'s remap path with a non-canonical deep tree.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r4.md`; seedhammer#29.
+- **Tier:** v1
+
+### Review r4 nits (record only)
+
+- Nit-1 (`md/canonicalize.go:363`): `rebuildTree` remaps a tr's own key index after its subtree, `remapIndices` did it before; only a panic message could differ, and the bounds check runs first.
+- Nit-2: three recursive functions remain (`describeTapLeaf`, one level; `rejectNestedUnspendable` and `containsSortedMultiA`, composer-built trees capped at 8 spend paths).
+- Nit-3: r4 ran on go1.25.10 (go.mod floor); the implementer's runs used go1.26.7.
+- Not run: two r4 mutants (malformed TapTree in `duplicateInTapTree` and `tapBranchDepth`) did not build because the disk filled.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-r4.md`; seedhammer#29.
+
+### `sh-fable-m1-plainmulti-repeated-slot-guard` — a multi that repeats a slot is shown as "k-of-n" where Rust reports none (repo: **seedhammer fork**; owning phase: **md port convergence**)
+
+**Status:** OPEN — Go lags Rust (convergence, Go-only port gap)
+
+- **Surfaced:** Fable final review M-1 (`design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`).
+- **What:** `md/policy_shape.go:379-380`: the `plainMulti` arm sets K/N without the `nkeys == br.Keys` guard that Rust has (`policy_shape.rs:615-619`). `wsh(multi(2,@0,@0,@1))` (card `md1faekzqqpq2tvyyy4qqxppsg3qqkcfs3z36psgk`) prints `1: 2-of-3` in Go; Rust gives k = 0, n = 0. One @0 signature satisfies both @0 positions. 1,907 of Fable's 144,492 thresh-centred cards differ, all this, for every multi kind, bare or as an `or_*` alternative. No vendored case has a repeated-slot multi.
+- **Reach:** no device flow reaches it today: the only outside-card summary input is the Build Policy template (sortedmulti over distinct slots).
+- **Fix:** the one-line guard. It fails `TestIterativeWalkMatchesRecursive` unless `branchOfRec` gets the same line (see `sh-fable-m4-frozen-recursive-references`). Ask Rust to add a repeated-slot multi vector first so the shared cases pin it.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-fable-m2-keyless-conjunction-quiet-wording` — a keyless path prints "0 key(s), custom" beside the new loud "NO KEY NEEDED" (repo: **seedhammer fork**; owning phase: **end-of-project minors**; precondition of any outside-card summary flow)
+
+**Status:** OPEN
+
+- **Surfaced:** Fable final review M-2.
+- **What:** `gui/template_engrave.go:196`. `wsh(or_d(pk(@0),1))` prints `2: 0 key(s), custom` for a path anyone can spend; with `older(10)` it prints `2: 0 key(s), custom +timelock`. Shapes agree with Rust. Any-of entries now say `NO KEY NEEDED`, so the quiet wording reads as the lesser warning.
+- **Reach:** latent, as M-1. Related: `sh-thresh-r1-m2-or-i-constant-arm-phantom-entry`. Fix before any flow renders an outside card's summary.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-fable-m3-resource-limit-edges-untested` — several resource-limit rules pass the committed tests when broken (repo: **seedhammer fork**, Rust first; owning phase: **md port convergence**)
+
+**Status:** OPEN
+
+- **Surfaced:** Fable final review M-3.
+- **What:** each of these mutants leaves `go test ./md/` green: 100 items → 101, 201 ops → 202, 1650 → 1651, 520 → 521 (`md/policy_typecheck.go:232`, `:237`, `:240`, `:373`); the tap 1000-element stack check removed (`:245`); the `+1` in thresh's exec-stack fold removed (`:1023-1028`). The code matches Rust (Fable's corpora catch the first five); only the exact tap edge and the exec-stack fold are unproven anywhere.
+- **Fix:** edge vectors in descriptor-mnemonic `cases.json` first (none exists for the tap stack rule), then re-vendor.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`; seedhammer#29.
+- **Tier:** v1
+
+### `sh-fable-m4-frozen-recursive-references` — the frozen recursive references pin known lags (repo: **seedhammer fork**; owning phase: **end-of-project minors**)
+
+**Status:** OPEN
+
+- **Surfaced:** Fable final review M-4.
+- **What:** `md/recursive_ref_test.go:5-11` says "keep the bodies as they were". A behaviour change to a walk (for example M-1's guard) then fails `TestIterativeWalkMatchesRecursive`, an unrelated test.
+- **Fix:** say in the header that a behaviour change edits both copies in one commit, or delete the references after the first release that ships the iterative walks.
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`; seedhammer#29.
+- **Tier:** v1
+
+### Fable final review nits (record only)
+
+- N-1: four commit ids cite one rule (`md/policy_typecheck.go:4-6` cites `f8b4a675`, `5ad5a9b2`; `md/policy_shape.go:181-182` cites `ca48a05e`; the pin is `1dac0e10`), all on an unmerged branch. Fold into `sh-typerule-r3-m2-repin-provenance-to-merged-commit`: re-cite them at the merged descriptor-mnemonic#76 commit.
+- N-2: `AnyOfMinKeys` returns 0 for a conjunction (`md/policy_shape.go:144-153`); a `(n int, ok bool)` return would make misuse a compile error.
+- N-3: the commits are unsigned and authored as Claude; Brian re-signs and adds DCO before any upstream PR (already in the PR body).
+- **Filed from:** `design/agent-reports/bughunt-2026-11-25-seedhammer-thresh-review-fable.md`; seedhammer#29.
