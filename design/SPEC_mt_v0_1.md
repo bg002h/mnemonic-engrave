@@ -1978,6 +1978,13 @@ what it could not check:
     characters by hand is not quick. Consider re-running with a node
     before you start.
 
+**Offline means no `bitcoin-cli` at all**: no `--bitcoin-cli` on the command
+line and none on `PATH`. That run prints the warning above and its exit status
+is unaffected (0 when every offline check passes). A `--bitcoin-cli` path the
+operator names that does not exist, cannot be started, fails, or gives a reply
+mt cannot read adds 32 (IO) per `SPEC_constellation_exit_codes.md` R9 (see
+(b1)); naming a missing path is not a way to go offline.
+
 > **THAT WARNING IS ENCODE-SHAPED, AND THE RECOVERY PATH NEEDS ITS OWN.**
 > Operator ruling 2026-08-23 — *"warn about what cannot be confirmed"* — applied
 > to `mt inspect` and `mt decode`, where the advice above is useless: the plate
@@ -2540,11 +2547,42 @@ exactly as permanent, as a machine-engraved one.
    whole of the remedy. **You warn about damage done and refuse damage you are
    about to do.**
 
-   **THE REMEDIES ARE THE SHELL'S, because `mt encode` HAS NO `--out`** — and a
-   first draft of this section advised one. `mt`'s stdout **is** the strings by
-   ruling (§3b), so there is no path for `mt` to open and create owner-only the
-   way `me` does. A refusal naming a flag that does not exist is worse than one
-   naming none: it sends the operator to `--help` to find it.
+   **`mt encode` HAS `--out` — REVERSED 2026-08-27 by section 6b of
+   `SPEC_constellation_cli_uniformity`, built as P1 row 10.** This paragraph
+   used to read *"the remedies are the shell's, because `mt encode` has no
+   `--out`"*, and argued from `mt`'s stdout being the strings *by ruling (§3b)*.
+
+   **That citation was checked and §3b does not say it.** §3b rules *which
+   stream* carries the artifact — stdout the artifact, stderr what the human
+   must see — which is a rule about streams, not about whether a file channel
+   exists. So the old sentence contradicted nothing except its own restatement
+   of §3b.
+
+   The reason to add the channel is §8.2h itself: `umask` and `chmod` are
+   remedies that exist **because** there was no `--out`, and neither creates the
+   file owner-only in the run the operator just made. `--out` does, through the
+   shared crate's `write_private` — which also tightens a target that **already
+   exists**, since `OpenOptions::mode()` binds on create only and re-running a
+   command is the case an operator actually hits (F-244).
+
+   Since mnemonic-io-lib 0.1.3 that write goes to a temp file beside the target
+   and is renamed over it, so a failed write leaves an existing file's bytes as
+   they were and creates nothing at a new name. The `--out` warning is printed
+   only after the write succeeded. A failed write prints `mt: cannot write the
+   output: <path>: <error>` and adds 32 (IO) to the exit status
+   (`SPEC_constellation_exit_codes.md` R8). mt then looks at the path again: if a
+   regular file was there and is still the same file with the same size and
+   modification time, the line ends `. <path> is unchanged.`; if nothing was
+   there and nothing is there now, it ends `. Nothing was written.`; otherwise
+   (a device, or a standard-stream name such as `/dev/stdout` that is written in
+   place) it says nothing about the disk.
+
+   **It OVERWRITES**, ruled by the operator 2026-08-26, and **it is on `encode`
+   alone**: the uniformity spec's section 6b reasons entirely about the refusal this section defines,
+   and that refusal fires from `encode`.
+
+   The shell remedies stay, below `--out`, for an operator who cannot change the
+   command line.
 
    **KEYED ON MODE BITS, NOT ON "is it a file".** `mode & 0o077 == 0` passes.
    **CHARACTER DEVICES are exempt** — a terminal and `/dev/null` persist nothing,
@@ -2570,6 +2608,22 @@ exactly as permanent, as a machine-engraved one.
    `shred -u` it once the plates are cut and verified still fires on every
    redirection. The refusal is **additive**: a new check about *who can read it*,
    beside the existing warning about *how long it lasts*.
+
+2i. **The output is one of the inputs** → **refuse**, before anything is read.
+   The output is `encode`'s `--out` (else stdout) and the stdout of `decode` and
+   `inspect`; the input is `--in` (else stdin). Same file means the same path, a
+   symlink or a hard link (device and inode), or two absent paths naming one
+   place. `verify` writes no stdout and is not checked. Refusal text:
+   FIX_bh1119_mt_output_writes section 4.
+
+   **A failed stdout write.** A reader that closes the pipe early only stops the
+   output; the exit code is the verb's own. Any other stdout write error, from a
+   verb or from `--help`/`--version` (a full disk, a read-only stdout), prints
+   `mt: cannot write the output: <error>` on stderr and adds 32 (IO) to the
+   verb's own exit status (R8). A failed stderr
+   write changes nothing: `verify`'s verdict is its exit code, and `decode
+   --json`'s report, which goes to stderr like the text report, is not checked;
+   the hex on stdout is.
 
 3. **An unsigned or unfinalized transaction offered for engraving** → refuse. It
    cannot be broadcast, so it is not a backup.
@@ -3350,6 +3404,11 @@ signed PSBT.
        > than with an RPC error reply mt already interprets, when it breaks
        > the pipe, or when its reply cannot be parsed. Naming a path that does
        > not exist is therefore not an offline switch.
+       >
+       > A **default** `bitcoin-cli`, found on `PATH` without being named,
+       > that then fails (the node is down, the call errors, the reply cannot
+       > be read) is an optional helper the operator did not ask for: mt
+       > warns that it has no answer and the exit status is unaffected (R9).
 
     b2. **`--elide-prefix` (`mt encode`) emits the set's invariant 8 characters
        on the first string only** (§3b). It changes the **display** form, never
@@ -3362,6 +3421,11 @@ signed PSBT.
        warnings would let a script engrave a plate whose hazards nobody saw,
        which is the opposite of what §0a's stderr split is for. It does **not**
        relax §1.1a's rule that stdout stays empty unless every check passes.
+
+       **`--json` with `--quiet` is refused** (§10.10, exit 64, usage): one asks for
+       the report as a document and the other for no report. **`--quiet` on
+       `inspect` or `verify` is refused** (§10.10, exit 64, usage), with or without
+       `--json`: their output is their report.
 
     **THE FLAG SPELLINGS — RULED 2026-08-23.** Operator-approved; sibling
     precedent taken verbatim wherever it exists, so an operator who knows `md`
@@ -3396,8 +3460,10 @@ signed PSBT.
     with any other bit (a corrected set that then fails a check is 17 or 18).
     A flag combination that is wrong on the command line alone is usage (64),
     checked before input is read; a malformed input (a pasted txid, an
-    unparseable PSBT) is 2; a refusal a flag waives is 8; a failed write adds
-    32.
+    unparseable PSBT) is 2; a check that came out no (`mt verify` against a
+    node that proves an input spent, the spec's worked table) is 1; a refusal
+    a flag waives is 8; a failed write adds 32; a bug is 101. The list is a
+    summary; §3's ordered tests decide.
     **The refusal-message format is RULED** — §8's preamble, three parts, with a
     machine-parseable verdict line. It was declared unspecified here while being
     the one item P5's tests assert against (R11 I4). Each input the table above requires needs some flag —

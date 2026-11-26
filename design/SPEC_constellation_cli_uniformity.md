@@ -32,8 +32,8 @@ binaries, not read from source:
 `ms encode --phrase "<12 words>"` exits 0 and says nothing about that phrase now
 being in shell history and in `ps`. Its stderr then recommends `> file.txt`,
 which under the default umask produces **mode 0644** — the exact disposal `me`
-and `mt` refuse (F-244, F-252): at exit 2 when measured, and at exit 8
-(REFUSED) since `SPEC_constellation_exit_codes.md`.
+and `mt` refuse (F-244, F-252): at exit 2 (`me`) and 1 (`mt`) when measured,
+and both at exit 8 (REFUSED) since `SPEC_constellation_exit_codes.md`.
 
 **The tool holding the most dangerous material in the constellation has the
 weakest handling of it.**
