@@ -802,6 +802,15 @@ overturned an earlier assumption and are marked.
        mt decode < plates.txt > tx.hex \
          && bitcoin-cli sendrawtransaction "$(cat tx.hex)"
 
+   Under `SPEC_constellation_exit_codes.md` a plate the BCH code corrected
+   exits **16** (REPAIRED) even when every check passes, so this one-liner
+   stops on a corrected set and does not broadcast it. To broadcast a set that
+   verified with corrections, after reading the stderr report that names them,
+   test the exit status with the repaired bit masked off:
+
+       mt decode < plates.txt > tx.hex; rc=$?
+       [ $(( rc & ~16 )) -eq 0 ] && bitcoin-cli sendrawtransaction "$(cat tx.hex)"
+
    This closes the pipe `mt` sits in the middle of: **hex or PSBT in
    (§8.2e), `mt1` strings onto steel, hex back out.** Everything human goes to
    stderr at both ends, so the pipe stays clean.
@@ -3332,7 +3341,13 @@ signed PSBT.
        > liveness table reads.
        >
        > **The only flag is `--bitcoin-cli <path>`**, for a binary not on
-       > `PATH`. Absent and not found → §6a's no-node warning, unchanged.
+       > `PATH`. Absent and not found → §6a's no-node warning, unchanged, and
+       > the exit status is unaffected (0 when every offline check passes):
+       > pointing `--bitcoin-cli` at nothing is the documented offline
+       > mechanism. A named helper that is found and then fails (it cannot be
+       > run, exits non-zero other than with an RPC error reply mt already interprets,
+       > or breaks the pipe) adds 32 (IO), per `SPEC_constellation_exit_codes.md`
+       > R9.
 
     b2. **`--elide-prefix` (`mt encode`) emits the set's invariant 8 characters
        on the first string only** (§3b). It changes the **display** form, never
@@ -3372,8 +3387,15 @@ signed PSBT.
     > `--rpc`** — (b1) rules that `bitcoin-cli` already holds the node's
     > location.
 
-    **Still unspecified, and deliberately: exit codes beyond 0.** `0 = every
-    check passed` is fixed in (b); the rest of the code space is implementation's.
+    **Exit codes: `SPEC_constellation_exit_codes.md` §3** (the constellation's
+    shared scheme; it replaces "the rest of the code space is implementation's").
+    `0 = every check passed` is fixed in (b), and under that spec's decision 5
+    it also means **no BCH correction was used**: a corrected set adds 16, summed
+    with any other bit (a corrected set that then fails a check is 17 or 18).
+    A flag combination that is wrong on the command line alone is usage (64),
+    checked before input is read; a malformed input (a pasted txid, an
+    unparseable PSBT) is 2; a refusal a flag waives is 8; a failed write adds
+    32.
     **The refusal-message format is RULED** — §8's preamble, three parts, with a
     machine-parseable verdict line. It was declared unspecified here while being
     the one item P5's tests assert against (R11 I4). Each input the table above requires needs some flag —
@@ -3382,8 +3404,8 @@ signed PSBT.
     them** — (b1) deleted it, because `bitcoin-cli` already holds it. Naming them
     is a CLI-design task, not a codec one. **Exit codes are the exception that
     should not wait**: §1.1a's documented pipeline now depends on a non-zero
-    exit, so `0 = every check passed` is fixed here and the rest of the code
-    space is left to implementation.
+    exit, so `0 = every check passed` is fixed here, and the rest of the code
+    space follows `SPEC_constellation_exit_codes.md` §3.
 
 11. **SETTLED** — How many codex32 characters fit a hand-engraved plate. Reasoning in §12.11.
 
