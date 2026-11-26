@@ -415,6 +415,15 @@ pub fn md1_refusals(d: &Parsed, remedy_a: &str, remedy_a2: &str) -> Vec<Refusal>
     if !no_wildcard.is_empty() {
         out.push(refusal::md1_no_wildcard(&no_wildcard, &d.keys, remedy_a2));
     }
+    // §6's md1-origin-mismatch row (amended 2026-11-25, bug hunt E3): md1 rebuilds each xpub's
+    // depth and child number from its origin, so an origin that contradicts
+    // them would put a false derivation on steel. Last, in §6's row order.
+    let mismatch: Vec<usize> = (0..d.keys.len())
+        .filter(|i| !refusal::origin_agrees(&d.keys[*i]))
+        .collect();
+    if !mismatch.is_empty() {
+        out.push(refusal::md1_origin_mismatch(&mismatch, &d.keys, d.multi));
+    }
     out
 }
 

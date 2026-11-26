@@ -655,7 +655,10 @@ mod tests {
     fn no_bundle_error_display_leaks_the_input_body() {
         const CANARY: &str = "CANARY_SECRET_BODY";
         let variants: Vec<BundleError> = vec![
-            BundleError::Classify(CANARY.into(), ClassifyError::UnknownHrp("zz".into())),
+            BundleError::Classify(CANARY.into(), ClassifyError::UnknownHrp(None)),
+            // E1 (2026-11-25): the canary INSIDE the ClassifyError, the way
+            // `parse_line` builds it from a line whose "HRP" is a secret.
+            parse_line(&format!("msl0{CANARY} plate 1")).unwrap_err(),
             BundleError::Validate(CANARY.into(), ValidateError::MkCorrected(2)),
             BundleError::Mk1SingleString(CANARY.into()),
             BundleError::Md1WireVersion(CANARY.into(), 12),

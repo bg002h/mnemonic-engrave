@@ -269,8 +269,13 @@ R(name="narrowed/use-site-non-consecutive", input=std(n=2, tail="/<0;2>/*"),
   source=NAR + "; address.Receive errors, address.Supported still true", covers=["narrowed-4.7"])
 
 # ---- accepted-extreme ------------------------------------------------------
+# Each key is child i of the 48h/0h/0h/2h account key (keytool-main.go), so its
+# origin is that path plus /i: an origin that matches the key's own depth (5)
+# and child number (i). Before 2026-11-25 the row declared the account path
+# alone, which `--as md1` now refuses (bug hunt E3, `md1-origin-mismatch`).
 R(name="accepted/sh-wsh-sortedmulti-16-keys",
-  input=sm(2, ["[%08x/%s]%s/<0;1>/*" % (i + 1, ORG, k) for i, k in enumerate(K16)], "shwsh"),
+  input=sm(2, ["[%08x/%s/%d]%s/<0;1>/*" % (i + 1, ORG, i, k) for i, k in enumerate(K16)],
+           "shwsh"),
   host_admits=True, md1_admits=True, format="bip380",
   source=SPEC + " S4.7 conjunct 3 (r6's recorded construction: 16 unhardened "
                 "children of the dc567276 fixture key; sh(wsh(...)) redeemScript is 34 bytes)",

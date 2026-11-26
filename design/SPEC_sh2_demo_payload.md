@@ -221,12 +221,17 @@ both of `seal`'s channels:
 ```console
 $ me seal --plaintext "key:6162" --out /tmp/t.uf2
 me: record 0 in the public section: unrecognised record:
-    unrecognized HRP 'key:6' (expected md, mk, ms, or mt)
+    unrecognized HRP (expected md, mk, ms, or mt; the text before the
+    first '1' is not shown, because it may be secret)
 
 $ me seal --in records.txt --out demo.uf2
 me: record 0 in the secret section: unrecognised record:
-    unrecognized HRP 'key:5b37336335646' (expected md, mk, ms, or mt)
+    unrecognized HRP (expected md, mk, ms, or mt; the text before the
+    first '1' is not shown, because it may be secret)
 ```
+
+(Transcript amended 2026-11-25, bug hunt E1: before then the refusal echoed the
+record's opening characters, `'key:6'` and `'key:5b37336335646'`.)
 
 `me seal` carries constellation STRINGS — md1/mk1/ms1/mt1. The composer record
 classes (`key:`, `hash:`, `now:`) are a `me sysw pack` surface, and `pack --help`

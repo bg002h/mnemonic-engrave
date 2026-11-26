@@ -135,8 +135,8 @@ fn the_file_carries_one_named_test_per_section_6_row() {
     let mine = named_row_tests();
     assert_eq!(
         mine.len(),
-        35,
-        "§6 is 35 data rows; this file names {mine:?}"
+        36,
+        "§6 is 36 data rows; this file names {mine:?}"
     );
     let vocabulary: std::collections::BTreeSet<String> = mnemonic_engrave::descriptor::Row::ALL
         .iter()
@@ -446,6 +446,63 @@ fn row_multi_record_descriptor() {
          `me sysw pack --as <descriptor|md1>` with just the descriptor -- one container \
          cannot yet carry a descriptor plus other records. The other records pack \
          without `--as`, as usual.",
+    );
+}
+
+/// A depth-3 xpub whose own child number is `0h` (bug hunt 2026-11-25 E3).
+const E3_XPUB: &str = "xpub6CUGRUonZSQ4TWtTMmzXdrXDtypWKiKrhko4egpiMZbpiaQL2jkwSB1icqYh2cfDfVxdx4df189oLKnC5fSwqPfgyP3hooxujYzAu3fDVmz";
+
+/// **§6's `md1-origin-mismatch` row (amended 2026-11-25, bug hunt E3; ruled
+/// by Brian).** md1 keeps
+/// a key's ORIGIN and rebuilds the xpub's depth and child number from it, so a
+/// key whose origin contradicts its own depth or child number would be cut
+/// with a derivation it was not made at. `--as md1` refuses it and points to
+/// `--as descriptor`, which carries the key exactly as given.
+#[test]
+fn row_md1_origin_mismatch() {
+    assert_row(
+        "md1-origin-mismatch",
+        &format!("wpkh([73c5da0a/84h/0h/7h]{E3_XPUB}/<0;1>/*)\n"),
+        &["--as", "md1"],
+        3,
+        "md1 cannot carry this wallet as written: key @0 ([73c5da0a/84h/0h/7h]\
+         xpub6CUGRUonZS…3fDVmz) is an xpub at depth 3 with child number 0h, but its \
+         origin `84h/0h/7h` ends in 7h. md1 keeps only the origin and rebuilds each \
+         key's depth and child number from it, so the card would record a derivation \
+         this key was not made at -- a signer deriving there gets a DIFFERENT key. Use \
+         `--as descriptor`, which carries the key exactly as given.",
+    );
+}
+
+/// E3's other shapes: an origin longer or shorter than the key's depth is
+/// refused by the depth clause; `--as descriptor` still packs the same input;
+/// and the consistent origin still packs under `--as md1`.
+#[test]
+fn bh1125_e3_md1_origin_depth_mismatch_refuses_and_the_controls_pack() {
+    for (origin, steps) in [("84h/0h/0h/5h", "4 steps"), ("84h", "1 step")] {
+        let doc = format!("wpkh([73c5da0a/{origin}]{E3_XPUB}/<0;1>/*)\n");
+        assert_row(
+            "md1-origin-mismatch",
+            &doc,
+            &["--as", "md1"],
+            3,
+            &format!("is an xpub at depth 3, but its origin `{origin}` has {steps}. md1 keeps"),
+        );
+        let out = run(&doc, &["--as", "descriptor", "--no-now"]);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "--as descriptor must still carry {origin}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    let good = format!("wpkh([73c5da0a/84h/0h/0h]{E3_XPUB}/<0;1>/*)\n");
+    let out = run(&good, &["--as", "md1", "--no-now"]);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "a consistent origin must pack: {}",
+        String::from_utf8_lossy(&out.stderr)
     );
 }
 

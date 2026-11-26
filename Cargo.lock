@@ -545,8 +545,8 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "md-codec"
-version = "0.48.5"
-source = "git+https://github.com/bg002h/descriptor-mnemonic?rev=c8bb97a5e2feccded5f05caf4c79c2458756c1c2#c8bb97a5e2feccded5f05caf4c79c2458756c1c2"
+version = "0.48.7"
+source = "git+https://github.com/bg002h/descriptor-mnemonic?rev=c8cde2346114ae461cbeb3be93ed9b46b00cc31b#c8cde2346114ae461cbeb3be93ed9b46b00cc31b"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -630,7 +630,7 @@ dependencies = [
 [[package]]
 name = "mt-codec"
 version = "0.2.0"
-source = "git+https://github.com/bg002h/mnemonic-transaction?rev=eec7910b06b6f6bc528de5731708c29cf7e37acd#eec7910b06b6f6bc528de5731708c29cf7e37acd"
+source = "git+https://github.com/bg002h/mnemonic-transaction?rev=9b094e0b0a6b2160e41690bd1ea13aa07d095f1b#9b094e0b0a6b2160e41690bd1ea13aa07d095f1b"
 dependencies = [
  "bitcoin",
  "thiserror",
