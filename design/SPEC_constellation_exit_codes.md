@@ -1,10 +1,21 @@
 # SPEC: constellation exit codes
 
-**Status:** DRAFT proposal, revision 5, 2026-11-26. Nothing is implemented yet.
-No binary, test or manual page moves until Brian has ruled on §2 and a review
-round closes with no Critical or Important findings.
+**Status:** revision 6, 2026-11-26. Implemented in all eight binaries and both
+GUIs on the `fx/*` working branches, which are reviewed but not merged or
+pushed (§10). The §2 decisions were built as recommended and still await
+Brian's ruling. So do the coordinator rulings of §2a, which the implementations
+follow, and the open questions of §2b, which nobody has decided.
 
-**Reviews so far** (Fable agents). §10 says how each finding was folded.
+**Revision 6 (2026-11-26).** This revision makes the spec say what the
+implementations do. It records the coordinator rulings taken during the
+implementation (§2a), lists the questions still open (§2b), folds the 27 spec
+defects that the final review listed (§10), records the interim state of the
+shared constants (decision 4, §9), replaces the GUI's version floors with
+detection by the help legend (§7j, §9), and adds Appendix A (settings and
+inputs, by tool). Revisions 1 to 5 were the review rounds below.
+
+**Spec reviews** (Fable agents). §10 says how each finding was folded. The
+implementation reviews are in §10 too.
 
 | round | result | report |
 | --- | --- | --- |
@@ -28,7 +39,11 @@ summable like 1, 2, 4, 8 so any combination into one sum is unique."*
 **Evidence.** The six survey reports, the brief they shared, and the round-0
 review are in `design/agent-reports/exit-codes-2026-11-26/`. They measured
 every binary at the heads of the 2026-11-25 fix PRs. A "today" cell is a
-measured run unless its report marks it as source only.
+measured run unless its report marks it as source only. Through §1, §2, §5,
+§7 and §8, "today" means before the implementation, as the surveys measured
+it. Revision 6 keeps those words so that each before-and-after stays
+readable; what the binaries do now is the "new" side.
+
 
 ## 1. Do we have one?
 
@@ -44,7 +59,7 @@ Only partly. Three earlier documents each cover a slice:
 Each tool's own spec or manual covers some of its codes. What is missing is one
 table across tools, and the surveys show the cost of that:
 
-| outcome | what the binaries return today |
+| outcome | what the binaries returned before the implementation |
 | --- | --- |
 | usage error | 2 (`md`, `mt`, `me`, `mr`, `mr-sitting`) or 64 (`mk`, `ms`, `mnemonic`). Inside `mt` and `mnemonic`, the flag clashes the program checks itself get 1 or 2 instead |
 | "the answer is no" | 1 (`md verify`, `mt`, `mr`, `mnemonic verify-message`) or 4 (`mk`, `ms`, the rest of `mnemonic`). `md descriptor --verify-against` gives 5 |
@@ -139,6 +154,15 @@ existing behaviour that some script or document relies on.
      with the source (§9).
    - mr-codec, which has a no-CLI-deps rule, keeps a copy with its own test
      against the §3 numbers.
+   - **Interim state (revision 6).** The publish has not happened.
+     mnemonic-io-lib 0.1.4 is written but unpublished. It holds the
+     constants, `Bits`, `HELP_LEGEND`, and, since the final review,
+     `exit::add` (adds a bit to a code, and leaves a code above 63 unchanged)
+     and `Bits::from_code`. `me` takes it by path. Every other binary carries
+     a local copy pinned to §3 by its own test, and the copies differ in their
+     names: module `exit` or `exit_code`, `LEGEND` or `HELP_LEGEND`, `add` or
+     `with_io_failure`, and 130 as `STOPPED`, `OPERATOR_STOP` or absent.
+     Replacing the copies with the published crate is owed (§9 step 1).
 
 5. **Every verb reports a correction it used (R6).**
    - Today these correct a damaged string, print a note on stderr, and exit 0:
@@ -164,13 +188,41 @@ existing behaviour that some script or document relies on.
      string or chunk of its format, and adds 2 for any that fails. It still
      prints the corrected strings with its warning, because a person
      repairing by hand needs to see them. A corrected string that fails its
-     check gives 16 + 2 = 18. With no oracle, as for a single string, it gives
-     16 + 4 + 2 = 22.
+     check would give 16 + 2 = 18, and with no oracle, as for a single string,
+     16 + 4 + 2 = 22. Under the shapes below (ruling 3), `repair` prints a
+     string that is no card only where it has no oracle for it, so it reports
+     22. A set that has its oracle and fails is 2 with nothing printed, so
+     `repair` does not report 18.
    - The check is per string. A set that is merely *incomplete* is not a
      failure (decision 7), and a *complete* set that fails reassembly is 2,
-    with nothing printed.
+     with nothing printed.
+
    - This changes E45 and the hazard line in mnemonic-refugium's CLAUDE.md
      ("its exit code stays the checksum's").
+   - **The shapes (ruling 3, §2a).** These are the same in `md`, `mk`, `ms`,
+     `mr` and the toolkit's `repair`. `mk` (a malformed set read as
+     incomplete) and `mr` (a complete set that fails, printed) were being
+     folded onto them when this revision was written (§10).
+
+     | input | status | printed |
+     | --- | --- | --- |
+     | an incomplete set or a lone chunk: fewer chunks than the total, distinct in-range indices, one total | 16 if a chunk was corrected, 0 if clean (decision 7) | yes, chunk by chunk |
+     | a malformed set: a repeated index, more chunks than the total, an index out of range, or chunks that disagree on the total | 2 | nothing |
+     | a complete set that fails reassembly or decode | 2 | nothing |
+     | a chunked set of one | as a complete set | as a complete set |
+     | a string that is not chunked, corrected, that decodes | 20 | yes |
+     | a string that is not chunked, corrected, that is no card | 22 | yes, and never written to `--out` |
+     | a string that is not chunked, clean, that is no card | 2 | nothing |
+     | a string whose chunk header is malformed | clean: 2; corrected: 22 | clean: nothing; corrected: yes |
+     | an `ms` K-of-N share | clean: 0; corrected: 20 | yes, and written to `--out` |
+
+     A share is a valid string of its format, not a card that failed. `md`
+     has one exception: a corrected single string at a wire version this
+     build does not support is printed at 22 whatever its chunk flag, so a
+     chunked set of one at a newer version is 22, not 2. That errs toward
+     warning.
+   - A string that is no card is shown, so that a person repairing by hand can
+     see it, but it is never filed for an engraver: `--out` is not written.
 
 7. **A correction in an incomplete chunk set is 16, not 20.**
    - D26 puts "verifiable by reassembly later" under `REPAIR_APPLIED`. Today
@@ -198,6 +250,9 @@ existing behaviour that some script or document relies on.
        code).
    - *The alternative* is 20 everywhere, which is safer and reverses D26's
      wording.
+   - What counts as incomplete, and what is malformed instead, is in decision
+     6's table. Chunks that carry different set ids are an open question
+     (§2b).
 
 8. **`inspect` reports a string that would not decode (R5).** Today `ms
    inspect` prints "FAIL: would NOT decode" and exits 0, as its locked table
@@ -236,6 +291,80 @@ existing behaviour that some script or document relies on.
     wallet that does not match the user's expectation in the same class as a
     secret typed on argv.
 
+### 2a. Rulings taken during the implementation
+
+The coordinator ruled on the questions the implementers raised. Each ruling
+was taken as a recommendation, with the same status as the decisions above:
+the implementations follow it, and it is pending Brian.
+
+1. **Named helpers (R9).** A helper is named when the operator gave its path
+   by flag or environment variable, even if the path equals the default. A
+   named helper that is missing, cannot be started, fails, or gives a reply
+   the tool cannot use sets 32. An unnamed default that is absent or failing
+   is a warning and sets nothing. A helper's own answer (a null, a not-found)
+   is not a failure. Naming a missing path is not an offline switch. An
+   explicit `mt --offline` is open (§2b).
+2. **16 survives a later failure (R1).** Once a verb has used a corrected
+   value, bit 16 stays set when the run then fails (17, 18, 24 and so on).
+   The exception is `repair` when it prints nothing.
+3. **The repair shapes (decisions 6 and 7).** Uniform across `md`, `mk`,
+   `ms`, `mr` and the toolkit, as decision 6's table gives them.
+4. **Self-disagreeing input, comparisons and conflicts (tests 1, 4 and 6).**
+   An input that disagrees with itself, or two parts of one input that
+   disagree, is 2. Bit 1 is a comparison between the input and a separate
+   reference the operator gave. A flag conflict judged without reading values
+   is 64. A missing required input channel is 64, and a named channel that
+   yields nothing is 2.
+5. **Passphrases and passwords (§3).** A wrong passphrase or password proven
+   by an authentication tag is 1. No tag, a missing passphrase, or a
+   malformed container is 2. A failure while sealing with a key the tool
+   derived is 101.
+6. **The lock and the mainnet sentence (§7h).** A held lock is 32. A refused
+   mainnet sentence is 130 (decision 9).
+7. **A choice the tool declines (test 5).** When the tool declines to choose
+   and a flag would choose, as `me` with `--as` omitted, the run is 8.
+8. **GUI scheme detection (R11, R12, §7j, §9).** Detection by the help legend
+   replaces version floors. 16 alone is shown amber, not green; the colour is
+   open for Brian (§2b).
+9. **Per-verb help (R11).** Each verb's `--help` ends with one line that
+   states the bits it can set.
+10. **JSON (R14).** The `kind` strings differ across tools and are renamed
+    only when mnemonic-io-lib is published. The additive repair fields are
+    recorded.
+11. **Decision 4's interim state** is recorded (decision 4, §9).
+
+### 2b. Open questions for Brian
+
+Nobody has decided these. The implementations do what each item says today.
+
+1. **An explicit offline switch for `mt`.** Under R9 naming a missing path is
+   not an offline switch, so an operator with `bitcoin-cli` on `PATH` cannot
+   keep `mt` from asking that node (which may be remote) about the
+   transaction's txids, short of editing `PATH`. The question is whether to
+   add `mt --offline` (or `--bitcoin-cli none`). Today there is none.
+2. **A damaged duplicate plate that `mt` discards.** When a set holds a clean
+   and a damaged copy of one chunk, `mt` keeps the clean copy and exits 0,
+   while it prints "re-cut it" for the damaged one. Either a discarded copy
+   does not set 16, as today, or 16 is set whenever the tool tells the
+   operator to re-engrave.
+3. **Groups with different set ids that cover every index.** Two `mk1`
+   chunks with different `chunk_set_id`s that together cover every index
+   exit 0 (16 if corrected) in `mk` and in the toolkit: each id forms its own
+   incomplete group, which decision 7 says is no failure. `md` refuses chunks
+   of two different cards (2). The choices are to say each set id is its own
+   group and the tool names the split, or to treat such groups as a
+   suspected miscorrection (2).
+4. **The GUI colour of 16 alone.** Recommended amber, which the mnemonic-gui fold adopts:
+   a lone corrected chunk is 16 and is verifiable only when the
+   set is reassembled, and the GUI cannot tell that from a verified
+   correction. The alternative is green with text that says "verified, or
+   verifiable when the whole set is read".
+5. **A toolkit path mismatch against a fingerprint mismatch.** In
+   `mnemonic bundle`, an inline descriptor path that disagrees with the
+   slot's path is 1, while the slot's fingerprint that disagrees with its
+   annotation is 2. Ruling 4 decides it once it is settled whether the slot
+   is a separate reference the operator gave or a second part of one input.
+
 ## 3. The scheme
 
 | code | name | set when | what the operator does |
@@ -244,7 +373,7 @@ existing behaviour that some script or document relies on.
 | 1 | NO | the input is well-formed, and a comparison against something else came out no: a reference, a phrase, a template, the chain, an expectation. For example a verify mismatch, NOT spend-equal, not a member, `--expect` not met, an input the node proves spent | read the verdict |
 | 2 | INVALID | an input is wrong for this verb whatever the flags: bad checksum, uncorrectable, wrong HRP or kind, a newer format, empty input, a malformed value the tool reads, an input that breaks the verb's correctness rules | fix or replace the input |
 | 4 | UNVERIFIED | the tool checked part of the result and could not confirm it: a correction with no oracle, a partial decode, a signature accepted leniently | verify before trusting the result |
-| 8 | REFUSED | the tool declined under a safety or policy rule that a flag, network, channel or different destination would waive, or a network mismatch (decision 1). Examples: secret on argv, an unsafe output destination, an output that exists and would be overwritten, a limit a flag can raise | change how it is run, or pass the override knowingly |
+| 8 | REFUSED | the tool declined under a safety or policy rule that a flag, network, channel or different destination would waive, or declined to make a choice that a flag would make, or a network mismatch (decision 1). Examples: secret on argv, an unsafe output destination, an output that exists and would be overwritten, a limit a flag can raise | change how it is run, or pass the override knowingly |
 | 16 | REPAIRED | the tool applied a checksum correction to an input and used the corrected value | the plate is damaged; re-engrave it |
 | 32 | IO | something the tool needed from the system failed or is missing: an input file, an output that cannot be written, stdout, a helper program the user asked for, a device, a lock, a RAM folder, an environment variable, a feature this build lacks | fix the environment |
 | 64 | USAGE | never combines: the command line alone is wrong (decision 2). Nothing ran | fix the command line |
@@ -270,7 +399,12 @@ single codes. Any other value from 65 to 125 is a bug.
 1. Is the command line wrong, judged without reading any input, file or
    environment: an unknown flag or verb, a missing argument, a conflict, or a
    bad *setting* (decision 2)? Then **64**. A malformed input value is not
-   this test; it is 2 (test 6). The exception is the argv
+   this test; it is 2 (test 6). A conflict here is one between flags, judged
+   without reading their values. A missing required input channel (no input
+   named where the verb has no default) is 64; a named channel that yields
+   nothing is empty input, 2 (decision 3, ruling 4). Where a verb reads stdin
+   when no input is named, as `ms` does, stdin is the named channel, so an
+   empty stdin is 2. The exception is the argv
    guard of uniformity spec §6d, which runs first: a secret on argv is 8
    (R2).
 2. Did something needed from the system fail or go missing? Then **32**.
@@ -278,15 +412,21 @@ single codes. Any other value from 65 to 125 is a bug.
 4. Is the input well-formed, but does it fail to match something it should
    match: a reference the user gave, a phrase, a template, a policy-id stub, a
    plan it should belong to, the chain's state, or an `--expect` claim? Then
-   **1**, even when an override exists (decision 11). A limit, cap, deadline
+   **1**, even when an override exists (decision 11). The comparison is
+   between the input and a separate reference the operator gave, or the
+   world (ruling 4). A limit, cap, deadline
    or delta that the tool enforces is not a match; those are test 5.
 5. Did the tool decline under one of its safety or policy rules, which a flag,
    a network, a channel or a different destination would waive? Examples:
    secret exposure, an unsafe or existing destination, the same file in and
-   out, a guardrail, a limit. Then **8**.
+   out, a guardrail, a limit. The same holds when the tool declines to make a
+   choice that a flag would make, such as `me` with `--as` omitted on an
+   input whose packing it will not guess (ruling 7). Then **8**.
 6. Is the input itself wrong for this verb, or insufficient for it (for
    example `mr member` with no keys for a seat the card does not key)? Then
-   **2**.
+   **2**. An input that disagrees with itself, or two parts of one input
+   that disagree (an origin fingerprint against its xpub, a `--key` bracket
+   against the template's path), is this test, not test 4 (ruling 4).
 7. Anything else is a bug: **101** (R13).
 
 A run that ends on its first failure takes that failure's class. When order
@@ -314,13 +454,31 @@ tests and vectors assert the bits that must be set, not the exact sum.
 | `me seal --iterations 5` | 64 | |
 | `ms` reading two inputs from stdin | 64 | |
 | `@env:NAME` with NAME unset | 32 | |
-| `mt verify --bitcoin-cli …` on an input the node proves spent | 1 | |
+| `mt encode` on an input the node proves spent | 1 | `mt verify` never asks a node |
+| `mt verify --bitcoin-cli …` | 64 | a node flag on a verb that never asks a node |
+| `me` with `--as` omitted where the tool will not choose a packing | 8 | a flag would choose (ruling 7) |
+| `me sysw hash` with no records | 64 | a missing required input, judged from argv |
+| `mnemonic restore --from xpub=…` | 2 | not a seed source: the wrong kind of input for the verb |
+| an origin fingerprint that disagrees with its xpub | 2 | one input disagrees with itself (ruling 4) |
+| a wrong passphrase proven by an authentication tag | 1 | ruling 5 |
+| `mr-sitting` with its lock held | 32 | ruling 6 |
+| `mr-sitting`, the operator refuses the mainnet sentence | 130 | a stop at a prompt (decision 9, ruling 6) |
 | `mr --time 1`, `--height abc`, `--digest zz`, `--set-id zz` | 2 | input values (decision 2) |
 | `derive-child --application rsa` | 2 | a valid name the tool will not do; no flag waives it |
 | a BIP-388 distinctness violation in `verify` | 2 | |
 | `mr-sitting root --network main` where input ends first | 2 | the first failure wins |
 
+**Passphrases and passwords** (ruling 5). An authenticated cipher cannot
+tell a wrong passphrase from altered ciphertext. So a decrypt that fails its
+authentication tag is 1, the passphrase compared with the container, and the
+message says that the passphrase is wrong or the container was altered. A
+decrypt with no tag to prove it, a missing passphrase, or a malformed
+container is 2. A failure while sealing with a key the tool derived itself
+cannot be caused by the input, so it is 101. `me` (`seal`, `sysw`) and the
+toolkit (BIP-38, Electrum, BSMS) implement this.
+
 `me`'s refusal table (`Row` in `me-cli/src/descriptor/refusal.rs`) and the 66
+
 `Refusal::new` sites in `mt-cli/src` (outside tests) each get a class column,
 decided by these tests.
 
@@ -374,6 +532,16 @@ does.
   under decision 6, `inspect` under R5) sums every bit it reports. A verb may
   stop at the first failure (fail fast) and report only what it examined.
   Tests assert masks where order can change the sum (§3).
+  - **Bit 16 survives a later failure** (ruling 2). Once a verb has used a
+    corrected value, bit 16 stays set in whatever status the run ends with,
+    including an atomic failure or a refusal: a verify mismatch on a
+    corrected card is 17, a content-id failure after a correction 18, a
+    network refusal 24, a stdout failure after a corrected repair 48. The
+    plate is damaged whatever
+    happened next, and the bit only adds a warning. The one exception is
+    `repair` when it prints nothing (an uncorrectable string, a malformed
+    set, a complete set that fails reassembly): it exits 2 alone, as in the
+    `md repair` example above.
 - **R2. The usage check comes first, except the argv guard.** A usage error
   exits 64 before any input is read or any output is written. One exception
   is the pre-parser argv guard of uniformity spec §6d: it is normative and runs
@@ -383,7 +551,11 @@ does.
   this spec's. A limit that depends on
   the input, such as `md descriptor --chain 7` on a card whose limit is 2, is
   not usage. It is 2, and it must be checked before the verdict is printed.
-  Today `md` prints the verdict first and then exits 1.
+  Before the implementation `md` printed the verdict first and then exited 1.
+  Putting usage first has a cost: advice that needs the input cannot come
+  before a usage error. `me --in wallet.txt` with no output mode is 64
+  before `me` can say "this is a descriptor; use `sysw pack`", so `me`
+  prints a static hint instead.
 - **R3. Classify with the ordered tests of §3.** Uniformity spec §6i (posture
   versus correctness) is a taxonomy. It explains most REFUSED rows, but it is
   not the test.
@@ -395,11 +567,14 @@ does.
   the mismatch. The rule follows the flag's function, not its prefix.
 - **R5. A report verb reports in its code (decision 8).**
   - `inspect` is a report verb. When the artifact it inspects would not
-    decode, it prints its whole report and sets 2. Today `ms inspect` prints
-    "FAIL: would NOT decode" and exits 0.
-  - A message must agree with its code. `ms verify` prints "OK: valid future
-    format" and exits 3 today; under this spec it exits 2, so the message
-    stops saying OK.
+    decode, or a share would not combine, it prints its whole report and
+    sets 2. Before the implementation `ms inspect` printed "FAIL: would NOT
+    decode" and exited 0.
+  - A message must agree with its code. `ms verify` printed "OK: valid
+    future format" and exited 3; under this spec it exits 2, so the message
+    stops saying OK. A verb whose only bit is 16 may print its success line
+    (`mt verify` and `mk verify` print `OK` and exit 16), and must name the
+    correction beside it.
   - A field that only describes the world is not a failure and leaves the code
     alone. `mt inspect`'s STATUS DEAD (the transaction is spent on chain) is
     such a field.
@@ -416,14 +591,31 @@ does.
   No new auto-repair behaviour is introduced.
 - **R8. Output failures add IO.** A stdout write error, a closed stdout or a
   full disk adds 32 to the other bits; it does not replace them. EPIPE (the
-  reader went away) keeps the verb's own code, as today. Every binary exits 0
-  with stdout closed today (`md decode <card> >&-`, `mt decode >&-`,
-  `me --hex >&-`, all measured), losing the output.
-- **R9. An absent optional helper is a warning; a helper that was asked for is
-  not optional.** `mt` with no node, or `me` without the preview sidecar,
-  exits 0 and says what it skipped. When the user named the helper (`mt
-  --bitcoin-cli PATH`) or the verb needs it (`mr-sitting`'s picotool), a
-  failure sets 32.
+  reader went away) keeps the verb's own code, as before. Before the
+  implementation every binary exited 0 with stdout closed (`md decode <card>
+  >&-`, `mt decode >&-`, `me --hex >&-`, all measured), losing the output.
+  - A closed stdout is detected on Linux, Android, macOS and the BSDs. On
+    Windows it is not, and a run with stdout closed still exits 0 with the
+    output lost.
+  - A closed stdin reads as empty input, 2 (decision 3).
+- **R9. An unnamed helper is optional; a named one is not** (ruling 1).
+  - A helper is *named* when the operator gave its path by flag or
+    environment variable, even if the path equals the default (`mt
+    --bitcoin-cli bitcoin-cli`, `ME_PREVIEW_BIN`). A helper the verb needs
+    (`mr-sitting`'s picotool) counts as named.
+  - A named helper that is missing, cannot be started, exits with a failure,
+    or gives a reply the tool cannot use sets 32. The tool says which helper
+    failed and how.
+  - An unnamed optional helper that is absent or failing is a warning and
+    sets nothing: `mt` with no `bitcoin-cli` on `PATH`, or one found there
+    that fails; `me` with no preview sidecar.
+  - A reply that is the helper's own answer, such as a null or a not-found,
+    is not a failure.
+  - Naming a path that does not exist is therefore not an offline switch.
+    Whether `mt` gains an explicit one is open (§2b).
+  - A helper failure sets 32 even when the input caused it, such as a
+    sidecar that cannot render the plate the input describes. The message
+    says what the helper reported.
 - **R10. Signals keep the shell meaning.** A process killed by signal N is
   reported by the shell as 128+N. A process that catches a signal to clean
   up, as the `mr-sitting` session's wipe hook does, re-raises the signal when it
@@ -432,8 +624,10 @@ does.
   process exits 32 instead, after printing its wipe-failure message, because
   the operator must now act on the device.
 - **R11. Help states the table.** Every binary's root `--help` ends with the
-  same legend, and the toolkit manual gains one appendix holding §3. Per-verb
-  help states only the bits that verb can set. The legend:
+  same legend, and the toolkit manual gains one appendix holding §3. Each
+  verb's `--help` ends with one line that states the bits that verb can set
+  (ruling 9). `mt`, `me`, `mk`, `ms` and `md repair` have it. `md`'s other
+  verbs, `mnemonic`, `mr` and `mr-sitting` still owe it. The legend:
 
   > Exit status: 0 = done, every check passed. 64 = bad command line, nothing
   > ran. 101 = internal error. 130 = stopped by the operator. Other codes from
@@ -442,6 +636,14 @@ does.
   > result before trusting it; 8 refused (network mismatch, secret on the
   > command line, unsafe output); 16 a correction was applied; 32 a file,
   > device or helper failed.
+
+  The legend is the last text of the root `--help` (and of `-h` and `help`
+  where they exist), compared with whitespace normalised, so a binary may
+  wrap it. Each binary has a test for this. A consumer detects the scheme
+  this way (ruling 8): an exact legend at the end means the bit codes; no
+  paragraph beginning `Exit status:` means the old codes; anything else (a
+  legend that differs by a word, or one that is not last) means the status
+  cannot be decoded, and the consumer shows the number undecoded.
 - **R12. GUIs decode the bits.**
   - A child killed by a signal has no exit code on Unix; a GUI shows
     "killed by signal N" from the platform's status.
@@ -450,6 +652,9 @@ does.
     anything else outside 0..125 as "ended abnormally" (§3).
   - A GUI decides whether output exists by looking at the output, never from
     the code.
+  - A GUI shows 16 alone in amber, not green (§2a ruling 8; the colour is
+    open, §2b). The code cannot tell a verified correction from one that is
+    verifiable only when the rest of a set is read.
   - The GUIs' own processes exit 0, 64, 32 (cannot start: missing libraries,
     no display, a child that fails to start) or 101. `mr-gui`'s catch-all 1
     goes, and mnemonic-gui keeps its deliberate 130 when a clean shutdown
@@ -468,10 +673,24 @@ does.
 - **R14. Machine-readable output carries the same number.** The JSON
   envelopes of `mk`, `ms` and `mnemonic` that hold an `exit_code` field put the
   process's exit status in it, and their schemas say it is a bit sum.
+  - **The `kind` strings are owed** (ruling 10). The tools named one class
+    differently: an IO failure is `IoError` in `mk`, `Io` in `ms` and
+    `IoFailure` in the toolkit, and an invalid input is `InvalidInput` in
+    `mk` and `BadInput` in `ms`. `Refused` and `Internal` agree. Nothing is
+    renamed now. One name per class is settled when mnemonic-io-lib is
+    published, and the GUI keys on the class names from then on.
+  - **Repair's additive fields.** A repair envelope may add `not_a_card` (at
+    22, saying why the corrected string is no card), `incomplete: true` (an
+    incomplete set or lone chunk, decision 7), `share` (an `ms` share), and
+    `mk verify` adds `corrected`. Each is additive; an envelope without them
+    keeps its old meaning. The three tools' repair shapes therefore no longer
+    byte-match one another.
+
 
 ## 5. Today to new, by class
 
-| class | today | new |
+| class | before | new |
+
 | --- | --- | --- |
 | success | 0 | 0 |
 | answer is no | `md` 1 (`--verify-against` 5); `mk` 4; `ms` 4; `mt` 1; `mnemonic` 4 (`verify-message` 1, strict BSMS mismatch 2); `mr`, `mr-sitting` 1; `me --expect` not met 4 | 1 |
@@ -518,6 +737,15 @@ none changes silently.
     uses 8 for anything else. It changes to check the N10 line instead.
   - Order: the network rule's units are not built yet, so they should be built
     straight onto bit 8 (§9).
+  - **Not done yet (revision 6).** None of the network-rule changes above is
+    made: `SPEC_network_rule.md` still says 8 is reserved and unreachable
+    (`:143`), still says "a CLI that exits 8" (`:146`), and still keys the GUI
+    rows on exit 8 (`:400-401`), and gate check 5 is unchanged. They are owed
+    with the network rule's unbuilt units.
+  - Among those units: `me`'s `MixedNetwork` (a file whose keys are of two
+    networks) sets 8, but no binary prints the N10 line yet, so a script
+    cannot tell it from an argv refusal. `md` and `mk` set 8 for a network
+    mismatch and print no N10 line either.
 - **Uniformity spec §6f.**
   - Its table is replaced.
   - Its "`mk` 2 → 1" was done, and `mk` now moves to 2 with everything else.
@@ -545,7 +773,9 @@ none changes silently.
   `Outcome::code()`) are all replaced by §3.
 - **mt spec.** The normative copy is in mnemonic-engrave:
   `SPEC_mt_v0_1.md:3384-3385` and `:810-827`. It changes by decision 5, and
-  the mnemonic-transaction copy re-syncs.
+  the mnemonic-transaction copy re-syncs. Done: engrave `27234b9`,
+  `9659335` and `946147a` (`mt verify --bitcoin-cli` is usage), with mt's
+  re-sync in `ffa1f45` (the last line still to follow).
 - **The toolkit's incomplete-set demote** (4 today) changes by decision 7.
 - **CLI review CLI-14.** Replaced by this spec. Decision 2 reverses its usage
   recommendation, and decision 3 its empty-input rule.
@@ -570,16 +800,25 @@ silent correction into 16.
 - **Correctness refusals move from 1 to 2:** BIP-388 key reuse, an
   unsupported shape, and an xprv where an xpub is expected.
 - **Network.** A wrong-network key moves from 1 to 8, per the network rule.
-- **Override refusals move to 8:** "needs `--experimental`", `--md-only` and
-  `--allow-invalid-miniscript` (1 today), and `--out` naming the input (2
-  today). Bad `compose` values move from 1 to 2.
+- **Override refusals move to 8:** "needs `--experimental`" and `--md-only`
+  (1 before), and `--out` naming the input (2 before). Bad `compose` values
+  move from 1 to 2.
+- **`--allow-invalid-miniscript`** is not in the `md` this was built against.
+  It exists only on md PR 76 (open and unmerged, branch
+  `claude/project-thread-utm1aa`, commit `fcefa83`), which refuses an
+  invalid-miniscript card at 1 unless the flag is given. Revisions 1 to 5
+  listed it here by mistake. When that PR lands, its refusal is 8 (an
+  override clears it, test 5), and toolkit manual `42-md.md:184`, which says
+  "exit 1", moves with it.
 - **Repair.** An incomplete set or a lone chunk, refused today (2, no
   output), is corrected chunk by chunk and printed: 16 if a correction was
   applied, 0 if clean (decision 7). A chunked set that reassembles moves from
   5 to 16. A
   single-string correction moves from 5 to 20, which closes FOLLOWUP
   `md-cli-non-chunked-single-string-repair-demote` by the same rule.
-  Uncorrectable stays 2, and the result is decode-checked (decision 6).
+  Uncorrectable stays 2, and the result is decode-checked (decision 6). A
+  corrected single string at a wire version this build does not support is
+  printed at 22 whatever its chunk flag (decision 6's exception).
 - **Unverified.** Partial decode stays 4 on `decode` and `inspect`.
 - **IO moves to 32:** `--in` missing (2), `--from-mk1-file` missing (1),
   `encode --out` unwritable (1), `gen-man`/`vectors` output dir (2), stdout
@@ -642,13 +881,25 @@ silent correction into 16.
 - **Refusals move from 1 to 8:** argv material, a world-readable stdout, and
   the same file given as input and output.
 - **IO moves from 1 to 32:** read and write failures. A named `--bitcoin-cli`
-  that fails moves from 0 to 32 (R9); no node at all stays 0 with its warning.
+  that is missing, cannot start, fails, or gives a reply `mt` cannot use
+  moves from 0 to 32 (R9), including a path that does not exist: naming one
+  is not an offline switch. An unnamed `bitcoin-cli`, absent from `PATH` or
+  found there and failing, stays 0 with its warning. Core's own answers
+  (exit 5 from `getrawtransaction`, 89 from an old Core's `getindexinfo`)
+  are answers, not failures. Whether to add `mt --offline` is open (§2b).
+- **`mt verify --bitcoin-cli`** is usage, 64: `verify` never asks a node
+  (`SPEC_mt_v0_1.md` (b)).
 - **Corrections.** In `decode`, `verify` and `inspect`, these move from 0 to 16
-  (decision 5); the set-level content-id is the oracle. The normative spec's
+  (decision 5). For `mt`, 16 means the reassembled transaction re-derives its
+  id. Witness bytes are not covered by the id; a miscorrection there yields a
+  transaction that cannot be broadcast, not a different one. So `mt` reports
+  16, never 20. A transliterated HRP character is a reading, not a
+  correction, and does not set 16. A damaged duplicate that `mt` discards for
+  a clean copy is 0 today (open, §2b). The normative spec's
   one-liner (`SPEC_mt_v0_1.md:810-827` in mnemonic-engrave) and its exit
   status line (`:3384-3385`) change with this.
 
-### 7e. `me` (mnemonic-engrave): about 80 non-zero pins; three gate scripts branch on 0, 2 or 4
+### 7e. `me` (mnemonic-engrave): about 80 non-zero pins; six gate scripts branch on the codes
 
 - **Constants.** The private constants at `crates/me-cli/src/main.rs:495-500`
   give way to the shared ones (decision 4).
@@ -671,8 +922,23 @@ silent correction into 16.
   `bundle --preview DIR`. The user asked for a preview, not for the sidecar
   (R9). If Brian prefers, `--preview` can count as asking for the sidecar,
   which would make this 32.
-- **Scripts.** The gate scripts move in the same PR, and so does
-  `policy-differential.py`.
+- **Refusal rows.** `--as` omitted, where `me` will not choose a packing, is
+  8: a flag would choose (ruling 7). `MixedNetwork` is 8 (decision 1). The
+  representability rows (`PromotionTestnetKey`, `Md1FixedIndex`,
+  `Md1NoWildcard`, `MultiUnderDescriptor` and similar) are 2.
+- **Passphrases.** An authentication failure on open is 1, a missing
+  passphrase or malformed container 2, and a sealing-side failure 101
+  (ruling 5). An out-of-range iteration count is 64 as a flag and 2 when read
+  from a container's header.
+- **Sidecar.** A render failure in a sidecar that was found is 32 even when
+  the input caused it (R9).
+- **Scripts.** Six gate scripts branch on the codes, and each has a `--cli`
+  mode that runs the binary: `fix-me-admission-canonical-gate.sh`,
+  `fix-me-checklist-partial-keys-gate.sh`, `fix-me-cli-arg-contract-gate.sh`
+  (it needs the seedhammer submodule and Go), `fix-me-descriptor-input-strict-gate.sh`,
+  `fix-me-inspection-fail-open-gate.sh` and `fix-me-output-integrity-gate.sh`.
+  All six pass in `--cli` mode at `3183c14`. They move in the same PR, and so
+  does `policy-differential.py`. Revisions 1 to 5 said three.
 
 ### 7f. `mnemonic` (mnemonic-toolkit): about 470 pins in 221 files
 
@@ -702,6 +968,11 @@ silent correction into 16.
   version (3), an undecodable card inside `verify-bundle` (4), empty input
   (1), the one-way `convert` refusals, the electrum-taproot, bip388-NUMS and
   wif-at-mint refusals, and an xprv inside an imported blob.
+- **Restore.** `restore --from xpub=…` is 2: an xpub is not a seed source,
+  the wrong kind of input for the verb, as `convert` from xpub to xprv.
+- **Passwords.** A wrong BIP-38 passphrase or Electrum password proven by its
+  authentication tag is 1, as the BSMS MAC; a decrypt with no tag is 2
+  (ruling 5).
 - **Refusals move to 8:** a secret on argv (2), network mismatch (per the
   network rule), and the `compare-cost` cap (3). `export-wallet` given a secret
   slot moves to 2: export is watch-only by definition, so no flag clears it.
@@ -757,7 +1028,10 @@ silent correction into 16.
   - An incomplete set of two or more chunks, refused today (2, no output), is
     corrected chunk by chunk and printed: 16, or 0 if clean (decision 7).
   - A set that reassembles is 16.
-  - A result that is not a card adds 2 (decision 6). Uncorrectable stays 2.
+  - A corrected string that is not chunked and is no card is printed at 22,
+    a clean one is 2 with nothing printed, and a complete set that fails
+    reassembly or decode is 2 with nothing printed (decision 6's table).
+    Uncorrectable stays 2.
   - E45's repair paragraph changes with this (§6).
 
 ### 7h. `mr-sitting` (mnemonic-refugium): about 270 code assertions (the survey's basis, including 0)
@@ -766,11 +1040,15 @@ silent correction into 16.
 - **Plan files.** A malformed plan, hand-back or kit file stays 2. A
   well-formed hand-back that belongs to another plan is a mismatch, so 1
   (test 4).
-- **IO moves from 2 to 32:** an unreadable file, the lock, no RAM folder, and
-  picotool unusable. A failed picotool `load` or erase moves from 1 to 32.
+- **IO moves from 2 to 32:** an unreadable file, a held lock (ruling 6), no
+  RAM folder, and picotool unusable. A failed picotool `load` or erase moves
+  from 1 to 32.
 - **No.** Verify mismatch stays 1.
 - **Operator stops** move from 1 to 130 (decision 9).
-- **Refusals move from 1 to 8:** mainnet on the network, and a brought seed.
+- **Mainnet.** An operator who refuses the mainnet confirmation sentence
+  stops the run, so it is 130 (decision 9, ruling 6), not 8.
+- **Refusals move from 1 to 8:** a brought seed.
+
 - **Existing output.** `practice --dir` whose files exist moves from 2 to 8.
 - **End of input at a prompt** moves from 1 to 2.
 - **Signals.** A session signal moves from 1 to 128+N, after the wipe (R10).
@@ -806,11 +1084,21 @@ silent correction into 16.
 - **Text that moves.** The tooltip at `src/schema/ms.rs:649` ("exit 64").
   About seven comments, one of which (`schema/mnemonic.rs:2358`) is already
   wrong. `tests/tutorial/manifest.rs:104`, and the recorded measurement JSON.
-- **Cutover (§9).** The GUI runs the first binary on PATH and checks a
-  version floor only for secret runs. Every old code is a valid new sum with a
-  different meaning, so the floor check has to cover every run. Old 5 reads as
-  NO + UNVERIFIED, old 3 as NO + INVALID, and old 4 from `mk verify` as
-  UNVERIFIED.
+- **Cutover (§9).** Every old code is a valid new sum with a different
+  meaning: old 5 reads as NO + UNVERIFIED, old 3 as NO + INVALID, and old 4
+  from `mk verify` as UNVERIFIED. So the GUI must know which scheme each
+  binary speaks before it reads a status. Revision 5 asked for a version
+  floor on every run. The implementation detects the scheme instead, from the
+  binary's root `--help` (R11, ruling 8):
+  - the exact legend as the last text, whitespace normalised: the bit codes;
+  - no paragraph beginning `Exit status:`: the old codes (Legacy);
+  - anything else, or a `--help` that hangs or fails: Undecoded, and the
+    status is shown as a bare number.
+  The probe must run the same file the run spawns (on Windows the
+  application's directory is searched before `PATH`). Version floors are gone,
+  except G1's floor for secret runs. A legend that drifts by one word in one
+  copy is therefore read as Undecoded, never as Legacy, whose 5 is green.
+- **16 alone** is amber, not green (R12; open, §2b).
 
 ### 7k. refugium-wallet
 
@@ -828,13 +1116,15 @@ silent correction into 16.
 
 ## 8. Defects found along the way
 
-These are true today, and except where noted each could be fixed on its own:
+These were true before the implementation. Each is fixed on the `fx/*`
+branches except where noted.
 
 - mnemonic-gui shows a green "Repair Applied" badge for `md descriptor
   --verify-against` NOT spend-equal (§7j; source reading).
 - `me` panics with 101 on a non-UTF-8 argument, before its argv secret guard
   runs (`me --hex $'\xff\xfe'`).
 - Every binary exits 0 with stdout closed, and the output is lost (R8).
+  Still true on Windows.
 - `mk repair` exits 0 on cards that `mk decode` rejects with 1 or 3.
 - `ms inspect` exits 0 while printing "FAIL: would NOT decode". This one is
   by `ms`'s locked table, so it changes only through decision 8.
@@ -842,7 +1132,8 @@ These are true today, and except where noted each could be fixed on its own:
   terminal.
 - `md descriptor --verify-against X --chain 7` prints its verdict and only
   then fails.
-- A named `mt --bitcoin-cli` that fails exits 0.
+- A named `mt --bitcoin-cli` that fails exits 0. Fixed: 32, and a named path
+  that does not exist is 32 too, so it is no longer an offline switch (R9).
 
 ## 9. Rollout
 
@@ -854,13 +1145,21 @@ binary and a new GUI meet without a version check. The order:
 1. The shared constants and the bit-set type in mnemonic-io-lib (decision 4):
    a crates.io publish, then pin and `vendor/` moves in the five consumers
    that take it from crates.io (`me` has a path dependency). The mr-codec copy and its test land at the same time.
+   - **Interim (revision 6).** This step did not come first. The binaries
+     were built with local copies (decision 4), and 0.1.4 is unpublished.
+     Before it is published it gains `exit::add` and `Bits::from_code`,
+     which it now has, so that no consumer keeps a shim. After the publish,
+     each binary replaces its copy, the JSON `kind` names are settled
+     (R14), and the toolkit's legend test switches to a whitespace-normalised
+     comparison, since the library's legend is one line.
 2. The network rule's unbuilt units are built straight onto bit 8, so none of
    that work has to be redone.
 3. The eight binaries, each with its tests, help legend (R11), JSON fields,
    manual chapter and gate scripts.
-4. In the same window: mnemonic-gui (bit decoding, and a version floor on
-   every run) and refugium-wallet (the mr-codec pin bump), plus the manual
-   appendix.
+4. In the same window: mnemonic-gui (bit decoding, and scheme detection from
+   the legend, §7j) and refugium-wallet (the mr-codec pin bump), plus the
+   manual appendix.
+
 
 `mr` is about two thirds of the test churn, so its PR is the long pole
 (decision 10). The others can land in any order behind step 1, with two
@@ -936,3 +1235,103 @@ input-value carve-out; §5 had no operator-stop row). All five are folded.
 | R4-I1 (`mr`'s incomplete sets) | Decision 7 states `mr`'s behaviour today (lone chunk 5 or 0; two or more chunks, incomplete: 2, no output). `md` and `mr` both change. A lone chunk is 16, and only a string that is not chunked is 20. §7g lists all of it. |
 | M1 to M9 | Folded. More silently correcting verbs listed (decision 5, §7f). Decision 8's false "as `md` and `mk` already do" removed. The argv guard wins for a malformed `--from` (§7f). §3's example of 20 replaced. `mk`'s "UNVERIFIED" message at 16 (decision 7). N10 and `MNEMONIC_NETWORK_JSON` (§6). A named `ME_PREVIEW_BIN` that is missing is 32 (§7e). A failed wipe during a stop exits 32 (R10). Tips, `--digest`, `--set-id`, `--application rsa` and distinctness placed (§3); signal kills in GUIs (R12). |
 | N1 to N5 | `mr`'s post-parse guard (R2). "Destination" in REFUSED. "Nothing printed" (decision 6). `mt` verb named. The shell example says "operator stop". N4: the mt line numbers are master's (`:3384-3385`, `:810-827`); the fix-PR head has them at `:3470-3471` and `:813-830`. |
+
+### Implementation reviews
+
+Each repo's implementation had three review steps. An Opus agent that did not
+write the code reviewed the whole diff, and the implementer folded it. A Fable
+agent then ran a final independent round across repos. The final findings are
+folded by Opus implementers, in the commits named below where they have
+landed. Every branch is `fx/<repo>`, and nothing is pushed.
+
+Opus reviews are at `design/agent-reports/exit-codes-impl-review-2026-11-26.md`
+in each repo, except `me`'s, which is
+`design/agent-reports/exit-codes-2026-11-26/impl-review-me.md` here. The Fable
+final reviews are in this repo's `design/agent-reports/exit-codes-2026-11-26/`:
+`final-review-md-mk-ms.md`, `final-review-mt-me-spec.md` and
+`final-review-toolkit-gui.md`.
+
+| repo | implementation | Opus review | Opus fold | Fable final review | final fold |
+| --- | --- | --- | --- | --- | --- |
+| descriptor-mnemonic (`md`) | `1a7063c`, `e2ae76f`, `09e9f29` | 0C, 2I, 7M, 7N | `b79bfa5`, `e178792` | md-mk-ms: NOT GREEN, 0C, 3I, 9M, 6N (the three binaries together) | `8c85bf9` |
+| mnemonic-key (`mk`) | `506c95f`, `f3a17c8` | 0C, 2I, 6M, 4N | `55a6e68` | md-mk-ms, as above | in progress at this revision |
+| mnemonic-secret (`ms`) | `ff7cb4e`, `d54e140` | 0C, 1I, 4M, 5N | `ce20d5a` | md-mk-ms, as above | `9da35f9` |
+| mnemonic-transaction (`mt`) | `60151a4`, `56e6ebc`, `bb996d0`, `608c338` | 0C, 2I, 5M, 5N | `d49dabf` | mt-me-spec: 0C, 2I, 11M, 6N (with the spec) | `b7b5480`, SPEC_mt re-sync `ffa1f45` |
+| mnemonic-engrave (`me`, mnemonic-io-lib) | `8ff5711`, `72273ea`, `82d2bb3`, `236c576`, `cf88af4` | 0C, 1I, 6M, 8N | `f0a9654`, `27234b9` | mt-me-spec, as above | `9659335`, `3183c14`, `946147a` |
+| mnemonic-toolkit (`mnemonic`, manuals) | `e51607b8`, `71dc68ac`, `f8b8d19c`, `a32c3bd2` | 1C, 6I, 11M, 5N | `2a3ce852`, `5931f7a7`, `1cfa8950`, `a0ac6ad0` | toolkit-gui: NOT GREEN, 0C, 4I, 14M, 6N | not yet |
+| mnemonic-gui | `a5fa42d`, `691f9ce`, `2545d0c` | 1C, 2I, 5M, 3N | `2168783` | toolkit-gui, as above | in progress at this revision |
+| mnemonic-refugium (`mr`, `mr-sitting`) | `26ee6dd42`, `6e6398d09`, `3e2a50c5e` | 0C, 4I, 7M, 3N (file not yet committed) | in progress at this revision | none yet | none yet |
+
+Still owed across the work, from the reviews:
+
+- `mr` has had no Fable final round, and its own process gate's whole-diff
+  review (`agent-reports/whole-diff-mr-<phase>.md`) is owed.
+- Gates nobody ran: `mt`'s `scripts/mutate-refusals.sh`, `me`'s
+  `fix-me-dev-gates-gate.sh` (no `--cli` mode), `mr`'s regtest rows, and
+  mnemonic-gui's tutorial snapshots, `schema_mirror` and secret-channel
+  re-measurement against the renumbered binaries.
+- Toolkit manual `45-mr.md` and `46-mr-sitting.md` passages that still give
+  old codes (toolkit-gui final review I1), and the manual lockstep FOLLOWUPS
+  for `mk` and `ms`.
+- The network-rule changes of §6, the mnemonic-io-lib publish (§9), and the
+  per-verb help lines that R11 lists as owed.
+
+### Revision 6: the final review's 27 spec items
+
+The list is at the end of `final-review-mt-me-spec.md`. "Ruling" means a
+coordinator ruling of §2a; "open" means §2b.
+
+| item | disposition |
+| --- | --- |
+| 1 (worked table names `mt verify`) | §3: `mt encode` on a spent input is 1; `mt verify --bitcoin-cli` is 64. |
+| 2 (R9: named, fails) | Ruling 1. R9 rewritten; §7d and §8 say a named missing path is 32 and not an offline switch. |
+| 3 (`mt --offline`) | Open, §2b item 1. |
+| 4 (R1: does 16 survive) | Ruling 2. R1 amended. |
+| 5 (complete set that fails reassembly) | Ruling 3: 2, nothing printed. Decision 6's table; §7g. |
+| 6 (groups with different set ids) | Open, §2b item 3. |
+| 7 (§7d's oracle) | §7d: 16 means the transaction re-derives its id; witness bytes are not covered. |
+| 8 (`OK` with 16) | R5: allowed, with the correction named beside it. |
+| 9 (what counts as used; discarded duplicate) | Transliteration is not a correction (§7d). The duplicate is open, §2b item 2. |
+| 10 (test 1 against self-contradicting values) | Ruling 4. Tests 1, 4 and 6. |
+| 11 (settings and inputs list) | Appendix A, with the `@env:` rule. |
+| 12 (wrong passphrase) | Ruling 5. §3 "Passphrases and passwords", §7e, §7f. |
+| 13 (a flag the input makes necessary) | Ruling 7. §3 test 5 and REFUSED row; §7e. |
+| 14 (missing argument against empty input) | Ruling 4. §3 worked table (`me sysw hash` with no records, 64). |
+| 15 (§7h against decision 9; the lock) | Ruling 6. §7h: the mainnet sentence is 130, the lock 32. |
+| 16 (R14 and `kind`) | Ruling 10. R14: owed for the io-lib publish; repair's additive fields recorded. |
+| 17 (GUI detection) | Ruling 8. R11, §7j and §9. |
+| 18 (colour of 16 alone) | Ruling 8: amber. Open for Brian, §2b item 4. |
+| 19 (per-verb help) | Ruling 9. R11 names which binaries have it and which owe it. |
+| 20 (closed stdout and stdin) | R8: the platforms; a closed stdin is 2. |
+| 21 (helper failure the input caused) | R9 and §7e: 32. |
+| 22 (R2 costs a referral) | R2: advice that needs the input cannot precede a usage error. |
+| 23 (`--out` at 22) | Ruling 3. Decision 6: never written to `--out`. |
+| 24 (`inspect` of a share) | R5: "or a share would not combine". |
+| 25 (decision 4's order) | Ruling 11. Decision 4 and §9 step 1 record the interim state. |
+| 26 (`MixedNetwork` and N10) | §6: listed with the unbuilt network-rule units, which are not done. |
+| 27 (§7e's gate-script count) | §7e names the six. |
+
+Other corrections in this revision: §7a's `--allow-invalid-miniscript`
+exists only on md PR 76, which is unmerged (§7a); `restore --from xpub` is 2
+(§3, §7f); `md`'s wire-version exception at 22 (decision 6); the status line;
+and the "today" note under Evidence.
+
+## Appendix A. Settings and inputs, by tool
+
+The rule is decision 2's: a setting is judged from the command line, so a bad
+one is 64; an input is the data the verb works on, so a bad one is 2, whoever
+rejects it. A setting is checked before any input is read (R2). For `@env:`
+references: a malformed variable name is 64 (judged from argv), an unset
+variable is 32, and a value that is not UTF-8 is 2.
+
+Each tool keeps its own list, and they agree on the principle. As implemented:
+
+| tool | settings and other command-line checks (64) | inputs (2) |
+| --- | --- | --- |
+| `md` | `--chain`, `--index`, `--count`, `--group-size`, `--separator`, `--network`, `--emit` | cards, `--key`, `--fingerprint`, `--path`, `compose --wrapper`, `--seat`; a `--chain` the card does not have (R2) |
+| `mk` | `derive --path`, `--index` | cards, `--xpub`, `--chunk-set-id`, `--policy-id-stub`, fingerprints, origin paths |
+| `ms` | share K and N, two readers on stdin (including `--in` naming stdin's file) | cards, phrases, shares |
+| `mt` | `--separator`, the flag combinations of `SPEC_mt` §10.10, `verify --bitcoin-cli` | the PSBT or transaction, `--input-value`, pasted txids |
+| `me` | `seal --iterations`, `sysw pack --passphrase-words`, the output mode | cards, descriptors, records, an iteration count read from a container |
+| `mnemonic` | `seed-xor split --shares`, `ms-shares split --threshold` and `--shares`, `convert` target settings | `--template` scheme names, `--expect-fingerprint`, `--expect-xpub`, `--from`, `--slot`, descriptors |
+| `mr`, `mr-sitting` | `--network`, `--lead`, `--epochs`, `--letters`, `--horizon`, `--delta-blocks`, `--anchor-time`, unknown glossary terms and practice cases | `--time`, `--height`, `--epoch`, `--slot`, `--index`, `--digest`, `--set-id`, `--hot-parent-fp`, the hot family's values, cards, keys and records; the list is `INPUT_FLAGS` |
