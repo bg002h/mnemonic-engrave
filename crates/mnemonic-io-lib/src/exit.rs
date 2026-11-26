@@ -20,7 +20,9 @@
 //! | 130 | [`STOPPED`] | the operator stopped it (a prompt answer, or Ctrl-C) |
 //!
 //! Codes 1 to 63 are sums of the six bits, and [`Bits`] is the type that sums
-//! them. 64, 101 and 130 are single codes and are not bits.
+//! them. 64, 101 and 130 are single codes and are not bits: [`add`] adds bits
+//! to a code and leaves a single code unchanged, and [`Bits::from_code`] reads
+//! a code back into bits (`None` for a single code).
 //!
 //! **What stays each binary's own is the CLASSIFICATION**: which of its
 //! failures is which class. The spec's ordered tests decide that per binary,
@@ -110,6 +112,28 @@ impl Bits {
     pub const fn to_exit_code(self) -> u8 {
         self.0
     }
+
+    /// The bits of an exit code, or `None` for a code that is not a sum of
+    /// bits (64 and above: [`USAGE`], [`INTERNAL`], [`STOPPED`], a signal).
+    pub const fn from_code(code: u8) -> Option<Bits> {
+        if code <= 63 {
+            Some(Bits(code))
+        } else {
+            None
+        }
+    }
+}
+
+/// `code` with `bits` added (R1, R8): a code that is already a sum of bits
+/// (0 to 63) gains them; a single code (64 and above: [`USAGE`], [`INTERNAL`],
+/// [`STOPPED`], a signal) is returned unchanged, because those never combine.
+/// So an IO failure after a usage error stays 64, never 96.
+pub const fn add(code: u8, bits: Bits) -> u8 {
+    if code > 63 {
+        code
+    } else {
+        code | bits.0
+    }
 }
 
 impl std::ops::BitOr for Bits {
@@ -187,6 +211,26 @@ pub fn write_block(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `add` sums onto a bit code and never onto a single code; `from_code`
+    /// is its inverse on 0..=63 and `None` above.
+    #[test]
+    fn add_and_from_code() {
+        assert_eq!(add(OK, Bits::IO), 32);
+        assert_eq!(add(REPAIRED | UNVERIFIED, Bits::IO), 52);
+        assert_eq!(add(INVALID, Bits::INVALID), 2);
+        for single in [USAGE, INTERNAL, STOPPED, 137, 255] {
+            assert_eq!(add(single, Bits::IO), single);
+            assert_eq!(Bits::from_code(single), None);
+        }
+        for c in 0..=63u8 {
+            let b = Bits::from_code(c).unwrap();
+            assert_eq!(b.to_exit_code(), c);
+            assert_eq!(add(c, Bits::OK), c);
+        }
+        assert_eq!(Bits::from_code(0), Some(Bits::OK));
+        assert_eq!(Bits::from_code(20), Some(Bits::REPAIRED | Bits::UNVERIFIED));
+    }
 
     /// The numbers are the spec's (§3), pinned one by one: a renumber here is a
     /// constellation-wide change, never a local one.

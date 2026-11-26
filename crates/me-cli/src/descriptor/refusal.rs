@@ -1264,7 +1264,11 @@ mod exit_class_tests {
             );
         }
         for &(row, want) in table {
-            assert_eq!(row.class().to_exit_code(), want, "{row:?}");
+            assert_eq!(
+                Some(row.class()),
+                mnemonic_io_lib::exit::Bits::from_code(want),
+                "{row:?}"
+            );
         }
     }
 }

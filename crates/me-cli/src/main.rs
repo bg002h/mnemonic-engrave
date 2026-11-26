@@ -61,9 +61,33 @@ struct Cli {
     command: Option<Command>,
 }
 
+/// R11's per-verb line: each verb's help states only the bits that verb can
+/// set. 64 (usage) and 101 (internal) can end any verb, and the full legend is
+/// at the end of `me --help`.
+const EXIT_BUNDLE: &str = "Exit status: 0 = done. 64 = bad command line. 101 = internal error. \
+Otherwise the sum of: 2 an input is invalid; 8 refused (unsafe output, manifest over a plate \
+preview, a preview directory already holding plates); 32 a file, stdout or the preview sidecar \
+failed. Full legend: me --help.";
+const EXIT_SEAL: &str = "Exit status: 0 = done. 64 = bad command line. 101 = internal error. \
+Otherwise the sum of: 2 an input is invalid; 8 refused (a secret on the command line, seed \
+material without --seal-secret); 32 a file failed. Full legend: me --help.";
+const EXIT_HASH: &str = "Exit status: 0 = done. 64 = bad command line. Otherwise the sum of: 2 an \
+input is invalid; 32 stdout failed. Full legend: me --help.";
+const EXIT_PACK: &str = "Exit status: 0 = done. 64 = bad command line. 101 = internal error. \
+Otherwise the sum of: 1 --expect said no; 2 an input is invalid; 8 refused (a secret or bearer \
+record on the command line, unsafe output, --as not given, a mixed network, an unsigned \
+transaction, a preimage, a digest-shaped phrase); 32 a file, stdout or the prompt failed. Full \
+legend: me --help.";
+const EXIT_WIPE: &str = "Exit status: 0 = done. 64 = bad command line. Otherwise the sum of: 8 \
+refused (unsafe output); 32 a file or stdout failed. Full legend: me --help.";
+const EXIT_SHOW: &str =
+    "Exit status: 0 = done. 64 = bad command line. Otherwise the sum of: 2 the \
+container is invalid; 32 the file or stdout failed. Full legend: me --help.";
+
 #[derive(Subcommand)]
 enum Command {
     /// Validate a wallet backup's public strings and emit a plate manifest + checklist.
+    #[command(after_help = EXIT_BUNDLE)]
     Bundle {
         /// Read newline-separated public strings from this file instead of stdin.
         #[arg(long, value_name = "FILE")]
@@ -104,6 +128,7 @@ enum Command {
     /// your own: total strength is the passphrase plus about 20 bits from the
     /// KDF, and a memorable passphrase does not survive an offline attack on a
     /// stolen machine.
+    #[command(after_help = EXIT_SEAL)]
     Seal {
         /// Records to ENCRYPT, on argv. Kept for FIXTURES AND TESTS only.
         ///
@@ -172,6 +197,7 @@ enum Command {
     /// No passphrase, no seal operation, no original file — so the expected
     /// value can be regenerated months later and compared against what the
     /// device displays.
+    #[command(after_help = EXIT_HASH)]
     Hash {
         /// The public records, in order.
         records: Vec<String>,
@@ -251,6 +277,7 @@ enum SyswCmd {
     /// Records are engraved verbatim and the record separator is LF, so a body
     /// carrying spaces or newlines would turn a scratch on the operator's only
     /// copy into silently-absorbed damage.
+    #[command(after_help = EXIT_PACK)]
     Pack {
         /// Records, on argv. As with `seal`, argv is a PUBLIC channel — prefer
         /// --in or stdin for anything real. A `tx:` record here is REFUSED
@@ -408,6 +435,7 @@ enum SyswCmd {
         r#as: Option<AsForm>,
     },
     /// Emit a full-region overwrite image (spec §5.5).
+    #[command(after_help = EXIT_WIPE)]
     Wipe {
         #[arg(long, value_name = "FILE")]
         out: Option<std::path::PathBuf>,
@@ -417,6 +445,7 @@ enum SyswCmd {
         fill: String,
     },
     /// Print what a container holds, and its digest.
+    #[command(after_help = EXIT_SHOW)]
     Show { file: std::path::PathBuf },
 }
 
@@ -522,7 +551,7 @@ fn bits_code(b: exit::Bits) -> i32 {
     if b.is_ok() {
         return EXIT_INTERNAL;
     }
-    i32::from(b.to_exit_code())
+    i32::from(exit::add(exit::OK, b))
 }
 
 /// Every string a token could plausibly BE, normalised for classification.
@@ -4279,7 +4308,7 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
             "record {i}, as given (records count from 0) is a second now: record.\n      record {i}: a second \
              now: record; only one is allowed. Remove one."
         ),
-        E::PassphraseMismatch => "a sealed payload needs a passphrase".into(),
+        E::PassphraseMismatch => "a sealed payload needs a passphrase, and none was given".into(),
         E::NotEnterableOnDevice(w) => format!(
             "the passphrase contains {w:?}, which is not a BIP-39 word. The device \
              offers only a word keyboard, so a payload sealed with this could never \
@@ -4295,11 +4324,18 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                                payload, or supply a real one."
             .into(),
         E::Crypto => "internal error: sealing failed".into(),
-        E::OpenFailed => "the passphrase did not open this payload".into(),
+        E::OpenFailed => "wrong passphrase, or this payload has been altered (the \
+                          authentication tag cannot tell which)"
+            .into(),
         E::NotUtf8 => "the records are not valid UTF-8".into(),
         E::NotCanonical(i, why) => canonical_sentence(*i, *why),
         E::MrSet(r) => mr_sentence(r.reason, &r.detail, &[]),
         E::Wire(w) => format!("malformed container: {w:?}"),
+        E::Iterations(n) => format!(
+            "--iterations {n} is outside {}..={}",
+            mnemonic_engrave::sysw::wire::MIN_ITERATIONS,
+            mnemonic_engrave::sysw::wire::MAX_ITERATIONS
+        ),
     }
 }
 

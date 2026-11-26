@@ -220,3 +220,56 @@ fn the_root_help_ends_with_the_exit_status_legend() {
         assert!(out.contains("Exit status: 0 = done"), "{flag}");
     }
 }
+
+/// R11's second sentence: each verb's help states only the bits that verb can
+/// set, and does not repeat the root legend.
+#[test]
+fn each_verb_help_states_its_own_exit_bits() {
+    let cases: &[(&[&str], &[&str], &[&str])] = &[
+        (
+            &["bundle"],
+            &["2 an input", "8 refused", "32 "],
+            &["1 --expect", "16 "],
+        ),
+        (
+            &["seal"],
+            &["2 an input", "8 refused", "32 "],
+            &["1 --expect", "16 "],
+        ),
+        (&["hash"], &["2 an", "32 stdout"], &["8 refused", "16 "]),
+        (
+            &["sysw", "pack"],
+            &["1 --expect", "2 an input", "8 refused", "32 "],
+            &["16 "],
+        ),
+        (
+            &["sysw", "wipe"],
+            &["8 refused", "32 "],
+            &["2 an input", "16 "],
+        ),
+        (&["sysw", "show"], &["2 the", "32 "], &["8 refused", "16 "]),
+    ];
+    for (verb, has, lacks) in cases {
+        let o = Command::new(me())
+            .args(*verb)
+            .arg("--help")
+            .output()
+            .unwrap();
+        assert_eq!(o.status.code(), Some(0), "{verb:?}");
+        let out = String::from_utf8(o.stdout).unwrap();
+        let line = out
+            .lines()
+            .find(|l| l.starts_with("Exit status:"))
+            .unwrap_or_else(|| panic!("{verb:?}: no exit-status line\n{out}"));
+        for h in *has {
+            assert!(line.contains(h), "{verb:?} lacks {h:?}: {line}");
+        }
+        for l in *lacks {
+            assert!(!line.contains(l), "{verb:?} states {l:?}: {line}");
+        }
+        assert!(
+            !out.contains(mnemonic_engrave::io::exit::HELP_LEGEND),
+            "{verb:?} repeats the root legend"
+        );
+    }
+}

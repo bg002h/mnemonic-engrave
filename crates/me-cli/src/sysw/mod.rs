@@ -64,7 +64,12 @@ pub struct Payload {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum SyswError {
+    /// A container's header (or `bound`) is malformed. Read from an input,
+    /// so INVALID, including an out-of-range iteration count in a header.
     Wire(wire::WireError),
+    /// `pack`'s `iterations` ARGUMENT is out of range: a setting, so USAGE.
+    /// Kept apart from `Wire(Iterations)`, which is a header that was READ.
+    Iterations(u32),
     /// A record `classify` cannot place. Fails CLOSED: better refused at
     /// creation with a name than mis-filed into the wrong section.
     ///
@@ -83,8 +88,10 @@ pub enum SyswError {
     /// An AEAD failure while SEALING, with a key `pack` derived itself: a bug.
     /// The OPEN side has its own variant, [`SyswError::OpenFailed`].
     Crypto,
-    /// [`open`] was handed no passphrase for a sealed container. Only `open`
-    /// raises it; `pack` never does.
+    /// [`open`] was handed NO passphrase for a sealed container: the
+    /// passphrase is missing, not wrong (the name predates [`SyswError::OpenFailed`];
+    /// a wrong one is `OpenFailed`). Only `open` raises it; `pack` never does.
+    /// INVALID (2): the call's input is incomplete.
     PassphraseMismatch,
     /// [`open`]: the tag did not verify under the passphrase given. AEAD cannot
     /// tell a wrong passphrase from a tampered container, so this is the one
@@ -138,9 +145,10 @@ impl SyswError {
     pub fn exit_code(&self) -> u8 {
         use mnemonic_io_lib::exit;
         match self {
-            SyswError::Wire(wire::WireError::Iterations(_)) => exit::USAGE,
+            SyswError::Iterations(_) => exit::USAGE,
             SyswError::Wire(
-                wire::WireError::TooShort(_)
+                wire::WireError::Iterations(_)
+                | wire::WireError::TooShort(_)
                 | wire::WireError::BadMagic
                 | wire::WireError::UnknownVersion(_)
                 | wire::WireError::UnknownKdf(_)
@@ -162,10 +170,12 @@ impl SyswError {
                 exit::REFUSED
             }
             SyswError::Crypto => exit::INTERNAL,
-            // The OPEN side (library API only; no `me` verb opens): a passphrase
-            // the user typed was compared with the container and came out no
-            // (test 4); a sealed container handed no passphrase is an input
-            // wrong for the call (test 6).
+            // The OPEN side (library API only; no `me` verb opens). An AEAD
+            // failure is NO (1, test 4) whether the passphrase was wrong OR the
+            // ciphertext or authenticated header was altered: the tag cannot
+            // tell the two apart, nothing is released either way, and the
+            // message names both. A sealed container handed no passphrase is an
+            // incomplete input (2, test 6).
             SyswError::OpenFailed => exit::NO,
             SyswError::PassphraseMismatch => exit::INVALID,
             SyswError::TooLarge(_)
@@ -612,7 +622,7 @@ pub fn pack_deterministic_with(
     // refusal that arrives after that ceremony teaches them the note is
     // worthless.
     if !(wire::MIN_ITERATIONS..=wire::MAX_ITERATIONS).contains(&iterations) {
-        return Err(SyswError::Wire(wire::WireError::Iterations(iterations)));
+        return Err(SyswError::Iterations(iterations));
     }
 
     // NOT a strength rule — those warn and proceed (spec §13 D3), and this must
@@ -940,6 +950,7 @@ mod tests {
                 UnknownReason::Composer(_) => "Unclassifiable::Composer",
                 UnknownReason::Mr(_) => "Unclassifiable::Mr",
             },
+            SyswError::Iterations(_) => "Iterations",
             SyswError::TooLarge(_) => "TooLarge",
             SyswError::SecondNow(_) => "SecondNow",
             SyswError::Crypto => "Crypto",
@@ -970,7 +981,8 @@ mod tests {
             (SyswError::Wire(W::UnknownKdf(9)), 2),
             (SyswError::Wire(W::UnknownAead(9)), 2),
             (SyswError::Wire(W::SectionTooLong), 2),
-            (SyswError::Wire(W::Iterations(1)), 64),
+            (SyswError::Wire(W::Iterations(1)), 2),
+            (SyswError::Iterations(1), 64),
             (un(U::NonHexBody("x")), 2),
             (un(U::NotATransaction(tx::TxError::Truncated)), 2),
             (un(U::UnsignedInputs(vec![0])), 8),
@@ -1024,7 +1036,7 @@ mod tests {
         let names: std::collections::BTreeSet<_> =
             table.iter().map(|(e, _)| sysw_variant(e)).collect();
         assert_eq!(names.len(), table.len(), "a variant is listed twice");
-        assert_eq!(names.len(), 29, "the table must list every variant");
+        assert_eq!(names.len(), 30, "the table must list every variant");
         for (e, want) in table {
             assert_eq!(e.exit_code(), want, "{e:?}");
         }

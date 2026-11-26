@@ -390,9 +390,12 @@ impl OpenError {
     /// password the user typed. Exhaustive on purpose (R13).
     ///
     /// - NO (1): [`OpenError::Authentication`] -- the typed password was
-    ///   compared with a well-formed container and came out no (test 4). AEAD
-    ///   cannot tell a wrong password from an altered payload, so both land
-    ///   here.
+    ///   compared with the container and came out no (test 4). AEAD cannot
+    ///   tell a wrong password from an altered payload (ciphertext, tag or
+    ///   authenticated header), so BOTH are 1, and the message names both
+    ///   ("wrong password, or this payload has been altered"). An altered
+    ///   payload is 2 only where it is caught before the tag: a malformed
+    ///   header, section or record.
     /// - INVALID (2): everything else -- a malformed header, section or record,
     ///   or a password that is malformed before any comparison.
     pub fn exit_code(&self) -> u8 {
