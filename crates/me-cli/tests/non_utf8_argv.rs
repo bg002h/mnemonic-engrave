@@ -52,4 +52,15 @@ fn argv_secret_guard_still_runs_before_the_utf8_refusal() {
     let err = String::from_utf8_lossy(&o.stderr).into_owned();
     assert!(!err.contains("panicked"), "{err}");
     assert_eq!(o.status.code(), Some(8), "stderr:\n{err}");
+    // The GUARD's refusal, not some other 8 (review M6), and it echoes
+    // neither the secret nor the raw bytes.
+    assert!(
+        err.contains("Refused BEFORE the command line was parsed"),
+        "{err}"
+    );
+    assert!(!err.contains(ms1), "the secret reached stderr:\n{err}");
+    assert!(
+        !o.stderr.windows(2).any(|w| w == [0xff, 0xfe]),
+        "the raw bytes reached stderr"
+    );
 }

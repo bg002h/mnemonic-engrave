@@ -80,9 +80,16 @@ pub enum SyswError {
     /// A second VALID `now:` record, at this index; the payload-wide rule
     /// (§6a) is enforced where the whole payload is seen.
     SecondNow(usize),
+    /// An AEAD failure while SEALING, with a key `pack` derived itself: a bug.
+    /// The OPEN side has its own variant, [`SyswError::OpenFailed`].
     Crypto,
-    /// A sealed payload was handed no passphrase, or vice versa.
+    /// [`open`] was handed no passphrase for a sealed container. Only `open`
+    /// raises it; `pack` never does.
     PassphraseMismatch,
+    /// [`open`]: the tag did not verify under the passphrase given. AEAD cannot
+    /// tell a wrong passphrase from a tampered container, so this is the one
+    /// answer for both.
+    OpenFailed,
     /// The passphrase normalises to nothing. Not a strength judgement — the
     /// DEVICE reads an empty passphrase as "none supplied", so such a payload
     /// could never be opened on the machine it is for.
@@ -154,7 +161,13 @@ impl SyswError {
             SyswError::PreimageNotAdmitted(..) | SyswError::PhraseLooksLikeDigest(..) => {
                 exit::REFUSED
             }
-            SyswError::Crypto | SyswError::PassphraseMismatch => exit::INTERNAL,
+            SyswError::Crypto => exit::INTERNAL,
+            // The OPEN side (library API only; no `me` verb opens): a passphrase
+            // the user typed was compared with the container and came out no
+            // (test 4); a sealed container handed no passphrase is an input
+            // wrong for the call (test 6).
+            SyswError::OpenFailed => exit::NO,
+            SyswError::PassphraseMismatch => exit::INVALID,
             SyswError::TooLarge(_)
             | SyswError::SecondNow(_)
             | SyswError::EmptyPassphrase
@@ -880,7 +893,7 @@ pub fn open(blob: &[u8], passphrase: Option<&str>) -> Result<Payload, SyswError>
     let normalised = crate::seal::passphrase::normalise(pass);
     let key = crate::seal::crypto::derive_key(&normalised, &h.salt, h.iterations);
     let pt =
-        crate::seal::crypto::open_bytes(&key, &h.iv, aad, ct).map_err(|_| SyswError::Crypto)?;
+        crate::seal::crypto::open_bytes(&key, &h.iv, aad, ct).map_err(|_| SyswError::OpenFailed)?;
     let secret = split_records(&pt)?
         .into_iter()
         .map(Zeroizing::new)
@@ -900,48 +913,118 @@ fn split_records(b: &[u8]) -> Result<Vec<String>, SyswError> {
 mod tests {
     use super::*;
 
-    /// R13's table test: each SyswError class lands on the spec's code.
+    /// The variant's name, nested reasons included. No wildcard: a new
+    /// variant does not compile until it is named here, and the table test
+    /// then fails until the table holds it.
+    fn sysw_variant(e: &SyswError) -> &'static str {
+        match e {
+            SyswError::Wire(w) => match w {
+                wire::WireError::TooShort(_) => "Wire::TooShort",
+                wire::WireError::BadMagic => "Wire::BadMagic",
+                wire::WireError::UnknownVersion(_) => "Wire::UnknownVersion",
+                wire::WireError::UnknownKdf(_) => "Wire::UnknownKdf",
+                wire::WireError::UnknownAead(_) => "Wire::UnknownAead",
+                wire::WireError::SectionTooLong => "Wire::SectionTooLong",
+                wire::WireError::Iterations(_) => "Wire::Iterations",
+            },
+            SyswError::Unclassifiable(_, r) => match r {
+                UnknownReason::NonHexBody(_) => "Unclassifiable::NonHexBody",
+                UnknownReason::NotATransaction(_) => "Unclassifiable::NotATransaction",
+                UnknownReason::UnsignedInputs(_) => "Unclassifiable::UnsignedInputs",
+                UnknownReason::Bip93OutsideTheProfile(_) => {
+                    "Unclassifiable::Bip93OutsideTheProfile"
+                }
+                UnknownReason::PreimagePlate { .. } => "Unclassifiable::PreimagePlate",
+                UnknownReason::TagKindMismatch => "Unclassifiable::TagKindMismatch",
+                UnknownReason::Unrecognised => "Unclassifiable::Unrecognised",
+                UnknownReason::Composer(_) => "Unclassifiable::Composer",
+                UnknownReason::Mr(_) => "Unclassifiable::Mr",
+            },
+            SyswError::TooLarge(_) => "TooLarge",
+            SyswError::SecondNow(_) => "SecondNow",
+            SyswError::Crypto => "Crypto",
+            SyswError::PassphraseMismatch => "PassphraseMismatch",
+            SyswError::OpenFailed => "OpenFailed",
+            SyswError::EmptyPassphrase => "EmptyPassphrase",
+            SyswError::NotEnterableOnDevice(_) => "NotEnterableOnDevice",
+            SyswError::PassphraseTooLong(_) => "PassphraseTooLong",
+            SyswError::NotUtf8 => "NotUtf8",
+            SyswError::MrSet(_) => "MrSet",
+            SyswError::PreimageNotAdmitted(..) => "PreimageNotAdmitted",
+            SyswError::PhraseLooksLikeDigest(..) => "PhraseLooksLikeDigest",
+            SyswError::NotCanonical(..) => "NotCanonical",
+        }
+    }
+
+    /// R13's table test: EVERY SyswError variant (nested reasons included),
+    /// each with its expected code written as a literal.
     #[test]
     fn every_sysw_error_maps_to_its_exit_code() {
-        use mnemonic_io_lib::exit;
+        use wire::WireError as W;
+        use UnknownReason as U;
+        let un = |r| SyswError::Unclassifiable(0, r);
         let table: Vec<(SyswError, u8)> = vec![
-            (SyswError::Wire(wire::WireError::Iterations(1)), exit::USAGE),
-            (SyswError::Wire(wire::WireError::BadMagic), exit::INVALID),
+            (SyswError::Wire(W::TooShort(1)), 2),
+            (SyswError::Wire(W::BadMagic), 2),
+            (SyswError::Wire(W::UnknownVersion(9)), 2),
+            (SyswError::Wire(W::UnknownKdf(9)), 2),
+            (SyswError::Wire(W::UnknownAead(9)), 2),
+            (SyswError::Wire(W::SectionTooLong), 2),
+            (SyswError::Wire(W::Iterations(1)), 64),
+            (un(U::NonHexBody("x")), 2),
+            (un(U::NotATransaction(tx::TxError::Truncated)), 2),
+            (un(U::UnsignedInputs(vec![0])), 8),
+            (un(U::Bip93OutsideTheProfile(0)), 2),
             (
-                SyswError::Wire(wire::WireError::SectionTooLong),
-                exit::INVALID,
+                un(U::PreimagePlate {
+                    id: PreimageId::HashOtherCase,
+                    x_len: None,
+                }),
+                2,
+            ),
+            (un(U::TagKindMismatch), 2),
+            (un(U::Unrecognised), 2),
+            (
+                un(U::Composer(
+                    composer_records::ComposerRecordError::KeyNetwork,
+                )),
+                2,
             ),
             (
-                SyswError::Unclassifiable(0, UnknownReason::UnsignedInputs(vec![0])),
-                exit::REFUSED,
+                un(U::Mr(MrFailure {
+                    reason: mr::MrReason::Case,
+                    len: 1,
+                    prefix: "mr1x".into(),
+                })),
+                2,
             ),
+            (SyswError::TooLarge(1), 2),
+            (SyswError::SecondNow(1), 2),
+            (SyswError::Crypto, 101),
+            (SyswError::PassphraseMismatch, 2),
+            (SyswError::OpenFailed, 1),
+            (SyswError::EmptyPassphrase, 2),
+            (SyswError::NotEnterableOnDevice("x".into()), 2),
+            (SyswError::PassphraseTooLong(1), 2),
+            (SyswError::NotUtf8, 2),
             (
-                SyswError::Unclassifiable(0, UnknownReason::NonHexBody("x")),
-                exit::INVALID,
-            ),
-            (
-                SyswError::Unclassifiable(0, UnknownReason::Unrecognised),
-                exit::INVALID,
-            ),
-            (
-                SyswError::Unclassifiable(0, UnknownReason::TagKindMismatch),
-                exit::INVALID,
+                SyswError::MrSet(mr::Refusal {
+                    reason: mr::Reason::SetCount,
+                    detail: mr::Detail::Record(0),
+                }),
+                2,
             ),
             (
                 SyswError::PreimageNotAdmitted(0, record::Class::Codex32Secret),
-                exit::REFUSED,
+                8,
             ),
-            (SyswError::PhraseLooksLikeDigest(0, 64), exit::REFUSED),
-            (SyswError::Crypto, exit::INTERNAL),
-            (SyswError::PassphraseMismatch, exit::INTERNAL),
-            (SyswError::TooLarge(1), exit::INVALID),
-            (SyswError::SecondNow(1), exit::INVALID),
-            (SyswError::EmptyPassphrase, exit::INVALID),
-            (SyswError::NotEnterableOnDevice("x".into()), exit::INVALID),
-            (SyswError::PassphraseTooLong(1), exit::INVALID),
-            (SyswError::NotUtf8, exit::INVALID),
-            (SyswError::NotCanonical(0, Spelling::Padding), exit::INVALID),
+            (SyswError::PhraseLooksLikeDigest(0, 64), 8),
+            (SyswError::NotCanonical(0, Spelling::Padding), 2),
         ];
+        let names: std::collections::BTreeSet<_> =
+            table.iter().map(|(e, _)| sysw_variant(e)).collect();
+        assert_eq!(names.len(), table.len(), "a variant is listed twice");
+        assert_eq!(names.len(), 29, "the table must list every variant");
         for (e, want) in table {
             assert_eq!(e.exit_code(), want, "{e:?}");
         }
@@ -1003,7 +1086,7 @@ mod tests {
         let blob = pack(vec![secret.to_string()], Some(PASS), ITER).unwrap();
         assert_eq!(
             open(&blob, Some("wrong words here friend now")).unwrap_err(),
-            SyswError::Crypto
+            SyswError::OpenFailed
         );
         assert_eq!(
             open(&blob, None).unwrap_err(),
@@ -1066,7 +1149,7 @@ mod tests {
         tampered[at..at + b.len()].copy_from_slice(b.as_bytes());
         assert_eq!(
             open(&tampered, Some(PASS)).unwrap_err(),
-            SyswError::Crypto,
+            SyswError::OpenFailed,
             "a valid-for-valid public swap must fail the tag"
         );
     }

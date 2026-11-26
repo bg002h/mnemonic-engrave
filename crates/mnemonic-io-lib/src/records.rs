@@ -45,10 +45,10 @@ pub fn split_record_stream(raw: &str) -> Vec<String> {
 ///
 /// **It returns a `String`, not a `(String, i32)`.** P0's one signature change:
 /// this function is the only member of the moving set that referenced one of
-/// `me`'s exit-code constants, and a shared IO library may publish no exit
-/// integer at all (plan §3). The number is the caller's — `me` maps this
-/// refusal onto its own usage code at the two `read_records` call sites, and a
-/// different binary would map it onto a different one.
+/// `me`'s exit-code constants. The library now publishes the constellation's
+/// numbers (`crate::exit`), but the CLASS of a refusal stays the caller's:
+/// `me` maps this one to INVALID (2, empty input is an invalid input per the
+/// exit-code spec's decision 3) at its `read_records` call sites.
 pub fn no_records_guard(
     recs: Vec<String>,
     from: Option<&std::path::Path>,

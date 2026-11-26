@@ -102,7 +102,14 @@ fn closed_stdout_with_out_file_succeeds_and_nothing_goes_astray() {
 fn closed_stdout_out_dev_stdout_fails() {
     let d = fixture();
     let r = sh(d.path(), "exec \"$ME\" --in m.txt --out /dev/stdout >&-");
-    assert_ne!(r.rc, Some(0), "{}", r.dump());
+    // IO (32) with the EBADF line, not merely non-zero (review M6).
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
+    assert!(
+        r.err()
+            .contains("me: cannot write the output: /dev/stdout: Bad file descriptor (os error 9)"),
+        "{}",
+        r.dump()
+    );
     assert!(!r.err().contains("panicked"), "{}", r.dump());
 }
 

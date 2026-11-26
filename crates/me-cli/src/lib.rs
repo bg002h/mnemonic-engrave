@@ -102,14 +102,30 @@ pub fn convert(input: &str) -> Result<Vec<u8>, ConvertError> {
 #[cfg(test)]
 mod tests {
 
-    /// R13's table test: an ms1 to the converter is INVALID (2), the spec's
-    /// worked example.
+    /// R13's table test: EVERY ConvertError variant is INVALID (2), each
+    /// listed with a literal. An ms1 to the converter is the spec's worked
+    /// example. The `match` has no wildcard, so a new variant fails to
+    /// compile here until it is listed.
     #[test]
-    fn a_refused_secret_is_invalid_input() {
-        assert_eq!(
-            super::ConvertError::RefusedSecret.exit_code(),
-            mnemonic_io_lib::exit::INVALID
-        );
+    fn every_convert_error_maps_to_its_exit_code() {
+        use super::{classify, ndef, validate, ConvertError as C};
+        let table: Vec<(C, u8)> = vec![
+            (C::Classify(classify::ClassifyError::NoSeparator), 2),
+            (C::RefusedSecret, 2),
+            (C::Validate(validate::ValidateError::Mt), 2),
+            (C::Ndef(ndef::NdefError::TooLong(1)), 2),
+        ];
+        let mut seen = [false; 4];
+        for (e, want) in &table {
+            seen[match e {
+                C::Classify(_) => 0,
+                C::RefusedSecret => 1,
+                C::Validate(_) => 2,
+                C::Ndef(_) => 3,
+            }] = true;
+            assert_eq!(e.exit_code(), *want, "{e}");
+        }
+        assert!(seen.iter().all(|&x| x), "the table must list every variant");
     }
     use super::*;
 

@@ -1151,6 +1151,22 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
             stdin: "".to_string(),
             why: "a --fill value that does not exist",
         },
+        // `--passphrase-words` outside 2..=24 is a setting too (review I1): it
+        // used to be judged after the input was read and the `sealing:` line
+        // printed, at 64 for a secret payload and 0 for a public one. Both
+        // payloads now give 64, with nothing read.
+        Case {
+            code: 64,
+            args: s(&["sysw", "pack", "--passphrase-words", "1", "text:6162"]),
+            stdin: "".to_string(),
+            why: "sysw pack: --passphrase-words below 2, public-only payload",
+        },
+        Case {
+            code: 64,
+            args: s(&["sysw", "pack", "--passphrase-words", "25"]),
+            stdin: SEED.to_string(),
+            why: "sysw pack: --passphrase-words above 24, secret payload on stdin",
+        },
         // THE ONE THAT DISAGREED. `me seal --iterations 5` exited one code and
         // `me sysw pack --iterations 5` another, for the same typo on the
         // same flag with the same range in the same message. Both are usage:

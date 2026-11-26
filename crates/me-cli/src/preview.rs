@@ -306,9 +306,17 @@ mod tests {
             },
             PreviewError::VersionParse("v".into()),
         ];
+        let mut seen = [false; 4];
         for e in table {
-            assert_eq!(e.exit_code(), mnemonic_io_lib::exit::IO, "{e}");
+            seen[match e {
+                PreviewError::Spawn(_) => 0,
+                PreviewError::Render { .. } => 1,
+                PreviewError::EmptyOutput { .. } => 2,
+                PreviewError::VersionParse(_) => 3,
+            }] = true;
+            assert_eq!(e.exit_code(), 32, "{e}");
         }
+        assert!(seen.iter().all(|&x| x), "the table must list every variant");
     }
     use std::ffi::OsStr;
     use std::fs;

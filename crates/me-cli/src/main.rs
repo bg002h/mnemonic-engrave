@@ -351,7 +351,7 @@ enum SyswCmd {
         /// the pipeline carries on, and `me sysw pack` builds a container from
         /// the `md1` records alone at exit 0. A plate is then cut from a wallet
         /// nobody can restore. `--expect descriptor,cosigner` turns that into a
-        /// refusal.
+        /// failed check (exit 1, "a check said no"), and nothing is written.
         ///
         /// It checks COMPLETENESS as well as presence: a half-transmitted
         /// `md1` or `mt1` set is present and still cannot be restored from.
@@ -515,8 +515,13 @@ fn read_err_code(e: &std::io::Error) -> i32 {
     }
 }
 
-/// The process code of a set of bits.
+/// The process code of a REFUSAL's set of bits. Every caller is a refusal
+/// path, so an empty set (a producer that refused with no row or no unmet
+/// expectation) fails closed as INTERNAL rather than exiting 0 (review N4).
 fn bits_code(b: exit::Bits) -> i32 {
+    if b.is_ok() {
+        return EXIT_INTERNAL;
+    }
     i32::from(b.to_exit_code())
 }
 
@@ -1000,6 +1005,13 @@ fn run() -> i32 {
     // BEFORE any input is read (exit-code spec R2: usage first).
     if cli.out.is_none() && !(cli.hex || cli.base64 || cli.stdout) {
         eprintln!("me: choose an output mode: --out <file>, --stdout, --hex, or --base64");
+        // Review N1: a fixed line, reading nothing. Since R2 decides the mode
+        // before the input is read, F-421's referral can no longer come first,
+        // so the pointer for a wallet export is given here instead.
+        eprintln!(
+            "      (a wallet export or descriptor is packed with \
+             `me sysw pack --as <descriptor|md1>`, not converted here)"
+        );
         return EXIT_USAGE;
     }
 
@@ -2005,6 +2017,22 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 return EXIT_USAGE;
             }
 
+            // Review I1 -- `--passphrase-words` outside its range is a setting,
+            // judged here with `--iterations`: before the input is read and
+            // before `decide_sealing` prints (R2, F-246). It used to fail inside
+            // `generate`, after the `sealing:` paragraph, at 64 for a secret
+            // payload and 0 (flag ignored) for a public one.
+            if let Some(n) = passphrase_words {
+                if !(sysw::wire::WORDS_MIN..=sysw::wire::WORDS_MAX).contains(n) {
+                    eprintln!(
+                        "me: --passphrase-words {n} is outside {}..={}",
+                        sysw::wire::WORDS_MIN,
+                        sysw::wire::WORDS_MAX
+                    );
+                    return EXIT_USAGE;
+                }
+            }
+
             let (recs, document) =
                 match read_records(records, r#in.as_ref(), *allow_argv_secret, r#as.is_some()) {
                     Ok(r) => (r.records, r.document),
@@ -2221,7 +2249,8 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // Placed above `read_records`, it PRE-EMPTED R2 -- the refusal for
             // a `tx:` record passed on ARGV, which is bearer material already
             // in the shell's history and in `ps`. That refusal is both more
-            // urgent and more specific, and it exits 3 rather than 2. The
+            // urgent and more specific; both now exit 8, so only the wording
+            // tells them apart. The
             // regenerated journey caught the swap; no test did.
             {
                 use std::io::IsTerminal;
@@ -2301,8 +2330,10 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                         Some((*generated).clone())
                     }
                     Err(e) => {
-                        eprintln!("me: {e:?}");
-                        return EXIT_USAGE;
+                        // Unreachable: the range is checked before the input
+                        // is read (review I1), so a failure here is a bug.
+                        eprintln!("me: internal error: {e:?}");
+                        return EXIT_INTERNAL;
                     }
                 }
             };
@@ -4263,7 +4294,8 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
                                is no keystroke for it. Use --no-passphrase for a plaintext \
                                payload, or supply a real one."
             .into(),
-        E::Crypto => "the passphrase did not open this payload".into(),
+        E::Crypto => "internal error: sealing failed".into(),
+        E::OpenFailed => "the passphrase did not open this payload".into(),
         E::NotUtf8 => "the records are not valid UTF-8".into(),
         E::NotCanonical(i, why) => canonical_sentence(*i, *why),
         E::MrSet(r) => mr_sentence(r.reason, &r.detail, &[]),
@@ -4273,6 +4305,16 @@ fn sysw_error(e: &mnemonic_engrave::sysw::SyswError) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// Review N4: a refusal path never exits 0, even if its producer hands
+    /// over no class at all.
+    #[test]
+    fn an_empty_refusal_fails_closed() {
+        use super::{bits_code, exit::Bits};
+        assert_eq!(bits_code(Bits::OK), 101);
+        assert_eq!(bits_code(Bits::NO | Bits::INVALID), 3);
+        assert_eq!(bits_code(Bits::REFUSED), 8);
+    }
+
     /// FIX_me_admission_canonical §2 item 3: exactly one leading U+FEFF goes.
     #[test]
     fn strip_leading_bom_removes_exactly_one() {

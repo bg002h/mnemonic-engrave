@@ -704,28 +704,57 @@ mod tests {
         }
     }
 
+    /// R13's table test: EVERY BundleError variant is INVALID (2), each with
+    /// a literal. Empty input is 2 (decision 3); an ms1 or mt1 is an input
+    /// `bundle` has no flag to take. The `match` has no wildcard.
     #[test]
     fn exit_codes_match_spec() {
-        // Exit-code spec §3: all INVALID (2). Empty input is 2 (decision 3);
-        // an ms1 or mt1 is an input `bundle` has no flag to take.
-        assert_eq!(BundleError::Empty.exit_code(), 2);
-        // Both kinds refuse with the same exit code -- the kind changes the
-        // GUIDANCE, never the verdict (F-586).
-        assert_eq!(
-            BundleError::RefusedSecret { preimage: false }.exit_code(),
-            2
-        );
-        assert_eq!(BundleError::RefusedSecret { preimage: true }.exit_code(), 2);
-        assert_eq!(BundleError::RefusedTransaction.exit_code(), 2);
-        assert_eq!(BundleError::Mk1SingleString("mk1x".into()).exit_code(), 2);
-        assert_eq!(
-            BundleError::Md1WireVersion("md1x".into(), 12).exit_code(),
-            2
-        );
-        assert_eq!(
-            BundleError::Md1MissingOrigin("md1x".into(), 0).exit_code(),
-            2
-        );
+        let md = || md_codec::Error::WireVersionMismatch { got: 12 };
+        let table: Vec<(BundleError, u8)> = vec![
+            (BundleError::Empty, 2),
+            // Both kinds refuse with the same exit code -- the kind changes
+            // the GUIDANCE, never the verdict (F-586).
+            (BundleError::RefusedSecret { preimage: false }, 2),
+            (BundleError::RefusedSecret { preimage: true }, 2),
+            (BundleError::RefusedTransaction, 2),
+            (
+                BundleError::Classify("x".into(), ClassifyError::NoSeparator),
+                2,
+            ),
+            (BundleError::Validate("x".into(), ValidateError::Mt), 2),
+            (BundleError::Mk1SingleString("mk1x".into()), 2),
+            (BundleError::Md1WireVersion("md1x".into(), 12), 2),
+            (BundleError::Md1Undecodable("md1x".into(), md()), 2),
+            (BundleError::Md1MissingOrigin("md1x".into(), 0), 2),
+            (BundleError::Md1HeaderRead("md1x".into(), md()), 2),
+            (
+                BundleError::SetIncompleteMk(
+                    "mk1x".into(),
+                    mk_codec::Error::InvalidHrp("x".into()),
+                ),
+                2,
+            ),
+            (BundleError::SetIncompleteMd("md1x".into(), md()), 2),
+        ];
+        let mut seen = std::collections::BTreeSet::new();
+        for (e, want) in &table {
+            seen.insert(match e {
+                BundleError::Empty => "Empty",
+                BundleError::RefusedSecret { .. } => "RefusedSecret",
+                BundleError::RefusedTransaction => "RefusedTransaction",
+                BundleError::Classify(..) => "Classify",
+                BundleError::Validate(..) => "Validate",
+                BundleError::Mk1SingleString(_) => "Mk1SingleString",
+                BundleError::Md1WireVersion(..) => "Md1WireVersion",
+                BundleError::Md1Undecodable(..) => "Md1Undecodable",
+                BundleError::Md1MissingOrigin(..) => "Md1MissingOrigin",
+                BundleError::Md1HeaderRead(..) => "Md1HeaderRead",
+                BundleError::SetIncompleteMk(..) => "SetIncompleteMk",
+                BundleError::SetIncompleteMd(..) => "SetIncompleteMd",
+            });
+            assert_eq!(e.exit_code(), *want, "{e:?}");
+        }
+        assert_eq!(seen.len(), 12, "the table must list every variant");
     }
 
     #[test]

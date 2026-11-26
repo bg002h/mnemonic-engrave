@@ -1214,22 +1214,57 @@ pub fn form_of(d: &Parsed) -> String {
 #[cfg(test)]
 mod exit_class_tests {
     use super::Row;
-    use mnemonic_io_lib::exit::Bits;
 
-    /// R13's table test: every §6 row, by [`Row::ALL`], has the class the
-    /// spec's ordered tests give it. Only the two waivable/network rows are
-    /// REFUSED; the rest are INVALID.
+    /// R13's table test: every §6 row, each with its expected code as a
+    /// literal (not a restated predicate). It must cover [`Row::ALL`] exactly.
     #[test]
     fn every_row_maps_to_its_exit_class() {
+        let table: &[(Row, u8)] = &[
+            (Row::Unparseable, 2),
+            (Row::EmptyFile, 2),
+            (Row::WhitespaceOnly, 2),
+            (Row::AsOmitted, 8),
+            (Row::JsonInnerMalformed, 2),
+            (Row::BlueWalletNoName, 2),
+            (Row::BlueWalletNoFormat, 2),
+            (Row::BlueWalletZeroCosigners, 2),
+            (Row::BlueWalletPolicyCount, 2),
+            (Row::BlueWalletNoOrigin, 2),
+            (Row::BlueWalletBadFingerprint, 2),
+            (Row::MultiUnderDescriptor, 2),
+            (Row::Miniscript, 2),
+            (Row::Md1FixedIndex, 2),
+            (Row::ThresholdExceedsKeys, 2),
+            (Row::ThresholdBelowOne, 2),
+            (Row::KeyCountExceeded, 2),
+            (Row::KeyIdentity, 2),
+            (Row::KeyIdentityDuplicate, 2),
+            (Row::MixedNetwork, 8),
+            (Row::UnsupportedKeyVersion, 2),
+            (Row::TaprootMultisig, 2),
+            (Row::PromotionPathNotInferable, 2),
+            (Row::PromotionAccountNotZero, 2),
+            (Row::PromotionFingerprintNoPath, 2),
+            (Row::PromotionMultisigCosignerKey, 2),
+            (Row::PromotionTestnetKey, 2),
+            (Row::BitcoinAddress, 2),
+            (Row::MultiInSingleKeyScript, 2),
+            (Row::KeyInScriptSlot, 2),
+            (Row::UseSiteHardened, 2),
+            (Row::UseSiteNonConsecutive, 2),
+            (Row::UseSiteOutOfSet, 2),
+            (Row::Md1NoWildcard, 2),
+            (Row::MultiRecordDescriptor, 2),
+        ];
+        assert_eq!(table.len(), Row::ALL.len(), "the table must list every row");
         for &row in Row::ALL {
-            let want = match row {
-                Row::AsOmitted | Row::MixedNetwork => Bits::REFUSED,
-                _ => Bits::INVALID,
-            };
-            assert_eq!(row.class(), want, "{row:?}");
-            assert_eq!(row.class().to_exit_code(), want.to_exit_code());
+            assert!(
+                table.iter().any(|(r, _)| *r == row),
+                "{row:?} is not in the table"
+            );
         }
-        assert_eq!(Row::AsOmitted.class().to_exit_code(), 8);
-        assert_eq!(Row::Unparseable.class().to_exit_code(), 2);
+        for &(row, want) in table {
+            assert_eq!(row.class().to_exit_code(), want, "{row:?}");
+        }
     }
 }
