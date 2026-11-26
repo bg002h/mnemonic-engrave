@@ -3460,10 +3460,11 @@ signed PSBT.
     with any other bit (a corrected set that then fails a check is 17 or 18).
     A flag combination that is wrong on the command line alone is usage (64),
     checked before input is read; a malformed input (a pasted txid, an
-    unparseable PSBT) is 2; a check that came out no (`mt verify` against a
-    node that proves an input spent, the spec's worked table) is 1; a refusal
-    a flag waives is 8; a failed write adds 32; a bug is 101. The list is a
-    summary; §3's ordered tests decide.
+    unparseable PSBT) is 2; a check that came out no (`mt verify --transaction`
+    naming another transaction; `mt encode` when the node proves an input
+    spent or contradicts a value) is 1; a refusal a flag waives is 8; a failed
+    write adds 32; a bug is 101. The list is a summary; the exit-code spec's
+    ordered tests decide.
     **The refusal-message format is RULED** — §8's preamble, three parts, with a
     machine-parseable verdict line. It was declared unspecified here while being
     the one item P5's tests assert against (R11 I4). Each input the table above requires needs some flag —
