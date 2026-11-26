@@ -1,6 +1,6 @@
 # SPEC: constellation exit codes
 
-**Status:** DRAFT proposal, revision 4, 2026-11-26. Nothing is implemented yet.
+**Status:** DRAFT proposal, revision 5, 2026-11-26. Nothing is implemented yet.
 No binary, test or manual page moves until Brian has ruled on §2 and a review
 round closes with no Critical or Important findings.
 
@@ -12,6 +12,7 @@ round closes with no Critical or Important findings.
 | 1 | NOT GREEN: 0 Critical, 5 Important, 12 Minor, 3 Nit | `review-r1.md` in the same directory |
 | 2 | NOT GREEN: 0 Critical, 3 Important, 8 Minor, 3 Nit | `review-r2.md` in the same directory |
 | 3 | NOT GREEN: 0 Critical, 2 Important, 5 Minor, 3 Nit | `review-r3.md` in the same directory |
+| 4 | NOT GREEN: 0 Critical, 1 Important, 9 Minor, 5 Nit | `review-r4.md` in the same directory |
 
 **Scope.** Every binary in the constellation except seedhammer and
 rust-miniscript: `md`, `mk`, `ms`, `mt`, `me`, `mnemonic`, `mr` and
@@ -142,7 +143,8 @@ existing behaviour that some script or document relies on.
 5. **Every verb reports a correction it used (R6).**
    - Today these correct a damaged string, print a note on stderr, and exit 0:
      `mt decode`/`verify`/`inspect`, `mk decode`/`verify`/`inspect`/`address`/`derive`,
-     and `mnemonic inspect --mk1` (which prints no note at all). Under R6 they
+     and `mnemonic inspect --mk1`, `convert --from mk1=…` and `word-card
+     --from …` (which print no note at all). Under R6 they
      exit with 16 set. The output is the same; a script now learns that the
      plate is damaged.
    - The cost: `SPEC_mt_v0_1.md:3384-3385` (mnemonic-engrave's normative copy)
@@ -165,32 +167,43 @@ existing behaviour that some script or document relies on.
      check gives 16 + 2 = 18. With no oracle, as for a single string, it gives
      16 + 4 + 2 = 22.
    - The check is per string. A set that is merely *incomplete* is not a
-     failure (decision 7), and a *complete* set that fails reassembly is 2.
+     failure (decision 7), and a *complete* set that fails reassembly is 2,
+    with nothing printed.
    - This changes E45 and the hazard line in mnemonic-refugium's CLAUDE.md
      ("its exit code stays the checksum's").
 
 7. **A correction in an incomplete chunk set is 16, not 20.**
    - D26 puts "verifiable by reassembly later" under `REPAIR_APPLIED`. Today
      the tools split three ways:
-     - `mk` and `mr` follow D26 and give 5.
+     - `mk` follows D26 and gives 5, though it prints "correction
+       UNVERIFIED … can alias to a different card" beside that 5.
      - The toolkit demotes the case to VERIFY-ME: `mnemonic repair --mk1`
        gives 4 where `mk repair` gives 5 on the same strings. Its
        `repair --md1` refuses an incomplete set, as `md` does (2).
      - `md repair` refuses an incomplete set or a lone chunk outright, clean
        or damaged: 2, with no output.
+     - `mr repair` accepts a lone chunk (5 if corrected, 0 if clean) but
+       refuses a set of two or more chunks that is incomplete: 2, with no
+       output ("the chunk set lacks chunk 2 of 4").
    - *Recommended: 16 everywhere*, which is D26 as written. The rest of the
      set will verify it when it is reassembled.
      - The toolkit changes.
-     - `md` changes more. It corrects and prints each chunk of an incomplete
-       set (16), and a clean lone chunk becomes 0 (§7a). That is what makes a
-       partly damaged set repairable before every plate is found.
+     - `md` and `mr` change more. They correct and print each chunk of an
+       incomplete set (16), and a clean one becomes 0 (§7a, §7g). That is what
+       makes a partly damaged set repairable before every plate is found.
+     - A lone chunk of a multi-chunk set counts as an incomplete set (16). Only
+       a string that is not chunked at all has no oracle (20).
+     - `mk`'s message changes to say the correction is verifiable when the
+       rest of the set is reassembled (R5: the message agrees with the
+       code).
    - *The alternative* is 20 everywhere, which is safer and reverses D26's
      wording.
 
 8. **`inspect` reports a string that would not decode (R5).** Today `ms
    inspect` prints "FAIL: would NOT decode" and exits 0, as its locked table
-   says. *Recommended:* it exits 2 and still prints its whole report, as `md`
-   and `mk inspect` already do.
+   says. *Recommended:* it exits 2. `md inspect` and `mk inspect` already
+   exit non-zero on such a string, printing nothing on stdout; R5 does not
+   require any tool to start printing a report it does not print today.
 
 9. **An operator who stops at a prompt gets 130.** Today a `mr-sitting`
    session stops with 1 when the operator answers "stop" or input ends at a
@@ -231,7 +244,7 @@ existing behaviour that some script or document relies on.
 | 1 | NO | the input is well-formed, and a comparison against something else came out no: a reference, a phrase, a template, the chain, an expectation. For example a verify mismatch, NOT spend-equal, not a member, `--expect` not met, an input the node proves spent | read the verdict |
 | 2 | INVALID | an input is wrong for this verb whatever the flags: bad checksum, uncorrectable, wrong HRP or kind, a newer format, empty input, a malformed value the tool reads, an input that breaks the verb's correctness rules | fix or replace the input |
 | 4 | UNVERIFIED | the tool checked part of the result and could not confirm it: a correction with no oracle, a partial decode, a signature accepted leniently | verify before trusting the result |
-| 8 | REFUSED | the tool declined under a safety or policy rule that a flag, network or channel would waive, or a network mismatch (decision 1). Examples: secret on argv, an unsafe output destination, an output that exists and would be overwritten, a limit a flag can raise | change how it is run, or pass the override knowingly |
+| 8 | REFUSED | the tool declined under a safety or policy rule that a flag, network, channel or different destination would waive, or a network mismatch (decision 1). Examples: secret on argv, an unsafe output destination, an output that exists and would be overwritten, a limit a flag can raise | change how it is run, or pass the override knowingly |
 | 16 | REPAIRED | the tool applied a checksum correction to an input and used the corrected value | the plate is damaged; re-engrave it |
 | 32 | IO | something the tool needed from the system failed or is missing: an input file, an output that cannot be written, stdout, a helper program the user asked for, a device, a lock, a RAM folder, an environment variable, a feature this build lacks | fix the environment |
 | 64 | USAGE | never combines: the command line alone is wrong (decision 2). Nothing ran | fix the command line |
@@ -301,7 +314,10 @@ tests and vectors assert the bits that must be set, not the exact sum.
 | `me seal --iterations 5` | 64 | |
 | `ms` reading two inputs from stdin | 64 | |
 | `@env:NAME` with NAME unset | 32 | |
-| `mt` input the node proves spent | 1 | |
+| `mt verify --bitcoin-cli …` on an input the node proves spent | 1 | |
+| `mr --time 1`, `--height abc`, `--digest zz`, `--set-id zz` | 2 | input values (decision 2) |
+| `derive-child --application rsa` | 2 | a valid name the tool will not do; no flag waives it |
+| a BIP-388 distinctness violation in `verify` | 2 | |
 | `mr-sitting root --network main` where input ends first | 2 | the first failure wins |
 
 `me`'s refusal table (`Row` in `me-cli/src/descriptor/refusal.rs`) and the 66
@@ -313,7 +329,7 @@ decided by these tests.
 ```sh
 md repair "$card"; rc=$?
 if   [ "$rc" -eq 0 ];  then echo "clean"
-elif [ "$rc" -ge 64 ]; then echo "usage, internal error or signal: $rc"
+elif [ "$rc" -ge 64 ]; then echo "usage, internal error, operator stop or signal: $rc"
 else
   [ $((rc & 1))  -ne 0 ] && echo "a check said no"
   [ $((rc & 2))  -ne 0 ] && echo "an input is invalid"
@@ -340,7 +356,8 @@ crash shows up as an NTSTATUS value. So anything outside 0..125, other than
 
 **What 20 does and does not say.** Round 0's C1 is right that 20 is also the
 sum of a verified correction and an unrelated unverified result. One example is
-a chunked md1 with no origin: it reassembles (16) and decodes only partly (4).
+`mnemonic verify-bundle` reporting a partial result (4) on a bundle in which
+another card's correction was verified (16).
 
 The scheme accepts this. Bit 4 is defined by what the operator must do,
 "verify before trusting", and that action is the same either way. So the sum
@@ -360,7 +377,10 @@ does.
 - **R2. The usage check comes first, except the argv guard.** A usage error
   exits 64 before any input is read or any output is written. One exception
   is the pre-parser argv guard of uniformity spec §6d: it is normative and runs
-  first. So a secret on argv plus a bad flag gives 8. A limit that depends on
+  first. So a secret on argv plus a bad flag gives 8 in the tools that have
+  that guard. `mr` checks argv after parsing, so there a bad flag gives 64
+  first; adopting the pre-parser guard in `mr` is uniformity-spec work, not
+  this spec's. A limit that depends on
   the input, such as `md descriptor --chain 7` on a card whose limit is 2, is
   not usage. It is 2, and it must be checked before the verdict is printed.
   Today `md` prints the verdict first and then exits 1.
@@ -408,7 +428,9 @@ does.
   reported by the shell as 128+N. A process that catches a signal to clean
   up, as the `mr-sitting` session's wipe hook does, re-raises the signal when it
   is done instead of exiting 1. A deliberate stop at a prompt exits 130
-  (decision 9).
+  (decision 9). If the wipe itself fails during a stop or a signal, the
+  process exits 32 instead, after printing its wipe-failure message, because
+  the operator must now act on the device.
 - **R11. Help states the table.** Every binary's root `--help` ends with the
   same legend, and the toolkit manual gains one appendix holding §3. Per-verb
   help states only the bits that verb can set. The legend:
@@ -421,6 +443,8 @@ does.
   > command line, unsafe output); 16 a correction was applied; 32 a file,
   > device or helper failed.
 - **R12. GUIs decode the bits.**
+  - A child killed by a signal has no exit code on Unix; a GUI shows
+    "killed by signal N" from the platform's status.
   - A GUI decodes 1..63 bit by bit and names each bit it finds. It never keys
     on a whole number other than 0, 64, 101 and 130 ("stopped"). It treats
     anything else outside 0..125 as "ended abnormally" (§3).
@@ -479,7 +503,10 @@ none changes silently.
     vectors, and `mk`'s JSON envelope. Under R1 the status can be 24 or more.
   - The GUI rows at `:400-401` ("CLI exit 8 → red banner / Override") key on
     the N10 machine line, not on the number. Otherwise they would fire on every
-    argv refusal.
+    argv refusal. N10 prints only under `MNEMONIC_NETWORK_JSON=1`, so the GUIs
+    set it when they run a CLI, and N10's trigger "a CLI that exits 8" becomes
+    "a CLI that sets bit 8". A script that needs to tell a network refusal
+    from other refusals sets the same variable.
   - N9 ("8 is reserved for `ms` and `mt` and unreachable") no longer holds.
     Both can set 8 for other refusals.
   - `me`'s `PromotionTestnetKey` "stays 3" becomes whatever the §3 tests give.
@@ -638,7 +665,9 @@ silent correction into 16.
 - **Expect.** `sysw pack --expect` not met moves from 4 to 1.
 - **IO moves to 32:** read failures (2), write failures (1), and a sidecar
   that was found but fails (2 or 4).
-- **No sidecar.** An absent sidecar stays 0 with a warning, even with
+- **Named sidecar.** `ME_PREVIEW_BIN` naming a file that does not exist moves
+  from 2 to 32: the user named the helper (R9).
+- **No sidecar.** An absent sidecar (none named) stays 0 with a warning, even with
   `bundle --preview DIR`. The user asked for a preview, not for the sidecar
   (R9). If Brian prefers, `--preview` can count as asking for the sidecar,
   which would make this 32.
@@ -656,8 +685,13 @@ silent correction into 16.
   checks on settings (1), such as `seed-xor split --shares 1`.
 - **Input values move to 2:** `BadInput` checks on input values, and a
   malformed scheme name (`--template bogus`, 64 from clap today). So does a
-  *malformed* `--from` or `--slot`, which the argv guard catches today (2), or
-  clap under `--allow-argv-secret` (64) (decision 2).
+  *malformed* `--from` or `--slot` under `--allow-argv-secret` (64 from clap
+  today) (decision 2). Without that flag the argv guard runs first and gives
+  8 (R2), as it should: `--from phrsae="<words>"` is a real secret on argv.
+- **Corrections.** `convert --from mk1=…` and `word-card --from …` move from 0
+  to 16 when they used a corrected card (decision 5). The implementer audits
+  every decode call site for R6, since R13's table test does not see an `Ok`
+  path.
 - **No moves to 1:** `verify-bundle` mismatch, `restore` expectations,
   `xpub-search`, and an `import-wallet` seed mismatch (all 4), and the strict
   BSMS signature or MAC mismatch (2). `verify-message` stays 1.
@@ -717,9 +751,14 @@ silent correction into 16.
 - **No.** Verify mismatch and `child --check` with no match stay 1.
 - **IO moves from 1 to 32:** `--keys-file`, `--heir-file`, `vectors --out`,
   and stdout.
-- **Repair.** A single string moves from 5 to 20, and a set that reassembles
-  to 16. A result that is not a card adds 2 (decision 6). Uncorrectable stays
-  2.
+- **Repair.**
+  - A string that is not chunked moves from 5 to 20.
+  - A lone chunk of a multi-chunk set moves from 5 to 16.
+  - An incomplete set of two or more chunks, refused today (2, no output), is
+    corrected chunk by chunk and printed: 16, or 0 if clean (decision 7).
+  - A set that reassembles is 16.
+  - A result that is not a card adds 2 (decision 6). Uncorrectable stays 2.
+  - E45's repair paragraph changes with this (§6).
 
 ### 7h. `mr-sitting` (mnemonic-refugium): about 270 code assertions (the survey's basis, including 0)
 
@@ -889,3 +928,11 @@ Some of these dispositions were refined in later rounds; where they differ, the 
 A mechanical check of the round-3 fold (Sonnet) found 1 Important (§7f's
 "parser-shaped" wording) and 4 Minor (decision 2, §7g and test 1 lacked the
 input-value carve-out; §5 had no operator-stop row). All five are folded.
+
+### Round 4
+
+| finding | disposition |
+| --- | --- |
+| R4-I1 (`mr`'s incomplete sets) | Decision 7 states `mr`'s behaviour today (lone chunk 5 or 0; two or more chunks, incomplete: 2, no output). `md` and `mr` both change. A lone chunk is 16, and only a string that is not chunked is 20. §7g lists all of it. |
+| M1 to M9 | Folded. More silently correcting verbs listed (decision 5, §7f). Decision 8's false "as `md` and `mk` already do" removed. The argv guard wins for a malformed `--from` (§7f). §3's example of 20 replaced. `mk`'s "UNVERIFIED" message at 16 (decision 7). N10 and `MNEMONIC_NETWORK_JSON` (§6). A named `ME_PREVIEW_BIN` that is missing is 32 (§7e). A failed wipe during a stop exits 32 (R10). Tips, `--digest`, `--set-id`, `--application rsa` and distinctness placed (§3); signal kills in GUIs (R12). |
+| N1 to N5 | `mr`'s post-parse guard (R2). "Destination" in REFUSED. "Nothing printed" (decision 6). `mt` verb named. The shell example says "operator stop". N4: the mt line numbers are master's (`:3384-3385`, `:810-827`); the fix-PR head has them at `:3470-3471` and `:813-830`. |
