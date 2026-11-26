@@ -3341,13 +3341,15 @@ signed PSBT.
        > liveness table reads.
        >
        > **The only flag is `--bitcoin-cli <path>`**, for a binary not on
-       > `PATH`. Absent and not found → §6a's no-node warning, unchanged, and
-       > the exit status is unaffected (0 when every offline check passes):
-       > pointing `--bitcoin-cli` at nothing is the documented offline
-       > mechanism. A named helper that is found and then fails (it cannot be
-       > run, exits non-zero other than with an RPC error reply mt already interprets,
-       > or breaks the pipe) adds 32 (IO), per `SPEC_constellation_exit_codes.md`
-       > R9.
+       > `PATH`. With no `--bitcoin-cli`, a `bitcoin-cli` absent from `PATH`
+       > → §6a's no-node warning, unchanged, and the exit status is unaffected
+       > (0 when every offline check passes): that is the offline case. A
+       > **named** `--bitcoin-cli` is a helper the operator asked for, so per
+       > `SPEC_constellation_exit_codes.md` R9 it adds 32 (IO) when the path
+       > does not exist or cannot be spawned, when it exits non-zero other
+       > than with an RPC error reply mt already interprets, when it breaks
+       > the pipe, or when its reply cannot be parsed. Naming a path that does
+       > not exist is therefore not an offline switch.
 
     b2. **`--elide-prefix` (`mt encode`) emits the set's invariant 8 characters
        on the first string only** (§3b). It changes the **display** form, never
