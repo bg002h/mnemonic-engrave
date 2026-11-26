@@ -1242,30 +1242,33 @@ Each repo's implementation had three review steps. An Opus agent that did not
 write the code reviewed the whole diff, and the implementer folded it. A Fable
 agent then ran a final independent round across repos. The final findings are
 folded by Opus implementers, in the commits named below where they have
-landed. Every branch is `fx/<repo>`, and nothing is pushed.
+landed. Every branch is `fx/<repo>`, merged into each repo's
+`claude/project-thread-o57s2k` branch for its open PR.
 
 Opus reviews are at `design/agent-reports/exit-codes-impl-review-2026-11-26.md`
 in each repo, except `me`'s, which is
 `design/agent-reports/exit-codes-2026-11-26/impl-review-me.md` here. The Fable
 final reviews are in this repo's `design/agent-reports/exit-codes-2026-11-26/`:
 `final-review-md-mk-ms.md`, `final-review-mt-me-spec.md` and
-`final-review-toolkit-gui.md`.
+`final-review-toolkit-gui.md`, `final-review-mr.md` and `final-review-rw.md`.
 
 | repo | implementation | Opus review | Opus fold | Fable final review | final fold |
 | --- | --- | --- | --- | --- | --- |
 | descriptor-mnemonic (`md`) | `1a7063c`, `e2ae76f`, `09e9f29` | 0C, 2I, 7M, 7N | `b79bfa5`, `e178792` | md-mk-ms: NOT GREEN, 0C, 3I, 9M, 6N (the three binaries together) | `8c85bf9` |
-| mnemonic-key (`mk`) | `506c95f`, `f3a17c8` | 0C, 2I, 6M, 4N | `55a6e68` | md-mk-ms, as above | in progress at this revision |
+| mnemonic-key (`mk`) | `506c95f`, `f3a17c8` | 0C, 2I, 6M, 4N | `55a6e68` | md-mk-ms, as above | `9a4e0aa`, `8f74a45` |
 | mnemonic-secret (`ms`) | `ff7cb4e`, `d54e140` | 0C, 1I, 4M, 5N | `ce20d5a` | md-mk-ms, as above | `9da35f9` |
 | mnemonic-transaction (`mt`) | `60151a4`, `56e6ebc`, `bb996d0`, `608c338` | 0C, 2I, 5M, 5N | `d49dabf` | mt-me-spec: 0C, 2I, 11M, 6N (with the spec) | `b7b5480`, SPEC_mt re-sync `ffa1f45` |
 | mnemonic-engrave (`me`, mnemonic-io-lib) | `8ff5711`, `72273ea`, `82d2bb3`, `236c576`, `cf88af4` | 0C, 1I, 6M, 8N | `f0a9654`, `27234b9` | mt-me-spec, as above | `9659335`, `3183c14`, `946147a` |
-| mnemonic-toolkit (`mnemonic`, manuals) | `e51607b8`, `71dc68ac`, `f8b8d19c`, `a32c3bd2` | 1C, 6I, 11M, 5N | `2a3ce852`, `5931f7a7`, `1cfa8950`, `a0ac6ad0` | toolkit-gui: NOT GREEN, 0C, 4I, 14M, 6N | not yet |
-| mnemonic-gui | `a5fa42d`, `691f9ce`, `2545d0c` | 1C, 2I, 5M, 3N | `2168783` | toolkit-gui, as above | in progress at this revision |
-| mnemonic-refugium (`mr`, `mr-sitting`) | `26ee6dd42`, `6e6398d09`, `3e2a50c5e` | 0C, 4I, 7M, 3N (file not yet committed) | in progress at this revision | none yet | none yet |
+| mnemonic-toolkit (`mnemonic`, manuals) | `e51607b8`, `71dc68ac`, `f8b8d19c`, `a32c3bd2` | 1C, 6I, 11M, 5N | `2a3ce852`, `5931f7a7`, `1cfa8950`, `a0ac6ad0` | toolkit-gui: NOT GREEN, 0C, 4I, 14M, 6N | `6205316f`, `1991f3e9`, `ed35d630`, `da439125`, `1c84f771` |
+| mnemonic-gui | `a5fa42d`, `691f9ce`, `2545d0c` | 1C, 2I, 5M, 3N | `2168783` | toolkit-gui, as above | `70970d2` |
+| mnemonic-refugium (`mr`, `mr-sitting`) | `26ee6dd42`, `6e6398d09`, `3e2a50c5e` | 0C, 4I, 7M, 3N | `f2a44d069` | `final-review-mr.md`: 0C, 2I, 7M, 9N | `26504288a`, `534a5d652`, `711373bef`, `27137cc6d`, `9131377b0` |
+| refugium-wallet (mr-gui, refugium-view; mr-codec pin to `9131377b`) | `1225400a` | 0C, 1I, 5M, 5N | `8cea3377` | `final-review-rw.md`: 0C, 1I, 2M, 5N | `e76999a7`, `013f3ebf`: the pin also brings mr's E101 card-check row, so the FOLLOWUP `rw-mrgui-card-check-row` is done here; two scoped re-reviews moved the check before engraving (`0902150c`, `46509782`, `c7c8fea2`; Brian's ruling pending) |
 
 Still owed across the work, from the reviews:
 
-- `mr` has had no Fable final round, and its own process gate's whole-diff
-  review (`agent-reports/whole-diff-mr-<phase>.md`) is owed.
+- `mr`'s own process gate's whole-diff review
+  (`agent-reports/whole-diff-mr-<phase>.md`) is owed, and its three typed-quit
+  pty rows (`w1t_pty.rs`) were changed to 130 but could not run here.
 - Gates nobody ran: `mt`'s `scripts/mutate-refusals.sh`, `me`'s
   `fix-me-dev-gates-gate.sh` (no `--cli` mode), `mr`'s regtest rows, and
   mnemonic-gui's tutorial snapshots, `schema_mirror` and secret-channel
