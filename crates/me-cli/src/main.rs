@@ -1372,7 +1372,7 @@ fn run_seal_cli(
         eprintln!();
         eprintln!("passphrase — write this down and store it APART from the machine:");
         eprintln!();
-        eprintln!("    {}", &**p);
+        eprintln!("    {}", **p);
     }
     eprintln!();
     eprintln!(
@@ -2296,7 +2296,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                             "passphrase — write this down and store it APART from the machine:"
                         );
                         eprintln!();
-                        eprintln!("    {}", &*generated);
+                        eprintln!("    {}", *generated);
                         eprintln!();
                         Some((*generated).clone())
                     }

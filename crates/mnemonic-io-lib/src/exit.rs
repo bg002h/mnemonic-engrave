@@ -59,7 +59,8 @@ pub const INTERNAL: u8 = 101;
 pub const STOPPED: u8 = 130;
 
 /// The root `--help` legend every binary ends with (spec R11), verbatim.
-pub const HELP_LEGEND: &str = "Exit status: 0 = done, every check passed. 64 = bad command line, nothing \
+pub const HELP_LEGEND: &str =
+    "Exit status: 0 = done, every check passed. 64 = bad command line, nothing \
 ran. 101 = internal error. 130 = stopped by the operator. Other codes from \
 128 up = killed by a signal. Otherwise the sum (1 to 63) of: 1 a check said no; \
 2 an input is invalid; 4 verify the result before trusting it; 8 refused \

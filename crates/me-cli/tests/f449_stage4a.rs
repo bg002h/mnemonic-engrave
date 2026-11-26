@@ -176,7 +176,7 @@ fn the_walk_keeps_the_version_for_both_shapes() {
     use mnemonic_engrave::sysw::record::{mdmk_unconfirmed_why, Unconfirmed};
     for s in [V12_SINGLE.to_string(), v12_chunk()] {
         assert_eq!(
-            mdmk_unconfirmed_why(&[s.clone()]),
+            mdmk_unconfirmed_why(std::slice::from_ref(&s)),
             vec![(0, Unconfirmed::UnsupportedWireVersion(12))],
             "{s}"
         );

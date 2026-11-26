@@ -1020,7 +1020,7 @@ mod rv_rows {
     fn mr1(data: &[u8]) -> String {
         let mut input = md_codec::bch::hrp_expand("mr");
         input.extend_from_slice(data);
-        input.extend(std::iter::repeat(0u8).take(13));
+        input.extend(std::iter::repeat_n(0u8, 13));
         let p = md_codec::bch::polymod_run(&input) ^ 0x085d21404aee15059u128;
         let mut all = data.to_vec();
         for i in 0..13 {
@@ -1072,7 +1072,7 @@ mod rv_rows {
     /// §14b check 5: every symbol of card version 7 (`u`, `a`, `7`) is reserved.
     #[test]
     fn rv_reserved_symbols_are_u_a_and_7() {
-        for sym in [b'u', b'a', b'7'] {
+        for sym in *b"ua7" {
             let v = ALPHA.iter().position(|&a| a == sym).unwrap() as u8;
             let s = mr1(&[v, 0]);
             assert_eq!(
@@ -1082,7 +1082,7 @@ mod rv_rows {
             );
         }
         // The neighbours are single-string cards.
-        for sym in [b'e', b'6', b'm'] {
+        for sym in *b"e6m" {
             let v = ALPHA.iter().position(|&a| a == sym).unwrap() as u8;
             assert!(mr::check_string(&mr1(&[v, 0])).is_ok());
         }
