@@ -1,6 +1,6 @@
 # SPEC: constellation exit codes
 
-**Status:** DRAFT proposal, revision 2, 2026-11-26. Nothing is implemented yet.
+**Status:** DRAFT proposal, revision 4, 2026-11-26. Nothing is implemented yet.
 No binary, test or manual page moves until Brian has ruled on §2 and a review
 round closes with no Critical or Important findings.
 
@@ -10,6 +10,8 @@ round closes with no Critical or Important findings.
 | --- | --- | --- |
 | 0 | NOT GREEN: 2 Critical, 16 Important, 14 Minor, 4 Nit | `design/agent-reports/exit-codes-2026-11-26/review-r0.md` |
 | 1 | NOT GREEN: 0 Critical, 5 Important, 12 Minor, 3 Nit | `review-r1.md` in the same directory |
+| 2 | NOT GREEN: 0 Critical, 3 Important, 8 Minor, 3 Nit | `review-r2.md` in the same directory |
+| 3 | NOT GREEN: 0 Critical, 2 Important, 5 Minor, 3 Nit | `review-r3.md` in the same directory |
 
 **Scope.** Every binary in the constellation except seedhammer and
 rust-miniscript: `md`, `mk`, `ms`, `mt`, `me`, `mnemonic`, `mr` and
@@ -65,7 +67,7 @@ cross-tool table.
 ## 2. Decisions for Brian
 
 Each decision has a recommendation, and the rest of the spec is written
-assuming it. The first four shape the scheme. The other six each change an
+assuming it. The first four shape the scheme. The other seven each change an
 existing behaviour that some script or document relies on.
 
 1. **Seven codes fit, and network mismatch shares bit 8.**
@@ -89,8 +91,28 @@ existing behaviour that some script or document relies on.
      the traditional `EX_USAGE` (BSD `sysexits.h`), and `mk`, `ms` and
      `mnemonic` already use it. `md`, `mt`, `me`, `mr` and `mr-sitting` change.
    - 64 covers what can be judged from the command line without reading any
-     input, file or environment variable: the parser's errors, and the tool's
-     own checks on flags and their values.
+     input, file or environment variable: the parser's errors (an unknown flag
+     or verb, a missing argument, a conflict, a bad setting value), and the
+     tool's own checks on its *settings*. A malformed *input* value is 2 even
+     when the parser rejects it (below).
+   - **Setting versus input on argv.** A setting tells the tool how to run:
+     iterations, counts, share K and N, output form, ranges. It is judged from
+     the command line, so a bad one is 64. An input is the data the verb works
+     on, even when it arrives as an argument: a card string, a key, a
+     fingerprint, template text, a wallet shape's parameters
+     (`md compose --wrapper`, `--path`), the hot family's values. Its validity
+     is about the wallet, so a bad one is 2.
+   - So `me seal --iterations 5`, the toolkit's `seed-xor split --shares 1`,
+     and `ms` with a bad K or N give 64. A malformed `md --key`,
+     `md --fingerprint`, `md compose --path 5of3` or `mr --hot-child Z:24`
+     gives 2.
+   - **Who checks the value does not change its class.** A malformed input
+     value is 2 even when clap's value parser is what rejects it. Examples:
+     `mr verify --hot-parent-fp zz`, a toolkit scheme name such as
+     `--template bogus`, and `--expect-fingerprint zz`. The implementation
+     marks those arguments as input and maps clap's invalid-value errors on
+     them to 2, so a fingerprint typo is 2 in every tool. E45's closed-list
+     entry for a malformed `--hot-parent-fp` moves to 2 with them (§6).
    - This reverses the CLI review's recommendation of 2, which predates the bit
      scheme. It also narrows `mr`'s E45 closed list: its entries that read the
      card (a card that is another format's string, `member` with no keys for a
@@ -111,8 +133,9 @@ existing behaviour that some script or document relies on.
    - *Recommended:* mnemonic-io-lib gains the constants and a small bit-set
      type, and each binary still does its own classification.
    - Six binaries already depend on the library, and `mt` takes it from
-     crates.io (0.1.3), so this means a publish plus six pin and `vendor/`
-     moves (§9).
+     crates.io (0.1.3). So this means a publish, then pin and `vendor/` moves
+     in the five crates.io consumers; `me` uses a path dependency and moves
+     with the source (§9).
    - mr-codec, which has a no-CLI-deps rule, keeps a copy with its own test
      against the §3 numbers.
 
@@ -137,20 +160,30 @@ existing behaviour that some script or document relies on.
      `mk repair` exits 0 on strings that `mk decode` rejects.
    - *Recommended:* every `repair` decodes each corrected or clean string as a
      string or chunk of its format, and adds 2 for any that fails. It still
-     prints the corrected strings with its warning (22 for a corrected
-     non-card), because a person repairing by hand needs to see them.
+     prints the corrected strings with its warning, because a person
+     repairing by hand needs to see them. A corrected string that fails its
+     check gives 16 + 2 = 18. With no oracle, as for a single string, it gives
+     16 + 4 + 2 = 22.
    - The check is per string. A set that is merely *incomplete* is not a
      failure (decision 7), and a *complete* set that fails reassembly is 2.
    - This changes E45 and the hazard line in mnemonic-refugium's CLAUDE.md
      ("its exit code stays the checksum's").
 
 7. **A correction in an incomplete chunk set is 16, not 20.**
-   - D26 puts "verifiable by reassembly later" under `REPAIR_APPLIED`, and
-     `md`, `mk` and `mr` follow it (5 today). The toolkit demotes the same case
-     to VERIFY-ME (4 today): `mnemonic repair --mk1` gives 4 where `mk repair`
-     gives 5 on the same strings.
-   - *Recommended: 16 everywhere*, which is D26 as written. The rest of the set
-     will verify it when it is reassembled. The toolkit changes.
+   - D26 puts "verifiable by reassembly later" under `REPAIR_APPLIED`. Today
+     the tools split three ways:
+     - `mk` and `mr` follow D26 and give 5.
+     - The toolkit demotes the case to VERIFY-ME: `mnemonic repair --mk1`
+       gives 4 where `mk repair` gives 5 on the same strings. Its
+       `repair --md1` refuses an incomplete set, as `md` does (2).
+     - `md repair` refuses an incomplete set or a lone chunk outright, clean
+       or damaged: 2, with no output.
+   - *Recommended: 16 everywhere*, which is D26 as written. The rest of the
+     set will verify it when it is reassembled.
+     - The toolkit changes.
+     - `md` changes more. It corrects and prints each chunk of an incomplete
+       set (16), and a clean lone chunk becomes 0 (§7a). That is what makes a
+       partly damaged set repairable before every plate is found.
    - *The alternative* is 20 everywhere, which is safer and reverses D26's
      wording.
 
@@ -163,7 +196,12 @@ existing behaviour that some script or document relies on.
    session stops with 1 when the operator answers "stop" or input ends at a
    prompt, which would read as "a check said no". *Recommended:* a deliberate
    stop exits 130, the same as Ctrl-C, since both mean "the operator stopped
-   it". End of input at a prompt is empty input, 2 (decision 3).
+   it".
+   - This covers "stop" typed at any prompt, including the mainnet
+     confirmation.
+   - End of input at a prompt is empty input, 2 (decision 3).
+   - GUIs read 130 as "stopped" (R12).
+   - *The alternative* is 2, which reads as "bad input" and is less true.
 
 10. **`mr` renumbers in the same cutover.**
     - `mr` is about two thirds of the test churn (1,700 assertions on 1 and 230
@@ -176,6 +214,15 @@ existing behaviour that some script or document relies on.
     - *The alternative* is to defer `mr` and `mr-sitting` to their next minor
       release, with the GUIs decoding by version.
 
+11. **A mismatch that an override can accept is NO (1), and the override
+    clears it.** `mnemonic restore --expect-fingerprint X` exits 4 today with
+    no output, and 0 with output under `--allow-mismatch`. The strict BSMS
+    mismatch is the same kind of thing. A mismatch is a comparison that came
+    out no, so *recommended:* 1, with the override clearing it (R4).
+    *The alternative* treats every overridable refusal as 8, which puts a
+    wallet that does not match the user's expectation in the same class as a
+    secret typed on argv.
+
 ## 3. The scheme
 
 | code | name | set when | what the operator does |
@@ -184,7 +231,7 @@ existing behaviour that some script or document relies on.
 | 1 | NO | the input is well-formed, and a comparison against something else came out no: a reference, a phrase, a template, the chain, an expectation. For example a verify mismatch, NOT spend-equal, not a member, `--expect` not met, an input the node proves spent | read the verdict |
 | 2 | INVALID | an input is wrong for this verb whatever the flags: bad checksum, uncorrectable, wrong HRP or kind, a newer format, empty input, a malformed value the tool reads, an input that breaks the verb's correctness rules | fix or replace the input |
 | 4 | UNVERIFIED | the tool checked part of the result and could not confirm it: a correction with no oracle, a partial decode, a signature accepted leniently | verify before trusting the result |
-| 8 | REFUSED | the tool chose not to proceed, and the same verb would proceed with a different flag, network or channel. Plus every network mismatch (decision 1). Examples: secret on argv, an unsafe output destination, an output that exists and would be overwritten, a limit a flag can raise | change how it is run, or pass the override knowingly |
+| 8 | REFUSED | the tool declined under a safety or policy rule that a flag, network or channel would waive, or a network mismatch (decision 1). Examples: secret on argv, an unsafe output destination, an output that exists and would be overwritten, a limit a flag can raise | change how it is run, or pass the override knowingly |
 | 16 | REPAIRED | the tool applied a checksum correction to an input and used the corrected value | the plate is damaged; re-engrave it |
 | 32 | IO | something the tool needed from the system failed or is missing: an input file, an output that cannot be written, stdout, a helper program the user asked for, a device, a lock, a RAM folder, an environment variable, a feature this build lacks | fix the environment |
 | 64 | USAGE | never combines: the command line alone is wrong (decision 2). Nothing ran | fix the command line |
@@ -205,14 +252,29 @@ single codes. Any other value from 65 to 125 is a bug.
 
 **The tests that pick a class,** asked in this order:
 
+0. Did the operator stop it, at a prompt or with Ctrl-C? Then **130**
+   (decision 9).
 1. Is the command line wrong, judged without reading any input, file or
-   environment? Then **64**.
+   environment: an unknown flag or verb, a missing argument, a conflict, or a
+   bad *setting* (decision 2)? Then **64**. A malformed input value is not
+   this test; it is 2 (test 6). The exception is the argv
+   guard of uniformity spec §6d, which runs first: a secret on argv is 8
+   (R2).
 2. Did something needed from the system fail or go missing? Then **32**.
-3. Did the tool choose not to proceed, when the same verb with a different flag,
-   network or channel would? Or is it a network mismatch? Then **8**.
-4. Is the input well-formed, with a comparison against something else coming
-   out no? Then **1**.
-5. Otherwise the input itself is wrong: **2**.
+3. Is it a network mismatch? Then **8** (decision 1).
+4. Is the input well-formed, but does it fail to match something it should
+   match: a reference the user gave, a phrase, a template, a policy-id stub, a
+   plan it should belong to, the chain's state, or an `--expect` claim? Then
+   **1**, even when an override exists (decision 11). A limit, cap, deadline
+   or delta that the tool enforces is not a match; those are test 5.
+5. Did the tool decline under one of its safety or policy rules, which a flag,
+   a network, a channel or a different destination would waive? Examples:
+   secret exposure, an unsafe or existing destination, the same file in and
+   out, a guardrail, a limit. Then **8**.
+6. Is the input itself wrong for this verb, or insufficient for it (for
+   example `mr member` with no keys for a seat the card does not key)? Then
+   **2**.
+7. Anything else is a bug: **101** (R13).
 
 A run that ends on its first failure takes that failure's class. When order
 can change the sum (a network refusal found before or after a correction),
@@ -263,8 +325,8 @@ fi
 ```
 
 A GUI applies the same 1..63 guard. On Windows an exit status is 32 bits, and a
-crash shows up as an NTSTATUS value, so anything outside 0..125 means "ended
-abnormally".
+crash shows up as an NTSTATUS value. So anything outside 0..125, other than
+130 (stopped by the operator or Ctrl-C), means "ended abnormally".
 
 **D26 under this scheme.** D26 is a rule about meaning, not numbers
 (uniformity spec §6f), so its meanings carry over and only the numbers move:
@@ -352,15 +414,16 @@ does.
   help states only the bits that verb can set. The legend:
 
   > Exit status: 0 = done, every check passed. 64 = bad command line, nothing
-  > ran. 101 = internal error. 128 and up = killed by a signal. Otherwise the
+  > ran. 101 = internal error. 130 = stopped by the operator. Other codes from
+  > 128 up = killed by a signal. Otherwise the
   > sum (1 to 63) of: 1 a check said no; 2 an input is invalid; 4 verify the
   > result before trusting it; 8 refused (network mismatch, secret on the
   > command line, unsafe output); 16 a correction was applied; 32 a file,
   > device or helper failed.
 - **R12. GUIs decode the bits.**
   - A GUI decodes 1..63 bit by bit and names each bit it finds. It never keys
-    on a whole number other than 0, 64 and 101, and it treats anything outside
-    0..125 as "ended abnormally" (§3).
+    on a whole number other than 0, 64, 101 and 130 ("stopped"). It treats
+    anything else outside 0..125 as "ended abnormally" (§3).
   - A GUI decides whether output exists by looking at the output, never from
     the code.
   - The GUIs' own processes exit 0, 64, 32 (cannot start: missing libraries,
@@ -398,6 +461,7 @@ does.
 | I/O, device, named helper | `md` 1 or 2; `mk` 1 (input file 64); `ms` 1; `mt` 1 (named `--bitcoin-cli` failing: 0); `me` 1 or 2 (sidecar 2 or 4); `mnemonic` 1 (two flags 2); `mr` 1; `mr-sitting` 1 or 2 | 32 |
 | unverified result | `md` partial decode 4; `mnemonic` `verify-bundle` partial 4, lenient BSMS 4 | 4 (`restore` with no reference stays 0, §3) |
 | unclassified failure, panic | 1 or 101 | 101 |
+| operator stop | `mr-sitting` session 1 | 130 |
 | signal | 128+N; `mr-sitting` session 1 | 128+N |
 
 ## 6. Rulings this changes
@@ -443,7 +507,8 @@ none changes silently.
     refusal").
   - "Repair's code is the checksum's either way" changes by decision 6.
   - The closed list narrows to checks on the command line alone (decision 2).
-    Its entries that read the card become 2. The 2026-10-06 "Keep 1" ruling
+    Its entries that read the card become 2, and so does its malformed
+    `--hot-parent-fp` entry (an input value; decision 2). The 2026-10-06 "Keep 1" ruling
     keeps its meaning: "not usage".
   - mnemonic-refugium's CLAUDE.md hazard line ("its exit code stays the
     checksum's") changes with decision 6.
@@ -481,7 +546,10 @@ silent correction into 16.
 - **Override refusals move to 8:** "needs `--experimental`", `--md-only` and
   `--allow-invalid-miniscript` (1 today), and `--out` naming the input (2
   today). Bad `compose` values move from 1 to 2.
-- **Repair.** A chunked set that reassembles moves from 5 to 16. A
+- **Repair.** An incomplete set or a lone chunk, refused today (2, no
+  output), is corrected chunk by chunk and printed: 16 if a correction was
+  applied, 0 if clean (decision 7). A chunked set that reassembles moves from
+  5 to 16. A
   single-string correction moves from 5 to 20, which closes FOLLOWUP
   `md-cli-non-chunked-single-string-repair-demote` by the same rule.
   Uncorrectable stays 2, and the result is decode-checked (decision 6).
@@ -584,9 +652,12 @@ silent correction into 16.
   - The verb-level `Ok(n)` returns.
   - `out_sink.rs:89`.
   - The clap override at `cli.rs:173`, which already gives 64.
-- **Usage moves to 64:** runtime flag-combination checks (2), parser-shaped
-  `BadInput` checks (1), and the argv guard firing on a *malformed* `--from` or
-  `--slot` (2).
+- **Usage moves to 64:** runtime flag-combination checks (2), and `BadInput`
+  checks on settings (1), such as `seed-xor split --shares 1`.
+- **Input values move to 2:** `BadInput` checks on input values, and a
+  malformed scheme name (`--template bogus`, 64 from clap today). So does a
+  *malformed* `--from` or `--slot`, which the argv guard catches today (2), or
+  clap under `--allow-argv-secret` (64) (decision 2).
 - **No moves to 1:** `verify-bundle` mismatch, `restore` expectations,
   `xpub-search`, and an `import-wallet` seed mismatch (all 4), and the strict
   BSMS signature or MAC mismatch (2). `verify-message` stays 1.
@@ -628,15 +699,21 @@ silent correction into 16.
   - `Failure::fail` and `Failure::usage` in `app/common.rs`.
   - The duplicate `mr_codec::repair::EXIT_*`.
   - `mr_codec::api::Outcome::code()`, which refugium-wallet reads (§7k).
-- **Usage moves from 2 to 64** for the parser's errors, and for those of
+- **Usage moves from 2 to 64** for the parser's errors on settings (input
+  values are 2, decision 2), and for those of
   E45's closed-list checks that need only the command line (decision 2).
   The list's entries that read a card become 2.
 - **Refusals ("1 on any other refusal") split by §3:**
   - to 2: a card that does not decode, a slot the card lacks, a malformed
     hot-family value ("Keep 1"), another format's string, and the
     published-vector root (the remedy is new draws, not a flag);
-  - to 8: a secret on argv (2 today), the hot-cold rules and seating guardrails
-    that `--accept-*` flags clear, and network refusals.
+  - to 1 (test 4): the `--accept-*` refusals that are mismatches, such as a
+    plate whose policy-id stub is not this card's (`--accept-stub-mismatch`);
+  - to 8: a secret on argv (2 today), the hot-cold rules and the guardrails on
+    deltas, lockups and deadlines that `--accept-*` flags clear, and network
+    refusals.
+  - Each `--accept-*` flag is placed by test 4 or 5 in the implementing PR,
+    and refugium-wallet follows (§7k).
 - **No.** Verify mismatch and `child --check` with no match stay 1.
 - **IO moves from 1 to 32:** `--keys-file`, `--heir-file`, `vectors --out`,
   and stdout.
@@ -647,7 +724,9 @@ silent correction into 16.
 ### 7h. `mr-sitting` (mnemonic-refugium): about 270 code assertions (the survey's basis, including 0)
 
 - **Usage** moves from 2 to 64.
-- **Plan files.** A malformed plan, hand-back or kit file stays 2.
+- **Plan files.** A malformed plan, hand-back or kit file stays 2. A
+  well-formed hand-back that belongs to another plan is a mismatch, so 1
+  (test 4).
 - **IO moves from 2 to 32:** an unreadable file, the lock, no RAM folder, and
   picotool unusable. A failed picotool `load` or erase moves from 1 to 32.
 - **No.** Verify mismatch stays 1.
@@ -734,8 +813,8 @@ alias, and every old code is a valid new sum, so no stage may let an old
 binary and a new GUI meet without a version check. The order:
 
 1. The shared constants and the bit-set type in mnemonic-io-lib (decision 4):
-   a crates.io publish, then pin and `vendor/` moves in the six binaries that
-   depend on it. The mr-codec copy and its test land at the same time.
+   a crates.io publish, then pin and `vendor/` moves in the five consumers
+   that take it from crates.io (`me` has a path dependency). The mr-codec copy and its test land at the same time.
 2. The network rule's unbuilt units are built straight onto bit 8, so none of
    that work has to be redone.
 3. The eight binaries, each with its tests, help legend (R11), JSON fields,
@@ -754,6 +833,8 @@ those expectations to match whichever sibling version its CI builds.
 ## 10. Disposition of review findings
 
 ### Round 0
+
+Some of these dispositions were refined in later rounds; where they differ, the round 1 and round 2 rows and the body text win.
 
 | finding | disposition |
 | --- | --- |
@@ -787,3 +868,24 @@ those expectations to match whichever sibling version its CI builds.
 | R1-I4 (incomplete set: three codes) | Decision 7 picks 16 everywhere. Decision 6 checks per string, so an incomplete set is not 2. R1 says a repair that prints its result sums its bits. |
 | R1-I5 (`restore` with no reference; bit 4 by printed text) | `restore` with no reference stays 0. Bit 4 means "checked and could not confirm", and not asking for a check is not a failure (§3). |
 | R1-M1 to M12, N1 to N3 | Folded: mt line numbers (normative copy); 66 `Refusal::new` sites and the composition of the 19 rows; HARD mismatch stated in decision 1 and §6, with the override claim removed from the legend; the gate-script check; `me` pins on a non-zero basis; the extra consumers (§7f, §7g, §7e, §9); `mk inspect` and `mt verify`/`inspect` in decision 5, with its alternatives; R13's table test in place of a grep; the range guard and Windows note (§3, R12); the GUIs' own codes (R12); `ms verify`'s message (R5); `me --preview` (§7e); "channel" defined, and `practice --dir` placed; the io-lib publish (decision 4, §9); `45-mr.md:53-60`; §7a's network line; the mnemonic-refugium CLAUDE.md hazard (decision 6, §6); R10's wording. |
+
+### Round 2
+
+| finding | disposition |
+| --- | --- |
+| R2-I1 (test 3 caught overridable "no" answers) | Tests reordered: network (3), comparison came out no (4), safety or policy rule (5), input (6), bug (7). An overridable mismatch is 1, as decision 11. `mr member` with no keys is 2. |
+| R2-I2 (flag values) | Decision 2 defines setting against input on argv, with examples. "Keep 1" holds: hot-family values are input, so 2. |
+| R2-I3 (`md` incomplete set) | Decision 7 states `md`'s refusal today and what changes; §7a lists it. |
+| Minor | §10 round-0 note; review file present; 130 added to R12 and §3; test 1 names the argv-guard exception; test 7 sends the rest to 101; the foreign hand-back placed; the typed "stop" placed (decision 9, with an alternative); decision 6's sums (18 and 22). |
+
+### Round 3
+
+| finding | disposition |
+| --- | --- |
+| R3-I1 (parser rejects an input value) | Decision 2: the class does not depend on who checks. A malformed input value is 2 even when clap rejects it; E45's `--hot-parent-fp` entry moves with it. |
+| R3-I2 (test 4 against §7g and §7h) | Test 4 now lists what counts as a match and excludes limits, caps, deadlines and deltas. §7g splits `--accept-*` into mismatches (1) and guardrails (8); §7h's foreign hand-back is 1. |
+| Minor and Nit | Test 5 covers destinations (M1). Test 0 places the operator stop, and the legend separates 130 from signals (M3). The toolkit's `repair --md1` today value (M4). `--expect-fingerprint zz` placed by decision 2 (M5; the rest of M5's cases are placed by the tests in the implementing PRs). Five crates.io pins plus `me`'s path dependency; "seven" of eleven. M2 (an ms1 on `me --hex` argv is 8, from a file 2) is intended: the argv guard runs first. |
+
+A mechanical check of the round-3 fold (Sonnet) found 1 Important (§7f's
+"parser-shaped" wording) and 4 Minor (decision 2, §7g and test 1 lacked the
+input-value carve-out; §5 had no operator-stop row). All five are folded.
