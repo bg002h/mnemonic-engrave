@@ -890,15 +890,28 @@ fn run() -> i32 {
     // lower has already lost. `me --nosuchflag <ms1>` is the test that tells
     // the two apart -- via the guard it is exit 3 with this wording, via clap
     // it is exit 2 naming the flag.
-    if let Some(msg) = argv_secret_guard(&std::env::args().collect::<Vec<_>>()) {
+    //
+    // argv is read as OsString (`env::args()` panics on a non-UTF-8 token).
+    // The guard sees a lossy copy, so it still runs first; only then is a
+    // non-UTF-8 token refused, without echoing it (it may be secret).
+    let argv_os: Vec<std::ffi::OsString> = std::env::args_os().collect();
+    let argv: Vec<String> = argv_os
+        .iter()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
+    if let Some(msg) = argv_secret_guard(&argv) {
         eprintln!("me: {msg}");
         return EXIT_REFUSED;
+    }
+    if argv_os.iter().any(|a| a.to_str().is_none()) {
+        eprintln!("me: an argument is not valid UTF-8 (not shown: it may be secret)");
+        return EXIT_USAGE;
     }
     let mut cli = match Cli::try_parse() {
         Ok(c) => c,
         Err(e) => return clap_exit(&e),
     };
-    if let Err(code) = apply_root_options(&mut cli, &std::env::args().collect::<Vec<_>>()) {
+    if let Err(code) = apply_root_options(&mut cli, &argv) {
         return code;
     }
 
