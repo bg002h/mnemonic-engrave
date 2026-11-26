@@ -33,7 +33,7 @@
 //! Row 11 says the test *"extracts the advised line from `me`'s own stderr"*.
 //! **That branch is currently unreachable**, measured 2026-08-27 over eleven
 //! argv shapes: the pre-parser `argv_secret_guard` refuses every input for which
-//! `class.is_argv_forbidden()` holds, at exit 3, before `read_records` runs, so
+//! `class.is_argv_forbidden()` holds, at exit 8, before `read_records` runs, so
 //! the secret-class `else` arm can only be selected by an input the pre-parser
 //! already rejected. The reachable half always takes the BEARER example. So the
 //! line is taken from the `pub const` the binary itself formats into the

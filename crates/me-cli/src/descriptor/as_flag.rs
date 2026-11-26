@@ -34,7 +34,7 @@ pub enum Decision {
     /// cards (`Class::MdMk`); `--as descriptor` yields exactly one canonical
     /// descriptor string (`Class::Descriptor`, §5.2).
     Pack(Vec<String>),
-    /// One or more §6 rows, at `EXIT_REFUSED`. More than one is §6's
+    /// One or more §6 rows, each classed by `Row::class` (8 or 2; several are OR-ed). More than one is §6's
     /// both-rows-fire case: a descriptor mixing an (a)-shaped and an
     /// (a″)-shaped key matches both §5.3 rows, both are true, and both name the
     /// same remedy.

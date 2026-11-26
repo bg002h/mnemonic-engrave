@@ -72,27 +72,27 @@ nocard() { grep -q '^digest:' "$D/err" && bad "$1: a digest card was printed"; r
 done_row() { [ "$rowbad" = 0 ] && echo "ok   $1"; return 0; }
 
 newrow w1; go w1 "${F0}\"\$ME\" sysw pack --no-passphrase text:6869 > sink.bin"
-rcis w1 1; lastis w1 'me: cannot write the output: File too large (os error 27)'; nocard w1; done_row w1
+rcis w1 32; lastis w1 'me: cannot write the output: File too large (os error 27)'; nocard w1; done_row w1
 newrow w2; go w2 "\"\$ME\" sysw pack --no-passphrase text:6869 > /dev/full"
-rcis w2 1; lastis w2 "$NOSPC"; nocard w2; done_row w2
+rcis w2 32; lastis w2 "$NOSPC"; nocard w2; done_row w2
 newrow w4; go w4 "\"\$ME\" --in m.txt --stdout > /dev/full"
-rcis w4 1; errexact w4 "$NOSPC"; done_row w4
+rcis w4 32; errexact w4 "$NOSPC"; done_row w4
 newrow w5; go w5 "\"\$ME\" --in m.txt --hex > /dev/full"
-rcis w5 1; errexact w5 "$NOSPC"; done_row w5
+rcis w5 32; errexact w5 "$NOSPC"; done_row w5
 newrow w11; go w11 "\"\$ME\" sysw wipe > /dev/full"
-rcis w11 1; errexact w11 "$NOSPC"; done_row w11
+rcis w11 32; errexact w11 "$NOSPC"; done_row w11
 newrow w12; go w12 "\"\$ME\" --help > /dev/full"
-rcis w12 1; errexact w12 "$NOSPC"; done_row w12
+rcis w12 32; errexact w12 "$NOSPC"; done_row w12
 newrow w14; go w14 "(sleep 0.5; exec \"\$ME\" sysw show c.bin) | true; exit \${PIPESTATUS[0]}"
 rcis w14 0; grep -q panicked "$D/err" && bad "w14: a panic"; grep -q 'cannot write' "$D/err" && bad "w14: a cannot-write line"; done_row w14
 
 newrow o1; printf 'OLD BACKUP\n' >"$D/F.bin"; go o1 "${F0}\"\$ME\" sysw pack --no-passphrase text:6869 --out F.bin"
-rcis o1 1; lastis o1 'me: cannot write the output: F.bin: File too large (os error 27). F.bin is unchanged.'
+rcis o1 32; lastis o1 'me: cannot write the output: F.bin: File too large (os error 27). F.bin is unchanged.'
 [ "$(cat "$D/F.bin")" = 'OLD BACKUP' ] || bad "o1: F.bin changed"; done_row o1
 newrow o2; go o2 "\"\$ME\" sysw pack --no-passphrase text:6869 --out nodir/x.bin"
-rcis o2 1; lastis o2 'me: cannot write the output: nodir/x.bin: No such file or directory (os error 2). Nothing was written.'; nocard o2; done_row o2
+rcis o2 32; lastis o2 'me: cannot write the output: nodir/x.bin: No such file or directory (os error 2). Nothing was written.'; nocard o2; done_row o2
 newrow o7; printf 'OLD BACKUP\n' >"$D/s.txt"; go o7 "${F0}\"\$ME\" sysw pack --no-passphrase text:6869 --out /dev/stdout >> s.txt"
-rcis o7 1; lastis o7 'me: cannot write the output: /dev/stdout: File too large (os error 27)'
+rcis o7 32; lastis o7 'me: cannot write the output: /dev/stdout: File too large (os error 27)'
 [ "$(stat -c %s "$D/s.txt")" = 11 ] || bad "o7: s.txt is $(stat -c %s "$D/s.txt") bytes, want 11"; done_row o7
 
 p1text() { echo "me: --manifest $1 is the same file as the plate preview $2; write the manifest to a new name"; }
@@ -102,7 +102,7 @@ prow() { # prow <name> <args> <M> <P> <mkdir-dir>
     PB="$D/fake-me-preview"
     [ "$1" = p7 ] && PB=""
     go "$1" "\"\$ME\" bundle --in b.txt --preview $5 --manifest $3"
-    rcis "$1" 2; lastis "$1" "$(p1text "$3" "$4")"
+    rcis "$1" 8; lastis "$1" "$(p1text "$3" "$4")"
     grep -E 'rendered plate|wrote manifest|preview skipped|backup needs' "$D/err" >/dev/null && bad "$1: a line that must not print"
     [ -s "$D/out" ] && bad "$1: stdout is not empty"
     [ -z "$(ls -A "$D/$5")" ] || bad "$1: $5 is not empty"

@@ -56,14 +56,15 @@ fn stderr(o: &std::process::Output) -> String {
     String::from_utf8_lossy(&o.stderr).into_owned()
 }
 
-/// Refused at exit 2, the given stderr line printed, and no render started.
+/// Refused at exit 32 (a named helper that failed), the given stderr line
+/// printed, and no render started.
 fn assert_refused(stdout: &str, err: &str, code: i32, want_line: &str) {
     let d = tempfile::tempdir().unwrap();
     let (stub, log) = write_stub(d.path(), stdout, err, code);
     let o = bundle_with(&stub);
     assert_eq!(
         o.status.code(),
-        Some(2),
+        Some(32),
         "probe {stdout:?} exit {code} must be refused: {o:?}"
     );
     assert!(
@@ -151,7 +152,7 @@ fn version_probe_success_renders_and_mismatch_refuses() {
     let d3 = tempfile::tempdir().unwrap();
     let (stub3, log3) = write_stub(d3.path(), "me-preview 0.12.0\n", "", 0);
     let o3 = bundle_with(&stub3);
-    assert_eq!(o3.status.code(), Some(2));
+    assert_eq!(o3.status.code(), Some(32));
     assert!(stderr(&o3).contains(&format!(
         "me: me-preview version mismatch: sidecar is \"0.12.0\", expected \"{CRATE_VERSION}\""
     )));

@@ -19,7 +19,8 @@
 //! 1. **No record-shaped input ever hears descriptor vocabulary or a changed
 //!    exit code.** Well-formed records of the six shapes the shipped classifier
 //!    admits, and mistyped attempts at them, keep the SHIPPED refusal
-//!    unchanged: exit 4, record vocabulary.
+//!    unchanged: exit 2 (INVALID; exit 4 before the constellation exit-code
+//!    spec), record vocabulary.
 //! 2. **Every admitted descriptor spelling reaches the descriptor surfaces.**
 //!    §4's four formats, all fifteen §4.5 rows, all five of conjunct 7's
 //!    use-site spellings, and descriptor content buried behind other records.
@@ -599,7 +600,7 @@ fn head(flag: &str, shipped: bool) -> String {
     }
 }
 
-/// §5.1's `--as`-omitted text, at `EXIT_USAGE`. **It states the CHOICE**,
+/// §5.1's `--as`-omitted text, at `EXIT_REFUSED` (8: `--as` waives it). **It states the CHOICE**,
 /// because an operator holding a wallet export does not know which they want.
 ///
 /// A value the BUILD does not carry is marked inline, so the block never offers

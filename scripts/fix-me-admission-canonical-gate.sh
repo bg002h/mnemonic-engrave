@@ -8,7 +8,7 @@
 # What it runs:
 #   A. CLI rows R1-R16 and controls C1-C7 of the FIX doc §5: builds `me` (--locked), runs
 #      `me sysw pack` once per row in a private scratch dir (umask 077). A refusal row requires
-#      exit 4, its PROPOSED sentence as one whole stderr line (T-SEP, T-LF, T-PAD, T-UTF8BODY;
+#      exit 2 (INVALID), its PROPOSED sentence as one whole stderr line (T-SEP, T-LF, T-PAD, T-UTF8BODY;
 #      the existing T-UNREC first line for C5/C6), and no output file. An accept row requires
 #      exit 0 and the container's records (bytes 52.. of the unsealed file) equal to the
 #      expected bytes exactly.
@@ -56,7 +56,7 @@ refuse() {
     if [ "$want" = --prefix ]; then mode=prefix; want=$1; shift; fi
     run "$row" "$1"
     local rc; rc=$(cat "$W/$row.rc")
-    [ "$rc" = 4 ] || bad "$row: exit $rc, want 4"
+    [ "$rc" = 2 ] || bad "$row: exit $rc, want 2"
     if [ $mode = x ]; then
         grep -qxF -- "$want" "$W/$row.err" || { bad "$row: stderr lacks its sentence as a whole line"; grep '^me: record' "$W/$row.err" | head -2 | cut -c1-200 | sed 's/^/    got: /'; }
     else
@@ -64,7 +64,7 @@ refuse() {
     fi
     [ -e "$W/o.bin" ] && bad "$row: an output file was written"
     grep -q 'write this down' "$W/$row.err" && bad "$row: the passphrase ceremony ran before the refusal"
-    [ "$rc" = 4 ] && echo "ok   $row"
+    [ "$rc" = 2 ] && echo "ok   $row"
 }
 # accept <row> <expected records, printf format> <snippet>
 accept() {

@@ -439,7 +439,7 @@ fn pack_refuses_a_section_too_long_for_its_own_parser() {
     me().args(["sysw", "pack", "--no-passphrase", "--in"])
         .arg(&f)
         .assert()
-        .code(4)
+        .code(2)
         .stderr(predicate::str::contains(format!(
             "a section caps at {MAX_SECTION_LEN} bytes"
         )));
@@ -597,7 +597,7 @@ fn show_refuses_a_public_section_that_is_not_utf8() {
     let mut b = plain_container(dir.path());
     b[60] = 0xff;
     let o = show_bytes(dir.path(), &b);
-    assert_eq!(o.status.code(), Some(4));
+    assert_eq!(o.status.code(), Some(2));
     let (out, err) = (
         String::from_utf8_lossy(&o.stdout),
         String::from_utf8_lossy(&o.stderr),
@@ -615,7 +615,7 @@ fn show_names_the_first_bad_byte_of_the_public_section() {
     let mut b = plain_container(dir.path());
     b[52] = 0x80;
     let o = show_bytes(dir.path(), &b);
-    assert_eq!(o.status.code(), Some(4));
+    assert_eq!(o.status.code(), Some(2));
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(err.lines().any(|l| l == t_utf8(52)), "stderr: {err}");
 }
@@ -630,7 +630,7 @@ fn show_refuses_a_sealed_public_section_that_is_not_utf8() {
     assert_eq!(h.pub_len, 9);
     b[60] = 0xff;
     let o = show_bytes(dir.path(), &b);
-    assert_eq!(o.status.code(), Some(4));
+    assert_eq!(o.status.code(), Some(2));
     let (out, err) = (
         String::from_utf8_lossy(&o.stdout),
         String::from_utf8_lossy(&o.stderr),
@@ -647,7 +647,7 @@ fn show_reports_truncation_before_an_unreadable_public_section() {
     b[60] = 0xff;
     b.pop();
     let o = show_bytes(dir.path(), &b);
-    assert_eq!(o.status.code(), Some(4));
+    assert_eq!(o.status.code(), Some(2));
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(err.contains("it is truncated"), "stderr: {err}");
     assert!(!err.contains("is not UTF-8 text"), "stderr: {err}");
@@ -998,14 +998,14 @@ fn pack_refuses_a_tx_record_that_is_not_a_transaction() {
     me().args(["sysw", "pack", "--no-passphrase"])
         .write_stdin("tx:abab\n")
         .assert()
-        .code(4)
+        .code(2)
         .stderr(predicate::str::contains(
             "not one serialized Bitcoin transaction",
         ));
     me().args(["sysw", "pack", "--no-passphrase"])
         .write_stdin("tx:zz\n")
         .assert()
-        .code(4)
+        .code(2)
         .stderr(predicate::str::contains("not lowercase hex"));
 }
 
@@ -1306,7 +1306,7 @@ const TX_RECORD: &str = "tx:020000000001017c8da925af70e49a12b0cea7b639df5037c87b
 fn a_tx_record_on_argv_is_refused() {
     me().args(["sysw", "pack", "--no-passphrase", TX_RECORD])
         .assert()
-        .code(3)
+        .code(8)
         .stdout(predicate::str::is_empty());
 }
 
@@ -1326,7 +1326,7 @@ fn the_argv_refusal_echoes_neither_the_transaction_nor_a_passphrase() {
     let out = me()
         .args(["sysw", "pack", TX_RECORD])
         .assert()
-        .code(3)
+        .code(8)
         .get_output()
         .clone();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
@@ -1407,7 +1407,7 @@ fn a_tx_record_anywhere_on_argv_is_refused_and_located() {
     let out = me()
         .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, TX_RECORD])
         .assert()
-        .code(3)
+        .code(8)
         .get_output()
         .clone();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
@@ -1426,7 +1426,7 @@ fn a_tx_record_anywhere_on_argv_is_refused_and_located() {
     let out = me()
         .args(["sysw", "pack", "--no-passphrase", TEXT, MD1, "tx:0100"])
         .assert()
-        .code(3)
+        .code(8)
         .get_output()
         .clone();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
@@ -1468,7 +1468,7 @@ fn the_unsigned_refusal_names_the_failing_input_indices() {
         .args(["sysw", "pack", "--no-passphrase"])
         .write_stdin(format!("tx:{TX_MIXED_STRIPPED}\n"))
         .assert()
-        .code(4)
+        .code(8)
         .get_output()
         .clone();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
@@ -1584,7 +1584,7 @@ fn allow_unsigned_inputs_loosens_nothing_else() {
         me().args(["sysw", "pack", "--no-passphrase", "--allow-unsigned-inputs"])
             .write_stdin(format!("{body}\n"))
             .assert()
-            .code(4)
+            .code(2)
             .stderr(predicate::str::contains(want));
     }
 }
@@ -2393,7 +2393,7 @@ fn a_bearer_record_on_argv_outranks_the_write_gate() {
 
     assert_eq!(
         o.status.code(),
-        Some(3),
+        Some(8),
         "R2's code, not the write gate's: {err}"
     );
     assert!(err.contains("ARGV"), "R2 must be the refusal shown: {err}");
@@ -3077,7 +3077,7 @@ fn pack_in(records: &[String]) -> (i32, String) {
 
 const KIT_WARNING: &str = "me: this payload is not a kit the device will engrave: ";
 
-/// S1 test 27 (§14g, §14h): each sentence in `me`'s record form; exit 4 for
+/// S1 test 27 (§14g, §14h): each sentence in `me`'s record form; exit 2 for
 /// every string and set refusal; the kit warning once, exit 0, for each
 /// kit-only reason; neither for a payload with no mr1; a set around a secret
 /// record packs.
@@ -3105,7 +3105,7 @@ fn sysw_pack_prints_mr_sentences() {
     ];
     for (section, name, sentence) in &refused {
         let (code, err) = pack_in(&mr_vector(section, name));
-        assert_eq!(code, 4, "{name}: {err}");
+        assert_eq!(code, 2, "{name}: {err}");
         assert!(
             err.contains(&format!("me: {sentence}")),
             "{name}: wanted {sentence:?} in {err}"
@@ -3260,7 +3260,7 @@ fn adm_pack(stdin: &[u8], args: &[&str]) -> (i32, String, Option<Vec<u8>>) {
 
 fn assert_refused(row: &str, got: (i32, String, Option<Vec<u8>>), sentence: &str) {
     let (rc, err, wire) = got;
-    assert_eq!(rc, 4, "{row}: exit; stderr:\n{err}");
+    assert_eq!(rc, 2, "{row}: exit; stderr:\n{err}");
     assert!(
         err.lines().any(|l| l == sentence),
         "{row}: whole-line sentence missing; stderr:\n{err}"
@@ -3300,7 +3300,7 @@ fn pack_refuses_a_wrapped_mnemonic_on_argv() {
     let got = adm_pack(b"", &["--allow-argv-secret", "--expect", "mnemonic", &w6]);
     assert_refused("R4", got, T_LF);
     let (rc, err, wire) = adm_pack(b"", &["--expect", "mnemonic", &w6]);
-    assert_eq!(rc, 3, "without --allow-argv-secret: exit; stderr:\n{err}");
+    assert_eq!(rc, 8, "without --allow-argv-secret: exit; stderr:\n{err}");
     assert!(err.contains("SECRET"), "{err}");
     assert!(wire.is_none());
 }
@@ -3310,7 +3310,7 @@ fn pack_refuses_a_wrapped_mnemonic_on_argv() {
 fn pack_refuses_text_and_pass_bodies_that_are_not_utf8() {
     assert_refused("R5", adm_pack(b"text:ff\n", &[]), &adm_t_utf8("text:"));
     let (rc, err, wire) = adm_pack(b"pass:ff\n", &[]);
-    assert_eq!(rc, 4, "{err}");
+    assert_eq!(rc, 2, "{err}");
     assert!(
         err.lines().any(|l| l == adm_t_utf8("pass:")),
         "R6 sentence:\n{err}"
@@ -3395,7 +3395,7 @@ fn pack_strips_one_leading_byte_order_mark_from_a_stream() {
 
 fn assert_refused_prefix(row: &str, got: (i32, String, Option<Vec<u8>>)) {
     let (rc, err, wire) = got;
-    assert_eq!(rc, 4, "{row}: exit; stderr:\n{err}");
+    assert_eq!(rc, 2, "{row}: exit; stderr:\n{err}");
     assert!(
         err.lines().any(|l| l.starts_with(T_UNREC_HEAD)),
         "{row}: Unrecognised sentence:\n{err}"
@@ -3416,7 +3416,7 @@ fn pack_refuses_before_the_passphrase_ceremony_on_a_spelling_fault() {
         .output()
         .unwrap();
     let err = String::from_utf8_lossy(&o.stderr);
-    assert_eq!(o.status.code(), Some(4), "{err}");
+    assert_eq!(o.status.code(), Some(2), "{err}");
     assert!(err.lines().any(|l| l == T_SEP), "{err}");
     assert!(!err.contains("write this down"), "{err}");
     assert!(!out.exists());

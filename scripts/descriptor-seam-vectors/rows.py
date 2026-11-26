@@ -134,79 +134,79 @@ R(name="promotion/01-bare-xpub", input=SK,
   host_admits=True, md1_admits=True, format="promoted-key",
   source=FORK_PARSE_TEST + " (bare-key promotion fixture)",
   covers=["formats-happy", "promotion-near-miss", "gate"],
-  gate=G(True, "as-decides", 2), want_addr="0",
+  gate=G(True, "as-decides", 8), want_addr="0",
   md1_route=("pkh(@0/<0;1>/*)", [SK], None, "m/44'/0'/0'"))
 
 R(name="promotion/02-bare-zpub", input=SKZL,
   host_admits=True, md1_admits=True, format="promoted-key",
   source=FORK_PARSE_TEST + " (bare zpub; the key re-serialises to xpub)",
-  covers=["promotion-near-miss", "gate"], gate=G(True, "as-decides", 2), want_addr="0",
+  covers=["promotion-near-miss", "gate"], gate=G(True, "as-decides", 8), want_addr="0",
   md1_route=("wpkh(@0/<0;1>/*)", [SK], None, "m/84'/0'/0'"))
 
 R(name="promotion/03-bare-Zpub-refused", input=SKZU,
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (version => 48'/0'/0'/2', not in the promotion loop)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-multisig-cosigner-key"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-multisig-cosigner-key"))
 
 R(name="promotion/04-bare-Ypub-refused", input=SKYU,
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (version => 48'/0'/0'/1', not in the promotion loop)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-multisig-cosigner-key"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-multisig-cosigner-key"))
 
 R(name="promotion/05-origin-44h", input="[%s/44'/0'/0']%s" % (SKFP, SK),
   host_admits=True, md1_admits=True, format="promoted-key",
   source=SPEC + " S4.5 (P2PKH path)", covers=["promotion-near-miss", "gate"],
-  gate=G(True, "as-decides", 2), want_addr="0",
+  gate=G(True, "as-decides", 8), want_addr="0",
   md1_route=("pkh(@0/<0;1>/*)", [SK], [SKFP], "m/44'/0'/0'"))
 
 R(name="promotion/06-origin-49h", input="[%s/49'/0'/0']%s" % (SKFP, SK),
   host_admits=True, md1_admits=True, format="promoted-key",
   source=SPEC + " S4.5 (P2SH_P2WPKH path)", covers=["promotion-near-miss", "gate"],
-  gate=G(True, "as-decides", 2), want_addr="0",
+  gate=G(True, "as-decides", 8), want_addr="0",
   md1_route=("sh(wpkh(@0/<0;1>/*))", [SK], [SKFP], "m/49'/0'/0'"))
 
 R(name="promotion/07-origin-84h-zpub", input="[%s/84'/0'/0']%s" % (SKFP, SKZL),
   host_admits=True, md1_admits=True, format="promoted-key",
   source=FORK_PARSE_TEST + " (the origin-annotated zpub fixture)",
-  covers=["promotion-near-miss", "gate"], gate=G(True, "as-decides", 2), want_addr="0",
+  covers=["promotion-near-miss", "gate"], gate=G(True, "as-decides", 8), want_addr="0",
   md1_route=("wpkh(@0/<0;1>/*)", [SK], [SKFP], "m/84'/0'/0'"))
 
 R(name="promotion/08-origin-86h-refused", input="[%s/86'/0'/0']%s" % (SKFP, SK),
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (taproot single-sig is not promotable)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-path-not-inferable"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-path-not-inferable"))
 
 R(name="promotion/09-origin-48h-cosigner-refused", input="[%s/48'/0'/0'/2']%s" % (SKFP, SK),
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (a multisig cosigner key is not a wallet)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-path-not-inferable"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-path-not-inferable"))
 
 R(name="promotion/10-account-one-refused", input="[%s/84'/0'/1']%s" % (SKFP, SKZL),
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (only account 0 qualifies)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-account-not-zero"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-account-not-zero"))
 
 R(name="promotion/11-origin-unhardened-refused", input="[%s/84/0/0]%s" % (SKFP, SKZL),
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (the comparison is on hardened values)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-path-not-inferable"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-path-not-inferable"))
 
 R(name="promotion/12-fingerprint-no-path-refused", input="[%s]%s" % (SKFP, SK),
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 (ParseKey needs originAndPath[8] == '/')",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-fingerprint-no-path"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-fingerprint-no-path"))
 
 R(name="promotion/13-children-no-origin", input=SK + "/<0;1>/*",
   host_admits=True, md1_admits=True, format="promoted-key",
   source=SPEC + " S4.5 (children do not affect the origin comparison)",
-  covers=["promotion-near-miss", "gate"], gate=G(True, "as-decides", 2), want_addr="0",
+  covers=["promotion-near-miss", "gate"], gate=G(True, "as-decides", 8), want_addr="0",
   md1_route=("pkh(@0/<0;1>/*)", [SK], None, "m/44'/0'/0'"))
 
 R(name="promotion/14-bare-xpub-trailing-newline", input=SK + "\n",
@@ -214,14 +214,14 @@ R(name="promotion/14-bare-xpub-trailing-newline", input=SK + "\n",
   host_admits=True, md1_admits=True, format="promoted-key",
   source=SPEC + " S4.5 + S4.6 (the host trims; the device refuses the raw bytes)",
   covers=["promotion-near-miss", "whitespace", "gate"],
-  gate=G(True, "as-decides", 2), want_addr="0", addr_from=SK,
+  gate=G(True, "as-decides", 8), want_addr="0", addr_from=SK,
   md1_route=("pkh(@0/<0;1>/*)", [SK], None, "m/44'/0'/0'"))
 
 R(name="promotion/15-bare-tpub-host-refused", input=SKT,
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S4.5 NORMATIVE ruling (host refuses tpub promotion entirely)",
   covers=["promotion-near-miss", "gate"],
-  gate=G(True, "descriptor-refusal", 3, "promotion-testnet-key"))
+  gate=G(True, "descriptor-refusal", 2, "promotion-testnet-key"))
 
 # ---- narrowed-4.7: every shape S4.7 narrows (host false; device measured) ---
 NAR = SPEC + " S4.7 (host narrows; device_admits is measured)"
@@ -407,13 +407,13 @@ for nm, s in [
     ("gate/record-text-xpub-payload", "text: " + SK),
 ]:
     R(name=nm, input=s, host_admits=False, md1_admits=False, format="none",
-      source=GATE2, covers=["gate"], gate=G(False, "record-refusal", 4))
+      source=GATE2, covers=["gate"], gate=G(False, "record-refusal", 2))
 
 R(name="gate/mistyped-bare-mnemonic",
   input="abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandoz",
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 3; the operand class of sysw_cli.rs:1928",
-  covers=["gate"], gate=G(False, "record-refusal", 4))
+  covers=["gate"], gate=G(False, "record-refusal", 2))
 R(name="gate/deadbeef-fronts-an-xpub", input="deadbeef: " + SK,
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 3 (r17's intended flip; invariant-1 boundary witness). "
@@ -424,7 +424,7 @@ R(name="gate/deadbeef-fronts-an-xpub", input="deadbeef: " + SK,
                 "bluewallet-no-name is nonetheless the right answer by S6's own standard: "
                 "the count row's text names a Policy: line this file does not have, so it "
                 "would be FALSE about the operator's file. Corrected per IMPL-P1-report F-2",
-  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "bluewallet-no-name"))
+  covers=["gate"], gate=G(True, "descriptor-refusal", 2, "bluewallet-no-name"))
 
 for nm, s in [
     ("gate/malformed-md1", "md1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzzzzzzz"),
@@ -434,12 +434,12 @@ for nm, s in [
 ]:
     R(name=nm, input=s, host_admits=False, md1_admits=False, format="none",
       source=SPEC + " S7 gate clause 4: the bech32 charset is not a base58check envelope",
-      covers=["gate"], gate=G(False, "record-refusal", 4))
+      covers=["gate"], gate=G(False, "record-refusal", 2))
 
 R(name="gate/multi-record-mnemonic-first", input=MNEMONIC + "\n" + std(n=2) + "\n",
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 5: the MNEMONIC-FIRST ordering is load-bearing (r19)",
-  covers=["gate"], gate=G(True, "multi-record", 4, "multi-record-descriptor"))
+  covers=["gate"], gate=G(True, "multi-record", 2, "multi-record-descriptor"))
 
 for nm, tail in [
     ("gate/buried-bare-Zpub", SKZU),
@@ -451,21 +451,21 @@ for nm, tail in [
       source=SPEC + " S7 gate clause 6 + S6's scope paragraph: the whole input does not "
                     "parse as one descriptor and no individual record does, so step 5's "
                     "generic four-forms text fires",
-      covers=["gate"], gate=G(True, "descriptor-refusal", 3, "unparseable"))
+      covers=["gate"], gate=G(True, "descriptor-refusal", 2, "unparseable"))
 
 R(name="gate/base58check-77-byte-payload", input="__B58_77__",
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 7: valid checksum, 77-byte payload -- one byte short "
                 "of an extended-key envelope, so T3's leading-segment test fails",
-  covers=["gate"], gate=G(False, "record-refusal", 4))
+  covers=["gate"], gate=G(False, "record-refusal", 2))
 R(name="gate/lone-open-bracket", input="[",
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 7", covers=["gate"],
-  gate=G(True, "descriptor-refusal", 3, "unparseable"))
+  gate=G(True, "descriptor-refusal", 2, "unparseable"))
 R(name="gate/xpub-trailing-slash", input=SK + "/",
   host_admits=False, md1_admits=False, format="none",
   source=SPEC + " S7 gate clause 7", covers=["gate"],
-  gate=G(True, "descriptor-refusal", 3, "unparseable"))
+  gate=G(True, "descriptor-refusal", 2, "unparseable"))
 
 R(name="gate/colliding-origin-sortedmulti",
   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K1, "/<0;1>/*")]),
@@ -473,22 +473,22 @@ R(name="gate/colliding-origin-sortedmulti",
   source=SPEC + " S4.7 conjunct 8 / S7 clause 8: one (fingerprint, origin) naming two "
                 "keys. NO address fields -- a colliding-origin wallet derives "
                 "byte-identical addresses to a clean control, so the refusal is the witness",
-  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity"))
+  covers=["gate"], gate=G(True, "descriptor-refusal", 2, "key-identity"))
 R(name="gate/duplicate-key-same-use-site",
   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K0, "/<0;1>/*")]),
   host_admits=False, md1_admits=False, format="bip380",
   source=SPEC + " S4.7 conjunct 8 / S7 clause 8: the same (xpub, use-site) in two slots",
-  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
+  covers=["gate"], gate=G(True, "descriptor-refusal", 2, "key-identity-duplicate"))
 R(name='gate/duplicate-key-implicit-use-site',
   input='wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/<0;1>/*))',
   host_admits=False, md1_admits=False, format="bip380",
   source="F-530 review C-2: the SAME wallet as duplicate-key-same-use-site with the second key's use site left implicit. derive::receive_path states that an absent path IS <0;1>/*, so these are one key at two seats -- and conjunct 8(b) compared a.children == b.children, admitted it, and derived the same key twice.",
-  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
+  covers=["gate"], gate=G(True, "descriptor-refusal", 2, "key-identity-duplicate"))
 R(name='gate/duplicate-key-change-chain-only',
   input='wsh(sortedmulti(2,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/3/*,[dc567276/48h/0h/0h/2h]xpub6DiYrfRwNnjeX4vHsWMajJVFKrbEEnu8gAW9vDuQzgTWEsEHE16sGWeXXUV1LBWQE1yCTmeprSNcqZ3W74hqVdgDbtYHUv3eM4W2TEUhpan/<2;3>/*))',
   host_admits=False, md1_admits=False, format="bip380",
   source='F-530 fold review NEW-1: a fixed child and a multipath key that are ONE key on the change chain and two on receive. Conjunct 8(b) compared receive only, so the primary admitted what the Go port refused; the shared file carried no row of this shape, so the parity gate could not see the divergence.',
-  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity-duplicate"))
+  covers=["gate"], gate=G(True, "descriptor-refusal", 2, "key-identity-duplicate"))
 R(name="gate/colliding-origin-multi",
   input=sm(2, [key(F0, ORG, K0, "/<0;1>/*"), key(F0, ORG, K1, "/<0;1>/*")], form="multi"),
   host_admits=False, md1_admits=False, format="bip380",
@@ -498,4 +498,4 @@ R(name="gate/colliding-origin-multi",
                 "under --as descriptor too -- measured. The previous note said conjunct 1 "
                 "refuses first, which was the ordering that produced the C1 Critical "
                 "(IMPL-S1S3-adversarial-review)",
-  covers=["gate"], gate=G(True, "descriptor-refusal", 3, "key-identity"))
+  covers=["gate"], gate=G(True, "descriptor-refusal", 2, "key-identity"))

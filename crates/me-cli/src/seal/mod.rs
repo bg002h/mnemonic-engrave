@@ -94,6 +94,34 @@ pub enum SealError {
     PwFormIterations(u32),
 }
 
+impl SealError {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3). Exhaustive on
+    /// purpose (R13).
+    ///
+    /// - USAGE (64): the settings -- `--iterations` and the v2 password form.
+    /// - INTERNAL (101): what `seal` cannot reach with a passphrase it
+    ///   generated itself (an invalid generated passphrase, an AEAD failure).
+    /// - INVALID (2): the records -- an input wrong for `seal` whatever the
+    ///   flags.
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
+        match self {
+            SealError::Iterations(_) | SealError::PwForm(_) | SealError::PwFormIterations(_) => {
+                exit::USAGE
+            }
+            SealError::Passphrase(_) | SealError::Crypto(_) => exit::INTERNAL,
+            SealError::Record(_)
+            | SealError::RecordAt { .. }
+            | SealError::Container(_)
+            | SealError::SecretInPublic(_)
+            | SealError::Empty
+            | SealError::TooLarge(_)
+            | SealError::Titles(_)
+            | SealError::Password(_) => exit::INVALID,
+        }
+    }
+}
+
 impl std::fmt::Display for SealError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -714,6 +742,25 @@ mod v2_tests;
 mod tests {
     use super::*;
     use std::fmt::Write as _;
+
+    /// R13's table test: each SealError class lands on the spec's code.
+    #[test]
+    fn every_seal_error_maps_to_its_exit_code() {
+        use mnemonic_io_lib::exit;
+        let table: Vec<(SealError, u8)> = vec![
+            (SealError::Iterations(1), exit::USAGE),
+            (SealError::PwForm(9), exit::USAGE),
+            (SealError::PwFormIterations(1), exit::USAGE),
+            (SealError::Passphrase("x".into()), exit::INTERNAL),
+            (SealError::SecretInPublic(0), exit::INVALID),
+            (SealError::Empty, exit::INVALID),
+            (SealError::TooLarge(1), exit::INVALID),
+            (SealError::Password("x".into()), exit::INVALID),
+        ];
+        for (e, want) in table {
+            assert_eq!(e.exit_code(), want, "{e}");
+        }
+    }
 
     const PASS: &str = "beef beef beef beef beef beef beef beef beef beef beef beef";
 

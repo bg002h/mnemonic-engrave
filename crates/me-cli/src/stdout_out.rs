@@ -8,7 +8,7 @@
 //!   stderr is pointed at `/dev/null`, and the verb runs on to its own exit
 //!   code (0 for a verb that succeeded);
 //! - any other error (S1c) prints `me: cannot write the output: <error>` as the
-//!   last stderr line and exits 1;
+//!   last stderr line and exits 32 (IO: an output failure, exit-codes R8);
 //! - a read-only stdout (S1d) is error EBADF at the first write;
 //! - a CLOSED stdout (`>&-`) is the same EBADF. std's runtime opens
 //!   `/dev/null` read-write on a closed fd 0-2 before `main`, so without
@@ -17,8 +17,8 @@
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Exit code of a failed write (ruling T6).
-pub const EXIT_WRITE: i32 = 1;
+/// Exit code of a failed write: IO (32), exit-codes spec R8.
+pub const EXIT_WRITE: i32 = mnemonic_io_lib::exit::IO as i32;
 
 /// Set once a closed pipe was seen: later stdout writes do nothing.
 static MUTED: AtomicBool = AtomicBool::new(false);

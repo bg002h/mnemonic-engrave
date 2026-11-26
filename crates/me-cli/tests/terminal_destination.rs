@@ -50,20 +50,21 @@ fn pty(args: &str) -> (i32, String) {
     (code, s)
 }
 
-/// `me sysw pack` with stdout on a terminal refuses, **at exit 2**.
+/// `me sysw pack` with stdout on a terminal refuses, **at exit 8** (REFUSED: a
+/// different destination, `--out`, waives it).
 ///
 /// This is the assertion the P0 move carries with it: it passes before the
 /// five functions move into `me`'s lib half and must pass after. Mutating
-/// `refuse_write_block`'s `WriteBlock::Terminal` arm from `EXIT_USAGE` to
-/// `EXIT_REFUSED` turns it RED — verified in both directions, which is what
+/// `refuse_write_block`'s `WriteBlock::Terminal` arm from REFUSED to any other
+/// class turns it RED — verified in both directions, which is what
 /// distinguishes it from the greps, which are green on an untouched tree and
 /// therefore cannot fail.
 #[test]
-fn a_terminal_destination_is_refused_at_exit_2() {
+fn a_terminal_destination_is_refused_at_exit_8() {
     let (code, out) = pty("sysw pack --no-passphrase text:6869");
     assert_eq!(
-        code, 2,
-        "the terminal refusal is EXIT_USAGE (2); got {code}. \
+        code, 8,
+        "the terminal refusal is REFUSED (8); got {code}. \
          Output was:\n{out}"
     );
     assert!(
@@ -127,7 +128,7 @@ fn a_wipe_image_is_never_called_bearer() {
          is F-259. Output was:\n{out}"
     );
     assert_eq!(
-        code, 2,
+        code, 8,
         "the terminal refusal STAYS -- 64 KB of binary across a scrollback is \
          worth refusing whatever the secrecy -- so the digit does not move; only \
          the false claim goes. Got {code}. Output was:\n{out}"
@@ -144,7 +145,7 @@ fn a_wipe_image_is_never_called_bearer() {
 #[test]
 fn a_real_container_is_still_called_bearer() {
     let (code, out) = pty("sysw pack --no-passphrase text:6869");
-    assert_eq!(code, 2, "unchanged: {out}");
+    assert_eq!(code, 8, "unchanged: {out}");
     assert!(
         out.contains("BEARER"),
         "deleting the label is not the fix -- it must survive where it is true: {out}"

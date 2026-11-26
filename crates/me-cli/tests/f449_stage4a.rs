@@ -86,7 +86,7 @@ fn sysw_confirms_a_version_8_card() {
 #[test]
 fn bundle_refuses_an_unchunked_plate_at_an_unsupported_version() {
     let r = me(&["bundle"], &format!("{V12_SINGLE}\n"));
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(r.out.is_empty(), "no manifest: {}", r.out);
     assert!(!r.err.contains("backup needs"), "no count: {}", r.err);
     assert!(r.err.contains("unsupported md1 wire version"), "{}", r.err);
@@ -97,7 +97,7 @@ fn bundle_refuses_an_unchunked_plate_at_an_unsupported_version() {
 #[test]
 fn bundle_refuses_an_unchunked_plate_that_does_not_decode() {
     let r = me(&["bundle"], &format!("{V4_UNDECODABLE}\n"));
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(r.out.is_empty(), "no manifest: {}", r.out);
     assert!(!r.err.contains("backup needs"), "no count: {}", r.err);
     assert!(r.err.contains("md1 plate does not decode"), "{}", r.err);
@@ -117,7 +117,7 @@ fn bundle_refuses_an_unchunked_plate_that_does_not_decode() {
 #[test]
 fn a_version_4_origin_less_template_is_refused_not_miscounted() {
     let r = me(&["bundle"], &format!("{V4_ORIGINLESS_TEMPLATE}\n"));
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(r.out.is_empty(), "{}", r.out);
     assert_origin_refusal(&r.err);
 }
@@ -127,7 +127,7 @@ fn a_version_4_origin_less_template_is_refused_not_miscounted() {
 #[test]
 fn a_chunked_origin_less_template_is_not_called_incomplete() {
     let r = me(&["bundle"], &format!("{V4_ORIGINLESS_CHUNKED}\n"));
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(r.out.is_empty(), "{}", r.out);
     assert!(!r.err.contains("incomplete"), "{}", r.err);
     assert_origin_refusal(&r.err);
@@ -154,7 +154,7 @@ fn assert_origin_refusal(err: &str) {
 #[test]
 fn a_good_plate_does_not_carry_a_bad_one() {
     let r = me(&["bundle"], &format!("{V8_TEMPLATE}\n{V12_SINGLE}\n"));
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(r.out.is_empty(), "{}", r.out);
     // R0 Nit: the refusal must name the BAD plate's version, so a refusal
     // caused by the good plate cannot pass this test.
@@ -165,7 +165,7 @@ fn a_good_plate_does_not_carry_a_bad_one() {
 #[test]
 fn bundle_names_the_version_of_a_chunk_it_cannot_read() {
     let r = me(&["bundle"], &format!("{}\n", v12_chunk()));
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(r.err.contains(V12_NAMED), "{}", r.err);
 }
 
@@ -250,7 +250,7 @@ fn expect_descriptor_names_the_version_instead_of_calling_it_incomplete() {
         ],
         "",
     );
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 2, "{}", r.err);
     assert!(!bin.exists(), "nothing written");
     assert!(r.err.contains(V12_NAMED), "{}", r.err);
     assert!(!r.err.contains("does not reassemble"), "{}", r.err);

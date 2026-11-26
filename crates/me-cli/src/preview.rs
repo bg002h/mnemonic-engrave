@@ -26,6 +26,22 @@ pub enum PreviewError {
     VersionParse(String),
 }
 
+impl PreviewError {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3, §7e): the sidecar
+    /// is a helper that was found (or named) and failed, so every arm is IO
+    /// (32) -- including a render that exits non-zero, which can be a crash of
+    /// the sidecar for any reason. Exhaustive on purpose (R13).
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
+        match self {
+            PreviewError::Spawn(_)
+            | PreviewError::Render { .. }
+            | PreviewError::EmptyOutput { .. }
+            | PreviewError::VersionParse(_) => exit::IO,
+        }
+    }
+}
+
 impl std::fmt::Display for PreviewError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -274,6 +290,26 @@ fn trim_leading_ascii_ws(b: &[u8]) -> &[u8] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// R13's table test: a sidecar failure is IO (32), whatever its kind.
+    #[test]
+    fn every_preview_error_is_io() {
+        let table = [
+            PreviewError::Spawn(io::Error::other("x")),
+            PreviewError::Render {
+                code: Some(1),
+                stderr: String::new(),
+            },
+            PreviewError::EmptyOutput {
+                path: "p".into(),
+                reason: "r".into(),
+            },
+            PreviewError::VersionParse("v".into()),
+        ];
+        for e in table {
+            assert_eq!(e.exit_code(), mnemonic_io_lib::exit::IO, "{e}");
+        }
+    }
     use std::ffi::OsStr;
     use std::fs;
 

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Exit codes follow the constellation exit-code spec** (`SPEC_constellation_exit_codes.md`, rev 5).
+  The numbers come from `mnemonic_io_lib::exit` (0.1.4), and the root `--help` ends with the spec's
+  legend. **Breaking for scripts that test `me`'s exit status:**
+
+  | was | now | what |
+  | --- | --- | --- |
+  | 2 (clap, usage) | 64 | a bad command line; every usage check now runs before any input is read |
+  | 2 (argument not UTF-8) | 64 | |
+  | 3 (secret or bearer on argv) | 8 | refused; `--allow-argv-secret` waives it where declared |
+  | 3 (`ms1` to the converter or `bundle`) | 2 | an input no flag takes |
+  | 4 (record, descriptor or container refusal) | 2 | invalid input |
+  | 4 (`--as` omitted, mixed network, unsigned tx, preimage, digest-shaped phrase) | 8 | refused under a rule a flag waives |
+  | 4 (`--expect` unmet) | 1 | a check said no |
+  | 2 (`--iterations`, `--pw-form`, `--expect` value) | 64 | settings are usage |
+  | 2 (unsafe destination: terminal, world-readable, manifest over a plate) | 8 | |
+  | 1 / 2 (write or read failure, preview sidecar) | 32 | IO |
+  | 2 (empty input) | 2 | unchanged |
+
+  A `--expect` failure and an invalid card in the same run sum (3). The table is pinned by
+  per-type tests (R13) and `tests/exit_digits.rs`.
+
 ### Fixed
 
 - **A write the destination refused is no longer reported as success** (bughunt-1119 bh-me-I4, Important;

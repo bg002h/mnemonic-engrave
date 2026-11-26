@@ -200,7 +200,7 @@ Damaged 4 characters in chunk 0 of a real keyed `wsh(sortedmulti(2,...))`:
 ```
 md decode --in damaged.md1
   -> md: codec error: codex32 decode error: BCH checksum verification failed
-md repair --in damaged.md1          # exit 5 = REPAIR_APPLIED
+md repair --in damaged.md1          # exit 20 = repaired (16) + verify before trusting (4)
   -> # md1 chunk 0: 4 corrections at position 17: 'q' -> 'y', position 32: 'p' -> '8',
   ->   position 47: 'z' -> '2', position 62: 'r' -> 'd'
 ```

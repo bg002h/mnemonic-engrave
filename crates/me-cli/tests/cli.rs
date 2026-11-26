@@ -33,13 +33,13 @@ fn md1_hex_to_stdout() {
 }
 
 #[test]
-fn ms1_is_refused_with_exit_3() {
+fn ms1_is_refused_with_exit_2() {
     Command::cargo_bin("me")
         .unwrap()
         .arg("--stdout")
         .write_stdin(MS1)
         .assert()
-        .code(3)
+        .code(2)
         .stderr(predicates::str::contains("CODEX32"));
 }
 
@@ -49,7 +49,7 @@ fn missing_output_mode_is_usage_error() {
         .unwrap()
         .write_stdin(MD1_VALID)
         .assert()
-        .code(2);
+        .code(64);
 }
 
 #[test]
@@ -168,41 +168,41 @@ fn bundle_clean_mk1_card_is_silent_on_chunk_set_id() {
 }
 
 #[test]
-fn bundle_ms1_refused_exit_3() {
+fn bundle_ms1_refused_exit_2() {
     Command::cargo_bin("me")
         .unwrap()
         .arg("bundle")
         .write_stdin(MS1)
         .assert()
-        .code(3)
+        .code(2)
         .stderr(predicates::str::contains("CODEX32"));
 }
 
 // A3/F4: interior separators ('-' or whitespace) in an otherwise-valid md1 are
 // stripped by md-codec before BCH but engraved verbatim by convert() — refuse
-// fail-closed. Convert path AND single-line bundle path both exit 4; the bundle
+// fail-closed. Convert path AND single-line bundle path both exit 2; the bundle
 // path must not echo the input body (composes with the Step 3 canary).
 #[test]
-fn convert_refuses_interior_separator_md1_exit_4() {
+fn convert_refuses_interior_separator_md1_exit_2() {
     for bad in ["md1yqpqq-xqq8xtwhw4xwn4qh", "md1yqpqq xqq8xtwhw4xwn4qh"] {
         Command::cargo_bin("me")
             .unwrap()
             .arg("--stdout")
             .write_stdin(bad)
             .assert()
-            .code(4);
+            .code(2);
     }
 }
 
 #[test]
-fn bundle_refuses_interior_separator_md1_exit_4_no_leak() {
+fn bundle_refuses_interior_separator_md1_exit_2_no_leak() {
     for bad in ["md1yqpqq-xqq8xtwhw4xwn4qh", "md1yqpqq xqq8xtwhw4xwn4qh"] {
         let assert = Command::cargo_bin("me")
             .unwrap()
             .arg("bundle")
             .write_stdin(bad)
             .assert()
-            .code(4);
+            .code(2);
         let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
         assert!(
             !stderr.contains(bad),
@@ -224,7 +224,7 @@ fn bundle_msx1_mangled_hrp_does_not_leak_secret_body() {
         .arg("bundle")
         .write_stdin(MSX1)
         .assert()
-        .code(4); // classify failure → invalid/integrity exit
+        .code(2); // classify failure → invalid input
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
     assert!(
         !stderr.contains(SECRET_BODY),
@@ -248,7 +248,7 @@ fn bundle_corrupted_mk1_does_not_leak_full_string() {
         .arg("bundle")
         .write_stdin(bad.clone())
         .assert()
-        .code(4);
+        .code(2);
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
     assert!(
         !stderr.contains(&bad),
@@ -258,10 +258,11 @@ fn bundle_corrupted_mk1_does_not_leak_full_string() {
 
 // B3 (F16): ms1 must be refused across case-folding, whitespace padding, a bad
 // checksum (refusal is HRP-only — NO decode of the secret payload), and at every
-// bundle line position. Exit 3 / RefusedSecret on BOTH convert and bundle; the
+// bundle line position. Exit 2 / RefusedSecret on BOTH convert and bundle (an ms1
+// is an input neither verb has a flag to take: exit-code spec §3); the
 // secret body is NEVER echoed to stderr (regression insurance for the Step 3 A1
-// redaction). "No decode" is asserted via the error TYPE (exit 3 = RefusedSecret,
-// not exit 4 = a validate/decode error), not timing.
+// redaction). "No decode" is asserted via the refusal's own MESSAGE (CODEX32),
+// not timing: a decode error shares the code 2 now.
 #[test]
 fn ms1_refusal_table() {
     fn run(args: &[&str], stdin: &str) -> (i32, String) {
@@ -303,8 +304,8 @@ fn ms1_refusal_table() {
         for mode in [["--stdout"].as_slice(), ["bundle"].as_slice()] {
             let (code, stderr) = run(mode, input);
             assert_eq!(
-                code, 3,
-                "{label} via {mode:?}: expected exit 3 (RefusedSecret); stderr={stderr}"
+                code, 2,
+                "{label} via {mode:?}: expected exit 2 (RefusedSecret); stderr={stderr}"
             );
             assert!(
                 stderr.contains("CODEX32"),
@@ -326,8 +327,8 @@ fn ms1_refusal_table() {
     for (label, input) in &positions {
         let (code, stderr) = run(&["bundle"], input);
         assert_eq!(
-            code, 3,
-            "bundle ms1 {label}: expected exit 3; stderr={stderr}"
+            code, 2,
+            "bundle ms1 {label}: expected exit 2; stderr={stderr}"
         );
         assert!(stderr.contains("CODEX32"), "bundle ms1 {label}: {stderr}");
         assert!(
@@ -338,13 +339,13 @@ fn ms1_refusal_table() {
 }
 
 #[test]
-fn bundle_dropped_chunk_exit_4_no_stdout() {
+fn bundle_dropped_chunk_exit_2_no_stdout() {
     let assert = Command::cargo_bin("me")
         .unwrap()
         .arg("bundle")
         .write_stdin(MK1_A) // total=2, only 1
         .assert()
-        .code(4);
+        .code(2);
     let stdout = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
     assert!(stdout.trim().is_empty(), "no manifest on failure: {stdout}");
 }
@@ -581,9 +582,10 @@ mod preview {
 
     // Spec §A2/F9: a sidecar that exits 0 but writes a 0-byte --out file must NOT
     // yield a recorded preview. render_plate errs (EmptyOutput) -> wire_previews
-    // maps it to exit 4 and records no preview path.
+    // maps it to exit 32 (a helper that was found and failed) and records no
+    // preview path.
     #[test]
-    fn empty_sidecar_output_exit_4() {
+    fn empty_sidecar_output_exit_32() {
         let bindir = unique_dir("empty-bin");
         write_fake_empty_output(&bindir, CRATE_VERSION);
         let outdir = unique_dir("empty-out");
@@ -595,15 +597,15 @@ mod preview {
             .arg(&outdir)
             .write_stdin(input())
             .assert()
-            .code(4);
+            .code(32);
         fs::remove_dir_all(&bindir).ok();
         fs::remove_dir_all(&outdir).ok();
     }
 
-    // Spec §6: a sidecar RENDER failure (string fits no plate) → exit 4 (invalid
-    // input), NOT 2. Version matches; only the render step fails.
+    // A sidecar RENDER failure is a helper that was found and failed: exit 32
+    // (exit-code spec §7e). Version matches; only the render step fails.
     #[test]
-    fn render_failure_exit_4() {
+    fn render_failure_exit_32() {
         let bindir = unique_dir("renderfail-bin");
         write_fake_render_fail(&bindir, CRATE_VERSION);
         let outdir = unique_dir("renderfail-out");
@@ -615,7 +617,7 @@ mod preview {
             .arg(&outdir)
             .write_stdin(input())
             .assert()
-            .code(4);
+            .code(32);
     }
 
     #[test]
@@ -691,10 +693,11 @@ mod preview {
 
     // A1/F8: rendering into a dir that already holds a foreign `plate-*` artifact
     // (e.g. a higher-index plate from a prior run) must refuse fail-closed with
-    // exit 2, render nothing, and never delete the pre-existing file. Version is
+    // exit 8 (an output that would be mixed into; a clean directory waives it),
+    // render nothing, and never delete the pre-existing file. Version is
     // matched so control reaches the dirty-dir scan past the locate/version gates.
     #[test]
-    fn dirty_preview_dir_refused_exit_2() {
+    fn dirty_preview_dir_refused_exit_8() {
         let bindir = unique_dir("dirty-bin");
         write_fake(&bindir, CRATE_VERSION);
         let outdir = unique_dir("dirty-out");
@@ -709,7 +712,7 @@ mod preview {
             .arg(&outdir)
             .write_stdin(input())
             .assert()
-            .code(2);
+            .code(8);
         let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
         assert!(
             stderr.contains(&outdir.display().to_string()),
@@ -730,7 +733,7 @@ mod preview {
     }
 
     #[test]
-    fn mismatched_version_exit_2() {
+    fn mismatched_version_exit_32() {
         let bindir = unique_dir("mismatch-bin");
         write_fake(&bindir, "0.0.0-not-the-crate-version");
         let outdir = unique_dir("mismatch-out");
@@ -743,7 +746,7 @@ mod preview {
             .arg(&outdir)
             .write_stdin(input())
             .assert()
-            .code(2)
+            .code(32)
             .stderr(predicates::str::contains("version"));
 
         fs::remove_dir_all(&bindir).ok();
@@ -889,11 +892,11 @@ mod preview {
     }
 
     // F11/D2: an explicit ME_PREVIEW_BIN that names a path which does not exist is a
-    // fail-loud usage error (EXIT_USAGE 2) with a distinct message naming the env var
+    // fail-loud helper failure (exit 32: the user named the helper, R9) with a distinct message naming the env var
     // and the path — NOT a silent graceful-degrade and NOT a fall-back to co-located
     // discovery. The user vouched for a specific binary that isn't there.
     #[test]
-    fn set_but_missing_me_preview_bin_exit_2() {
+    fn set_but_missing_me_preview_bin_exit_32() {
         let outdir = unique_dir("missing-bin-out");
         let missing = unique_dir("missing-bin-parent").join("no-such-me-preview");
 
@@ -905,7 +908,7 @@ mod preview {
             .arg(&outdir)
             .write_stdin(input())
             .assert()
-            .code(2);
+            .code(32);
         let stderr = String::from_utf8(assert.get_output().stderr.clone()).unwrap();
         assert!(
             stderr.contains("ME_PREVIEW_BIN"),
@@ -949,9 +952,10 @@ mod preview {
     }
 
     #[test]
-    fn unwritable_preview_dir_exit_2() {
+    fn unwritable_preview_dir_exit_32() {
         // --preview pointing at a non-existent dir: `wire_previews`' `!dir.is_dir()`
-        // gate refuses it with EXIT_USAGE(2) before any render is attempted.
+        // gate refuses it with exit 32 (a directory that cannot be written) before
+        // any render is attempted.
         let bindir = unique_dir("unwritable-bin");
         write_fake(&bindir, CRATE_VERSION);
         let missing = unique_dir("unwritable-parent").join("does-not-exist");
@@ -964,7 +968,7 @@ mod preview {
             .arg(&missing)
             .write_stdin(input())
             .assert()
-            .code(2);
+            .code(32);
 
         fs::remove_dir_all(&bindir).ok();
     }
@@ -1092,17 +1096,19 @@ mod perms {
 
 /// GRAFT 2 — THE EXIT-CODE VOCABULARY IS ONE VOCABULARY.
 ///
-/// `me` has three failure codes and they mean different things:
+/// `me` speaks the constellation's codes (`SPEC_constellation_exit_codes.md`
+/// §3), and each failure class has one number whatever the subcommand:
 ///
 /// | code | meaning | the operator's next move |
 /// | --- | --- | --- |
-/// | 2 | **usage** — the invocation is wrong; nothing was read, nothing judged | fix the command line |
-/// | 3 | **policy refusal** — understood, admissible-looking, and refused on purpose | this tool will never do that |
-/// | 4 | **invalid** — the INPUT is not what it must be | fix the input |
+/// | 1 | **no** — a well-formed input did not meet a stated expectation | read the verdict |
+/// | 2 | **invalid** — the INPUT is not what it must be | fix the input |
+/// | 8 | **refused** — understood, and declined under a rule a flag, channel or destination would waive | change how it is run |
+/// | 32 | **io** — a file, device or helper failed | fix the environment |
+/// | 64 | **usage** — the command line alone is wrong; nothing was read | fix the command line |
 ///
-/// The distinction is load-bearing for scripts: a `2` says try again, a `3`
-/// says stop, a `4` says the artifact is wrong. A subcommand that spells the
-/// same situation with a different digit makes all three unusable.
+/// A subcommand that spells the same situation with a different digit makes
+/// them all unusable from a script.
 ///
 /// This is a TABLE rather than a set of scattered `.code()` calls precisely
 /// because the defect it exists to catch is a DISAGREEMENT between two
@@ -1130,50 +1136,33 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
     }
     let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     let cases = vec![
-        // ── 2, USAGE ────────────────────────────────────────────────────────
+        // ── 64, USAGE ───────────────────────────────────────────────────────
+        // Judged from the command line alone, before any input is read
+        // (exit-code spec R2): a valid string on stdin does not change it.
         Case {
-            code: 2,
-            args: s(&["--stdout"]),
-            stdin: "".to_string(),
-            why: "no input at all",
-        },
-        Case {
-            code: 2,
+            code: 64,
             args: s(&[]),
             stdin: MD1_VALID.to_string(),
             why: "a valid string with no output mode chosen",
         },
         Case {
-            code: 2,
-            args: s(&["sysw", "pack", "--no-passphrase"]),
-            stdin: "".to_string(),
-            why: "no records on argv and no --in",
-        },
-        Case {
-            code: 2,
+            code: 64,
             args: s(&["sysw", "wipe", "--fill", "sideways"]),
             stdin: "".to_string(),
             why: "a --fill value that does not exist",
         },
-        Case {
-            code: 2,
-            args: s(&["sysw", "show", "/nonexistent/payload.bin"]),
-            stdin: "".to_string(),
-            why: "a file that is not there",
-        },
-        // THE ONE THAT DISAGREED. `me seal --iterations 5` exits 2 and
-        // `me sysw pack --iterations 5` exited 4, for the same typo on the
+        // THE ONE THAT DISAGREED. `me seal --iterations 5` exited one code and
+        // `me sysw pack --iterations 5` another, for the same typo on the
         // same flag with the same range in the same message. Both are usage:
-        // no input has been read and nothing about the operator's DATA is
-        // wrong. Fixed on the sysw side, because `seal` is the shipped one.
+        // a setting, judged from the command line alone.
         Case {
-            code: 2,
+            code: 64,
             args: s(&["seal", "--iterations", "5", "--out"]),
             stdin: "".to_string(),
             why: "seal: --iterations below the floor",
         },
         Case {
-            code: 2,
+            code: 64,
             args: s(&[
                 "sysw",
                 "pack",
@@ -1188,7 +1177,7 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
             why: "sysw pack: --iterations below the floor",
         },
         Case {
-            code: 2,
+            code: 64,
             args: s(&[
                 "sysw",
                 "pack",
@@ -1202,62 +1191,89 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
             stdin: "".to_string(),
             why: "sysw pack: --iterations above the ceiling",
         },
-        // ── 3, POLICY REFUSAL ───────────────────────────────────────────────
+        // ── 32, IO ──────────────────────────────────────────────────────────
         Case {
-            code: 3,
-            args: s(&["--stdout"]),
-            stdin: MS1.to_string(),
-            why: "an ms1 secret: understood, well-formed, and never engraved",
+            code: 32,
+            args: s(&["sysw", "show", "/nonexistent/payload.bin"]),
+            stdin: "".to_string(),
+            why: "a file that is not there",
         },
+        // ── 8, REFUSED ──────────────────────────────────────────────────────
         // R2 / G-P3.5. Understood, well-formed, and refused on purpose: a raw
-        // signed transaction is BEARER and argv is a public channel. Not
-        // usage -- the command line is spelled correctly -- and not invalid
-        // input, because the same record on --in or stdin packs fine.
+        // signed transaction is BEARER and argv is a public channel. A private
+        // channel (or `--allow-argv-secret`) waives it, so it is 8.
         Case {
-            code: 3,
+            code: 8,
             args: s(&["sysw", "pack", "--no-passphrase", &format!("tx:{STRIPPED}")]),
             stdin: String::new(),
             why: "a tx: record on argv",
         },
-        // ── 4, INVALID INPUT ────────────────────────────────────────────────
+        // ON STDIN, not argv: argv is refused before admission is even
+        // considered (the case above), so the unsigned-input refusal can only
+        // be reached through a private channel. `--allow-unsigned-inputs`
+        // waives it: 8 (the spec's own worked example).
         Case {
-            code: 4,
+            code: 8,
+            args: s(&["sysw", "pack", "--no-passphrase"]),
+            stdin: format!("tx:{STRIPPED}\n"),
+            why: "a transaction with an unsigned input",
+        },
+        // ── 2, INVALID ──────────────────────────────────────────────────────
+        Case {
+            code: 2,
+            args: s(&["--stdout"]),
+            stdin: "".to_string(),
+            why: "no input at all (empty input is INVALID, spec decision 3)",
+        },
+        Case {
+            code: 2,
+            args: s(&["sysw", "pack", "--no-passphrase"]),
+            stdin: "".to_string(),
+            why: "no records on argv and nothing on stdin",
+        },
+        // An ms1 is an input no flag of the converter takes (spec §3's worked
+        // table: "an ms1 ... to `me --hex`" is 2).
+        Case {
+            code: 2,
+            args: s(&["--stdout"]),
+            stdin: MS1.to_string(),
+            why: "an ms1 secret given to the converter",
+        },
+        Case {
+            code: 2,
             args: s(&["--stdout"]),
             stdin: "md1notavalidstring".to_string(),
             why: "a string that does not decode",
         },
         Case {
-            code: 4,
+            code: 2,
             args: s(&["sysw", "show"]),
             stdin: "".to_string(),
             why: "a file that is not a container",
         },
         Case {
-            code: 4,
+            code: 2,
             args: s(&["sysw", "pack", "--no-passphrase", "not a record"]),
             stdin: "".to_string(),
             why: "a record this container cannot place",
         },
-        // ON STDIN, not argv: argv is refused at 3 before admission is even
-        // considered (the case above), so the unsigned-input refusal can only
-        // be reached through a private channel.
+        // WAS `me tx` over bytes that are not a transaction. That verb moved to
+        // `mt encode --qr` with P3b -- `me` no longer manufactures any
+        // constellation string -- so the SITUATION is kept here on the verb
+        // that survives, because what this table checks is that every
+        // subcommand spells "the input is wrong" with the same digit.
         Case {
-            code: 4,
-            args: s(&["sysw", "pack", "--no-passphrase"]),
-            stdin: format!("tx:{STRIPPED}\n"),
-            why: "a transaction with an unsigned input",
-        },
-        // WAS `me tx` over bytes that are not a transaction, at exit 4. That
-        // verb moved to `mt encode --qr` with P3b -- `me` no longer
-        // manufactures any constellation string -- so the SITUATION is kept
-        // here on the verb that survives, because what this table checks is
-        // that every subcommand spells "the input is wrong" with the same
-        // digit, and dropping the row would shrink the comparison instead.
-        Case {
-            code: 4,
+            code: 2,
             args: s(&["sysw", "pack", "--no-passphrase"]),
             stdin: "tx:abababab\n".to_string(),
             why: "a tx: record whose body is hex but not a transaction",
+        },
+        // ── 1, NO ───────────────────────────────────────────────────────────
+        Case {
+            code: 1,
+            args: s(&["sysw", "pack", "--no-passphrase", "--expect", "cosigner"]),
+            stdin: format!("{MD1_VALID}\n"),
+            why: "--expect not met: a well-formed stream compared against a claim",
         },
     ];
 
@@ -1294,9 +1310,9 @@ fn the_exit_code_vocabulary_is_one_vocabulary() {
         );
     }
 
-    // ...and all three codes are actually exercised, so the table cannot rot
-    // into a one-code test without anyone noticing.
-    for want in [2, 3, 4] {
+    // ...and every code is actually exercised, so the table cannot rot into a
+    // one-code test without anyone noticing.
+    for want in [1, 2, 8, 32, 64] {
         assert!(
             cases.iter().any(|c| c.code == want),
             "the vocabulary test no longer covers exit {want}"

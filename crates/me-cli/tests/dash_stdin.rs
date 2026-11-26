@@ -153,7 +153,7 @@ fn a_second_dash_is_refused_rather_than_guessed_at() {
         ],
         "text:6162\n",
     );
-    assert_eq!(o.status.code(), Some(2), "a usage error: {}", err(&o));
+    assert_eq!(o.status.code(), Some(64), "a usage error: {}", err(&o));
     assert!(
         err(&o).contains("stdin can only be read once"),
         "{}",
@@ -194,32 +194,33 @@ fn an_empty_stdin_at_a_dash_is_refused_not_skipped() {
 }
 
 /// **THE DIFFERENTIAL'S OTHER HALF: unchanged everywhere except the enumerated
-/// dash cells.** Each of these four codes was measured on the pre-change tree,
-/// and each is justified rather than merely recorded — a table you match
+/// dash cells.** Each of these four refusals was measured on the pre-change
+/// tree (the digits are the exit-code spec's since 2026-11-26: clap's usage
+/// errors 64, a missing file 32), and each is justified rather than merely recorded — a table you match
 /// against is a table you can update to match a regression.
 #[test]
 fn the_four_surfaces_a_dash_cannot_occupy_are_unchanged() {
     // `me -` : `me`'s own positional is a subcommand slot, so clap rejects `-`
     // as an unrecognised subcommand. There is no record list to splice into.
     let o = run(&["-"], "md1\n");
-    assert_eq!(o.status.code(), Some(2), "{}", err(&o));
+    assert_eq!(o.status.code(), Some(64), "{}", err(&o));
     assert!(err(&o).contains("unrecognized subcommand"), "{}", err(&o));
 
     // `bundle -` : `bundle` already defaults to stdin and declares NO
     // positional, so `-` is an unexpected argument and adds nothing.
     let o = run(&["bundle", "-"], "md1\n");
-    assert_eq!(o.status.code(), Some(2), "{}", err(&o));
+    assert_eq!(o.status.code(), Some(64), "{}", err(&o));
     assert!(err(&o).contains("unexpected argument"), "{}", err(&o));
 
     // `sysw wipe -` : no positional at all; the image is generated, not read.
     let o = run(&["sysw", "wipe", "-"], "");
-    assert_eq!(o.status.code(), Some(2), "{}", err(&o));
+    assert_eq!(o.status.code(), Some(64), "{}", err(&o));
     assert!(err(&o).contains("unexpected argument"), "{}", err(&o));
 
     // `sysw show -` : its positional is a container FILE PATH, not a record, so
     // `-` is a filename and ENOENT is the honest answer. Making it mean stdin
     // here would be a different feature.
     let o = run(&["sysw", "show", "-"], "");
-    assert_eq!(o.status.code(), Some(2), "{}", err(&o));
+    assert_eq!(o.status.code(), Some(32), "{}", err(&o));
     assert!(err(&o).contains("No such file or directory"), "{}", err(&o));
 }

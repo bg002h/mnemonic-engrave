@@ -43,7 +43,7 @@ use sha2::Digest as _;
 /// header, and `scripts/descriptor-seam-vectors/README.md` for the regenerate
 /// + re-pin recipe.
 const SEAM_VECTORS_SHA256: &str =
-    "71bba6f24a4b3613d9d7ac7fafa7fc43ff35d1b557ec5b9189b3a3fc6ad5b227";
+    "ec4b6e216bb9e064319ec5c66fcdac47f64055ce4089e2058ed211f911bb5ade";
 
 const PATH: &str = "testdata/descriptor_seam_vectors.json";
 
@@ -317,10 +317,18 @@ fn the_row_schema_holds_on_every_row() {
                 "{n}: unknown outcome {outcome:?}"
             );
             let exit = r["exit_code"].as_u64().unwrap();
+            // The exit-code spec's classes (`SPEC_constellation_exit_codes.md`
+            // §3): the choice block is REFUSED (8, `--as` waives it), a §6 row
+            // is its own class (`Row::class`: INVALID 2, or REFUSED 8 for a
+            // network contradiction), and a record or multi-record refusal is
+            // an INVALID input (2).
             let want = match outcome {
-                "as-decides" => 2,
-                "descriptor-refusal" => 3,
-                "record-refusal" | "multi-record" => 4,
+                "as-decides" => 8,
+                "descriptor-refusal" => match r["refusal_row"].as_str() {
+                    Some("mixed-network") | Some("as-omitted") => 8,
+                    _ => 2,
+                },
+                "record-refusal" | "multi-record" => 2,
                 _ => unreachable!(),
             };
             assert_eq!(exit, want, "{n}: outcome {outcome} does not exit {want}");
@@ -873,13 +881,13 @@ fn classify_run(code: i32, err: &str) -> &'static str {
     if is_record_refusal(err) {
         return "record-refusal";
     }
-    if code == 2 && err.contains("`--as` decides how it is packed") {
+    if code == 8 && err.contains("`--as` decides how it is packed") {
         return "as-decides";
     }
-    if code == 4 && err.contains("is a wallet descriptor. A descriptor is packed ALONE") {
+    if code == 2 && err.contains("is a wallet descriptor. A descriptor is packed ALONE") {
         return "multi-record";
     }
-    if code == 3 {
+    if code == 2 || code == 8 {
         return "descriptor-refusal";
     }
     "unclassified"

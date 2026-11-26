@@ -114,6 +114,59 @@ pub enum SyswError {
     NotCanonical(usize, Spelling),
 }
 
+impl SyswError {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3), by its ordered
+    /// tests. Exhaustive on purpose (R13): a new variant, or a new
+    /// [`UnknownReason`], does not compile until it is classified.
+    ///
+    /// - USAGE (64): an `--iterations` value out of range -- a setting.
+    /// - REFUSED (8): a refusal a flag waives -- an unsigned input
+    ///   (`--allow-unsigned-inputs`, the spec's worked example), a preimage
+    ///   carrier (`--pack-preimage`), a digest-shaped phrase
+    ///   (`--phrase-looks-like-digest-ok`).
+    /// - INTERNAL (101): states `pack` cannot reach with a passphrase it built
+    ///   itself (an AEAD failure while SEALING, a sealing/passphrase mismatch).
+    /// - INVALID (2): everything else -- the input is wrong for this verb
+    ///   whatever the flags.
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
+        match self {
+            SyswError::Wire(wire::WireError::Iterations(_)) => exit::USAGE,
+            SyswError::Wire(
+                wire::WireError::TooShort(_)
+                | wire::WireError::BadMagic
+                | wire::WireError::UnknownVersion(_)
+                | wire::WireError::UnknownKdf(_)
+                | wire::WireError::UnknownAead(_)
+                | wire::WireError::SectionTooLong,
+            ) => exit::INVALID,
+            SyswError::Unclassifiable(_, reason) => match reason {
+                UnknownReason::UnsignedInputs(_) => exit::REFUSED,
+                UnknownReason::NonHexBody(_)
+                | UnknownReason::NotATransaction(_)
+                | UnknownReason::Bip93OutsideTheProfile(_)
+                | UnknownReason::PreimagePlate { .. }
+                | UnknownReason::TagKindMismatch
+                | UnknownReason::Unrecognised
+                | UnknownReason::Composer(_)
+                | UnknownReason::Mr(_) => exit::INVALID,
+            },
+            SyswError::PreimageNotAdmitted(..) | SyswError::PhraseLooksLikeDigest(..) => {
+                exit::REFUSED
+            }
+            SyswError::Crypto | SyswError::PassphraseMismatch => exit::INTERNAL,
+            SyswError::TooLarge(_)
+            | SyswError::SecondNow(_)
+            | SyswError::EmptyPassphrase
+            | SyswError::NotEnterableOnDevice(_)
+            | SyswError::PassphraseTooLong(_)
+            | SyswError::NotUtf8
+            | SyswError::MrSet(_)
+            | SyswError::NotCanonical(..) => exit::INVALID,
+        }
+    }
+}
+
 /// Which spelling rule (SPEC §5.3.3) refused a record. First match wins, in
 /// declaration order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -846,6 +899,53 @@ fn split_records(b: &[u8]) -> Result<Vec<String>, SyswError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// R13's table test: each SyswError class lands on the spec's code.
+    #[test]
+    fn every_sysw_error_maps_to_its_exit_code() {
+        use mnemonic_io_lib::exit;
+        let table: Vec<(SyswError, u8)> = vec![
+            (SyswError::Wire(wire::WireError::Iterations(1)), exit::USAGE),
+            (SyswError::Wire(wire::WireError::BadMagic), exit::INVALID),
+            (
+                SyswError::Wire(wire::WireError::SectionTooLong),
+                exit::INVALID,
+            ),
+            (
+                SyswError::Unclassifiable(0, UnknownReason::UnsignedInputs(vec![0])),
+                exit::REFUSED,
+            ),
+            (
+                SyswError::Unclassifiable(0, UnknownReason::NonHexBody("x")),
+                exit::INVALID,
+            ),
+            (
+                SyswError::Unclassifiable(0, UnknownReason::Unrecognised),
+                exit::INVALID,
+            ),
+            (
+                SyswError::Unclassifiable(0, UnknownReason::TagKindMismatch),
+                exit::INVALID,
+            ),
+            (
+                SyswError::PreimageNotAdmitted(0, record::Class::Codex32Secret),
+                exit::REFUSED,
+            ),
+            (SyswError::PhraseLooksLikeDigest(0, 64), exit::REFUSED),
+            (SyswError::Crypto, exit::INTERNAL),
+            (SyswError::PassphraseMismatch, exit::INTERNAL),
+            (SyswError::TooLarge(1), exit::INVALID),
+            (SyswError::SecondNow(1), exit::INVALID),
+            (SyswError::EmptyPassphrase, exit::INVALID),
+            (SyswError::NotEnterableOnDevice("x".into()), exit::INVALID),
+            (SyswError::PassphraseTooLong(1), exit::INVALID),
+            (SyswError::NotUtf8, exit::INVALID),
+            (SyswError::NotCanonical(0, Spelling::Padding), exit::INVALID),
+        ];
+        for (e, want) in table {
+            assert_eq!(e.exit_code(), want, "{e:?}");
+        }
+    }
 
     const PASS: &str = "abandon abandon abandon abandon abandon abandon";
     const ITER: u32 = wire::MIN_ITERATIONS;

@@ -3,7 +3,7 @@
 //!
 //! std's runtime puts a read-write `/dev/null` on a closed fd 1 before `main`,
 //! so the output vanished at exit 0. `me` detects that at startup and reports
-//! the write the way it reports a read-only stdout (EBADF, exit 1).
+//! the write the way it reports a read-only stdout (EBADF, exit 32: IO).
 #![cfg(unix)]
 
 use std::fs;
@@ -68,19 +68,19 @@ fn names(dir: &Path) -> Vec<String> {
 }
 
 #[test]
-fn closed_stdout_hex_exits_1() {
+fn closed_stdout_hex_exits_32() {
     let d = fixture();
     let r = sh(d.path(), "exec \"$ME\" --in m.txt --hex >&-");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.err(), format!("{EBADF}\n"), "{}", r.dump());
 }
 
 #[test]
-fn closed_stdout_help_and_version_exit_1() {
+fn closed_stdout_help_and_version_exit_32() {
     let d = fixture();
     for flag in ["--help", "--version", "bundle --help"] {
         let r = sh(d.path(), &format!("exec \"$ME\" {flag} >&-"));
-        assert_eq!(r.rc, Some(1), "{flag}: {}", r.dump());
+        assert_eq!(r.rc, Some(32), "{flag}: {}", r.dump());
         assert_eq!(r.err(), format!("{EBADF}\n"), "{flag}: {}", r.dump());
     }
 }
@@ -109,7 +109,7 @@ fn closed_stdout_out_dev_stdout_fails() {
 #[test]
 fn closed_stdin_and_stderr_do_not_panic() {
     let d = fixture();
-    // Closed stdin: nothing to read is the usual usage refusal.
+    // Closed stdin: nothing to read is empty input, INVALID (2).
     let r = sh(d.path(), "exec \"$ME\" --hex <&-");
     assert_eq!(r.rc, Some(2), "{}", r.dump());
     // Closed stderr: the conversion still succeeds on stdout.

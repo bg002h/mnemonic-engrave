@@ -29,7 +29,7 @@ macro_rules! outln {
 /// `mt1`) into an NDEF payload, reading it from stdin or `--in`. Refuses
 /// secret `ms1`.
 #[derive(Parser)]
-#[command(name = "me", version, about)]
+#[command(name = "me", version, about, after_help = mnemonic_engrave::io::exit::HELP_LEGEND)]
 struct Cli {
     /// Read the input string from this file instead of stdin.
     #[arg(long, value_name = "FILE")]
@@ -475,29 +475,50 @@ impl From<AsForm> for mnemonic_engrave::descriptor::Form {
     }
 }
 
-/// THE EXIT-CODE VOCABULARY. Three failure codes, three different things, and
-/// the distinction is what makes them usable from a script:
+/// THE EXIT-CODE VOCABULARY: the constellation's
+/// (`SPEC_constellation_exit_codes.md` §3), from `mnemonic-io-lib`'s `exit`
+/// module, so `me` and its siblings cannot drift apart on a number.
 ///
 /// | code | meaning | the operator's next move |
 /// | --- | --- | --- |
-/// | 2 | **usage** — the invocation is wrong. Nothing was read and nothing about the DATA was judged | fix the command line |
-/// | 3 | **policy refusal** — understood, well-formed, and refused on purpose | this tool will never do that |
-/// | 4 | **invalid** — the INPUT is not what it must be | fix the input |
+/// | 1 | **no** -- a well-formed input did not meet a stated claim (`--expect`) | read the verdict |
+/// | 2 | **invalid** -- the INPUT is wrong for this verb whatever the flags (including empty input) | fix the input |
+/// | 8 | **refused** -- understood, and declined under a rule a flag, channel or destination waives (secret or bearer on argv, an unsafe destination, `--as` not given) | change how it is run |
+/// | 32 | **io** -- a file, stdout, the preview sidecar or the passphrase prompt failed | fix the environment |
+/// | 64 | **usage** -- the command line alone is wrong; nothing was read | fix the command line |
+/// | 101 | **internal** -- a bug | report it |
 ///
 /// Every site returns one of these BY NAME. Bare integers are what let
-/// `me seal --iterations 5` exit 2 while `me sysw pack --iterations 5` exited
-/// 4, for the same typo on the same flag with the same range in the same
-/// sentence — invisible until the two were put in one table
-/// (`tests/cli.rs::the_exit_code_vocabulary_is_one_vocabulary`).
-///
-/// A flag value out of range is USAGE, not invalid: no input has been read at
-/// the point it is caught, so there is nothing yet for "invalid" to be about.
-const EXIT_OK: i32 = 0;
-const EXIT_USAGE: i32 = 2;
-const EXIT_REFUSED: i32 = 3;
-const EXIT_INVALID: i32 = 4;
-/// A write the destination refused (ruling T6; FIX_me_output_integrity).
+/// `me seal --iterations 5` and `me sysw pack --iterations 5` exit with two
+/// different codes for the same typo on the same flag
+/// (`tests/cli.rs::the_exit_code_vocabulary_is_one_vocabulary`). Which class a
+/// failure is, is decided by the spec's ordered tests; the library errors carry
+/// their own exhaustive `exit_code()` / `class()` so no variant goes
+/// unclassified (R13).
+const EXIT_OK: i32 = exit::OK as i32;
+const EXIT_INVALID: i32 = exit::INVALID as i32;
+const EXIT_REFUSED: i32 = exit::REFUSED as i32;
+const EXIT_IO: i32 = exit::IO as i32;
+const EXIT_USAGE: i32 = exit::USAGE as i32;
+const EXIT_INTERNAL: i32 = exit::INTERNAL as i32;
+/// A write the destination refused: IO (R8).
 const EXIT_WRITE: i32 = stdout_out::EXIT_WRITE;
+use mnemonic_engrave::io::exit;
+
+/// A read that failed. Bytes that are not text are an INVALID input (a binary
+/// file piped in by mistake); anything else is the system's, IO.
+fn read_err_code(e: &std::io::Error) -> i32 {
+    if e.kind() == std::io::ErrorKind::InvalidData {
+        EXIT_INVALID
+    } else {
+        EXIT_IO
+    }
+}
+
+/// The process code of a set of bits.
+fn bits_code(b: exit::Bits) -> i32 {
+    i32::from(b.to_exit_code())
+}
 
 /// Every string a token could plausibly BE, normalised for classification.
 ///
@@ -528,7 +549,7 @@ fn argv_candidates(token: &str) -> Vec<String> {
 /// **And it binds only where the flag is DECLARED** (round-11 M-2). `me`
 /// declares `allow_argv_secret` on `sysw pack` and `seal` — so on `me`, `bundle`, `sysw show`, `sysw wipe` and the helps
 /// the guard refuses even when argv carries the flag. Today those surfaces make
-/// clap reject it as an unexpected argument at exit 2; the guard reaching its
+/// clap reject it as an unexpected argument at exit 64 (usage); the guard reaching its
 /// answer first is the point of §6d's ordering.
 fn argv_override_applies(argv: &[String]) -> bool {
     if !argv.iter().any(|t| t == "--allow-argv-secret") {
@@ -827,7 +848,7 @@ fn apply_root_options(cli: &mut Cli, argv: &[String]) -> Result<(), i32> {
         let mut cmd =
             Cli::command().mut_subcommand("seal", |s| s.mut_arg("out", |a| a.required(true)));
         if let Err(e) = cmd.try_get_matches_from_mut(argv) {
-            e.exit();
+            return Err(clap_exit(&e));
         }
         return Err(EXIT_USAGE);
     }
@@ -862,8 +883,10 @@ fn shell_word(path: &std::path::Path) -> String {
 
 /// What `Cli::parse()` did on a parse error, with the stdout case (`--help`,
 /// `<verb> --help`, `help <verb>`, `--version`) written through the checked
-/// writer (S1, S1f): usage errors keep clap's stderr text and exit 2; help and
-/// version text is byte-identical when the write succeeds.
+/// writer (S1, S1f): usage errors keep clap's stderr text and exit 64 (every
+/// `me` argument clap judges is a setting, a path or a record list, so none of
+/// its errors is an input value's -- exit-code spec decision 2); help and
+/// version text is byte-identical when the write succeeds, at 0.
 fn clap_exit(e: &clap::Error) -> i32 {
     use std::io::IsTerminal;
     if e.use_stderr() || std::io::stdout().is_terminal() {
@@ -880,7 +903,11 @@ fn clap_exit(e: &clap::Error) -> i32 {
         };
         stdout_out::write(text.as_bytes());
     }
-    e.exit_code()
+    if e.exit_code() == 0 {
+        EXIT_OK
+    } else {
+        EXIT_USAGE
+    }
 }
 
 fn run() -> i32 {
@@ -888,12 +915,13 @@ fn run() -> i32 {
     // `Cli::parse()`: clap names the offending VALUE in its error for every
     // shape that has no declared flag to blame, so a guard placed one line
     // lower has already lost. `me --nosuchflag <ms1>` is the test that tells
-    // the two apart -- via the guard it is exit 3 with this wording, via clap
-    // it is exit 2 naming the flag.
+    // the two apart -- via the guard it is exit 8 (REFUSED) with this wording,
+    // via clap it is exit 64 naming the flag.
     //
     // argv is read as OsString (`env::args()` panics on a non-UTF-8 token).
-    // The guard sees a lossy copy, so it still runs first; only then is a
-    // non-UTF-8 token refused, without echoing it (it may be secret).
+    // The guard sees a lossy copy, so it still runs first (exit-code spec §3
+    // test 1's exception); only then is a non-UTF-8 token refused, at USAGE
+    // (64), without echoing it (it may be secret).
     let argv_os: Vec<std::ffi::OsString> = std::env::args_os().collect();
     let argv: Vec<String> = argv_os
         .iter()
@@ -968,6 +996,13 @@ fn run() -> i32 {
         return run_hash_cli(records, *sealed);
     }
 
+    // The output mode is judged from the command line alone, so it is decided
+    // BEFORE any input is read (exit-code spec R2: usage first).
+    if cli.out.is_none() && !(cli.hex || cli.base64 || cli.stdout) {
+        eprintln!("me: choose an output mode: --out <file>, --stdout, --hex, or --base64");
+        return EXIT_USAGE;
+    }
+
     // Read into a Zeroizing buffer so the input (incl. read_to_string's
     // allocation, which a secret could reach via --in) is scrubbed on drop —
     // defense-in-depth on top of the ms1 refusal.
@@ -977,26 +1012,28 @@ fn run() -> i32 {
             Ok(s) => *input = s, // moves the buffer into the Zeroizing wrapper
             Err(e) => {
                 eprintln!("me: cannot read {}: {e}", path.display());
-                return EXIT_USAGE;
+                return read_err_code(&e);
             }
         }
     } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
         eprintln!("me: cannot read stdin: {e}");
-        return EXIT_USAGE;
+        return read_err_code(&e);
     }
 
-    // NOTHING PIPED IN IS A USAGE ERROR, not a decode failure. Before this,
-    // empty input reached `convert` and came back
-    // "not a bech32 string (no '1' separator / empty HRP)" at exit 4 --
-    // describing input the operator never gave as malformed, and disagreeing
-    // with `me sysw pack`, which has always said "no ... given (pipe it in, or
-    // --in FILE)" at exit 2 for the same situation. A new user's first action
+    // NOTHING PIPED IN gets its own sentence, not a decode failure's. Before
+    // this, empty input reached `convert` and came back
+    // "not a bech32 string (no '1' separator / empty HRP)" -- describing input
+    // the operator never gave as malformed, and disagreeing with
+    // `me sysw pack`, which has always said "no ... given (pipe it in, or
+    // --in FILE)" for the same situation. Its CODE is INVALID (2): in a
+    // pipeline an empty stdin nearly always means the step before failed
+    // (exit-code spec decision 3). A new user's first action
     // is exactly this one. (The verb it used to agree with was `me tx`, which
     // has since moved to `mt encode --qr`; the agreement is with the
     // remaining verbs, and it still has to hold.)
     if input.trim().is_empty() {
         eprintln!("me: no input given (pipe an md1/mk1 string in, or --in FILE)");
-        return EXIT_USAGE;
+        return EXIT_INVALID;
     }
 
     // Capture the plate-budget flag before the input is dropped.
@@ -1031,7 +1068,7 @@ fn run() -> i32 {
         Ok(b) => b,
         Err(ConvertError::RefusedSecret) => {
             eprintln!("me: {}", ConvertError::RefusedSecret);
-            return EXIT_REFUSED;
+            return i32::from(ConvertError::RefusedSecret.exit_code());
         }
         Err(e) => {
             eprintln!("me: {e}");
@@ -1055,7 +1092,7 @@ fn run() -> i32 {
                      \x20   me sysw pack --as <descriptor|md1> --in <your export file>"
                 );
             }
-            return EXIT_INVALID;
+            return i32::from(e.exit_code());
         }
     };
 
@@ -1066,19 +1103,20 @@ fn run() -> i32 {
         eprintln!("{}", line.as_str());
     }
 
-    // Emit per the selected output mode. Human guidance -> stderr only.
+    // Emit per the selected output mode (one was chosen: checked above, before
+    // the input was read). Human guidance -> stderr only.
     if let Some(path) = &cli.out {
         if let Err(code) = write_out(path, &bytes) {
             return code;
         }
         eprintln!("me: wrote {} NDEF bytes to {}", bytes.len(), path.display());
-    } else if cli.hex || cli.base64 || cli.stdout {
+    } else {
         // F-244: all three stdout modes carry the SAME bytes; gating raw and not
         // hex would teach the operator to reach for hex. `--out` was already
         // owner-only via write_private -- these were the paths that were not.
         if let (false, Some(mode)) = (cli.allow_world_readable, stdout_world_readable_mode()) {
             refuse_world_readable_stdout(mode);
-            return EXIT_USAGE;
+            return EXIT_REFUSED;
         }
         if cli.hex {
             let s: String = bytes.iter().fold(String::new(), |mut acc, b| {
@@ -1091,9 +1129,6 @@ fn run() -> i32 {
         } else {
             stdout_out::write(&bytes);
         }
-    } else {
-        eprintln!("me: choose an output mode: --out <file>, --stdout, --hex, or --base64");
-        return EXIT_USAGE;
     }
     EXIT_OK
 }
@@ -1110,19 +1145,19 @@ fn run_bundle_cli(
             Ok(s) => *input = s,
             Err(e) => {
                 eprintln!("me: cannot read {}: {e}", path.display());
-                return EXIT_USAGE;
+                return read_err_code(&e);
             }
         }
     } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
         eprintln!("me: cannot read stdin: {e}");
-        return EXIT_USAGE;
+        return read_err_code(&e);
     }
 
     let mut manifest = match mnemonic_engrave::bundle::run_bundle(&input) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("me: {e}");
-            return e.exit_code();
+            return i32::from(e.exit_code());
         }
     };
 
@@ -1140,7 +1175,7 @@ fn run_bundle_cli(
                 .collect();
             if let Some(i) = same_file(Endpoint::Path(m), &eps) {
                 refuse_manifest_is_plate(m, &planned[i].1);
-                return EXIT_USAGE;
+                return EXIT_REFUSED;
             }
         }
         if let Some(code) = wire_previews(&mut manifest, dir, png) {
@@ -1160,7 +1195,7 @@ fn run_bundle_cli(
                 .collect();
             if let Some(i) = same_file(Endpoint::Path(m), &eps) {
                 refuse_manifest_is_plate(m, &rendered[i]);
-                return EXIT_USAGE;
+                return EXIT_REFUSED;
             }
         }
     }
@@ -1169,7 +1204,7 @@ fn run_bundle_cli(
         Ok(j) => j,
         Err(e) => {
             eprintln!("me: cannot serialize manifest: {e}");
-            return EXIT_USAGE;
+            return EXIT_INTERNAL;
         }
     };
     if let Some(path) = manifest_path {
@@ -1206,6 +1241,15 @@ fn run_seal_cli(
     // path reads into a Zeroizing buffer, exactly as `convert` and `bundle` do.
     //
     // argv survives for fixtures and tests, and warns when it carries a seed.
+    // `--iterations` is a setting, judged from the command line alone, so it
+    // is refused before any input is read (exit-code spec R2). Same words as
+    // `seal::seal`'s own range check, which stays as the library's backstop.
+    if !(seal::wire::MIN_ITERATIONS..=seal::wire::MAX_ITERATIONS).contains(&iterations) {
+        let e = seal::SealError::Iterations(iterations);
+        eprintln!("me: {e}");
+        return i32::from(e.exit_code());
+    }
+
     let mut input = Zeroizing::new(String::new());
     let from_argv = !payload.is_empty();
     let secret: Vec<String> = if from_argv {
@@ -1220,12 +1264,12 @@ fn run_seal_cli(
                 Ok(s) => *input = s,
                 Err(e) => {
                     eprintln!("me: cannot read {}: {e}", path.display());
-                    return EXIT_USAGE;
+                    return read_err_code(&e);
                 }
             }
         } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
             eprintln!("me: cannot read stdin: {e}");
-            return EXIT_USAGE;
+            return read_err_code(&e);
         }
         // Split on '\n' ONLY, and do not trim. `encode_section` scans the
         // UNTRIMMED record for `\r` (§6.4: "no CR anywhere"), so a CRLF file
@@ -1244,8 +1288,10 @@ fn run_seal_cli(
     // refuse. `encode_section` trims internally, once, after the CR scan.
     let public: Vec<String> = plaintext.to_vec(); // &[String] -> Vec<String>
     if secret.is_empty() && public.is_empty() {
+        // Nothing on argv, so `--in` or stdin was read and was empty: an
+        // empty input, INVALID (exit-code spec decision 3).
         eprintln!("me: nothing to seal");
-        return EXIT_USAGE;
+        return EXIT_INVALID;
     }
 
     // §9: seed material needs the explicit opt-in. Best-effort anti-footgun, not
@@ -1288,10 +1334,7 @@ fn run_seal_cli(
         Ok(s) => s,
         Err(e) => {
             eprintln!("me: {e}");
-            return match e {
-                seal::SealError::Iterations(_) => EXIT_USAGE,
-                _ => EXIT_INVALID,
-            };
+            return i32::from(e.exit_code());
         }
     };
 
@@ -1343,6 +1386,8 @@ fn run_seal_cli(
 fn run_hash_cli(records: &[String], sealed: bool) -> i32 {
     use mnemonic_engrave::seal::{pubhash, record};
     if records.is_empty() {
+        // `hash` reads its records from argv only, so none is a missing
+        // argument: USAGE (exit-code spec decision 3 keeps that at 64).
         eprintln!("me: no records given");
         return EXIT_USAGE;
     }
@@ -1402,7 +1447,8 @@ fn planned_plate_paths(
 }
 
 /// P1c: the refusal, `M` as typed and `P` as `me: rendered plate <n> → <P>`
-/// would print it. Exit code 2 is the caller's.
+/// would print it. Exit code 8 (REFUSED: a different destination waives it) is
+/// the caller's.
 fn refuse_manifest_is_plate(m: &std::path::Path, plate: &std::path::Path) {
     eprintln!(
         "me: --manifest {} is the same file as the plate preview {}; write the manifest to a new name",
@@ -1417,10 +1463,12 @@ fn refuse_manifest_is_plate(m: &std::path::Path, plate: &std::path::Path) {
 /// Returns:
 ///   - `None` to continue (the common case): either previews were rendered, or
 ///     the sidecar is absent and we degrade gracefully (note on stderr, exit 0).
-///   - `Some(code)` to stop now: version mismatch / unreadable version / non-dir
-///     target → `EXIT_USAGE` (2); a sidecar RENDER failure (bad input, e.g. a
-///     string that fits no plate) → `EXIT_INVALID` (4) per spec §6; a Spawn/IO
-///     failure (couldn't run the sidecar) → `EXIT_USAGE` (2).
+///   - `Some(code)` to stop now: a named sidecar that is missing, a version
+///     mismatch or unreadable version, a target that is not a writable
+///     directory, a sidecar that fails to spawn or render → `EXIT_IO` (32: a
+///     helper the user asked for failed, exit-code spec R9 and §7e); a
+///     directory already holding plate artifacts → `EXIT_REFUSED` (8: a clean
+///     destination waives it).
 fn wire_previews(
     manifest: &mut mnemonic_engrave::manifest::Manifest,
     dir: &std::path::Path,
@@ -1432,7 +1480,7 @@ fn wire_previews(
     // Explicit opt-in: `ME_PREVIEW_BIN` names a specific sidecar binary and takes
     // precedence over co-located discovery. Read it here in the wrapper (before the
     // version gate) so `locate_in` stays pure. A set-but-missing path is a FAIL-LOUD
-    // usage error (EXIT_USAGE): the user vouched for a specific binary that isn't
+    // helper failure (EXIT_IO, R9): the user vouched for a specific binary that isn't
     // there, so silently degrading — or falling back to exe-adjacent — would be
     // surprising. (An empty value is treated as unset.)
     let explicit_env = std::env::var_os("ME_PREVIEW_BIN")
@@ -1445,7 +1493,7 @@ fn wire_previews(
                  (set it to the me-preview binary, or unset it for co-located discovery)",
                 p.display()
             );
-            return Some(EXIT_USAGE);
+            return Some(EXIT_IO);
         }
     }
 
@@ -1482,11 +1530,11 @@ fn wire_previews(
                  \x20   cp target/release/me-preview {}",
                 sidecar.display()
             );
-            return Some(EXIT_USAGE);
+            return Some(EXIT_IO);
         }
         Err(e) => {
             eprintln!("me: cannot determine me-preview version: {e}");
-            return Some(EXIT_USAGE);
+            return Some(EXIT_IO);
         }
     }
 
@@ -1496,7 +1544,7 @@ fn wire_previews(
             "me: preview directory {} is not a writable directory",
             dir.display()
         );
-        return Some(EXIT_USAGE);
+        return Some(EXIT_IO);
     }
 
     // Fail-closed (F8): refuse a dir that already holds foreign `plate-*` artifacts
@@ -1514,14 +1562,14 @@ fn wire_previews(
                              (e.g. {name}); use an empty/clean directory",
                             dir.display()
                         );
-                        return Some(EXIT_USAGE);
+                        return Some(EXIT_REFUSED);
                     }
                 }
             }
         }
         Err(e) => {
             eprintln!("me: cannot scan preview directory {}: {e}", dir.display());
-            return Some(EXIT_USAGE);
+            return Some(EXIT_IO);
         }
     }
 
@@ -1540,17 +1588,9 @@ fn wire_previews(
             }
             Err(e) => {
                 eprintln!("me: {e}");
-                // Spec §6: a sidecar RENDER failure (e.g. a string that fits no
-                // plate) is an invalid-input outcome → exit 4. A Spawn/IO failure
-                // (couldn't run the sidecar) is an environment/usage error → exit 2.
-                return Some(match e {
-                    preview::PreviewError::Render { .. } => EXIT_INVALID,
-                    // A render that produced no usable artifact (empty/garbage
-                    // output) is an invalid outcome, same class as a render
-                    // failure → exit 4 (the default `_` would map it to 2).
-                    preview::PreviewError::EmptyOutput { .. } => EXIT_INVALID,
-                    _ => EXIT_USAGE,
-                });
+                // A sidecar that was found and failed -- to spawn, to render,
+                // or to produce a usable file -- is IO (32): exit-code spec §7e.
+                return Some(i32::from(e.exit_code()));
             }
         }
     }
@@ -1664,7 +1704,7 @@ fn out_state(path: &std::path::Path) -> OutState {
 }
 
 /// `--out`, `--manifest`, `seal --out`: `write_private`, and on failure the W2
-/// line (ruling T6 with R5 as amended): one last stderr line, exit 1. The state
+/// line (ruling T6 with R5 as amended): one last stderr line, exit 32 (IO). The state
 /// sentence is said only when a second look confirms it.
 fn write_out(path: &std::path::Path, bytes: &[u8]) -> Result<(), i32> {
     let before = out_state(path);
@@ -1712,13 +1752,15 @@ fn refuse_write_block(b: WriteBlock, len: usize) -> Option<i32> {
         // re-created the defect under a clean build, clean clippy and a green
         // suite -- so `tests/terminal_destination.rs` asserts the emitted
         // WORDS, which is the only thing that noticed.
+        // Both are REFUSED (8): a destination refusal that `--out` (or, for
+        // the mode gate, `--allow-world-readable`) waives -- exit-code spec §3.
         WriteBlock::Terminal(kind) => {
             refuse_terminal_destination(len, kind);
-            Some(EXIT_USAGE)
+            Some(EXIT_REFUSED)
         }
         WriteBlock::WorldReadable(mode) => {
             refuse_world_readable_stdout(mode);
-            Some(EXIT_USAGE)
+            Some(EXIT_REFUSED)
         }
     }
 }
@@ -1918,6 +1960,51 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 );
             }
 
+            // EXIT-CODE SPEC R2: the usage checks come before any input is
+            // read -- after the argv bearer/secret gate, the one check that
+            // precedes them (a flag-shape usage error must not pre-empt a
+            // refusal about material already in the shell's history).
+            if let Err((msg, code)) = argv_records_guard(records, *allow_argv_secret) {
+                eprintln!("me: {msg}");
+                return code;
+            }
+            // §5.1's single-document contract: argv and `--in` alone decide it.
+            if r#as.is_some() {
+                if let Some(msg) = mnemonic_engrave::descriptor::as_flag::single_document_error(
+                    records.len(),
+                    r#in.is_some(),
+                ) {
+                    eprintln!("me: {msg}");
+                    return EXIT_USAGE;
+                }
+            }
+            // `--expect`'s value: a setting. Parsed here, used after admission.
+            let expect_kinds = match expect.as_deref().map(sysw::expect::parse_kinds) {
+                None => None,
+                Some(Ok(k)) => Some(k),
+                Some(Err(e)) => {
+                    eprintln!("me: {e}");
+                    return EXIT_USAGE;
+                }
+            };
+            // P5 N-1 -- `--iterations` outside the range. It used to sit just
+            // before `decide_sealing`, which PRINTS (F-246: no line describing
+            // a container may print until every gate that can abort the write
+            // has run); it now sits before the input is even read, which keeps
+            // that rule and adds R2's. MIN_ITERATIONS is the clap default
+            // (100_000), so a value outside the range is ALWAYS one the
+            // operator typed, on the sealed and unsealed paths alike. USAGE,
+            // as `me seal` says for the same flag.
+            if !(sysw::wire::MIN_ITERATIONS..=sysw::wire::MAX_ITERATIONS).contains(iterations) {
+                eprintln!(
+                    "me: --iterations {iterations} is outside {}..={} — a container built with \
+                     it is one no conforming reader will open",
+                    sysw::wire::MIN_ITERATIONS,
+                    sysw::wire::MAX_ITERATIONS
+                );
+                return EXIT_USAGE;
+            }
+
             let (recs, document) =
                 match read_records(records, r#in.as_ref(), *allow_argv_secret, r#as.is_some()) {
                     Ok(r) => (r.records, r.document),
@@ -1937,23 +2024,20 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // the shipped ones rather than a second implementation.
             let mut recs = recs;
             if let Some(form) = r#as {
-                if let Some(msg) = mnemonic_engrave::descriptor::as_flag::single_document_error(
-                    records.len(),
-                    r#in.is_some(),
-                ) {
-                    eprintln!("me: {msg}");
-                    return EXIT_USAGE;
-                }
                 let run = mnemonic_engrave::descriptor::as_flag::run((*form).into(), &document);
                 for n in &run.notes {
                     eprintln!("me: {n}");
                 }
                 match run.decision {
                     mnemonic_engrave::descriptor::as_flag::Decision::Refused(rs) => {
+                        // Each §6 row carries its class; more than one row
+                        // (§6's both-rows-fire case) reports the sum (R1).
+                        let mut bits = exit::Bits::OK;
                         for r in &rs {
                             eprintln!("me: {r}");
+                            bits |= r.row.class();
                         }
-                        return EXIT_REFUSED;
+                        return bits_code(bits);
                     }
                     mnemonic_engrave::descriptor::as_flag::Decision::Pack(strings) => {
                         recs = strings;
@@ -2000,23 +2084,19 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // the stream -- for a record the SAME invocation packs at exit 0
             // without `--expect`. A false refusal carrying a false message, on
             // the funds path, inside the feature added to prevent exactly that.
-            if let Some(spec) = expect {
-                let kinds = match sysw::expect::parse_kinds(spec) {
-                    Ok(k) => k,
-                    Err(e) => {
-                        // A flag VALUE out of range is USAGE, not invalid: no
-                        // input has been read at the point it is caught, so
-                        // there is nothing yet for "invalid" to be about.
-                        eprintln!("me: {e}");
-                        return EXIT_USAGE;
-                    }
-                };
-                let unmet = sysw::expect::check(&recs, &kinds, admission);
+            // The value was parsed, as a setting, before the input was read.
+            if let Some(kinds) = &expect_kinds {
+                let unmet = sysw::expect::check(&recs, kinds, admission);
                 if !unmet.is_empty() {
+                    // NO (1): the stream was compared against the operator's
+                    // stated claim and came out no -- or INVALID (2) for a
+                    // card this build cannot read (`Unmet::class`).
+                    let mut bits = exit::Bits::OK;
                     for u in &unmet {
                         eprintln!("me: {}", sysw::expect::describe(u));
+                        bits |= u.class();
                     }
-                    return EXIT_INVALID;
+                    return bits_code(bits);
                 }
             }
 
@@ -2036,8 +2116,8 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // output while `document` is still the descriptor, so consulting
             // here would answer "`--as` decides" to an operator who has just
             // decided. And it runs AFTER `--expect`: ahead of it, `--in
-            // <descriptor> --expect mnemonic` would exit 2 about a choice
-            // instead of 4 about the expectation that was actually stated.
+            // <descriptor> --expect mnemonic` would exit 8 about a choice
+            // instead of 1 about the expectation that was actually stated.
             //
             // The gate's first invariant is that a record-shaped input never
             // hears descriptor vocabulary or a changed exit code, and
@@ -2065,16 +2145,18 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     mnemonic_engrave::descriptor::Outcome::RecordRefusal => {}
                     mnemonic_engrave::descriptor::Outcome::AsDecides => {
                         eprintln!("me: {}", mnemonic_engrave::descriptor::choice_block());
-                        // Nothing was refused; a choice was not made.
-                        return EXIT_USAGE;
+                        // The tool declines to choose a packing for the
+                        // operator, and `--as` waives it: REFUSED (8), the
+                        // class of §6's as-omitted row.
+                        return bits_code(mnemonic_engrave::descriptor::Row::AsOmitted.class());
                     }
                     mnemonic_engrave::descriptor::Outcome::DescriptorRefusal(r) => {
                         eprintln!("me: {r}");
-                        return EXIT_REFUSED;
+                        return bits_code(r.row.class());
                     }
                     mnemonic_engrave::descriptor::Outcome::MultiRecord(r) => {
                         eprintln!("me: {r}");
-                        return EXIT_INVALID;
+                        return bits_code(r.row.class());
                     }
                 }
             }
@@ -2092,7 +2174,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // ordering change, not a second implementation of admission.
             if let Err(e) = sysw::admit_check(&recs, admission) {
                 eprintln!("me: {}", sysw_error(&e));
-                return EXIT_INVALID;
+                return i32::from(e.exit_code());
             }
 
             // §6a's payload-wide single-`now:` rule, checked HERE as well as in
@@ -2105,11 +2187,9 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             {
                 let nows = mnemonic_engrave::sysw::composer_records::now_indices(&recs);
                 if nows.len() > 1 {
-                    eprintln!(
-                        "me: {}",
-                        sysw_error(&mnemonic_engrave::sysw::SyswError::SecondNow(nows[1]))
-                    );
-                    return EXIT_INVALID;
+                    let e = mnemonic_engrave::sysw::SyswError::SecondNow(nows[1]);
+                    eprintln!("me: {}", sysw_error(&e));
+                    return i32::from(e.exit_code());
                 }
             }
 
@@ -2176,30 +2256,6 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // The flags still WIN when given: they are the operator saying
             // what they want, and the content default only decides when
             // nobody has. What §2.4 forbids is deciding SILENTLY.
-            // P5 N-1 — BEFORE `decide_sealing`, which PRINTS. F-246's rule is
-            // that no line describing a container may print until every gate
-            // that can abort the write has run, and this was the one gate still
-            // sitting behind it: `--iterations 5` printed `sealing: SEALED ...`
-            // and then exited 2.
-            //
-            // The `sealing &&` guard came off with the move, and it costs
-            // nothing: MIN_ITERATIONS is the clap default (100_000), so a value
-            // outside the range is ALWAYS one the operator typed. Refusing a
-            // mistyped flag on the unsealed path too is the honest reading --
-            // silently ignoring it was never the intent.
-            if !(sysw::wire::MIN_ITERATIONS..=sysw::wire::MAX_ITERATIONS).contains(iterations) {
-                eprintln!(
-                    "me: --iterations {iterations} is outside {}..={} — a container built with \
-                     it is one no conforming reader will open",
-                    sysw::wire::MIN_ITERATIONS,
-                    sysw::wire::MAX_ITERATIONS
-                );
-                // USAGE, not invalid, and `me seal` has always said so
-                // (`SealError::Iterations(_) => EXIT_USAGE`). Nothing has been
-                // read yet; the operator mistyped a flag.
-                return EXIT_USAGE;
-            }
-
             let sealing = decide_sealing(&recs, *no_passphrase, *passphrase_ask, *passphrase_words);
             // H6 §8.2.4 — AFTER the sealing line, because its own wording refers
             // to it. `decide_sealing` itself is BYTE-UNCHANGED: classification
@@ -2221,7 +2277,14 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     Ok(p) => Some(p),
                     Err(e) => {
                         eprintln!("me: reading the passphrase: {e}");
-                        return EXIT_USAGE;
+                        // End of input at a prompt is empty input (2,
+                        // exit-code spec decision 9); anything else is the
+                        // terminal failing (32).
+                        return if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                            EXIT_INVALID
+                        } else {
+                            EXIT_IO
+                        };
                     }
                 }
             } else {
@@ -2314,16 +2377,10 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     } else {
                         eprintln!("me: {}", sysw_error(&e));
                     }
-                    // The library's own out-of-range iteration check reports
-                    // the same operator mistake as the flag guard above, so it
-                    // gets the same code rather than the generic one.
-                    if matches!(
-                        e,
-                        sysw::SyswError::Wire(sysw::wire::WireError::Iterations(_))
-                    ) {
-                        return EXIT_USAGE;
-                    }
-                    return EXIT_INVALID;
+                    // `SyswError::exit_code` gives the library's own
+                    // out-of-range iteration check the same code as the flag
+                    // guard above (USAGE), and the rest their classes.
+                    return i32::from(e.exit_code());
                 }
             };
             // F-605: THE CARD IS PRINTED AFTER THE WRITE, NOT BEFORE.
@@ -2354,7 +2411,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                     }
                     Err(e) => {
                         eprintln!("me: {}", sysw_error(&e));
-                        return EXIT_INVALID;
+                        return i32::from(e.exit_code());
                     }
                 };
                 eprintln!(
@@ -2429,7 +2486,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                 Ok(b) => b,
                 Err(e) => {
                     eprintln!("me: {}: {e}", file.display());
-                    return EXIT_USAGE;
+                    return read_err_code(&e);
                 }
             };
             let h = match sysw::wire::Header::parse(&blob) {
@@ -3463,6 +3520,118 @@ struct Records {
     document: String,
 }
 
+/// The post-parse argv gate of `sysw pack` (R2 / G-P3.5, P5 I-1, F-270).
+///
+/// Split out of [`read_records`] so `pack` can run it FIRST, ahead of its
+/// usage checks (exit-code spec R2: the argv guard is the one check that
+/// precedes usage), and still before any input is read. `read_records` calls it
+/// too, so the gate holds for every caller of the reader.
+fn argv_records_guard(argv: &[String], allow_argv_secret: bool) -> Result<(), (String, i32)> {
+    // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
+    // the whole gate: a guard placed downstream of the work it exists to
+    // prevent has already lost. Before it, `me sysw pack tx:<hex>` wrote
+    // the container to stdout at exit 0 -- and on the DEFAULT path it also
+    // generated a passphrase and told the operator to write it down first.
+    //
+    // argv is a PUBLIC channel: /proc/<pid>/cmdline is world-readable
+    // without hidepid, `ps` shows it to every user on the box, and the
+    // shell records it in a history file that outlives the machine. A raw
+    // signed transaction is a BEARER instrument -- whoever reads it can
+    // broadcast it -- so "prefer --in" is not enough. `mt` already refuses
+    // a transaction as an argument for exactly this reason.
+    //
+    // Matched on the TRIMMED, case-folded prefix rather than through
+    // `classify`, deliberately: a near-miss like ` TX:<hex>` is then
+    // refused here for the BEARER reason rather than three screens later
+    // for a formatting one. Neither message may name the body.
+    for (i, r) in argv.iter().enumerate() {
+        use mnemonic_engrave::sysw::record::Class;
+        // F-270: TRIM AND CASE-FOLD, and feed the result to BOTH arms.
+        // This used to be `trim_start` only, and only the `tx:` prefix arm
+        // consumed it -- `classify` received the RAW token -- so the
+        // near-miss protection this gate's own comment describes existed
+        // for one class of five. Measured: an uppercase `MS1…` was refused
+        // as "not a form this container can place" at rc 4 rather than as
+        // SECRET key material at rc 3, pointing the operator at
+        // `sysw::classify` instead of at purging their history.
+        let trimmed = r.trim().to_ascii_lowercase();
+
+        // The `tx:` PREFIX check stays, and stays FIRST, for the reason
+        // above: a near-miss like ` TX:<hex>` is refused here for the
+        // BEARER reason rather than three screens later for a formatting
+        // one. `classify` would call that shape `Unknown`.
+        let by_prefix = trimmed.starts_with(mnemonic_engrave::sysw::record::TX_PREFIX);
+        if allow_argv_secret {
+            // The operator has said where they are. A single-user
+            // air-gapped box or an amnesic Tails session has no other
+            // observer and no persistence, and refusing there is friction
+            // that teaches people to alias the flag on permanently -- the
+            // failure mode that retired R3.
+            continue;
+        }
+
+        // P5 I-1 — AND THE CLASS CHECK, because the prefix covered ONE of
+        // five. Measured 2026-08-26: this gate refused a `tx:` record and
+        // accepted, at exit 0 in silence, an `ms1` string (seed entropy), a
+        // raw BIP-39 mnemonic, a `pass:` record, and the same transaction
+        // carried as `mt1` strings. It refused a TRANSACTION while accepting
+        // a SEED PHRASE.
+        //
+        // Keyed on the CLASS, not on a list of prefixes, so a class added
+        // later is covered by `is_argv_forbidden` rather than by whoever
+        // remembers to extend a match arm here.
+        let class = mnemonic_engrave::sysw::classify(&trimmed);
+        if by_prefix || class.is_argv_forbidden() {
+            // NAME THE CLASS, NEVER THE BODY. Printing it back would put the
+            // material in a SECOND public place -- the defect this refusal
+            // exists to name.
+            // The private-channel EXAMPLE must match the class. Showing
+            // `mt encode --qr | me sysw pack` to someone who pasted a seed
+            // phrase is advice for a different artifact entirely.
+            let example = if by_prefix || class.is_bearer() {
+                mnemonic_engrave::sysw::advice::BEARER_PRIVATE_CHANNEL_EXAMPLE
+            } else {
+                mnemonic_engrave::sysw::advice::SECRET_PRIVATE_CHANNEL_EXAMPLE
+            };
+            // F-264: the purge recipes are BUILT, not spelled inline, so a
+            // test can run the emitted one rather than a copy of it -- and
+            // so `history -d` can be NAMED in the warning while appearing
+            // in no recipe. See `io::remedy`.
+            let purge = mnemonic_engrave::io::remedy::history_purge_block("me sysw pack");
+            let (what, why) = if by_prefix || class == Class::Tx {
+                ("a `tx:` record", "A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it")
+            } else if class == Class::Mt {
+                ("an `mt1` string", "An mt1 set carries a signed transaction -- anyone who can read the set can broadcast it")
+            } else {
+                (
+                    "SECRET key material",
+                    "It can spend everything derived from it, forever",
+                )
+            };
+            return Err((
+                format!(
+                    "record {i}, as given (records count from 0), is {what} on \
+                     ARGV. Refused; nothing was read and nothing was written.\n      \
+                     {why} -- and argv is public: /proc, `ps` and \
+                     your shell history all keep a copy.\n      \
+                     Use a private channel instead:\n      \
+                     {example}\n      \
+                     \x20   me sysw pack --in records.txt --out p.bin\n\n      \
+                     {purge}\n      \
+                     If argv is safe where you are -- a single-user \
+                     air-gapped box, an amnesic Tails session -- \
+                     --allow-argv-secret proceeds."
+                ),
+                // REFUSED (8), not usage: the record is understood and
+                // well-formed, and a private channel or
+                // `--allow-argv-secret` waives the refusal.
+                EXIT_REFUSED,
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// `mt encode … | me sysw pack …` — a join an early draft claimed already
 /// worked and which measurably did not.
 fn read_records(
@@ -3474,118 +3643,18 @@ fn read_records(
     if let Some(p) = in_path.filter(|_| argv.is_empty()) {
         let raw = strip_leading_bom(
             std::fs::read_to_string(p)
-                .map_err(|e| (format!("{}: {e}", p.display()), EXIT_USAGE))?,
+                .map_err(|e| (format!("{}: {e}", p.display()), read_err_code(&e)))?,
         );
         // R7, and it applies to THIS channel too -- see `no_records`.
         let records =
-            no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_USAGE))?;
+            no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_INVALID))?;
         return Ok(Records {
             records,
             document: raw,
         });
     }
     if !argv.is_empty() {
-        // R2 / G-P3.5. THIS RUNS BEFORE ANYTHING ELSE `pack` DOES, and that is
-        // the whole gate: a guard placed downstream of the work it exists to
-        // prevent has already lost. Before it, `me sysw pack tx:<hex>` wrote
-        // the container to stdout at exit 0 -- and on the DEFAULT path it also
-        // generated a passphrase and told the operator to write it down first.
-        //
-        // argv is a PUBLIC channel: /proc/<pid>/cmdline is world-readable
-        // without hidepid, `ps` shows it to every user on the box, and the
-        // shell records it in a history file that outlives the machine. A raw
-        // signed transaction is a BEARER instrument -- whoever reads it can
-        // broadcast it -- so "prefer --in" is not enough. `mt` already refuses
-        // a transaction as an argument for exactly this reason.
-        //
-        // Matched on the TRIMMED, case-folded prefix rather than through
-        // `classify`, deliberately: a near-miss like ` TX:<hex>` is then
-        // refused here for the BEARER reason rather than three screens later
-        // for a formatting one. Neither message may name the body.
-        for (i, r) in argv.iter().enumerate() {
-            use mnemonic_engrave::sysw::record::Class;
-            // F-270: TRIM AND CASE-FOLD, and feed the result to BOTH arms.
-            // This used to be `trim_start` only, and only the `tx:` prefix arm
-            // consumed it -- `classify` received the RAW token -- so the
-            // near-miss protection this gate's own comment describes existed
-            // for one class of five. Measured: an uppercase `MS1…` was refused
-            // as "not a form this container can place" at rc 4 rather than as
-            // SECRET key material at rc 3, pointing the operator at
-            // `sysw::classify` instead of at purging their history.
-            let trimmed = r.trim().to_ascii_lowercase();
-
-            // The `tx:` PREFIX check stays, and stays FIRST, for the reason
-            // above: a near-miss like ` TX:<hex>` is refused here for the
-            // BEARER reason rather than three screens later for a formatting
-            // one. `classify` would call that shape `Unknown`.
-            let by_prefix = trimmed.starts_with(mnemonic_engrave::sysw::record::TX_PREFIX);
-            if allow_argv_secret {
-                // The operator has said where they are. A single-user
-                // air-gapped box or an amnesic Tails session has no other
-                // observer and no persistence, and refusing there is friction
-                // that teaches people to alias the flag on permanently -- the
-                // failure mode that retired R3.
-                continue;
-            }
-
-            // P5 I-1 — AND THE CLASS CHECK, because the prefix covered ONE of
-            // five. Measured 2026-08-26: this gate refused a `tx:` record and
-            // accepted, at exit 0 in silence, an `ms1` string (seed entropy), a
-            // raw BIP-39 mnemonic, a `pass:` record, and the same transaction
-            // carried as `mt1` strings. It refused a TRANSACTION while accepting
-            // a SEED PHRASE.
-            //
-            // Keyed on the CLASS, not on a list of prefixes, so a class added
-            // later is covered by `is_argv_forbidden` rather than by whoever
-            // remembers to extend a match arm here.
-            let class = mnemonic_engrave::sysw::classify(&trimmed);
-            if by_prefix || class.is_argv_forbidden() {
-                // NAME THE CLASS, NEVER THE BODY. Printing it back would put the
-                // material in a SECOND public place -- the defect this refusal
-                // exists to name.
-                // The private-channel EXAMPLE must match the class. Showing
-                // `mt encode --qr | me sysw pack` to someone who pasted a seed
-                // phrase is advice for a different artifact entirely.
-                let example = if by_prefix || class.is_bearer() {
-                    mnemonic_engrave::sysw::advice::BEARER_PRIVATE_CHANNEL_EXAMPLE
-                } else {
-                    mnemonic_engrave::sysw::advice::SECRET_PRIVATE_CHANNEL_EXAMPLE
-                };
-                // F-264: the purge recipes are BUILT, not spelled inline, so a
-                // test can run the emitted one rather than a copy of it -- and
-                // so `history -d` can be NAMED in the warning while appearing
-                // in no recipe. See `io::remedy`.
-                let purge = mnemonic_engrave::io::remedy::history_purge_block("me sysw pack");
-                let (what, why) = if by_prefix || class == Class::Tx {
-                    ("a `tx:` record", "A raw signed transaction is a BEARER instrument -- anyone who can read it can broadcast it")
-                } else if class == Class::Mt {
-                    ("an `mt1` string", "An mt1 set carries a signed transaction -- anyone who can read the set can broadcast it")
-                } else {
-                    (
-                        "SECRET key material",
-                        "It can spend everything derived from it, forever",
-                    )
-                };
-                return Err((
-                    format!(
-                        "record {i}, as given (records count from 0), is {what} on \
-                         ARGV. Refused; nothing was read and nothing was written.\n      \
-                         {why} -- and argv is public: /proc, `ps` and \
-                         your shell history all keep a copy.\n      \
-                         Use a private channel instead:\n      \
-                         {example}\n      \
-                         \x20   me sysw pack --in records.txt --out p.bin\n\n      \
-                         {purge}\n      \
-                         If argv is safe where you are -- a single-user \
-                         air-gapped box, an amnesic Tails session -- \
-                         --allow-argv-secret proceeds."
-                    ),
-                    // POLICY REFUSAL, not usage: the record is understood and
-                    // well-formed, and this tool will never accept it here.
-                    EXIT_REFUSED,
-                ));
-            }
-        }
+        argv_records_guard(argv, allow_argv_secret)?;
         // R1 (bug hunt #4): argv AND --in. Checked AFTER the guard above, for
         // the pack arm's rule: a flag-shape usage error must not pre-empt a
         // refusal about material already in the shell's history.
@@ -3636,7 +3705,10 @@ fn read_records(
             // would build a container missing exactly what the pipeline was
             // supposed to supply.
             if from_stdin.is_empty() {
-                return Err((no_records_guard(from_stdin, None).unwrap_err(), EXIT_USAGE));
+                return Err((
+                    no_records_guard(from_stdin, None).unwrap_err(),
+                    EXIT_INVALID,
+                ));
             }
             // Spliced IN PLACE. A record's position is the operator's, and
             // appending stdin at the end would silently reorder the container
@@ -3662,7 +3734,8 @@ fn read_records(
     }
     // R7 for the stdin channel, through the same guard `--in` uses.
     let raw = read_stdin_raw()?;
-    let records = no_records_guard(split_record_stream(&raw), None).map_err(|e| (e, EXIT_USAGE))?;
+    let records =
+        no_records_guard(split_record_stream(&raw), None).map_err(|e| (e, EXIT_INVALID))?;
     Ok(Records {
         records,
         document: raw,
@@ -3710,7 +3783,7 @@ fn read_stdin_raw() -> Result<String, (String, i32)> {
     let mut raw = String::new();
     std::io::stdin()
         .read_to_string(&mut raw)
-        .map_err(|e| (format!("stdin: {e}"), EXIT_USAGE))?;
+        .map_err(|e| (format!("stdin: {e}"), read_err_code(&e)))?;
     Ok(strip_leading_bom(raw))
 }
 
@@ -3758,7 +3831,7 @@ fn emit(
         Some(p) => match write_out(p, bytes) {
             Ok(()) => EXIT_OK,
             // A write that failed is the environment, not the artifact: a
-            // read-only directory or a full disk. Exit 1 (ruling T6).
+            // read-only directory or a full disk. IO, exit 32 (R8).
             Err(code) => code,
         },
         // A failed stdout write ends the verb inside the writer (S1a-S1d).

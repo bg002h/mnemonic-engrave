@@ -74,6 +74,59 @@ pub enum Row {
 }
 
 impl Row {
+    /// The exit-code class of this §6 row (`SPEC_constellation_exit_codes.md`
+    /// §3). Exhaustive on purpose (R13): a new row does not compile until it is
+    /// classified.
+    ///
+    /// - REFUSED (8): [`Row::AsOmitted`] -- the tool declines to choose a
+    ///   packing for the operator, and `--as` waives it -- and
+    ///   [`Row::MixedNetwork`], a network contradiction inside the file
+    ///   (test 3; decision 1's HARD mismatch).
+    /// - INVALID (2): every other row. Each is a fact about the wallet or the
+    ///   file -- unparseable, inadmissible, or not representable on the path
+    ///   asked for -- and no flag waives the rule behind it.
+    pub fn class(self) -> mnemonic_io_lib::exit::Bits {
+        use mnemonic_io_lib::exit::Bits;
+        match self {
+            Row::AsOmitted | Row::MixedNetwork => Bits::REFUSED,
+            Row::Unparseable
+            | Row::EmptyFile
+            | Row::WhitespaceOnly
+            | Row::JsonInnerMalformed
+            | Row::BlueWalletNoName
+            | Row::BlueWalletNoFormat
+            | Row::BlueWalletZeroCosigners
+            | Row::BlueWalletPolicyCount
+            | Row::BlueWalletNoOrigin
+            | Row::BlueWalletBadFingerprint
+            | Row::MultiUnderDescriptor
+            | Row::Miniscript
+            | Row::Md1FixedIndex
+            | Row::ThresholdExceedsKeys
+            | Row::ThresholdBelowOne
+            | Row::KeyCountExceeded
+            | Row::KeyIdentity
+            | Row::KeyIdentityDuplicate
+            | Row::UnsupportedKeyVersion
+            | Row::TaprootMultisig
+            | Row::PromotionPathNotInferable
+            | Row::PromotionAccountNotZero
+            | Row::PromotionFingerprintNoPath
+            | Row::PromotionMultisigCosignerKey
+            | Row::PromotionTestnetKey
+            | Row::BitcoinAddress
+            | Row::MultiInSingleKeyScript
+            | Row::KeyInScriptSlot
+            | Row::UseSiteHardened
+            | Row::UseSiteNonConsecutive
+            | Row::UseSiteOutOfSet
+            | Row::Md1NoWildcard
+            | Row::MultiRecordDescriptor => Bits::INVALID,
+        }
+    }
+}
+
+impl Row {
     pub const ALL: &'static [Row] = &[
         Row::Unparseable,
         Row::EmptyFile,
@@ -1155,5 +1208,28 @@ pub fn form_of(d: &Parsed) -> String {
     match (d.script, d.multi) {
         (s, None) => s.descriptor_form().to_string(),
         (s, Some(m)) => format!("{}({}(…))", s.descriptor_form(), m.spelling()),
+    }
+}
+
+#[cfg(test)]
+mod exit_class_tests {
+    use super::Row;
+    use mnemonic_io_lib::exit::Bits;
+
+    /// R13's table test: every §6 row, by [`Row::ALL`], has the class the
+    /// spec's ordered tests give it. Only the two waivable/network rows are
+    /// REFUSED; the rest are INVALID.
+    #[test]
+    fn every_row_maps_to_its_exit_class() {
+        for &row in Row::ALL {
+            let want = match row {
+                Row::AsOmitted | Row::MixedNetwork => Bits::REFUSED,
+                _ => Bits::INVALID,
+            };
+            assert_eq!(row.class(), want, "{row:?}");
+            assert_eq!(row.class().to_exit_code(), want.to_exit_code());
+        }
+        assert_eq!(Row::AsOmitted.class().to_exit_code(), 8);
+        assert_eq!(Row::Unparseable.class().to_exit_code(), 2);
     }
 }
