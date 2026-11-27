@@ -2097,7 +2097,7 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
                         return bits_code(bits);
                     }
                     mnemonic_engrave::descriptor::as_flag::Decision::Pack(strings) => {
-                        recs = strings;
+                        recs = Zeroizing::new(strings);
                     }
                 }
             }
@@ -2421,28 +2421,29 @@ fn run_sysw(cmd: &SyswCmd) -> i32 {
             // engraves such a payload through its other doors.
             report_kit(&recs, &unconfirmed);
 
-            let blob = match sysw::pack_with(recs, passphrase.as_deref(), *iterations, admission) {
-                Ok(b) => b,
-                Err(e) => {
-                    // On the WRITE path "malformed container" is the wrong
-                    // sentence — nothing is malformed, the operator simply gave
-                    // more than a section can hold. Saying it the reader's way
-                    // sends them looking for a corrupt file they do not have.
-                    if e == sysw::SyswError::Wire(sysw::wire::WireError::SectionTooLong) {
-                        eprintln!(
+            let blob =
+                match sysw::pack_with(take(recs), passphrase.as_deref(), *iterations, admission) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        // On the WRITE path "malformed container" is the wrong
+                        // sentence — nothing is malformed, the operator simply gave
+                        // more than a section can hold. Saying it the reader's way
+                        // sends them looking for a corrupt file they do not have.
+                        if e == sysw::SyswError::Wire(sysw::wire::WireError::SectionTooLong) {
+                            eprintln!(
                             "me: these records are too long for one payload: a section caps at \
                              {} bytes. Split them across two payloads.",
                             sysw::wire::MAX_SECTION_LEN
                         );
-                    } else {
-                        eprintln!("me: {}", sysw_error(&e));
+                        } else {
+                            eprintln!("me: {}", sysw_error(&e));
+                        }
+                        // `SyswError::exit_code` gives the library's own
+                        // out-of-range iteration check the same code as the flag
+                        // guard above (USAGE), and the rest their classes.
+                        return i32::from(e.exit_code());
                     }
-                    // `SyswError::exit_code` gives the library's own
-                    // out-of-range iteration check the same code as the flag
-                    // guard above (USAGE), and the rest their classes.
-                    return i32::from(e.exit_code());
-                }
-            };
+                };
             // F-605: THE CARD IS PRINTED AFTER THE WRITE, NOT BEFORE.
             //
             // It used to print here, and a failing write then left the operator
@@ -3581,9 +3582,12 @@ fn report_strength(passphrase: Option<&str>, records: &[String]) {
 /// document, and the join is the only reading of several that keeps a record's
 /// index meaning what it means everywhere else.
 #[derive(Debug)]
+///
+/// Both fields are `Zeroizing`: a `phrase:` or `ms1` record is secret
+/// material, and the records and the joined document are its copies.
 struct Records {
-    records: Vec<String>,
-    document: String,
+    records: Zeroizing<Vec<String>>,
+    document: Zeroizing<String>,
 }
 
 /// The post-parse argv gate of `sysw pack` (R2 / G-P3.5, P5 I-1, F-270).
@@ -3707,13 +3711,15 @@ fn read_records(
     as_present: bool,
 ) -> Result<Records, (String, i32)> {
     if let Some(p) = in_path.filter(|_| argv.is_empty()) {
-        let raw = strip_leading_bom(
+        let raw = strip_leading_bom(Zeroizing::new(
             std::fs::read_to_string(p)
                 .map_err(|e| (format!("{}: {e}", p.display()), read_err_code(&e)))?,
-        );
+        ));
         // R7, and it applies to THIS channel too -- see `no_records`.
-        let records =
-            no_records_guard(split_record_stream(&raw), Some(p)).map_err(|e| (e, EXIT_INVALID))?;
+        let records = Zeroizing::new(split_record_stream(&raw));
+        let records = Zeroizing::new(
+            no_records_guard(take(records), Some(p)).map_err(|e| (e, EXIT_INVALID))?,
+        );
         return Ok(Records {
             records,
             document: raw,
@@ -3734,8 +3740,8 @@ fn read_records(
             // With `--as`, the caller's §5.1 shape check refuses this
             // invocation in its own words. Read neither --in nor stdin.
             return Ok(Records {
-                records: argv.to_vec(),
-                document: argv.join("\n"),
+                records: Zeroizing::new(argv.to_vec()),
+                document: Zeroizing::new(argv.join("\n")),
             });
         }
         // §6b — `-` MEANS STDIN, AND IT IS IMPLEMENTED RATHER THAN MERELY
@@ -3772,14 +3778,14 @@ fn read_records(
             // supposed to supply.
             if from_stdin.is_empty() {
                 return Err((
-                    no_records_guard(from_stdin, None).unwrap_err(),
+                    no_records_guard(Vec::new(), None).unwrap_err(),
                     EXIT_INVALID,
                 ));
             }
             // Spliced IN PLACE. A record's position is the operator's, and
             // appending stdin at the end would silently reorder the container
             // relative to the command they typed.
-            let mut out = Vec::with_capacity(argv.len() + from_stdin.len() - 1);
+            let mut out = Zeroizing::new(Vec::with_capacity(argv.len() + from_stdin.len() - 1));
             for r in argv {
                 if r == "-" {
                     out.extend(from_stdin.iter().cloned());
@@ -3787,21 +3793,22 @@ fn read_records(
                     out.push(r.clone());
                 }
             }
-            let document = out.join("\n");
+            let document = Zeroizing::new(out.join("\n"));
             return Ok(Records {
                 records: out,
                 document,
             });
         }
         return Ok(Records {
-            records: argv.to_vec(),
-            document: argv.join("\n"),
+            records: Zeroizing::new(argv.to_vec()),
+            document: Zeroizing::new(argv.join("\n")),
         });
     }
     // R7 for the stdin channel, through the same guard `--in` uses.
     let raw = read_stdin_raw()?;
+    let records = Zeroizing::new(split_record_stream(&raw));
     let records =
-        no_records_guard(split_record_stream(&raw), None).map_err(|e| (e, EXIT_INVALID))?;
+        Zeroizing::new(no_records_guard(take(records), None).map_err(|e| (e, EXIT_INVALID))?);
     Ok(Records {
         records,
         document: raw,
@@ -3814,25 +3821,35 @@ fn read_records(
 /// — same tty note, same error, same splitting. Two readers of one channel is
 /// how `--in` and stdin came to disagree about an empty input in the first
 /// place.
-fn read_stdin_records() -> Result<Vec<String>, (String, i32)> {
-    Ok(split_record_stream(&read_stdin_raw()?))
+fn read_stdin_records() -> Result<Zeroizing<Vec<String>>, (String, i32)> {
+    Ok(Zeroizing::new(split_record_stream(&read_stdin_raw()?)))
+}
+
+/// Move a vector out of its `Zeroizing` wrapper without copying its strings,
+/// for a callee that takes `Vec<String>` by value and hands it back (the
+/// caller rewraps the result). The wrapper is left holding an empty vector.
+fn take(mut v: Zeroizing<Vec<String>>) -> Vec<String> {
+    std::mem::take(&mut *v)
 }
 
 /// Remove exactly one U+FEFF at the very start of a stream's raw text
 /// (FIX_me_admission_canonical §2 item 3). Nothing else is removed: a second
 /// one, or one later, stays and is refused by the existing `Unrecognised` text.
-fn strip_leading_bom(raw: String) -> String {
-    match raw.strip_prefix('\u{feff}') {
-        Some(rest) => rest.to_string(),
-        None => raw,
+///
+/// The BOM is drained in place, so the text is not copied into a second
+/// allocation that nothing would wipe.
+fn strip_leading_bom(mut raw: Zeroizing<String>) -> Zeroizing<String> {
+    if raw.starts_with('\u{feff}') {
+        raw.drain(..'\u{feff}'.len_utf8());
     }
+    raw
 }
 
 /// The stdin channel's bytes, before any splitting. Split out so the record
 /// stream and the whole-input document are the SAME read — stdin can only be
 /// read once, and two readers of one channel is how `--in` and stdin came to
 /// disagree about an empty input in the first place.
-fn read_stdin_raw() -> Result<String, (String, i32)> {
+fn read_stdin_raw() -> Result<Zeroizing<String>, (String, i32)> {
     // A TTY here is the "looks like a hang" case: an operator who typed
     // `me sysw pack` and pressed Enter with nothing piped in otherwise sees a
     // blank line forever. Say what is being waited for, on stderr, before
@@ -3846,7 +3863,7 @@ fn read_stdin_raw() -> Result<String, (String, i32)> {
             );
         }
     }
-    let mut raw = String::new();
+    let mut raw = Zeroizing::new(String::new());
     std::io::stdin()
         .read_to_string(&mut raw)
         .map_err(|e| (format!("stdin: {e}"), read_err_code(&e)))?;
@@ -4360,22 +4377,31 @@ mod tests {
     /// FIX_me_admission_canonical §2 item 3: exactly one leading U+FEFF goes.
     #[test]
     fn strip_leading_bom_removes_exactly_one() {
-        assert_eq!(strip_leading_bom("abc".to_string()), "abc");
-        assert_eq!(strip_leading_bom("\u{feff}abc".to_string()), "abc");
-        assert_eq!(
-            strip_leading_bom("\u{feff}\u{feff}abc".to_string()),
-            "\u{feff}abc"
-        );
-        assert_eq!(strip_leading_bom("a\u{feff}bc".to_string()), "a\u{feff}bc");
-        assert_eq!(
-            strip_leading_bom(" \u{feff}abc".to_string()),
-            " \u{feff}abc"
-        );
-        assert_eq!(strip_leading_bom(String::new()), "");
+        let strip =
+            |t: &str| -> String { strip_leading_bom(Zeroizing::new(t.to_string())).to_string() };
+        assert_eq!(strip("abc"), "abc");
+        assert_eq!(strip("\u{feff}abc"), "abc");
+        assert_eq!(strip("\u{feff}\u{feff}abc"), "\u{feff}abc");
+        assert_eq!(strip("a\u{feff}bc"), "a\u{feff}bc");
+        assert_eq!(strip(" \u{feff}abc"), " \u{feff}abc");
+        assert_eq!(strip(""), "");
+    }
+
+    /// The BOM is drained in place: the returned text is the SAME allocation
+    /// the read produced, so nothing is left behind in a buffer no wrapper
+    /// owns.
+    #[test]
+    fn strip_leading_bom_keeps_the_allocation() {
+        let raw = Zeroizing::new("\u{feff}phrase:abc".to_string());
+        let before = raw.as_ptr();
+        let out = strip_leading_bom(raw);
+        assert_eq!(out.as_ptr(), before);
+        assert_eq!(out.as_str(), "phrase:abc");
     }
 
     use super::strip_leading_bom;
     use super::{is_plate_artifact, shell_word, write_block, PayloadKind, WriteBlock};
+    use zeroize::Zeroizing;
     // `destination` and `Destination` are the library half's now, and only
     // this test module consults them directly.
     use mnemonic_engrave::io::{destination, Destination};

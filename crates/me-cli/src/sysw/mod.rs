@@ -761,6 +761,9 @@ fn split(
     records: Vec<String>,
     adm: Admission,
 ) -> Result<(Payload, Vec<u8>, wire::Header), SyswError> {
+    // Wrapped so a refusal below drops a secret record wiped, not freed as
+    // is; the loop moves each record out into its own wrapper.
+    let mut records = Zeroizing::new(records);
     // Admission first, so the partition below is total: every record is either
     // secret or public by the time it runs.
     admit_check(&records, adm)?;
@@ -771,7 +774,7 @@ fn split(
         return Err(SyswError::SecondNow(nows[1]));
     }
     let mut payload = Payload::default();
-    for r in records {
+    for r in std::mem::take(&mut *records) {
         // SPEC_hashlock_kinds §6: "Input is liberal, output is conservative."
         // THE PRODUCER RULE HAPPENS HERE, not in `hash_record` alone -- an
         // explicit `hash:sha256:<64hex>` is ACCEPTED on input and must never
