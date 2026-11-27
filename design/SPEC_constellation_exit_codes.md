@@ -1262,7 +1262,7 @@ final reviews are in this repo's `design/agent-reports/exit-codes-2026-11-26/`:
 | mnemonic-toolkit (`mnemonic`, manuals) | `e51607b8`, `71dc68ac`, `f8b8d19c`, `a32c3bd2` | 1C, 6I, 11M, 5N | `2a3ce852`, `5931f7a7`, `1cfa8950`, `a0ac6ad0` | toolkit-gui: NOT GREEN, 0C, 4I, 14M, 6N | `6205316f`, `1991f3e9`, `ed35d630`, `da439125`, `1c84f771` |
 | mnemonic-gui | `a5fa42d`, `691f9ce`, `2545d0c` | 1C, 2I, 5M, 3N | `2168783` | toolkit-gui, as above | `70970d2` |
 | mnemonic-refugium (`mr`, `mr-sitting`) | `26ee6dd42`, `6e6398d09`, `3e2a50c5e` | 0C, 4I, 7M, 3N | `f2a44d069` | `final-review-mr.md`: 0C, 2I, 7M, 9N | `26504288a`, `534a5d652`, `711373bef`, `27137cc6d`, `9131377b0` |
-| refugium-wallet (mr-gui, refugium-view; mr-codec pin to `9131377b`) | `1225400a` | 0C, 1I, 5M, 5N | `8cea3377` | `final-review-rw.md`: 0C, 1I, 2M, 5N | `e76999a7`, `013f3ebf`: the pin also brings mr's E101 card-check row, so the FOLLOWUP `rw-mrgui-card-check-row` is done here; two scoped re-reviews moved the check before engraving (`0902150c`, `46509782`, `c7c8fea2`; Brian's ruling pending) |
+| refugium-wallet (mr-gui, refugium-view; mr-codec pin to `9131377b`) | `1225400a` | 0C, 1I, 5M, 5N | `8cea3377` | `final-review-rw.md`: 0C, 1I, 2M, 5N | `e76999a7`, `013f3ebf`: the pin also brings mr's E101 card-check row, so the FOLLOWUP `rw-mrgui-card-check-row` is done here; two scoped re-reviews moved the check before engraving (`0902150c`, `46509782`, `c7c8fea2`; Brian ruled for this on 2026-11-27) |
 
 Still owed across the work, from the reviews:
 
