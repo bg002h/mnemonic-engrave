@@ -498,7 +498,10 @@ fn hex_lower(b: &[u8]) -> String {
 /// Strictly lowercase, strictly even-length. Uppercase is rejected rather than
 /// accepted-and-lowercased: EPD §6.6 hashes the record as it appears on the
 /// wire, so two spellings of one body would be two different digests.
-fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
+///
+/// Shared with `composer_records` (whose `phrase:` body is secret), which pins
+/// this exact grammar in a unit test: change what it accepts and that reds.
+pub(crate) fn unhex_lower(s: &str) -> Option<Zeroizing<Vec<u8>>> {
     // `% 2 != 0` rather than `is_multiple_of` — unstable on CI's Rust.
     // `manual_is_multiple_of` does not exist on CI's PINNED clippy (0.1.85)
     // either, so naming it below is itself an unknown lint there under

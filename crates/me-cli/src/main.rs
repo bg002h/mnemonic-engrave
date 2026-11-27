@@ -3490,16 +3490,22 @@ fn report_preimage_admission(records: &[String]) {
 /// Deriving is what makes §8.2.3's phrase half possible at all, and it is the
 /// reason the check lives on the host: PBKDF2 at 100,000 iterations is
 /// milliseconds here and about ten seconds on the SH2.
-fn preimage_of(record: &str, class: mnemonic_engrave::sysw::record::Class) -> Option<[u8; 32]> {
+///
+/// `Zeroizing`: X is bearer material, and a plain `[u8; 32]` return copied it
+/// out of `HashlockMethod::preimage`'s wiped buffer into one nothing wiped.
+fn preimage_of(
+    record: &str,
+    class: mnemonic_engrave::sysw::record::Class,
+) -> Option<zeroize::Zeroizing<[u8; 32]>> {
     use mnemonic_engrave::sysw::composer_records::{parse, ComposerRecord};
     use mnemonic_engrave::sysw::record::Class as C;
     match class {
         C::Phrase => match parse(record) {
-            Some(Ok(ComposerRecord::Phrase(p))) => Some(*p.method.preimage(p.phrase.as_bytes())),
+            Some(Ok(ComposerRecord::Phrase(p))) => Some(p.method.preimage(p.phrase.as_bytes())),
             _ => None,
         },
         C::Preimage => match ms_codec::decode(record.trim()) {
-            Ok((_, ms_codec::Payload::Preimage(x))) => Some(*x),
+            Ok((_, ms_codec::Payload::Preimage(x))) => Some(zeroize::Zeroizing::new(*x)),
             _ => None,
         },
         _ => None,

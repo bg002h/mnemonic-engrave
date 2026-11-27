@@ -15,14 +15,21 @@
 //! and every interior component are declarations nothing here can verify
 //! (F-217). The mapping review on the device says so beside each slot.
 //!
-//! The hex helpers are local twins of `record.rs`'s private ones on purpose:
-//! this module's rules are the composer spec's and are ported to the Go
-//! classifier as ONE unit; sharing a private helper across the two prefix
-//! families would couple that port to `record.rs`'s history.
+//! The hex ENCODER is a local twin of `record.rs`'s. The DECODER is
+//! `record.rs`'s own strict lowercase one, shared because it returns a
+//! `Zeroizing` buffer and the `phrase:` body is SECRET: a second, plain-`Vec`
+//! copy freed the decoded phrase unwiped. The composer spec's hex grammar
+//! (even length, `0-9a-f` only) is still this module's: a unit test below
+//! pins the shared decoder to it, string for string, so a change on the
+//! `record.rs` side reds here before it reaches the Go port's lockstep rows.
 
 use std::str::FromStr;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub};
+
+// Strict: even length, every character in `0-9a-f`; uppercase is NOT hex here
+// (section 5.3). Returns `Zeroizing<Vec<u8>>`. See the module doc.
+use super::record::unhex_lower;
 
 /// `key:<hex of "[fingerprint/path]xpub">`.
 pub const KEY_PREFIX: &str = "key:";
@@ -90,13 +97,27 @@ impl HashlockMethod {
     }
 }
 
-/// A parsed `phrase:` record. `phrase` is SECRET.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A parsed `phrase:` record. `phrase` is SECRET: it is wiped on drop, and
+/// `Debug` prints the method and never the phrase.
+#[derive(Clone, PartialEq, Eq)]
 pub struct PhraseRecord {
     /// The method selector the record names.
     pub method: HashlockMethod,
-    /// The phrase, verbatim, everything after the FIRST comma.
-    pub phrase: String,
+    /// The phrase, verbatim, everything after the FIRST comma. `Zeroizing`
+    /// so the parsed record wipes it on drop; borrow it (`as_bytes()`) rather
+    /// than copying it out.
+    pub phrase: zeroize::Zeroizing<String>,
+}
+
+/// Manual, NOT derived: a derived `Debug` prints the phrase, and a `{:?}` goes
+/// to logs, panic messages and test output that outlive the run.
+impl std::fmt::Debug for PhraseRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PhraseRecord")
+            .field("method", &self.method)
+            .field("phrase", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Which hash the SCRIPT commits to, in a `hash:` record
@@ -306,37 +327,6 @@ fn hex_lower(b: &[u8]) -> String {
         })
 }
 
-/// Strict: even length, every character in `0-9a-f`. Uppercase is NOT hex here
-/// (section 5.3: the section is hashed in its canonical lowercase form).
-fn unhex_lower(s: &str) -> Option<Vec<u8>> {
-    // `% 2 != 0`, NOT `is_multiple_of`, AND THE LINT IS ALLOWED ON PURPOSE.
-    //
-    // A newer clippy suggests `.is_multiple_of(2)`; that method is UNSTABLE
-    // (rust-lang/rust#128101) and CI pins Rust 1.85.0, where it is E0658. I
-    // took the suggestion, the local gate went green on a 1.97 nightly, and CI
-    // refused to compile -- a local tool demanding a change the pinned
-    // toolchain rejects. The push ritual caught it and correctly refused to
-    // push master, which is the whole reason the staging step exists.
-    //
-    // `unknown_lints` is allowed alongside it so the pinned 1.85 clippy, which
-    // has never heard of this lint, does not warn about the allow itself.
-    #[allow(unknown_lints, clippy::manual_is_multiple_of)]
-    if s.len() % 2 != 0
-        || !s
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    {
-        return None;
-    }
-    let mut out = Vec::with_capacity(s.len() / 2);
-    for pair in s.as_bytes().chunks(2) {
-        let hi = (pair[0] as char).to_digit(16)? as u8;
-        let lo = (pair[1] as char).to_digit(16)? as u8;
-        out.push((hi << 4) | lo);
-    }
-    Some(out)
-}
-
 /// `key:` + hex of the origin text. The text is NOT validated here; `parse`
 /// is the gate, so a test can build a malformed record on purpose.
 pub fn key_record(text: &str) -> String {
@@ -447,9 +437,14 @@ fn parse_phrase(body: &str) -> Result<ComposerRecord, ComposerRecordError> {
         _ => return Err(P),
     };
     ms_codec::hashlock::validate_phrase(phrase.as_bytes()).map_err(|_| P)?;
+    // Into a `Zeroizing` buffer sized up front, so it never reallocates and
+    // abandons an unwiped copy. `bytes` (the whole decoded body) is
+    // `Zeroizing` too and is wiped when this function returns.
+    let mut owned = zeroize::Zeroizing::new(String::with_capacity(phrase.len()));
+    owned.push_str(phrase);
     Ok(ComposerRecord::Phrase(PhraseRecord {
         method,
-        phrase: phrase.to_owned(),
+        phrase: owned,
     }))
 }
 
@@ -728,4 +723,76 @@ pub fn fixture_rows() -> Vec<FixtureRow> {
             host_line: c.host_line.map(str::to_string),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    /// The composer module's OWN decoder, verbatim from before it was replaced
+    /// by `record.rs`'s zeroizing one. It is the composer spec's hex grammar
+    /// (§6a / section 5.3), kept here as the reference the shared decoder is
+    /// held to.
+    fn reference_unhex_lower(s: &str) -> Option<Vec<u8>> {
+        #[allow(unknown_lints, clippy::manual_is_multiple_of)]
+        if s.len() % 2 != 0
+            || !s
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return None;
+        }
+        let mut out = Vec::with_capacity(s.len() / 2);
+        for pair in s.as_bytes().chunks(2) {
+            let hi = (pair[0] as char).to_digit(16)? as u8;
+            let lo = (pair[1] as char).to_digit(16)? as u8;
+            out.push((hi << 4) | lo);
+        }
+        Some(out)
+    }
+
+    /// The shared decoder accepts and rejects EXACTLY the strings the
+    /// composer's own decoder did, and decodes each accepted one to the same
+    /// bytes. Exhaustive over every string of up to four characters from an
+    /// alphabet that holds each class boundary (`0`/`9`, `a`/`f`, the
+    /// uppercase twins, the next letter `g`, the characters just outside the
+    /// digit and letter ranges, a separator, and a multi-byte character whose
+    /// BYTES are what a byte-wise check sees), plus the record corpus bodies.
+    ///
+    /// MUTATION that reds it: let `record.rs`'s `nibble` accept `b'A'..=b'F'`.
+    #[test]
+    fn the_shared_decoder_matches_the_composer_grammar_string_for_string() {
+        const ALPHABET: &[char] = &[
+            '0', '9', 'a', 'f', 'A', 'F', 'g', '/', ':', '`', ' ', ',', 'é',
+        ];
+        let mut inputs: Vec<String> = vec![String::new()];
+        let mut layer: Vec<String> = vec![String::new()];
+        for _ in 0..4 {
+            let next: Vec<String> = layer
+                .iter()
+                .flat_map(|p| {
+                    ALPHABET.iter().map(move |c| {
+                        let mut s = p.clone();
+                        s.push(*c);
+                        s
+                    })
+                })
+                .collect();
+            inputs.extend(next.iter().cloned());
+            layer = next;
+        }
+        for c in super::CASES {
+            if let Some((_, body)) = c.record.split_once(':') {
+                inputs.push(body.to_string());
+            }
+        }
+        let mut accepted = 0usize;
+        for s in &inputs {
+            let shared = super::unhex_lower(s).map(|z| z.to_vec());
+            let reference = reference_unhex_lower(s);
+            assert_eq!(shared, reference, "decoders disagree on {s:?}");
+            accepted += usize::from(reference.is_some());
+        }
+        // Not vacuous: both sides of the grammar were exercised.
+        assert!(accepted > 100, "only {accepted} accepted inputs");
+        assert!(inputs.len() - accepted > 100);
+    }
 }
