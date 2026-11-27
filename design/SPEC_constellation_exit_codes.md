@@ -345,7 +345,9 @@ These were open in revision 6's first form. Brian answered each on
    --offline`, since `verify` never asks a node.
 2. **A damaged duplicate plate that `mt` discards: 16.** Whenever `mt`
    tells the operator to re-cut a plate, the run adds 16, even when a clean
-   copy supplied the result.
+   copy supplied the result. Conditional advice about a string `mt` cannot
+   place in the set ("if it is one of these, re-cut it") is not that, and an
+   unreadable spare string stays 0 (Brian, the same day).
 3. **Groups with different set ids that cover every index: 2.** In `mk`
    and the toolkit, two or more short groups under different `chunk_set_id`s
    that declare one size and together cover every index of it are refused
