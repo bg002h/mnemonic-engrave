@@ -4,15 +4,16 @@
 GUIs on the `fx/*` working branches, which are reviewed but not merged or
 pushed (§10). The §2 decisions were built as recommended and still await
 Brian's ruling. So do the coordinator rulings of §2a, which the implementations
-follow, and the open questions of §2b, which nobody has decided.
+follow. Brian answered the five questions of §2b on 2026-11-26.
 
 **Revision 6 (2026-11-26).** This revision makes the spec say what the
 implementations do. It records the coordinator rulings taken during the
-implementation (§2a), lists the questions still open (§2b), folds the 27 spec
-defects that the final review listed (§10), records the interim state of the
-shared constants (decision 4, §9), replaces the GUI's version floors with
-detection by the help legend (§7j, §9), and adds Appendix A (settings and
-inputs, by tool). Revisions 1 to 5 were the review rounds below.
+implementation (§2a), records Brian's answers to the questions that were
+open (§2b, 2026-11-26), folds the 27 spec defects that the final review
+listed (§10), records the interim state of the shared constants
+(decision 4, §9), replaces the GUI's version floors with detection by the
+help legend (§7j, §9), and adds Appendix A (settings and inputs, by tool).
+Revisions 1 to 5 were the review rounds below.
 
 **Spec reviews** (Fable agents). §10 says how each finding was folded. The
 implementation reviews are in §10 too.
@@ -251,8 +252,8 @@ existing behaviour that some script or document relies on.
    - *The alternative* is 20 everywhere, which is safer and reverses D26's
      wording.
    - What counts as incomplete, and what is malformed instead, is in decision
-     6's table. Chunks that carry different set ids are an open question
-     (§2b).
+     6's table. Short groups under different set ids that together
+      cover every index of one size are 2 (§2b item 3).
 
 8. **`inspect` reports a string that would not decode (R5).** Today `ms
    inspect` prints "FAIL: would NOT decode" and exits 0, as its locked table
@@ -302,8 +303,8 @@ the implementations follow it, and it is pending Brian.
    named helper that is missing, cannot be started, fails, or gives a reply
    the tool cannot use sets 32. An unnamed default that is absent or failing
    is a warning and sets nothing. A helper's own answer (a null, a not-found)
-   is not a failure. Naming a missing path is not an offline switch. An
-   explicit `mt --offline` is open (§2b).
+   is not a failure. Naming a missing path is not an offline switch;
+   `mt --offline` is (§2b item 1).
 2. **16 survives a later failure (R1).** Once a verb has used a corrected
    value, bit 16 stays set when the run then fails (17, 18, 24 and so on).
    The exception is `repair` when it prints nothing.
@@ -324,8 +325,8 @@ the implementations follow it, and it is pending Brian.
 7. **A choice the tool declines (test 5).** When the tool declines to choose
    and a flag would choose, as `me` with `--as` omitted, the run is 8.
 8. **GUI scheme detection (R11, R12, §7j, §9).** Detection by the help legend
-   replaces version floors. 16 alone is shown amber, not green; the colour is
-   open for Brian (§2b).
+   replaces version floors. 16 alone is shown amber, not green (Brian, §2b
+   item 4).
 9. **Per-verb help (R11).** Each verb's `--help` ends with one line that
    states the bits it can set.
 10. **JSON (R14).** The `kind` strings differ across tools and are renamed
@@ -333,37 +334,28 @@ the implementations follow it, and it is pending Brian.
     recorded.
 11. **Decision 4's interim state** is recorded (decision 4, §9).
 
-### 2b. Open questions for Brian
+### 2b. Brian's answers to the open questions (2026-11-26)
 
-Nobody has decided these. The implementations do what each item says today.
+These were open in revision 6's first form. Brian answered each on
+2026-11-26, and the implementations follow.
 
-1. **An explicit offline switch for `mt`.** Under R9 naming a missing path is
-   not an offline switch, so an operator with `bitcoin-cli` on `PATH` cannot
-   keep `mt` from asking that node (which may be remote) about the
-   transaction's txids, short of editing `PATH`. The question is whether to
-   add `mt --offline` (or `--bitcoin-cli none`). Today there is none.
-2. **A damaged duplicate plate that `mt` discards.** When a set holds a clean
-   and a damaged copy of one chunk, `mt` keeps the clean copy and exits 0,
-   while it prints "re-cut it" for the damaged one. Either a discarded copy
-   does not set 16, as today, or 16 is set whenever the tool tells the
-   operator to re-engrave.
-3. **Groups with different set ids that cover every index.** Two `mk1`
-   chunks with different `chunk_set_id`s that together cover every index
-   exit 0 (16 if corrected) in `mk` and in the toolkit: each id forms its own
-   incomplete group, which decision 7 says is no failure. `md` refuses chunks
-   of two different cards (2). The choices are to say each set id is its own
-   group and the tool names the split, or to treat such groups as a
-   suspected miscorrection (2).
-4. **The GUI colour of 16 alone.** Recommended amber, which the mnemonic-gui fold adopts:
-   a lone corrected chunk is 16 and is verifiable only when the
-   set is reassembled, and the GUI cannot tell that from a verified
-   correction. The alternative is green with text that says "verified, or
-   verifiable when the whole set is read".
-5. **A toolkit path mismatch against a fingerprint mismatch.** In
-   `mnemonic bundle`, an inline descriptor path that disagrees with the
-   slot's path is 1, while the slot's fingerprint that disagrees with its
-   annotation is 2. Ruling 4 decides it once it is settled whether the slot
-   is a separate reference the operator gave or a second part of one input.
+1. **`mt --offline`: added.** With it `mt` never runs `bitcoin-cli`, even one
+   on `PATH`, says the chain was not checked, and exits as with no node.
+   Together with `--bitcoin-cli` it is usage (64).
+2. **A damaged duplicate plate that `mt` discards: 16.** Whenever `mt`
+   tells the operator to re-cut a plate, the run adds 16, even when a clean
+   copy supplied the result.
+3. **Groups with different set ids that cover every index: 2.** In `mk`
+   and the toolkit, two or more short groups under different `chunk_set_id`s
+   that declare one size and together cover every index of it are refused
+   (2, nothing printed): a suspected miscorrection of a set id, or two cards
+   mixed. Short groups that do not cover keep decision 7, and a complete
+   group never counts. The one-card verbs already refuse any mix of set
+   ids, as `md` does.
+4. **The GUI colour of 16 alone: amber,** as built.
+5. **A toolkit path mismatch and a fingerprint mismatch: both 2.** In
+   `mnemonic bundle` the slot and its descriptor or annotation are parts of
+   one input, so either disagreement is an input that contradicts itself.
 
 ## 3. The scheme
 
@@ -612,7 +604,7 @@ does.
   - A reply that is the helper's own answer, such as a null or a not-found,
     is not a failure.
   - Naming a path that does not exist is therefore not an offline switch.
-    Whether `mt` gains an explicit one is open (§2b).
+    `mt --offline` is the explicit switch (§2b item 1).
   - A helper failure sets 32 even when the input caused it, such as a
     sidecar that cannot render the plate the input describes. The message
     says what the helper reported.
@@ -652,8 +644,8 @@ does.
     anything else outside 0..125 as "ended abnormally" (§3).
   - A GUI decides whether output exists by looking at the output, never from
     the code.
-  - A GUI shows 16 alone in amber, not green (§2a ruling 8; the colour is
-    open, §2b). The code cannot tell a verified correction from one that is
+  - A GUI shows 16 alone in amber, not green (§2a ruling 8; Brian kept amber,
+    §2b item 4). The code cannot tell a verified correction from one that is
     verifiable only when the rest of a set is read.
   - The GUIs' own processes exit 0, 64, 32 (cannot start: missing libraries,
     no display, a child that fails to start) or 101. `mr-gui`'s catch-all 1
@@ -886,7 +878,8 @@ silent correction into 16.
   is not an offline switch. An unnamed `bitcoin-cli`, absent from `PATH` or
   found there and failing, stays 0 with its warning. Core's own answers
   (exit 5 from `getrawtransaction`, 89 from an old Core's `getindexinfo`)
-  are answers, not failures. Whether to add `mt --offline` is open (§2b).
+  are answers, not failures. `mt --offline` never runs `bitcoin-cli`, says the chain was not
+  checked, and is usage (64) together with `--bitcoin-cli` (§2b item 1).
 - **`mt verify --bitcoin-cli`** is usage, 64: `verify` never asks a node
   (`SPEC_mt_v0_1.md` (b)).
 - **Corrections.** In `decode`, `verify` and `inspect`, these move from 0 to 16
@@ -895,7 +888,8 @@ silent correction into 16.
   transaction that cannot be broadcast, not a different one. So `mt` reports
   16, never 20. A transliterated HRP character is a reading, not a
   correction, and does not set 16. A damaged duplicate that `mt` discards for
-  a clean copy is 0 today (open, §2b). The normative spec's
+  a clean copy adds 16, because `mt` tells the operator to re-cut it (§2b
+  item 2). The normative spec's
   one-liner (`SPEC_mt_v0_1.md:810-827` in mnemonic-engrave) and its exit
   status line (`:3384-3385`) change with this.
 
@@ -1098,7 +1092,7 @@ silent correction into 16.
   application's directory is searched before `PATH`). Version floors are gone,
   except G1's floor for secret runs. A legend that drifts by one word in one
   copy is therefore read as Undecoded, never as Legacy, whose 5 is green.
-- **16 alone** is amber, not green (R12; open, §2b).
+- **16 alone** is amber, not green (R12; Brian, §2b item 4).
 
 ### 7k. refugium-wallet
 
@@ -1288,13 +1282,13 @@ coordinator ruling of §2a; "open" means §2b.
 | --- | --- |
 | 1 (worked table names `mt verify`) | §3: `mt encode` on a spent input is 1; `mt verify --bitcoin-cli` is 64. |
 | 2 (R9: named, fails) | Ruling 1. R9 rewritten; §7d and §8 say a named missing path is 32 and not an offline switch. |
-| 3 (`mt --offline`) | Open, §2b item 1. |
+| 3 (`mt --offline`) | Added (Brian, §2b item 1). |
 | 4 (R1: does 16 survive) | Ruling 2. R1 amended. |
 | 5 (complete set that fails reassembly) | Ruling 3: 2, nothing printed. Decision 6's table; §7g. |
-| 6 (groups with different set ids) | Open, §2b item 3. |
+| 6 (groups with different set ids) | 2 when they cover every index (Brian, §2b item 3). |
 | 7 (§7d's oracle) | §7d: 16 means the transaction re-derives its id; witness bytes are not covered. |
 | 8 (`OK` with 16) | R5: allowed, with the correction named beside it. |
-| 9 (what counts as used; discarded duplicate) | Transliteration is not a correction (§7d). The duplicate is open, §2b item 2. |
+| 9 (what counts as used; discarded duplicate) | Transliteration is not a correction (§7d). The duplicate adds 16 (Brian, §2b item 2). |
 | 10 (test 1 against self-contradicting values) | Ruling 4. Tests 1, 4 and 6. |
 | 11 (settings and inputs list) | Appendix A, with the `@env:` rule. |
 | 12 (wrong passphrase) | Ruling 5. §3 "Passphrases and passwords", §7e, §7f. |
@@ -1303,7 +1297,7 @@ coordinator ruling of §2a; "open" means §2b.
 | 15 (§7h against decision 9; the lock) | Ruling 6. §7h: the mainnet sentence is 130, the lock 32. |
 | 16 (R14 and `kind`) | Ruling 10. R14: owed for the io-lib publish; repair's additive fields recorded. |
 | 17 (GUI detection) | Ruling 8. R11, §7j and §9. |
-| 18 (colour of 16 alone) | Ruling 8: amber. Open for Brian, §2b item 4. |
+| 18 (colour of 16 alone) | Ruling 8: amber; Brian kept it (§2b item 4). |
 | 19 (per-verb help) | Ruling 9. R11 names which binaries have it and which owe it. |
 | 20 (closed stdout and stdin) | R8: the platforms; a closed stdin is 2. |
 | 21 (helper failure the input caused) | R9 and §7e: 32. |
