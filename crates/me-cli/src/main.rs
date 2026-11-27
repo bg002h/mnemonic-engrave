@@ -1056,7 +1056,7 @@ fn run() -> i32 {
                 return read_err_code(&e);
             }
         }
-    } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+    } else if let Err(e) = read_to_zeroizing(&mut std::io::stdin().lock()).map(|s| input = s) {
         eprintln!("me: cannot read stdin: {e}");
         return read_err_code(&e);
     }
@@ -1189,7 +1189,7 @@ fn run_bundle_cli(
                 return read_err_code(&e);
             }
         }
-    } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+    } else if let Err(e) = read_to_zeroizing(&mut std::io::stdin().lock()).map(|s| input = s) {
         eprintln!("me: cannot read stdin: {e}");
         return read_err_code(&e);
     }
@@ -1308,7 +1308,7 @@ fn run_seal_cli(
                     return read_err_code(&e);
                 }
             }
-        } else if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+        } else if let Err(e) = read_to_zeroizing(&mut std::io::stdin().lock()).map(|s| input = s) {
             eprintln!("me: cannot read stdin: {e}");
             return read_err_code(&e);
         }
@@ -3581,13 +3581,22 @@ fn report_strength(passphrase: Option<&str>, records: &[String]) {
 /// the operands joined with newlines — §5.1 makes a single argv operand the
 /// document, and the join is the only reading of several that keeps a record's
 /// index meaning what it means everywhere else.
-#[derive(Debug)]
 ///
 /// Both fields are `Zeroizing`: a `phrase:` or `ms1` record is secret
-/// material, and the records and the joined document are its copies.
+/// material, and the records and the joined document are its copies. Its
+/// `Debug` prints counts only.
 struct Records {
     records: Zeroizing<Vec<String>>,
     document: Zeroizing<String>,
+}
+
+impl std::fmt::Debug for Records {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Records")
+            .field("records", &self.records.len())
+            .field("document", &"<redacted>")
+            .finish()
+    }
 }
 
 /// The post-parse argv gate of `sysw pack` (R2 / G-P3.5, P5 I-1, F-270).
@@ -3863,11 +3872,43 @@ fn read_stdin_raw() -> Result<Zeroizing<String>, (String, i32)> {
             );
         }
     }
-    let mut raw = Zeroizing::new(String::new());
-    std::io::stdin()
-        .read_to_string(&mut raw)
+    let raw = read_to_zeroizing(&mut std::io::stdin().lock())
         .map_err(|e| (format!("stdin: {e}"), read_err_code(&e)))?;
     Ok(strip_leading_bom(raw))
+}
+
+/// `read_to_string` into a buffer that is wiped as it grows. `read_to_string`
+/// itself regrows its `String` by reallocating, and each regrowth frees the old
+/// allocation without wiping it, leaving a partial copy of a secret record
+/// behind. Here every buffer that is outgrown is a `Zeroizing` that is dropped
+/// wiped once its bytes have been copied into the larger one.
+fn read_to_zeroizing(r: &mut impl Read) -> std::io::Result<Zeroizing<String>> {
+    let mut buf: Zeroizing<Vec<u8>> = Zeroizing::new(Vec::with_capacity(8192));
+    let mut chunk = Zeroizing::new([0u8; 4096]);
+    loop {
+        let n = match r.read(&mut chunk[..]) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        };
+        if buf.len() + n > buf.capacity() {
+            let mut grown = Zeroizing::new(Vec::with_capacity((buf.len() + n) * 2));
+            grown.extend_from_slice(&buf);
+            buf = grown; // the outgrown buffer drops here, wiped
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
+    match std::str::from_utf8(&buf) {
+        // Moved, not copied: the String takes the Vec's allocation.
+        Ok(_) => Ok(Zeroizing::new(
+            String::from_utf8(std::mem::take(&mut *buf)).expect("checked above"),
+        )),
+        Err(_) => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "stream did not contain valid UTF-8",
+        )),
+    }
 }
 
 /// **`kind` is its own parameter, and F-259 is why.** It used to travel in the
@@ -4385,6 +4426,30 @@ mod tests {
         assert_eq!(strip("a\u{feff}bc"), "a\u{feff}bc");
         assert_eq!(strip(" \u{feff}abc"), " \u{feff}abc");
         assert_eq!(strip(""), "");
+    }
+
+    /// The wiping reader returns exactly what `read_to_string` would, across
+    /// chunk and growth boundaries, and refuses non-UTF-8 the same way.
+    #[test]
+    fn read_to_zeroizing_matches_read_to_string() {
+        for len in [0usize, 1, 4095, 4096, 4097, 8192, 8193, 70_000] {
+            let text: String = (0..len).map(|i| (b'a' + (i % 26) as u8) as char).collect();
+            let got = super::read_to_zeroizing(&mut text.as_bytes()).unwrap();
+            assert_eq!(got.as_str(), text, "len {len}");
+        }
+        let multibyte = "é".repeat(5000);
+        assert_eq!(
+            super::read_to_zeroizing(&mut multibyte.as_bytes())
+                .unwrap()
+                .as_str(),
+            multibyte
+        );
+        let bad: &[u8] = &[b'a', 0xff, b'b'];
+        let e = super::read_to_zeroizing(&mut { bad }).unwrap_err();
+        let mut s = String::new();
+        let std_e = std::io::Read::read_to_string(&mut { bad }, &mut s).unwrap_err();
+        assert_eq!(e.kind(), std_e.kind());
+        assert_eq!(e.to_string(), std_e.to_string());
     }
 
     /// The BOM is drained in place: the returned text is the SAME allocation
