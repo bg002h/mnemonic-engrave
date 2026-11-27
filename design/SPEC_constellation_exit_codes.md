@@ -341,7 +341,8 @@ These were open in revision 6's first form. Brian answered each on
 
 1. **`mt --offline`: added.** With it `mt` never runs `bitcoin-cli`, even one
    on `PATH`, says the chain was not checked, and exits as with no node.
-   Together with `--bitcoin-cli` it is usage (64).
+   Together with `--bitcoin-cli` it is usage (64), and so is `mt verify
+   --offline`, since `verify` never asks a node.
 2. **A damaged duplicate plate that `mt` discards: 16.** Whenever `mt`
    tells the operator to re-cut a plate, the run adds 16, even when a clean
    copy supplied the result.
@@ -878,8 +879,9 @@ silent correction into 16.
   is not an offline switch. An unnamed `bitcoin-cli`, absent from `PATH` or
   found there and failing, stays 0 with its warning. Core's own answers
   (exit 5 from `getrawtransaction`, 89 from an old Core's `getindexinfo`)
-  are answers, not failures. `mt --offline` never runs `bitcoin-cli`, says the chain was not
-  checked, and is usage (64) together with `--bitcoin-cli` (§2b item 1).
+  are answers, not failures. `mt --offline` never runs
+  `bitcoin-cli`, says the chain was not checked, and is usage (64) together
+  with `--bitcoin-cli` and on `verify` (§2b item 1).
 - **`mt verify --bitcoin-cli`** is usage, 64: `verify` never asks a node
   (`SPEC_mt_v0_1.md` (b)).
 - **Corrections.** In `decode`, `verify` and `inspect`, these move from 0 to 16
