@@ -46,17 +46,17 @@ flip() {
     cp "$LOG/$1.bin" "$LOG/$2.bin"
     printf "\\$4" | dd of="$LOG/$2.bin" bs=1 seek="$3" conv=notrunc status=none
 }
-# refuse <row> <file> <offset>: show must exit 4 with T-UTF8 naming <offset>.
+# refuse <row> <file> <offset>: show must exit 2 with T-UTF8 naming <offset>.
 refuse() {
     "$ME" sysw show "$LOG/$2.bin" >"$LOG/$2.show.out" 2>"$LOG/$2.show.err"
     local rc=$?
     local want="me: this file's public section is not UTF-8 text (where UTF-8 decoding first fails, at file offset $3); it is damaged, or it was not written by \`me sysw pack\`. No identity or digest is shown, because either would be a number for records that cannot be read."
-    [ "$rc" = 4 ] || bad "$1: exit $rc, want 4"
+    [ "$rc" = 2 ] || bad "$1: exit $rc, want 2"
     grep -qxF -- "$want" "$LOG/$2.show.err" || { bad "$1: stderr lacks the T-UTF8 line for offset $3"; sed 's/^/    got: /' "$LOG/$2.show.err" | head -3; }
     grep -q '^identity:' "$LOG/$2.show.out" && bad "$1: printed an identity"
     grep -q '^digest:' "$LOG/$2.show.err" && bad "$1: printed a digest"
     grep -q '^public record' "$LOG/$2.show.out" && bad "$1: listed records"
-    [ "$rc" = 4 ] && echo "ok   $1"
+    [ "$rc" = 2 ] && echo "ok   $1"
 }
 # accept <row> <file> <digest-grep>: show must exit 0, print an identity and the digest line.
 accept() {
@@ -88,11 +88,11 @@ n=$(stat -c %s "$LOG/sealed-last.bin")
 head -c $((n - 1)) "$LOG/sealed-last.bin" >"$LOG/sealed-last-short.bin"
 "$ME" sysw show "$LOG/sealed-last-short.bin" >"$LOG/sealed-last-short.show.out" 2>"$LOG/sealed-last-short.show.err"
 rc=$?
-if [ "$rc" = 4 ] && grep -q "but its header declares $n; it is truncated" "$LOG/sealed-last-short.show.err" \
+if [ "$rc" = 2 ] && grep -q "but its header declares $n; it is truncated" "$LOG/sealed-last-short.show.err" \
     && ! grep -q 'is not UTF-8 text' "$LOG/sealed-last-short.show.err"; then
     echo "ok   R8"
 else
-    bad "R8: exit $rc, want 4 with the truncation sentence and no T-UTF8"
+    bad "R8: exit $rc, want 2 with the truncation sentence and no T-UTF8"
 fi
 
 [ "${1:-}" = "--cli" ] && { [ $fail = 0 ] && echo "gate --cli: PASS" || echo "gate --cli: FAIL"; exit $fail; }

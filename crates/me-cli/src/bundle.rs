@@ -8,8 +8,8 @@ use crate::manifest::{
 };
 use crate::validate::{self, ValidateError};
 
-/// Why a bundle could not be produced. `exit_code()` maps to the CLI contract
-/// (2 usage, 3 ms1 refused, 4 invalid/integrity), consistent with the converter.
+/// Why a bundle could not be produced. `exit_code()` maps to the exit-code
+/// spec's classes (every arm is INVALID, 2), consistent with the converter.
 #[derive(Debug)]
 pub enum BundleError {
     /// No input strings at all.
@@ -58,11 +58,26 @@ pub enum BundleError {
 }
 
 impl BundleError {
-    pub fn exit_code(&self) -> i32 {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3). Every arm is an
+    /// INVALID input: empty input (decision 3), a string no flag of `bundle`
+    /// admits (an ms1 or mt1, like "an ms1 to `me --hex`" in the spec's worked
+    /// table), or a plate or set that does not validate. Exhaustive on purpose
+    /// (R13): a new variant does not compile until it is classified.
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
         match self {
-            BundleError::Empty => 2,
-            BundleError::RefusedSecret { .. } => 3,
-            _ => 4,
+            BundleError::Empty
+            | BundleError::RefusedSecret { .. }
+            | BundleError::RefusedTransaction
+            | BundleError::Classify(..)
+            | BundleError::Validate(..)
+            | BundleError::Mk1SingleString(_)
+            | BundleError::Md1WireVersion(..)
+            | BundleError::Md1Undecodable(..)
+            | BundleError::Md1MissingOrigin(..)
+            | BundleError::Md1HeaderRead(..)
+            | BundleError::SetIncompleteMk(..)
+            | BundleError::SetIncompleteMd(..) => exit::INVALID,
         }
     }
 }
@@ -689,17 +704,57 @@ mod tests {
         }
     }
 
+    /// R13's table test: EVERY BundleError variant is INVALID (2), each with
+    /// a literal. Empty input is 2 (decision 3); an ms1 or mt1 is an input
+    /// `bundle` has no flag to take. The `match` has no wildcard.
     #[test]
     fn exit_codes_match_spec() {
-        assert_eq!(BundleError::Empty.exit_code(), 2);
-        // Both kinds refuse with the same exit code -- the kind changes the
-        // GUIDANCE, never the verdict (F-586).
-        assert_eq!(
-            BundleError::RefusedSecret { preimage: false }.exit_code(),
-            3
-        );
-        assert_eq!(BundleError::RefusedSecret { preimage: true }.exit_code(), 3);
-        assert_eq!(BundleError::Mk1SingleString("mk1x".into()).exit_code(), 4);
+        let md = || md_codec::Error::WireVersionMismatch { got: 12 };
+        let table: Vec<(BundleError, u8)> = vec![
+            (BundleError::Empty, 2),
+            // Both kinds refuse with the same exit code -- the kind changes
+            // the GUIDANCE, never the verdict (F-586).
+            (BundleError::RefusedSecret { preimage: false }, 2),
+            (BundleError::RefusedSecret { preimage: true }, 2),
+            (BundleError::RefusedTransaction, 2),
+            (
+                BundleError::Classify("x".into(), ClassifyError::NoSeparator),
+                2,
+            ),
+            (BundleError::Validate("x".into(), ValidateError::Mt), 2),
+            (BundleError::Mk1SingleString("mk1x".into()), 2),
+            (BundleError::Md1WireVersion("md1x".into(), 12), 2),
+            (BundleError::Md1Undecodable("md1x".into(), md()), 2),
+            (BundleError::Md1MissingOrigin("md1x".into(), 0), 2),
+            (BundleError::Md1HeaderRead("md1x".into(), md()), 2),
+            (
+                BundleError::SetIncompleteMk(
+                    "mk1x".into(),
+                    mk_codec::Error::InvalidHrp("x".into()),
+                ),
+                2,
+            ),
+            (BundleError::SetIncompleteMd("md1x".into(), md()), 2),
+        ];
+        let mut seen = std::collections::BTreeSet::new();
+        for (e, want) in &table {
+            seen.insert(match e {
+                BundleError::Empty => "Empty",
+                BundleError::RefusedSecret { .. } => "RefusedSecret",
+                BundleError::RefusedTransaction => "RefusedTransaction",
+                BundleError::Classify(..) => "Classify",
+                BundleError::Validate(..) => "Validate",
+                BundleError::Mk1SingleString(_) => "Mk1SingleString",
+                BundleError::Md1WireVersion(..) => "Md1WireVersion",
+                BundleError::Md1Undecodable(..) => "Md1Undecodable",
+                BundleError::Md1MissingOrigin(..) => "Md1MissingOrigin",
+                BundleError::Md1HeaderRead(..) => "Md1HeaderRead",
+                BundleError::SetIncompleteMk(..) => "SetIncompleteMk",
+                BundleError::SetIncompleteMd(..) => "SetIncompleteMd",
+            });
+            assert_eq!(e.exit_code(), *want, "{e:?}");
+        }
+        assert_eq!(seen.len(), 12, "the table must list every variant");
     }
 
     #[test]
@@ -780,7 +835,7 @@ mod tests {
     }
 
     // Spec §10 #6 — two mk1 chunks with MISMATCHED chunk_set_id presented together:
-    // each forms an incomplete 1-of-2 group → exit 4 (distinct from the same-id
+    // each forms an incomplete 1-of-2 group → exit 2 (distinct from the same-id
     // cross_chunk_hash case in test #7).
     #[test]
     fn foreign_mismatched_set_ids_fail() {
@@ -869,7 +924,7 @@ mod tests {
     /// hold.
     ///
     /// The refusal itself is correct for both and does not move: both kinds are
-    /// secret, neither belongs on this tool, and both exit 3.
+    /// secret, neither belongs on this tool, and both exit 2 (INVALID: no flag takes them).
     ///
     /// The two ms1 strings below are throwaway test values -- a preimage of
     /// `sha256("y"*32)` and the all-but-one-zero entropy card -- generated for
@@ -903,7 +958,7 @@ mod tests {
             msg.contains("not entered through CODEX32"),
             "the preimage message does not correct the screen the old text named:\n{msg}"
         );
-        assert_eq!(pre.exit_code(), 3, "the refusal verdict must not change");
+        assert_eq!(pre.exit_code(), 2, "the refusal verdict must not change");
 
         // The control: a real seed card keeps the original wording, or the fix
         // is just a reworded blanket message.
@@ -913,7 +968,7 @@ mod tests {
             smsg.contains("secret seed entropy") && smsg.contains("CODEX32"),
             "a seed card lost its (correct) guidance:\n{smsg}"
         );
-        assert_eq!(seed.exit_code(), 3);
+        assert_eq!(seed.exit_code(), 2);
 
         // Neither message may carry the secret body.
         for m in [&msg, &smsg] {

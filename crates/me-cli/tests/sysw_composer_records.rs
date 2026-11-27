@@ -760,3 +760,55 @@ fn hash_lock_new_refuses_a_digest_of_the_wrong_width() {
         );
     }
 }
+
+// ---- the decoded `phrase:` record is SECRET: wiped on drop, never printed -----
+
+/// The phrase a parsed `phrase:` record holds is in a ZEROIZING buffer, so the
+/// parsed record wipes it on drop. Pinned at the type: a plain `String` here
+/// does not compile.
+///
+/// MUTATION that reds it: `pub phrase: String` (the pre-fix field) -> E0308.
+#[test]
+fn a_parsed_phrase_record_holds_the_phrase_in_a_zeroizing_buffer() {
+    let phrase = "correct horse battery staple";
+    let rec = phrase_record(HashlockMethod::Sha256, phrase);
+    match parse(&rec) {
+        Some(Ok(ComposerRecord::Phrase(p))) => {
+            let held: &zeroize::Zeroizing<String> = &p.phrase;
+            assert_eq!(held.as_str(), phrase);
+            assert_eq!(p.method, HashlockMethod::Sha256);
+        }
+        other => panic!("not a Phrase record: {other:?}"),
+    }
+}
+
+/// `{:?}` of a parsed phrase record (and of the `ComposerRecord` around it)
+/// names the method and NEVER the phrase: a `Debug` line goes to logs, panic
+/// messages and test output, all of which outlive the run.
+///
+/// MUTATION that reds it: `#[derive(Debug)]` back on `PhraseRecord`.
+#[test]
+fn debug_of_a_phrase_record_does_not_print_the_phrase() {
+    let phrase = "correct horse battery staple";
+    for m in [HashlockMethod::Hardened, HashlockMethod::Sha256] {
+        let rec = phrase_record(m, phrase);
+        let Some(Ok(ComposerRecord::Phrase(p))) = parse(&rec) else {
+            panic!("not a Phrase record");
+        };
+        let inner = format!("{p:?}");
+        let inner_alt = format!("{p:#?}");
+        let outer = format!("{:?}", ComposerRecord::Phrase(p.clone()));
+        for s in [&inner, &inner_alt, &outer] {
+            assert!(!s.contains(phrase), "Debug printed the phrase: {s}");
+            assert!(
+                !s.contains("correct"),
+                "Debug printed part of the phrase: {s}"
+            );
+            assert!(
+                s.contains("redacted"),
+                "Debug does not say it redacted: {s}"
+            );
+            assert!(s.contains(&format!("{m:?}")), "Debug lost the method: {s}");
+        }
+    }
+}

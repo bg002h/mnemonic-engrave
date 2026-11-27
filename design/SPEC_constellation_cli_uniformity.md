@@ -32,7 +32,8 @@ binaries, not read from source:
 `ms encode --phrase "<12 words>"` exits 0 and says nothing about that phrase now
 being in shell history and in `ps`. Its stderr then recommends `> file.txt`,
 which under the default umask produces **mode 0644** — the exact disposal `me`
-and `mt` refuse at exit 2 (F-244, F-252).
+and `mt` refuse (F-244, F-252): at exit 2 (`me`) and 1 (`mt`) when measured,
+and both at exit 8 (REFUSED) since `SPEC_constellation_exit_codes.md`.
 
 **The tool holding the most dangerous material in the constellation has the
 weakest handling of it.**
@@ -1053,6 +1054,12 @@ is deliberately not quoted: it changed when a row moved, and a pointer naming
 | `mt` | 2 | 1 | n/a | n/a |
 | `mnemonic` | 64 | **1 or 2 — by input shape (see below)** | **4** | **2** |
 | `me` | 2 | 4 = unplaceable record; 2 = terminal refusal; **3 = policy refusal (`EXIT_REFUSED`)** | n/a | n/a |
+
+**Superseded for every row by `SPEC_constellation_exit_codes.md`** (2026-11-26).
+The cells above are the measurements this section ruled on, kept as measured.
+Under that spec `me` exits 64 for a usage error, 2 for an unplaceable record or
+an invalid artifact, 8 for a terminal, world-readable or argv-secret refusal,
+and 32 for a failed write.
 
 **`mnemonic`'s two remaining cells are now measured too**, with the verb each
 was taken from, because a cell without one is what §6f already had to retract.

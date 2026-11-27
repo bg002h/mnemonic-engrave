@@ -308,7 +308,7 @@ fn bughunt_me_03b_pack_passphrase_without_secrets_is_the_unsealed_form() {
 }
 
 /// FIX R1 (#4): records on argv together with `--in` are refused with the
-/// seal refusal's text at exit 2, and nothing is written.
+/// seal refusal's text at exit 64 (usage), and nothing is written.
 #[test]
 fn bughunt_me_04b_pack_in_plus_argv_refusal_text_and_exit() {
     let dir = tempfile::tempdir().unwrap();
@@ -329,7 +329,7 @@ fn bughunt_me_04b_pack_in_plus_argv_refusal_text_and_exit() {
             String::from_utf8_lossy(&a.stderr).into_owned()
         ),
         (
-            Some(2),
+            Some(64),
             "me: pass records on argv OR via --in, not both\n".to_string()
         ),
         "refusal"
@@ -362,7 +362,7 @@ fn bughunt_me_05b_uf2_cap_is_the_64k_seal_region() {
 }
 
 /// FIX R1 + architect S1: with argv AND `--in`, the argv bearer/secret guard
-/// still runs first (exit 3, its own refusal), so "not both" never pre-empts
+/// still runs first (exit 8, its own refusal), so "not both" never pre-empts
 /// a refusal about material already in the shell's history.
 #[test]
 fn bughunt_me_04c_argv_bearer_guard_precedes_not_both() {
@@ -379,14 +379,14 @@ fn bughunt_me_04c_argv_bearer_guard_precedes_not_both() {
         .output()
         .unwrap();
     let err = String::from_utf8_lossy(&a.stderr).into_owned();
-    assert_eq!(a.status.code(), Some(3), "stderr:\n{err}");
+    assert_eq!(a.status.code(), Some(8), "stderr:\n{err}");
     assert!(err.contains("is a `tx:` record on ARGV"), "stderr:\n{err}");
     assert!(!err.contains("not both"), "stderr:\n{err}");
     assert!(!out.exists(), "nothing may be written");
 }
 
 /// Architect S1 + S3: the same order holds with `--as`: the bearer refusal
-/// (exit 3) precedes §5.1's shape refusal.
+/// (exit 8) precedes §5.1's shape refusal.
 #[test]
 fn bughunt_me_04d_as_argv_bearer_guard_precedes_single_document_with_in() {
     let dir = tempfile::tempdir().unwrap();
@@ -399,7 +399,7 @@ fn bughunt_me_04d_as_argv_bearer_guard_precedes_single_document_with_in() {
         .output()
         .unwrap();
     let err = String::from_utf8_lossy(&a.stderr).into_owned();
-    assert_eq!(a.status.code(), Some(3), "stderr:\n{err}");
+    assert_eq!(a.status.code(), Some(8), "stderr:\n{err}");
     assert!(err.contains("is a `tx:` record on ARGV"), "stderr:\n{err}");
     assert!(
         !err.contains("--as packs exactly one descriptor per invocation."),

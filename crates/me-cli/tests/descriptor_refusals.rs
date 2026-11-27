@@ -158,7 +158,7 @@ fn row_unparseable() {
         "unparseable",
         "this file is not any of the four\n",
         &["--as", "md1"],
-        3,
+        2,
         "this is not a wallet descriptor in any of the four forms `me` reads: a BlueWallet \
          `Key: value` setup file, a plain BIP-380 descriptor, a `{\"label\":…,\"descriptor\":…}` \
          JSON export, or a single extended key.",
@@ -166,8 +166,7 @@ fn row_unparseable() {
 }
 
 /// The SHIPPED `me 0.7.0` refusal, kept verbatim per §6 (R0's I7), at
-/// **`EXIT_USAGE` (2)** — this spec records the existing behaviour rather than
-/// silently regressing a tested surface.
+/// **INVALID (2)**: empty input is an invalid input (exit-code spec decision 3).
 #[test]
 fn row_empty_file() {
     assert_row("empty-file", "", &["--as", "md1"], 2, "no records in ");
@@ -186,15 +185,15 @@ fn row_whitespace_only() {
     );
 }
 
-/// §5.1's choice block. **`EXIT_USAGE` (2)**, not 3 — nothing was refused, a
-/// choice was not made.
+/// §5.1's choice block. **REFUSED (8)**: the tool declines to choose for the
+/// operator, and `--as` waives it (exit-code spec §3, test 5).
 #[test]
 fn row_as_omitted() {
     assert_row(
         "as-omitted",
         &vector_input("formats-happy/bip380-sortedmulti-multipath"),
         &[],
-        2,
+        8,
         "this input is a wallet descriptor, and `--as` decides how it is packed.",
     );
 }
@@ -242,7 +241,7 @@ this input is a wallet descriptor, and `--as` decides how it is packed.
         &[],
     );
     let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert_eq!(out.status.code().unwrap(), 2, "stderr:\n{err}");
+    assert_eq!(out.status.code().unwrap(), 8, "stderr:\n{err}");
     assert!(
         err.contains(&format!("me: {BLOCK}\n")),
         "the binary does not print §5.1's block verbatim:\n{err}"
@@ -299,7 +298,7 @@ fn row_json_inner_malformed() {
         "json-inner-malformed",
         "{\"label\":\"my wallet\",\"descriptor\":\"wsh(sortedmulti(2,\"}",
         &["--as", "md1"],
-        3,
+        2,
         "the `{label, descriptor}` JSON parsed, and its `descriptor` field did not: \
          script: missing `)`. The label was \"my wallet\". The problem is in the \
          descriptor string, not the JSON.",
@@ -319,7 +318,7 @@ fn json_missing_descriptor_field_gets_its_own_sentence() {
         "json-inner-malformed",
         "{\"label\":\"my wallet\"}",
         &["--as", "descriptor"],
-        3,
+        2,
         "the `{label, descriptor}` JSON parsed and carries no `descriptor` field -- \
          its keys are: label. The label was \"my wallet\". The problem is the \
          missing field, not a descriptor string: re-export from your wallet \
@@ -332,9 +331,9 @@ fn json_missing_descriptor_field_gets_its_own_sentence() {
         "the sibling's false-for-this-input sentence is back: {err}"
     );
     // T4 is NOT widened: without --as the same input still gets the record
-    // refusal at exit 4, never descriptor vocabulary (F-429's invariant).
+    // refusal at exit 2, never descriptor vocabulary (F-429's invariant).
     let out = run("{\"label\":\"my wallet\"}", &[]);
-    assert_eq!(out.status.code().unwrap(), 4);
+    assert_eq!(out.status.code().unwrap(), 2);
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -353,7 +352,7 @@ fn row_bluewallet_no_name() {
         "bluewallet-no-name",
         &vector_input("gate/deadbeef-fronts-an-xpub"),
         &[],
-        3,
+        2,
         "this is a BlueWallet setup file -- it has 1 cosigner line -- but no `Name:` \
          header, and the device requires one. Add a line `Name: <anything>`.",
     );
@@ -365,7 +364,7 @@ fn row_bluewallet_no_format() {
         "bluewallet-no-format",
         &vector_input("bluewallet/no-format-header"),
         &["--as", "md1"],
-        3,
+        2,
         "this BlueWallet setup file has no `Format:` header, so the script type is \
          undefined. Add `Format: P2WSH` (or `P2SH`, or `P2WSH-P2SH`).",
     );
@@ -377,7 +376,7 @@ fn row_bluewallet_zero_cosigners() {
         "bluewallet-zero-cosigners",
         &vector_input("bluewallet/zero-cosigner-lines"),
         &["--as", "md1"],
-        3,
+        2,
         "this BlueWallet file has headers but no cosigner lines \
          (`<8-hex-fingerprint>: <xpub>`). There is no wallet here to pack -- was the \
          export truncated? Re-export from the coordinator.",
@@ -390,7 +389,7 @@ fn row_bluewallet_policy_count() {
         "bluewallet-policy-count",
         &bluewallet_policy_mismatch(),
         &["--as", "md1"],
-        3,
+        2,
         "`Policy: 2 of 3` declares 3 cosigners; the file has 2. Cosigner lines are \
          `<8-hex-fingerprint>: <xpub>`.",
     );
@@ -402,7 +401,7 @@ fn row_bluewallet_no_origin() {
         "bluewallet-no-origin",
         &vector_input("bluewallet/derivation-after-keys"),
         &["--as", "md1"],
-        3,
+        2,
         "cosigner `dc567276` has no derivation path -- the `Derivation:` header appears \
          after the cosigner lines. The descriptor this file produces cannot be re-read \
          by the device. Put `Derivation: <path>` above the first cosigner line.",
@@ -417,7 +416,7 @@ fn row_bluewallet_bad_fingerprint() {
         "bluewallet-bad-fingerprint",
         &vector_input("bluewallet/short-fingerprint"),
         &["--as", "md1"],
-        3,
+        2,
         "-- a master fingerprint is exactly 8 hex characters (4 bytes).",
     );
 }
@@ -434,14 +433,14 @@ fn row_bluewallet_bad_fingerprint() {
 /// §6's multi-record row, reached with the MNEMONIC-FIRST ordering (§11 item
 /// 4's clause): a descriptor-FIRST input passes with or without the per-line
 /// gate scope and is not a witness for the repair that rule exists to pin.
-/// **`EXIT_INVALID` (4)**, as today.
+/// **INVALID (2)**.
 #[test]
 fn row_multi_record_descriptor() {
     assert_row(
         "multi-record-descriptor",
         &vector_input("gate/multi-record-mnemonic-first"),
         &[],
-        4,
+        2,
         " is a wallet descriptor. A descriptor is packed ALONE: run \
          `me sysw pack --as <descriptor|md1>` with just the descriptor -- one container \
          cannot yet carry a descriptor plus other records. The other records pack \
@@ -462,7 +461,7 @@ fn row_multi_under_descriptor() {
         "multi-under-descriptor",
         &vector_input("neither/wsh-multi"),
         &["--as", "descriptor"],
-        3,
+        2,
         "the device's descriptor parser accepts `sortedmulti` and not `multi`. This \
          wallet can still be engraved: `--as md1` encodes `multi` policies (for \
          use-site paths md1 can represent -- otherwise no path carries it, and the \
@@ -477,7 +476,7 @@ fn row_miniscript() {
         "miniscript",
         &vector_input("neither/miniscript"),
         &["--as", "md1"],
-        3,
+        2,
         "`me` reads the descriptor family the device reads: single-sig and \
          `sortedmulti`, optionally under `sh`. This descriptor uses miniscript \
          fragments (`or_d`), which neither path handles in this release. `md encode` \
@@ -491,7 +490,7 @@ fn row_threshold_exceeds_keys() {
         "threshold-exceeds-keys",
         &vector_input("narrowed/threshold-exceeds-keys"),
         &["--as", "md1"],
-        3,
+        2,
         "threshold 5 of 2 keys can never be satisfied -- no combination of signatures \
          reaches 5. Funds sent to this wallet would be unspendable. Nothing was packed.",
     );
@@ -505,7 +504,7 @@ fn row_threshold_below_one() {
         "threshold-below-one",
         &vector_input("narrowed/threshold-zero"),
         &["--as", "md1"],
-        3,
+        2,
         "threshold 0 means NO signature is required: anyone who can see this script can \
          spend from it. This is almost certainly not the wallet you meant -- and if it \
          already holds funds, treat them as at risk now. Nothing was packed.",
@@ -518,7 +517,7 @@ fn row_key_count_exceeded() {
         "key-count-exceeded",
         &vector_input("narrowed/sh-sortedmulti-16-keys"),
         &["--as", "md1"],
-        3,
+        2,
         "`sh(sortedmulti(…))` carries at most 15 keys -- there the multi's output script \
          IS the redeemScript, one 520-byte script element (BIP-383). `wsh(…)` and \
          `sh(wsh(…))` carry at most 20 (`OP_CHECKMULTISIG`); their redeemScript is 34 \
@@ -538,7 +537,7 @@ fn row_key_identity() {
         "key-identity",
         &vector_input("gate/colliding-origin-sortedmulti"),
         &[],
-        3,
+        2,
         "this wallet description contradicts itself: keys 0 and 1 both claim origin \
          `dc567276/48h/0h/0h/2h` but name different keys -- one origin identifies \
          exactly one key, so no wallet matches this description. Check the export: one \
@@ -569,7 +568,7 @@ fn row_key_identity_duplicate() {
             "key-identity-duplicate",
             &vector_input(vector),
             &[],
-            3,
+            2,
             "keys 0 and 1 are the same key at the same derivation -- a threshold that needs \
              the same key twice is not the multisig this file describes, and it lets one \
              holder produce two of the required signatures. Remove the duplicate line, or \
@@ -584,7 +583,7 @@ fn row_mixed_network() {
         "mixed-network",
         &vector_input("narrowed/mixed-network"),
         &["--as", "md1"],
-        3,
+        8,
         "key 1 is `tpub` (testnet) while key 0 is `xpub` (mainnet). The device accepts \
          this descriptor and then cannot derive any address from it. All keys must \
          share one network.",
@@ -599,7 +598,7 @@ fn row_unsupported_key_version() {
         "unsupported-key-version",
         &vector_input("version-gap/full-origin-ypub"),
         &["--as", "md1"],
-        3,
+        2,
         "`me` admits exactly `xpub`, `tpub`, `zpub`, `Ypub`, `Zpub`. This key is \
          `ypub`, whose equivalent is `xpub`: sh(wpkh([4bbaa801/49h/0h/0h]",
     );
@@ -611,7 +610,7 @@ fn row_taproot_multisig() {
         "taproot-multisig",
         &vector_input("narrowed/tr-sortedmulti"),
         &["--as", "md1"],
-        3,
+        2,
         "taproot multisig is `multi_a`/`sortedmulti_a` (BIP-387); `tr(sortedmulti(…))` \
          is not a valid descriptor even though the device's parser accepts it. Check \
          the export.",
@@ -624,7 +623,7 @@ fn row_multi_in_single_key_script() {
         "multi-in-single-key-script",
         &vector_input("narrowed/wpkh-sortedmulti"),
         &["--as", "md1"],
-        3,
+        2,
         "a multisig policy cannot live inside a single-key script. The device's parser \
          accepts this spelling and then cannot derive any address from it (measured: \
          `address: multisig script: … unsupported descriptor`). The forms the device \
@@ -639,7 +638,7 @@ fn row_key_in_script_slot() {
         "key-in-script-slot",
         &vector_input("narrowed/wsh-of-key"),
         &["--as", "md1"],
-        3,
+        2,
         "`wsh`/`sh` of a single key is not a wallet form the device can derive addresses \
          for (measured: `Supported=false`, `address: singlesig script: … unsupported \
          descriptor`). A single-key wallet is `pkh(…)`, `wpkh(…)`, `sh(wpkh(…))` or \
@@ -653,7 +652,7 @@ fn row_use_site_hardened() {
         "use-site-hardened",
         &vector_input("narrowed/use-site-hardened"),
         &["--as", "md1"],
-        3,
+        2,
         "a hardened use-site step cannot be derived from an xpub (BIP-32). The device \
          would silently derive the UNhardened child and display addresses for a wallet \
          that cannot exist, so this is refused on both `--as` paths.",
@@ -666,7 +665,7 @@ fn row_use_site_non_consecutive() {
         "use-site-non-consecutive",
         &vector_input("narrowed/use-site-non-consecutive"),
         &["--as", "md1"],
-        3,
+        2,
         "the device derives only `<i;i+1>` pairs (receive; change). It accepts this \
          descriptor and then errors on every address.",
     );
@@ -682,7 +681,7 @@ fn row_use_site_out_of_set() {
         "use-site-out-of-set",
         &format!("wpkh([4bbaa801/84h/0h/0h]{XPUB}/0/1/*)"),
         &["--as", "md1"],
-        3,
+        2,
         "use-site paths `me` ACCEPTS: absent, `/*`, `/i/*`, `<i;i+1>`, `<i;i+1>/*`. This \
          one is `/0/1/*`, outside the set the device is measured to handle.",
     );
@@ -698,7 +697,7 @@ fn row_promotion_path_not_inferable() {
         "promotion-path-not-inferable",
         &vector_input("promotion/08-origin-86h-refused"),
         &[],
-        3,
+        2,
         "is a single extended key. `me` can infer a whole wallet from one only when its \
          origin is `m/44h/0h/0h` (-> `pkh`), `m/84h/0h/0h` (-> `wpkh`) or `m/49h/0h/0h` \
          (-> `sh(wpkh)`). This one is `m/86h/0h/0h` -- taproot single-sig, which is not \
@@ -712,7 +711,7 @@ fn row_promotion_account_not_zero() {
         "promotion-account-not-zero",
         &vector_input("promotion/10-account-one-refused"),
         &[],
-        3,
+        2,
         "is a single extended key, and this one is `m/84h/0h/1h`. Only account 0 is \
          inferable. Supply the descriptor: wpkh([4bbaa801/84h/0h/1h]",
     );
@@ -724,7 +723,7 @@ fn row_promotion_fingerprint_no_path() {
         "promotion-fingerprint-no-path",
         &vector_input("promotion/12-fingerprint-no-path-refused"),
         &[],
-        3,
+        2,
         "gives a fingerprint with no derivation path, so there is nothing to match a \
          script against. Either give the full origin -- `[4bbaa801/84h/0h/0h]xpub6C9j4",
     );
@@ -736,7 +735,7 @@ fn row_promotion_multisig_cosigner_key() {
         "promotion-multisig-cosigner-key",
         &vector_input("promotion/03-bare-Zpub-refused"),
         &[],
-        3,
+        2,
         "a `Zpub` declares a MULTISIG account (`m/48h/0h/0h/2h`). A multisig cosigner \
          key is not a wallet -- supply the full descriptor (`wsh(sortedmulti(…))`), or a \
          BlueWallet setup file listing every cosigner.",
@@ -749,7 +748,7 @@ fn row_promotion_testnet_key() {
         "promotion-testnet-key",
         &vector_input("promotion/15-bare-tpub-host-refused"),
         &[],
-        3,
+        2,
         "this is a testnet key. Its version byte would map to the MAINNET path \
          `m/44h/0h/0h`, which `me` will not assume. Supply the descriptor with its real \
          origin.",
@@ -770,7 +769,7 @@ fn row_md1_fixed_index() {
         "md1-fixed-index",
         &vector_input("md1-split/fixed-index"),
         &["--as", "md1"],
-        3,
+        2,
         "md1 cannot carry this wallet as written: key @0 ([dc567276/48h/0h/0h/2h]\
          xpub6DiYrfRwNn…EUhpan) uses `/0/*`, and key @1 \
          ([f245ae38/48h/0h/0h/2h]xpub6DnT4E1fT8…sY39Ge) uses `/0/*`, a single fixed \
@@ -788,7 +787,7 @@ fn row_md1_no_wildcard() {
         "md1-no-wildcard",
         &vector_input("md1-split/multipath-no-wildcard"),
         &["--as", "md1"],
-        3,
+        2,
         "md1 cannot carry this wallet as written: key @0 ([dc567276/48h/0h/0h/2h]\
          xpub6DiYrfRwNn…EUhpan) uses `/<0;1>`, and key @1 \
          ([f245ae38/48h/0h/0h/2h]xpub6DnT4E1fT8…sY39Ge) uses `/<0;1>` with no trailing \
@@ -810,7 +809,7 @@ fn row_bitcoin_address() {
         "bitcoin-address",
         "bc1qadgf37zk0wtu69j7yclswl99e5jmcv5eh69jp4calgs4ehsecm5sqcjw5a\n",
         &["--as", "md1"],
-        3,
+        2,
         "that is a bitcoin address, not a descriptor. No program on the device consumes \
          an address record.",
     );
@@ -853,7 +852,12 @@ fn no_device_behaviour_claim_transposes_to_a_multi_input() {
         let document = vector_input(row).replace("sortedmulti(", "multi(");
         let out = run(&document, &["--as", "md1"]);
         let err = String::from_utf8_lossy(&out.stderr).to_string();
-        assert_eq!(out.status.code().unwrap(), 3, "{slug}: stderr:\n{err}");
+        let want_exit = if slug == "mixed-network" { 8 } else { 2 };
+        assert_eq!(
+            out.status.code().unwrap(),
+            want_exit,
+            "{slug}: stderr:\n{err}"
+        );
         assert!(
             err.contains(
                 // The taproot row splices the clause mid-sentence, so the
@@ -899,7 +903,7 @@ fn a_mixed_a_and_a2_input_fires_both_section_5_3_rows() {
     );
     let out = run(&document, &["--as", "md1"]);
     let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert_eq!(out.status.code().unwrap(), 3, "stderr:\n{err}");
+    assert_eq!(out.status.code().unwrap(), 2, "stderr:\n{err}");
     assert!(
         err.contains("uses `/0/*`, a single fixed chain index"),
         "the (a) row did not fire:\n{err}"
@@ -947,7 +951,7 @@ fn item_5_the_five_case_matrix() {
             what: "1. carried -- the choice block",
             document: vector_input("formats-happy/bip380-sortedmulti-multipath"),
             flags: vec![],
-            exit: 2,
+            exit: 8,
             want: "this input is a wallet descriptor, and `--as` decides how it is packed.",
             forbid: "not available in this build",
         },
@@ -955,7 +959,7 @@ fn item_5_the_five_case_matrix() {
             what: "2. inadmissible, `--as` omitted -- the admission refusal, directly",
             document: vector_input("narrowed/threshold-zero"),
             flags: vec![],
-            exit: 3,
+            exit: 2,
             want: "threshold 0 means NO signature is required",
             forbid: "`--as` decides how it is packed",
         },
@@ -963,7 +967,7 @@ fn item_5_the_five_case_matrix() {
             what: "3. carried by NEITHER value -- the input's own refusal, directly",
             document: vector_input("neither/wsh-multi-fixed-path"),
             flags: vec![],
-            exit: 3,
+            exit: 2,
             want: "No `me` path engraves this file as written, in any build.",
             forbid: "`--as` decides how it is packed",
         },
@@ -971,7 +975,7 @@ fn item_5_the_five_case_matrix() {
             what: "3b. the S3 case-3 witness is CARRIED now -- the exit-code flip S2 made",
             document: vector_input("md1-split/fixed-index"),
             flags: vec![],
-            exit: 2,
+            exit: 8,
             want: "this input is a wallet descriptor, and `--as` decides how it is packed.",
             forbid: "not available in this build",
         },
@@ -979,7 +983,7 @@ fn item_5_the_five_case_matrix() {
             what: "4. inadmissible WITH `--as descriptor` -- admission precedes the window",
             document: vector_input("narrowed/threshold-zero"),
             flags: vec!["--as", "descriptor"],
-            exit: 3,
+            exit: 2,
             want: "threshold 0 means NO signature is required",
             forbid: "not available in this build",
         },
@@ -987,7 +991,7 @@ fn item_5_the_five_case_matrix() {
             what: "5. a `multi` form WITH `--as descriptor` -- conjunct 1's PERMANENT refusal",
             document: vector_input("neither/wsh-multi"),
             flags: vec!["--as", "descriptor"],
-            exit: 3,
+            exit: 2,
             want: "the device's descriptor parser accepts `sortedmulti` and not `multi`.",
             forbid: "not available in this build",
         },
@@ -1050,7 +1054,7 @@ fn json_duplicate_member_gets_its_own_sentence() {
         "json-inner-malformed",
         &dis_lower_first(),
         &["--as", "descriptor"],
-        3,
+        2,
         want,
     );
     let err = String::from_utf8_lossy(&run(&dis_lower_first(), &["--as", "descriptor"]).stderr)
@@ -1063,7 +1067,7 @@ fn json_duplicate_member_gets_its_own_sentence() {
 fn out_of_range_path_index_is_refused_not_rewritten() {
     let want = "the origin path is not a path: `73c5da0a/2147483696/1h/0h/2h`.";
     for mode in ["descriptor", "md1"] {
-        assert_row("unparseable", &dis_origin_range(), &["--as", mode], 3, want);
+        assert_row("unparseable", &dis_origin_range(), &["--as", mode], 2, want);
         let err =
             String::from_utf8_lossy(&run(&dis_origin_range(), &["--as", mode]).stderr).to_string();
         assert!(!err.contains("48h"), "{err}");

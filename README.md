@@ -129,11 +129,17 @@ Validation is **per-string** (a single chunk of a multi-chunk card validates on 
 echo "md1yqpqqxqq8xtwhw4xwn4qh" | me --hex      # hex to stdout
 echo "mk1..."                   | me --out wallet.ndef   # raw NDEF to a file
 
-# ms1 is refused (exit 3), with on-device-entry guidance:
+# ms1 is refused (exit 2: not a public string), with on-device-entry guidance:
 echo "ms1..."                   | me --stdout
 ```
 
-Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**. If an output cannot be written (a full disk), `me` prints `me: cannot write the output: ...` and exits 1, and an existing `--out` file is left as it was; a reader that closes the pipe early only stops the output.
+Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**. If an output cannot be written (a full disk), `me` prints `me: cannot write the output: ...` and exits 32, and an existing `--out` file is left as it was; a reader that closes the pipe early only stops the output.
+
+Exit status follows the constellation's shared scheme (the legend ends `me --help`):
+0 done; 64 bad command line, nothing ran; 101 internal error; otherwise a sum of
+1 a check said no (`sysw pack --expect`), 2 an input is invalid, 8 refused (a
+secret on the command line, an unsafe destination, a network mismatch, `--as`
+not given), 32 a file, the preview sidecar or the prompt failed.
 
 ### Plate previews
 
@@ -149,7 +155,7 @@ ME_PREVIEW_BIN=/path/to/me-preview me bundle --preview ./plates
 ```
 
 If no sidecar is found, previews are skipped (a note is printed) and the manifest
-is still emitted. A set-but-missing `ME_PREVIEW_BIN` is a hard error (exit 2). A `--manifest` that is one of the plate previews is refused (exit 2).
+is still emitted. A set-but-missing `ME_PREVIEW_BIN` is a hard error (exit 32). A `--manifest` that is one of the plate previews is refused (exit 8).
 
 ## Verifying releases
 

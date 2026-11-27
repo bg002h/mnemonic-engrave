@@ -152,6 +152,21 @@ pub enum Unmet {
     UnreadableVersion { kind: Kind, index: usize, got: u8 },
 }
 
+impl Unmet {
+    /// The exit-code class (`SPEC_constellation_exit_codes.md` §3). An
+    /// expectation that came out no is NO (1, test 4: the stream is compared
+    /// against the operator's `--expect` claim). A card at a wire version this
+    /// build does not read is not well-formed for this build, so it is INVALID
+    /// (2). Exhaustive on purpose (R13).
+    pub fn class(&self) -> mnemonic_io_lib::exit::Bits {
+        use mnemonic_io_lib::exit::Bits;
+        match self {
+            Unmet::Absent(_) | Unmet::Incomplete { .. } => Bits::NO,
+            Unmet::UnreadableVersion { .. } => Bits::INVALID,
+        }
+    }
+}
+
 /// Parse `--expect`'s comma-separated value.
 ///
 /// Errors carry the full vocabulary, because the two most likely wrong guesses
@@ -306,6 +321,34 @@ pub fn describe(u: &Unmet) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// R13's table test: an unmet expectation is NO (1); a card this build
+    /// cannot read is INVALID (2).
+    #[test]
+    fn every_unmet_maps_to_its_exit_class() {
+        use mnemonic_io_lib::exit::Bits;
+        for kind in ALL {
+            assert_eq!(Unmet::Absent(kind).class(), Bits::NO);
+            assert_eq!(
+                Unmet::Incomplete {
+                    kind,
+                    indices: vec![0]
+                }
+                .class(),
+                Bits::NO
+            );
+            assert_eq!(
+                Unmet::UnreadableVersion {
+                    kind,
+                    index: 0,
+                    got: 9
+                }
+                .class(),
+                Bits::INVALID
+            );
+        }
+        assert_eq!((Bits::NO | Bits::INVALID).to_exit_code(), 3);
+    }
 
     const MD1_A: &str = "md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3";
     const MT_EVEN: [&str; 6] = [

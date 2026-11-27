@@ -145,7 +145,7 @@ fn bh_me_i3_root_in_conflict_refused_by_sysw_pack() {
             "a3.bin",
         ],
     );
-    assert_eq!(code(&o), 2);
+    assert_eq!(code(&o), 64);
     assert_eq!(err(&o), conflict("in", "sysw pack"));
     assert!(!d.path().join("a3.bin").exists());
 }
@@ -189,7 +189,7 @@ fn bh_me_i3_root_converter_option_refused_by_sysw_pack() {
             "text:6162",
         ],
     );
-    assert_eq!(code(&o), 2);
+    assert_eq!(code(&o), 64);
     assert_eq!(err(&o), notake("hex", "sysw pack"));
     assert!(!d.path().join("a5.bin").exists());
 }
@@ -202,14 +202,14 @@ fn bh_me_i3_first_misplaced_option_is_named() {
         d.path(),
         &["--echo", "--in", "given", "bundle", "--in", "other"],
     );
-    assert_eq!(code(&o), 2);
+    assert_eq!(code(&o), 64);
     assert_eq!(err(&o), notake("echo", "bundle"));
     // A5c: a conflict that comes before a not-taken option is the one named.
     let o = me(
         d.path(),
         &["--in", "given", "--echo", "bundle", "--in", "other"],
     );
-    assert_eq!(code(&o), 2);
+    assert_eq!(code(&o), 64);
     assert_eq!(err(&o), conflict("in", "bundle"));
 }
 
@@ -272,7 +272,7 @@ fn bh_me_i3_root_out_honoured_by_sysw_wipe() {
 fn bh_me_i3_root_in_conflict_refused_by_bundle() {
     let d = setup();
     let o = me(d.path(), &["--in", "given", "bundle", "--in", "other"]);
-    assert_eq!(code(&o), 2);
+    assert_eq!(code(&o), 64);
     assert_eq!(err(&o), conflict("in", "bundle"));
 }
 
@@ -310,7 +310,7 @@ fn bh_me_i3_controls_guard_seal_text_converter_unchanged() {
         d.path(),
         &["--out", "a9.uf2", "seal", "--allow-argv-secret", MS1],
     );
-    assert_eq!(code(&o), 3);
+    assert_eq!(code(&o), 8);
     assert!(err(&o)
         .lines()
         .next()
@@ -319,7 +319,7 @@ fn bh_me_i3_controls_guard_seal_text_converter_unchanged() {
     assert!(!d.path().join("a9.uf2").exists());
     // A10: `--out` in neither place keeps clap's text byte for byte.
     let o = me(d.path(), &["seal", "--plaintext", MD1]);
-    assert_eq!(code(&o), 2);
+    assert_eq!(code(&o), 64);
     assert_eq!(
         err(&o),
         "error: the following required arguments were not provided:\n  --out <OUT>\n\nUsage: me seal --out <OUT> --plaintext <PLAINTEXT> [PAYLOAD]...\n\nFor more information, try '--help'.\n"
@@ -455,7 +455,7 @@ fn bh_me_i3_misplaced_option_after_valued_option_is_named() {
             "z1.bin",
         ],
     );
-    assert_eq!(code(&o), 2, "{}", err(&o));
+    assert_eq!(code(&o), 64, "{}", err(&o));
     assert_eq!(err(&o), notake("hex", "sysw pack"));
     assert!(!d.path().join("z1.bin").exists());
     let o = me(
@@ -471,6 +471,6 @@ fn bh_me_i3_misplaced_option_after_valued_option_is_named() {
             "z2.bin",
         ],
     );
-    assert_eq!(code(&o), 2, "{}", err(&o));
+    assert_eq!(code(&o), 64, "{}", err(&o));
     assert_eq!(err(&o), notake("base64", "sysw pack"));
 }

@@ -157,7 +157,7 @@ fn w1_pack_stdout_rejected_by_fsize_limit_is_not_success() {
         fx.p(),
         &format!("{FSIZE0}\"$ME\" sysw pack --no-passphrase text:6869 > sink.bin"),
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: File too large (os error 27)",
@@ -169,7 +169,7 @@ fn w1_pack_stdout_rejected_by_fsize_limit_is_not_success() {
 }
 
 #[test]
-fn w2_pack_stdout_full_exits_1() {
+fn w2_pack_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
@@ -178,90 +178,90 @@ fn w2_pack_stdout_full_exits_1() {
         fx.p(),
         "\"$ME\" sysw pack --no-passphrase text:6869 > /dev/full",
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.last(), NOSPC, "{}", r.dump());
     assert!(!r.has_card(), "{}", r.dump());
 }
 
 #[test]
-fn w3_pack_read_only_stdout_exits_1() {
+fn w3_pack_read_only_stdout_exits_32() {
     let fx = Fx::new();
     let r = run(
         fx.p(),
         "\"$ME\" sysw pack --no-passphrase text:6869 1</dev/null",
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.last(), EBADF, "{}", r.dump());
     assert!(!r.has_card(), "{}", r.dump());
 }
 
 #[test]
-fn w4_converter_raw_stdout_full_exits_1() {
+fn w4_converter_raw_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --in m.txt --stdout > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w5_converter_hex_full_exits_1() {
+fn w5_converter_hex_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --in m.txt --hex > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w6_converter_base64_full_exits_1() {
+fn w6_converter_base64_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --in m.txt --base64 > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w7_converter_hex_read_only_stdout_exits_1() {
+fn w7_converter_hex_read_only_stdout_exits_32() {
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --in m.txt --hex 1</dev/null");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{EBADF}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w8_bundle_stdout_full_exits_1_without_checklist() {
+fn w8_bundle_stdout_full_exits_32_without_checklist() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" bundle --in b.txt > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.last(), NOSPC, "{}", r.dump());
     assert!(!r.panicked(), "{}", r.dump());
     assert!(!r.stderr.contains("backup needs"), "{}", r.dump());
 }
 
 #[test]
-fn w9_show_stdout_full_exits_1() {
+fn w9_show_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" sysw show c.bin > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w10_hash_stdout_full_exits_1() {
+fn w10_hash_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
@@ -270,40 +270,40 @@ fn w10_hash_stdout_full_exits_1() {
         fx.p(),
         &format!("\"$ME\" hash --unsealed {MD1} > /dev/full"),
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w11_wipe_stdout_full_exits_1() {
+fn w11_wipe_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" sysw wipe > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w12_help_stdout_full_exits_1() {
+fn w12_help_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --help > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
 #[test]
-fn w13_version_stdout_full_exits_1() {
+fn w13_version_stdout_full_exits_32() {
     if !dev_full_present() {
         return;
     }
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --version > /dev/full");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(r.stderr, format!("{NOSPC}\n"), "{}", r.dump());
 }
 
@@ -357,7 +357,7 @@ fn o1_pack_failed_overwrite_says_unchanged() {
         fx.p(),
         &format!("{FSIZE0}\"$ME\" sysw pack --no-passphrase text:6869 --out F.bin"),
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: F.bin: File too large (os error 27). F.bin is unchanged.",
@@ -376,7 +376,7 @@ fn o2_pack_missing_dir_says_nothing_was_written() {
         fx.p(),
         "\"$ME\" sysw pack --no-passphrase text:6869 --out nodir/x.bin",
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: nodir/x.bin: No such file or directory (os error 2). Nothing was written.",
@@ -394,7 +394,7 @@ fn o3_pack_failed_new_file_leaves_nothing() {
         fx.p(),
         &format!("{FSIZE0}\"$ME\" sysw pack --no-passphrase text:6869 --out N.bin"),
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: N.bin: File too large (os error 27). Nothing was written.",
@@ -421,7 +421,7 @@ fn o4_pack_read_only_dir_says_unchanged() {
     );
     let kept = fs::read(ro.join("F")).unwrap();
     fs::set_permissions(&ro, fs::Permissions::from_mode(0o700)).unwrap();
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: ro/F: Permission denied (os error 13). ro/F is unchanged.",
@@ -435,7 +435,7 @@ fn o4_pack_read_only_dir_says_unchanged() {
 fn o5_converter_out_missing_dir() {
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" --in m.txt --out nodir/x.ndef");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.stderr,
         "me: cannot write the output: nodir/x.ndef: No such file or directory (os error 2). Nothing was written.\n",
@@ -448,7 +448,7 @@ fn o5_converter_out_missing_dir() {
 fn o6_bundle_manifest_missing_dir() {
     let fx = Fx::new();
     let r = run(fx.p(), "\"$ME\" bundle --in b.txt --manifest nodir/x.json");
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: nodir/x.json: No such file or directory (os error 2). Nothing was written.",
@@ -467,7 +467,7 @@ fn o7_stdio_alias_onto_a_file_names_no_state() {
         fx.p(),
         &format!("{FSIZE0}\"$ME\" sysw pack --no-passphrase text:6869 --out /dev/stdout >> s.txt"),
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: /dev/stdout: File too large (os error 27)",
@@ -484,7 +484,7 @@ fn o8_seal_out_missing_dir() {
         fx.p(),
         "\"$ME\" seal md1fv9wjpqpqpm6jzzqqvqpdqnf4ztqq4gy99tzyzyzdv7xh9vpdwu3t7dhhesk2tl3 --out nodir/x.uf2",
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert_eq!(
         r.last(),
         "me: cannot write the output: nodir/x.uf2: No such file or directory (os error 2). Nothing was written.",
@@ -504,7 +504,7 @@ fn o9_pack_out_device_names_no_state() {
         fx.p(),
         "\"$ME\" sysw pack --no-passphrase text:6869 --out /dev/full",
     );
-    assert_eq!(r.rc, Some(1), "{}", r.dump());
+    assert_eq!(r.rc, Some(32), "{}", r.dump());
     assert!(
         r.last()
             .starts_with("me: cannot write the output: /dev/full: ")
@@ -526,7 +526,7 @@ fn p1_text(m: &str, p: &str) -> String {
 
 /// The shared refusal assertions of p1-p7.
 fn assert_p1_refused(r: &Run, m: &str, p: &str) {
-    assert_eq!(r.rc, Some(2), "{}", r.dump());
+    assert_eq!(r.rc, Some(8), "{}", r.dump());
     assert_eq!(r.last(), p1_text(m, p), "{}", r.dump());
     for bad in [
         "rendered plate",
@@ -662,7 +662,7 @@ fn p10_manifest_alias_made_during_render_refused() {
     let fx = Fx::new();
     fs::create_dir(fx.p().join("p")).unwrap();
     let r = fx.bundle("--preview p --manifest L", Some("L"));
-    assert_eq!(r.rc, Some(2), "{}", r.dump());
+    assert_eq!(r.rc, Some(8), "{}", r.dump());
     assert_eq!(r.last(), p1_text("L", "p/plate-1.svg"), "{}", r.dump());
     assert_eq!(fs::read(fx.p().join("p/plate-1.svg")).unwrap(), b"<svg/>");
     assert!(r.stdout.is_empty());

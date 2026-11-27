@@ -57,7 +57,9 @@ BAD=md1yqfdsqsjuqqpr5e55uzqqgqqqrqqvf4d7h59r2
 GOOD=md1yqfdsssjuqqcr5e55uqqqgqqq6qqvf4d7h59r2
 if md decode "$BAD" >/dev/null 2>&1; then bad "the damaged string should NOT decode" "it decoded"; else ok "damaged string is rejected"; fi
 out=$(md repair "$BAD" 2>/dev/null); rc=$?
-[[ $rc -eq 5 ]] && ok "md repair exits 5 (REPAIR_APPLIED)" || bad "md repair exit code" "got $rc, want 5"
+# A single (unchunked) string: 16 REPAIRED + 4 UNVERIFIED = 20 (exit-codes
+# spec decision 7; a chunked set that reassembles would be 16).
+[[ $rc -eq 20 ]] && ok "md repair exits 20 (repaired, unverified)" || bad "md repair exit code" "got $rc, want 20"
 grep -q '4 corrections' <<<"$out" && ok "repair reports 4 corrections" || bad "correction count" "$(head -2 <<<"$out")"
 [[ $(grep -o '^md1[a-z0-9]*' <<<"$out" | head -1) == "$GOOD" ]] \
   && ok "repaired string is byte-identical to the original" || bad "repair output" "$(grep -o '^md1[a-z0-9]*' <<<"$out" | head -1)"

@@ -103,14 +103,14 @@ fn as_descriptor_is_a_value_the_flag_accepts_and_packs() {
     assert_eq!(code(&out), 0, "a carried wallet packs. stderr:\n{err}");
 }
 
-/// A value outside the two is USAGE — nothing about the data was judged.
+/// A value outside the two is USAGE (64) — nothing about the data was judged.
 #[test]
 fn as_refuses_a_value_outside_the_two() {
     let (out, _d) = pack_in(
         &row_input("formats-happy/bip380-sortedmulti-multipath"),
         &["--as", "qr"],
     );
-    assert_eq!(code(&out), 2, "stderr:\n{}", stderr(&out));
+    assert_eq!(code(&out), 64, "stderr:\n{}", stderr(&out));
 }
 
 /// §5.1's single-document contract: `--as` with more than one argv operand.
@@ -123,7 +123,7 @@ fn as_with_two_argv_operands_is_usage() {
         .output()
         .unwrap();
     let err = stderr(&out);
-    assert_eq!(code(&out), 2, "stderr:\n{err}");
+    assert_eq!(code(&out), 64, "stderr:\n{err}");
     assert!(
         err.contains("--as packs exactly one descriptor per invocation."),
         "stderr:\n{err}"
@@ -145,7 +145,7 @@ fn as_with_argv_and_in_together_is_usage() {
         .output()
         .unwrap();
     let err = stderr(&out);
-    assert_eq!(code(&out), 2, "stderr:\n{err}");
+    assert_eq!(code(&out), 64, "stderr:\n{err}");
     assert!(
         err.contains("--as packs exactly one descriptor per invocation."),
         "stderr:\n{err}"
@@ -173,7 +173,7 @@ fn as_with_one_argv_operand_is_the_document() {
 fn as_on_a_non_descriptor_gets_the_cause_selection() {
     let (out, _d) = pack_in("hello, this is not a descriptor\n", &["--as", "md1"]);
     let err = stderr(&out);
-    assert_eq!(code(&out), 3, "stderr:\n{err}");
+    assert_eq!(code(&out), 2, "stderr:\n{err}");
     assert!(
         err.contains("not a wallet descriptor in any of the four forms"),
         "stderr:\n{err}"
@@ -493,6 +493,11 @@ fn item_2_every_format_packs_reads_back_and_derives_the_device_address() {
 /// The referral fires on §5.1's OWN shape gate, shared rather than
 /// reimplemented, so the two surfaces cannot disagree about what looks like a
 /// descriptor. Three inputs: two that must refer, one that must not.
+///
+/// Each run names an output mode (`--hex`): since the constellation exit-code
+/// spec (R2) a missing output mode is a usage error (64) decided before the
+/// input is read, so the referral is reached only once the command line is
+/// whole.
 #[test]
 fn the_converter_refers_a_descriptor_to_sysw_pack() {
     const REFERRAL: &str =
@@ -510,12 +515,13 @@ fn the_converter_refers_a_descriptor_to_sysw_pack() {
         std::fs::write(&path, row_input(row)).unwrap();
         let out = assert_cmd::Command::cargo_bin("me")
             .unwrap()
+            .arg("--hex")
             .arg("--in")
             .arg(&path)
             .output()
             .unwrap();
         let err = stderr(&out);
-        assert_eq!(code(&out), 4, "{row}: the converter's own exit code\n{err}");
+        assert_eq!(code(&out), 2, "{row}: the converter's own exit code\n{err}");
         assert!(err.contains(REFERRAL), "{row}: no referral\n{err}");
         assert!(
             err.contains(NEXT),
@@ -533,12 +539,13 @@ fn the_converter_refers_a_descriptor_to_sysw_pack() {
     std::fs::write(&path, "zzz1nonsense\n").unwrap();
     let out = assert_cmd::Command::cargo_bin("me")
         .unwrap()
+        .arg("--hex")
         .arg("--in")
         .arg(&path)
         .output()
         .unwrap();
     let err = stderr(&out);
-    assert_eq!(code(&out), 4, "{err}");
+    assert_eq!(code(&out), 2, "{err}");
     assert!(err.contains("unrecognized HRP"), "{err}");
     assert!(
         !err.contains("that looks like a wallet DESCRIPTOR"),
@@ -577,7 +584,7 @@ fn the_argv_bearer_guard_precedes_the_single_document_check() {
     let err = stderr(&out);
     assert_eq!(
         code(&out),
-        3,
+        8,
         "the bearer refusal is a policy refusal\n{err}"
     );
     assert!(
@@ -597,7 +604,7 @@ fn the_argv_bearer_guard_precedes_the_single_document_check() {
 #[test]
 fn the_md1_records_reach_the_shipped_expect_gate() {
     let doc = row_input("formats-happy/bluewallet-sh-fixture");
-    for (kinds, want_exit) in [("descriptor", 0), ("transaction", 4)] {
+    for (kinds, want_exit) in [("descriptor", 0), ("transaction", 1)] {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("document.txt");
         let out_path = dir.path().join("container.bin");
@@ -656,7 +663,14 @@ fn multi_twin(row: &str) -> String {
 /// whenever 2–8 refuse, because `--as md1` refuses the same file permanently.
 fn assert_same_refusal_under_every_flag(document: &str, want: &str) {
     for (err, rc) in under_all_three_flags(document) {
-        assert_eq!(rc, 3, "every flag state refuses. stderr:\n{err}");
+        // A network contradiction inside the file is REFUSED (8); every other
+        // flag-independent conjunct is an INVALID input (2).
+        let want_rc = if want.contains("All keys must share one network.") {
+            8
+        } else {
+            2
+        };
+        assert_eq!(rc, want_rc, "every flag state refuses. stderr:\n{err}");
         assert!(
             err.contains(want),
             "a flag state lost the refusal conjuncts 2-8 earn.\nWANT: {want}\nGOT:  {err}"
@@ -747,7 +761,7 @@ fn as_descriptor_on_a_sound_multi_still_gets_conjunct_1s_permanent_refusal() {
     let document = row_input("neither/wsh-multi");
     let (out, _d) = pack_in(&document, &["--as", "descriptor"]);
     let err = stderr(&out);
-    assert_eq!(code(&out), 3, "stderr:\n{err}");
+    assert_eq!(code(&out), 2, "stderr:\n{err}");
     assert!(
         err.contains("the device's descriptor parser accepts `sortedmulti` and not `multi`."),
         "the sound `multi` lost conjunct 1's refusal:\n{err}"
@@ -840,7 +854,7 @@ fn the_compare_prompt_survives_whatever_the_follower_does() {
             "--as md1, an (a″) refusal",
             a2.clone(),
             vec!["--as", "md1"],
-            3,
+            2,
         ),
         (
             "--as descriptor, the same wallet PACKED",
@@ -852,7 +866,7 @@ fn the_compare_prompt_survives_whatever_the_follower_does() {
             "--as descriptor, conjunct 1's permanent multi refusal",
             row_input("neither/wsh-multi-fixed-path"),
             vec!["--as", "descriptor"],
-            3,
+            2,
         ),
     ];
     let mut checked = 0;
@@ -1014,7 +1028,7 @@ fn the_label_warning_fires_exactly_on_the_paths_that_pack() {
             0,
             true,
         ),
-        ("--as omitted (choice block)", vec![], 2, false),
+        ("--as omitted (choice block)", vec![], 8, false),
     ];
     let mut checked = 0;
     for (what, flags, exit, want_warning) in cases {
@@ -1068,7 +1082,7 @@ fn a_quoted_fragment_never_spans_a_newline() {
     let err = stderr(&out);
     assert_eq!(
         code(&out),
-        3,
+        2,
         "two descriptors are one malformed document\n{err}"
     );
     assert!(
@@ -1103,7 +1117,7 @@ fn a_backtick_inside_a_quoted_fragment_is_escaped() {
     let err = stderr(&out);
     assert_eq!(
         code(&out),
-        3,
+        2,
         "the row and the exit code are unchanged\n{err}"
     );
     assert!(

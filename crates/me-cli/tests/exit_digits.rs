@@ -12,17 +12,15 @@
 //! | `read_records`, stdin error | 2 → 3 | green, missed |
 //! | `emit`, write failure | 2 → 3 | green, missed |
 //!
-//! Since FIX_me_output_integrity (T6) a failed write is exit 1, not 2; the row now pins that digit.
-//!
-//! **Exit 2 is a usage error; exit 3 is a policy refusal.** They mean different
-//! things to a script — *fix your command line* versus *this tool will never do
-//! that* — and five of `me`'s refusals could swap one for the other undetected.
+//! Since the constellation exit-code spec (`SPEC_constellation_exit_codes.md`,
+//! 2026-11-26) the digits are the constellation's: the world-readable
+//! destination is REFUSED (8, a destination change or `--allow-world-readable`
+//! waives it), a missing `--in` file and a failed write are IO (32), and stdin
+//! that is not text is an INVALID input (2). The rows pin those digits.
 //!
 //! **The tests checked that a refusal HAPPENED, never which kind**, which is
 //! why the mutation survived. `!success()` cannot discharge this; only the
-//! integer can. It is not a defect P0 introduced — the control proves it is the
-//! state of the shipped binary — but P0 moves exactly these functions, and a
-//! refactor over an untested distinction is how the distinction quietly dies.
+//! integer can.
 //!
 //! **Site 1 is pinned in `terminal_destination.rs`, not here**, because it
 //! needs a real pty: none of the 12 `world_readable_output.rs` tests reaches
@@ -30,7 +28,7 @@
 //! reachable with ordinary process plumbing and live here.
 //!
 //! **Each assertion pins the digit AND a distinguishing phrase.** Pinning the
-//! digit alone would let a DIFFERENT refusal that also exits 2 satisfy the
+//! digit alone would let a DIFFERENT refusal with the same digit satisfy the
 //! test — the same false-pass shape one level up.
 #![cfg(unix)]
 
@@ -47,12 +45,15 @@ fn err_of(o: &Output) -> String {
 }
 
 /// The exit-code vocabulary, named so the assertions read as intent.
-const USAGE: i32 = 2;
+const INVALID: i32 = 2;
+const REFUSED: i32 = 8;
+const IO: i32 = 32;
+const USAGE: i32 = 64;
 
 /// **Site 2 — `refuse_write_block`'s WorldReadable arm.**
 /// stdout is a regular file whose mode grants group/other read.
 #[test]
-fn a_world_readable_stdout_is_usage_two() {
+fn a_world_readable_stdout_is_refused_eight() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("wr.bin");
     let f = fs::File::create(&out).unwrap();
@@ -67,9 +68,9 @@ fn a_world_readable_stdout_is_usage_two() {
 
     assert_eq!(
         o.status.code(),
-        Some(USAGE),
-        "a world-readable stdout is a USAGE error -- fix the redirect -- not a \
-         policy refusal: {}",
+        Some(REFUSED),
+        "a world-readable stdout is REFUSED -- a destination change or \
+         --allow-world-readable waives it: {}",
         err_of(&o)
     );
     assert!(
@@ -81,7 +82,7 @@ fn a_world_readable_stdout_is_usage_two() {
 
 /// **Site 3 — `read_records`'s `--in` error.** The file is not there.
 #[test]
-fn an_unreadable_in_file_is_usage_two() {
+fn an_unreadable_in_file_is_io_thirty_two() {
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("nope.txt");
 
@@ -93,9 +94,8 @@ fn an_unreadable_in_file_is_usage_two() {
 
     assert_eq!(
         o.status.code(),
-        Some(USAGE),
-        "a missing --in file is the operator's command line, not a policy \
-         refusal: {}",
+        Some(IO),
+        "a missing --in file is something needed from the system: {}",
         err_of(&o)
     );
     assert!(
@@ -109,7 +109,7 @@ fn an_unreadable_in_file_is_usage_two() {
 /// that are not UTF-8, which is what a binary file piped in by mistake looks
 /// like.
 #[test]
-fn unreadable_stdin_is_usage_two() {
+fn stdin_that_is_not_text_is_invalid_two() {
     use std::io::Write;
     let mut child = Command::new(me())
         .args(["sysw", "pack", "--no-passphrase"])
@@ -128,8 +128,8 @@ fn unreadable_stdin_is_usage_two() {
 
     assert_eq!(
         o.status.code(),
-        Some(USAGE),
-        "stdin that is not text is a usage error: {}",
+        Some(INVALID),
+        "stdin that is not text is an invalid input: {}",
         err_of(&o)
     );
     assert!(
@@ -141,11 +141,10 @@ fn unreadable_stdin_is_usage_two() {
 
 /// **Site 5 — `emit`'s write failure.** A write that failed is the
 /// environment, not the artifact: a read-only directory, a full disk, a closed
-/// pipe. Here, a parent directory that does not exist. Since
-/// FIX_me_output_integrity (T6) a failed write is exit 1, not 2; this row pins
-/// that digit.
+/// pipe. Here, a parent directory that does not exist. A failed write is IO,
+/// exit 32; this row pins that digit.
 #[test]
-fn a_failed_write_is_exit_one() {
+fn a_failed_write_is_io_thirty_two() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("no-such-dir").join("p.bin");
 
@@ -158,7 +157,7 @@ fn a_failed_write_is_exit_one() {
 
     assert_eq!(
         o.status.code(),
-        Some(1),
+        Some(IO),
         "a write that failed is the environment, not a policy refusal: {}",
         err_of(&o)
     );
@@ -173,10 +172,9 @@ fn a_failed_write_is_exit_one() {
     assert!(!out.exists(), "nothing may be left behind");
 }
 
-/// **THE CONTROL.** Every assertion above is `== 2`, so a build in which
-/// everything exited 2 would satisfy all four. This pins that the same command,
-/// with nothing wrong with it, exits 0 — and that a genuine POLICY refusal
-/// still exits 3, so the two codes really are distinguishable in this suite.
+/// **THE CONTROL.** The same command with nothing wrong with it exits 0, and a
+/// genuine USAGE error exits 64 -- so a build in which everything exited one
+/// digit could not satisfy the rows above.
 #[test]
 fn the_vocabulary_still_has_more_than_one_code_in_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -189,16 +187,89 @@ fn the_vocabulary_still_has_more_than_one_code_in_it() {
         .unwrap();
     assert_eq!(o.status.code(), Some(0), "control: {}", err_of(&o));
 
-    // A policy refusal: a `tx:` record on argv. Exit 3, and it must NOT be 2.
+    // A policy refusal: a `tx:` record on argv. REFUSED, 8.
     let o = Command::new(me())
         .args(["sysw", "pack", "--no-passphrase", "tx:0100"])
         .output()
         .unwrap();
-    assert_eq!(
-        o.status.code(),
-        Some(3),
-        "a policy refusal is 3 -- if this is 2, the distinction the four tests \
-         above pin has collapsed and they are all passing for nothing: {}",
-        err_of(&o)
-    );
+    assert_eq!(o.status.code(), Some(REFUSED), "{}", err_of(&o));
+
+    // A usage error: a setting out of range, judged from the command line.
+    let o = Command::new(me())
+        .args(["sysw", "pack", "--no-passphrase", "--iterations", "5"])
+        .arg("text:6869")
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(USAGE), "{}", err_of(&o));
+}
+
+/// R11: the root `--help` ends with the spec's legend, verbatim, and so does
+/// `-h`. The text is `mnemonic_io_lib::exit::HELP_LEGEND`, which its own unit
+/// test pins to the spec.
+#[test]
+fn the_root_help_ends_with_the_exit_status_legend() {
+    for flag in ["--help", "-h"] {
+        let o = Command::new(me()).arg(flag).output().unwrap();
+        assert_eq!(o.status.code(), Some(0), "{flag}");
+        let out = String::from_utf8(o.stdout).unwrap();
+        assert!(
+            out.trim_end()
+                .ends_with(mnemonic_engrave::io::exit::HELP_LEGEND),
+            "{flag} does not end with the legend:\n{out}"
+        );
+        assert!(out.contains("Exit status: 0 = done"), "{flag}");
+    }
+}
+
+/// R11's second sentence: each verb's help states only the bits that verb can
+/// set, and does not repeat the root legend.
+#[test]
+fn each_verb_help_states_its_own_exit_bits() {
+    let cases: &[(&[&str], &[&str], &[&str])] = &[
+        (
+            &["bundle"],
+            &["2 an input", "8 refused", "32 "],
+            &["1 --expect", "16 "],
+        ),
+        (
+            &["seal"],
+            &["2 an input", "8 refused", "32 "],
+            &["1 --expect", "16 "],
+        ),
+        (&["hash"], &["2 an", "32 stdout"], &["8 refused", "16 "]),
+        (
+            &["sysw", "pack"],
+            &["1 --expect", "2 an input", "8 refused", "32 "],
+            &["16 "],
+        ),
+        (
+            &["sysw", "wipe"],
+            &["8 refused", "32 "],
+            &["2 an input", "16 "],
+        ),
+        (&["sysw", "show"], &["2 the", "32 "], &["8 refused", "16 "]),
+    ];
+    for (verb, has, lacks) in cases {
+        let o = Command::new(me())
+            .args(*verb)
+            .arg("--help")
+            .output()
+            .unwrap();
+        assert_eq!(o.status.code(), Some(0), "{verb:?}");
+        let out = String::from_utf8(o.stdout).unwrap();
+        let line = out
+            .lines()
+            .find(|l| l.starts_with("Exit status:"))
+            .unwrap_or_else(|| panic!("{verb:?}: no exit-status line\n{out}"));
+        for h in *has {
+            assert!(line.contains(h), "{verb:?} lacks {h:?}: {line}");
+        }
+        for l in *lacks {
+            assert!(!line.contains(l), "{verb:?} states {l:?}: {line}");
+        }
+        assert!(
+            !out.contains(mnemonic_engrave::io::exit::HELP_LEGEND),
+            "{verb:?} repeats the root legend"
+        );
+    }
 }

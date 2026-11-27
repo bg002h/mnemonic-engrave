@@ -12,7 +12,7 @@
 //! **The gate is a GENERATED CROSS-PRODUCT, not a hand list, on every axis.**
 //! Two earlier drafts of this work enumerated first surfaces and then shapes,
 //! and both came up short — the shape list missed `Class::Passphrase`, the
-//! `pass:` record, which `me` refuses at rc 3 as *SECRET key material on ARGV*
+//! `pass:` record, which `me` refuses at rc 8 as *SECRET key material on ARGV*
 //! and which leaked bare. A list you write by hand is a list you can be short
 //! by one, and a security gate short by one class is not a gate.
 //!
@@ -45,7 +45,7 @@ fn stderr_of(o: &Output) -> String {
 
 /// The refusal is recognisable by its own words, never by a bare exit code.
 fn is_guard_refusal(o: &Output) -> bool {
-    o.status.code() == Some(3)
+    o.status.code() == Some(8)
         && stderr_of(o).contains("Refused BEFORE the command line was parsed")
 }
 
@@ -134,9 +134,9 @@ fn no_argv_forbidden_class_reaches_stderr_on_any_surface() {
 /// **THE ORDERING TEST**, and it is what distinguishes pre- from post-parse
 /// without modifying any non-test code.
 ///
-/// `me --nosuchflag <ms1>` reaches the guard (exit **3**, the guard's wording)
-/// and not clap (exit **2**, naming the flag). Measured on the pre-guard
-/// binary: exit 2, `error: unexpected argument '--nosuchflag' found`.
+/// `me --nosuchflag <ms1>` reaches the guard (exit **8**, the guard's wording)
+/// and not clap (exit **64**, naming the flag). Measured on the pre-guard
+/// binary: clap's usage exit, `error: unexpected argument '--nosuchflag' found`.
 #[test]
 fn the_guard_decides_before_clap_does() {
     let o = run(&["--nosuchflag", MS1]);
@@ -207,7 +207,7 @@ fn allow_argv_secret_binds_only_where_it_is_declared() {
 }
 
 /// **THE POSITIVE CONTROLS, without which a refuse-everything guard passes
-/// every row above.** `fn guard(_) -> ! { exit(3) }` satisfies both the
+/// every row above.** `fn guard(_) -> ! { exit(8) }` satisfies both the
 /// absence-of-secret gate and the ordering test.
 #[test]
 fn the_guard_refuses_nothing_it_should_not() {

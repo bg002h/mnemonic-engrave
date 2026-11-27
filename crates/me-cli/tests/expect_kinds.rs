@@ -82,7 +82,7 @@ fn expect_descriptor_cosigner_refuses_a_payload_with_no_cosigner_card() {
         &[MD1_A, MD1_B, MD1_C],
         &["--expect", "descriptor,cosigner"],
     );
-    assert_eq!(r.code, 4, "the input is not what it must be: {}", r.err);
+    assert_eq!(r.code, 1, "a stated expectation came out no: {}", r.err);
     assert!(
         r.err.contains("--expect cosigner") && r.err.contains("NO record of that kind"),
         "the refusal must name the kind that is MISSING, not the one present: {}",
@@ -109,7 +109,7 @@ fn expect_transaction_refuses_a_stream_that_holds_none() {
         &[MD1_A, MD1_B, MD1_C],
         &["--expect", "descriptor,transaction"],
     );
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 1, "{}", r.err);
     assert!(
         r.err.contains("--expect transaction") && r.err.contains("NO record of that kind"),
         "{}",
@@ -125,7 +125,7 @@ fn expect_transaction_refuses_a_stream_that_holds_none() {
 fn expect_descriptor_refuses_an_incomplete_md1_set() {
     let dir = tempfile::tempdir().unwrap();
     let r = pack(dir.path(), &[MD1_A], &["--expect", "descriptor"]);
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 1, "{}", r.err);
     assert!(
         r.err.contains("does not reassemble"),
         "the refusal must distinguish INCOMPLETE from ABSENT -- they need \
@@ -158,7 +158,7 @@ fn expect_transaction_refuses_an_incomplete_mt1_set() {
     let half: Vec<&str> = MT_EVEN[..3].to_vec();
 
     let r = pack(dir.path(), &half, &["--expect", "transaction"]);
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 1, "{}", r.err);
     assert!(
         r.err.contains("does not reassemble"),
         "half an mt1 set is present and unrestorable: {}",
@@ -225,7 +225,7 @@ fn allow_unsigned_inputs_and_expect_transaction_do_not_falsely_refuse() {
 /// The vocabulary refuses what it cannot satisfy, **as a USAGE error**, and
 /// says why.
 ///
-/// A flag value out of range is USAGE (2), not invalid (4): no input has been
+/// A flag value out of range is USAGE (64), not invalid (2): no input has been
 /// read at the point it is caught, so there is nothing yet for "invalid" to be
 /// about. `address` and `passphrase` are the two likely wrong guesses and each
 /// gets its own reason rather than a bare "unknown".
@@ -238,7 +238,7 @@ fn the_vocabulary_excludes_what_can_never_be_satisfied() {
     ] {
         let r = pack(dir.path(), &[MD1_A, MD1_B, MD1_C], &["--expect", word]);
         assert_eq!(
-            r.code, 2,
+            r.code, 64,
             "an unknown --expect kind is a USAGE error, not an invalid input: {}",
             r.err
         );
@@ -302,9 +302,9 @@ fn vector_field(name: &str, field: &str) -> String {
 /// would report that record absent — 100% reproducibly, on the funds path,
 /// inside the feature added to prevent exactly that class of false refusal.
 ///
-/// The exit code here is 2, not 0, and that is §5.1 rather than `--expect`:
+/// The exit code here is 8, not 0, and that is §5.1 rather than `--expect`:
 /// `--expect` resolves FIRST and is MET, and the run then reaches the choice
-/// block because `--as` was omitted. What this pins is that it is not exit 4
+/// block because `--as` was omitted. What this pins is that it is not exit 1
 /// saying no record of that kind is in the stream.
 #[test]
 fn expect_descriptor_is_satisfied_by_a_descriptor_record() {
@@ -316,7 +316,7 @@ fn expect_descriptor_is_satisfied_by_a_descriptor_record() {
         "the record `--as descriptor` packs must satisfy `--expect descriptor`: {}",
         r.err
     );
-    assert_eq!(r.code, 2, "{}", r.err);
+    assert_eq!(r.code, 8, "{}", r.err);
     assert!(
         r.err.contains("`--as` decides how it is packed"),
         "{}",
@@ -371,7 +371,7 @@ fn as_descriptor_with_expect_descriptor_packs() {
 fn expect_descriptor_still_refuses_a_mnemonic_only_container() {
     let dir = tempfile::tempdir().unwrap();
     let r = pack(dir.path(), &[MNEMONIC], &["--expect", "descriptor"]);
-    assert_eq!(r.code, 4, "{}", r.err);
+    assert_eq!(r.code, 1, "{}", r.err);
     assert!(
         r.err.contains("an md1 descriptor card")
             && r.err.contains("a descriptor record (`--as descriptor`)"),

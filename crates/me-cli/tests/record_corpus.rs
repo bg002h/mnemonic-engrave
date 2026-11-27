@@ -257,8 +257,8 @@ fn the_capture_covers_every_class_s2_must_not_move() {
 /// **`--expect` resolves BEFORE the gate, and that ordering is a decision.**
 /// The gate moved up to sit immediately before `admit_check`; one step further
 /// and it would overtake `--expect`, turning an operator's stated, unmet
-/// expectation (exit 4, and it names the kind) into a menu about how to pack
-/// the file (exit 2).
+/// expectation (exit 1, and it names the kind) into a menu about how to pack
+/// the file (exit 8).
 #[test]
 fn expect_resolves_before_the_descriptor_gate() {
     let doc = json(DESCRIPTOR_VECTORS)["vectors"]
@@ -281,7 +281,7 @@ fn expect_resolves_before_the_descriptor_gate() {
         .output()
         .unwrap();
     let err = String::from_utf8_lossy(&out.stderr).to_string();
-    assert_eq!(out.status.code(), Some(4), "stderr: {err}");
+    assert_eq!(out.status.code(), Some(1), "stderr: {err}");
     assert!(err.contains("a BIP-39 mnemonic"), "stderr: {err}");
     assert!(
         !err.contains("`--as` decides how it is packed"),

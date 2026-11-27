@@ -1,0 +1,3 @@
+# The CI toolchain (.github/workflows: RUST_TOOLCHAIN 1.85.0). A newer local
+# clippy then does not suggest APIs that toolchain lacks (is_multiple_of, 1.87).
+msrv = "1.85.0"

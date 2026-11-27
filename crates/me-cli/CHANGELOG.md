@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Exit codes follow the constellation exit-code spec** (`SPEC_constellation_exit_codes.md`, rev 5).
+  The numbers come from `mnemonic_io_lib::exit` (0.1.4), and the root `--help` ends with the spec's
+  legend. **Breaking for scripts that test `me`'s exit status:**
+
+  "Was" is the code just before this change. Three rows were also changed by the unreleased fixes
+  below, so v0.13.0 differs there: a non-UTF-8 argument panicked (101); a failed write exited 0,
+  101 or 2 (bh-me-I4); a `--manifest` over a plate preview overwrote it at 0 (bh-me-I10).
+
+  | was | now | what |
+  | --- | --- | --- |
+  | 2 | 64 | a bad command line (clap), no output mode, `--iterations`, a bad `--expect` value, `--fill`, records both on argv and via `--in`, `me hash` with no records |
+  | 2 after reading (sealed) / 0, ignored (public) | 64 | `sysw pack --passphrase-words` outside 2..=24: now judged before any input is read |
+  | 2 (a 101 panic in v0.13.0) | 64 | an argument that is not UTF-8 |
+  | 3 | 8 | a secret or bearer record on argv; `me seal` given seed material without `--seal-secret`; the descriptor row "mixed network" |
+  | 2 | 8 | `--as` omitted for a descriptor (the choice block); a terminal or world-readable stdout; `--manifest` naming a plate preview; a preview directory that already holds plate artifacts |
+  | 3 | 2 | an `ms1` given to the converter or `bundle`; every other descriptor refusal row (from the gate or `--as`) |
+  | 4 | 2 | an invalid md1/mk1/mt1 string to the converter; `bundle`'s invalid, incomplete or transaction input; `sysw pack` record and container refusals, several records under `--as`; `sysw show` on a damaged container |
+  | 4 | 8 | `sysw pack` given an unsigned transaction, a preimage carrier without `--pack-preimage`, or a digest-shaped phrase |
+  | 4 | 1 | `--expect` not met (a check said no) |
+  | 1 | 32 | a failed write: stdout, `--out`, `--manifest` |
+  | 2 | 32 | a failed read (`--in`, `sysw show <file>`), `ME_PREVIEW_BIN` set but missing, a sidecar version mismatch, a preview path that is not a directory, the passphrase prompt failing |
+  | 4 | 32 | the preview sidecar failing to render, or writing no usable file |
+  | 2 | 101 | the manifest cannot be serialised (a bug) |
+  | 2 | 2 | empty input (unchanged) |
+
+  A `--expect` failure and an invalid card in the same run sum (3). The table is pinned by
+  per-type tests (R13) and `tests/exit_digits.rs`.
+
 ### Fixed
 
 - **A write the destination refused is no longer reported as success** (bughunt-1119 bh-me-I4, Important;

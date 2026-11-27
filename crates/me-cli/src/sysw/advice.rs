@@ -39,7 +39,7 @@ pub const BEARER_PRIVATE_CHANNEL_EXAMPLE: &str =
 /// Measured 2026-08-27 over eleven argv shapes (a BIP-39 phrase, an `ms1` in
 /// three spellings, `pass:`, `text:`, three `tx:` forms, `md1`, `mt1`): the
 /// pre-parser `argv_secret_guard` refuses every input for which
-/// `class.is_argv_forbidden()` holds, at exit 3, before `read_records` runs —
+/// `class.is_argv_forbidden()` holds, at exit 8 (REFUSED), before `read_records` runs —
 /// so the `else` arm above can only be selected by an input the pre-parser
 /// already rejected. The reachable half of this refusal is the `by_prefix` arm
 /// (a `tx:` prefix the classifier does not recognise), which always takes the

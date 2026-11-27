@@ -19,11 +19,11 @@ echo "md1yqpqqxqq8xtwhw4xwn4qh" | me --hex            # hex to stdout
 echo "mk1…"                     | me --out wallet.ndef # raw NDEF to a file
 echo "md1…"                     | me --hex --echo      # also echo the validated string to stderr
 
-# ms1 is refused (exit 3), with on-device-entry guidance:
+# ms1 is refused (exit 2: not a public string), with on-device-entry guidance:
 echo "ms1…"                     | me --stdout
 ```
 
-Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**.
+Input is read from **stdin** (or `--in <file>`) — never a positional argument, so a secret can't leak into `ps`/shell history. NDEF bytes go to stdout (`--stdout` / `--hex` / `--base64`) or `--out <file>`; all human-readable text goes to **stderr**. Exit codes: see the legend at the end of `me --help`.
 
 ## License
 

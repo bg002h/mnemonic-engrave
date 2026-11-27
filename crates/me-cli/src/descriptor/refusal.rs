@@ -74,6 +74,59 @@ pub enum Row {
 }
 
 impl Row {
+    /// The exit-code class of this §6 row (`SPEC_constellation_exit_codes.md`
+    /// §3). Exhaustive on purpose (R13): a new row does not compile until it is
+    /// classified.
+    ///
+    /// - REFUSED (8): [`Row::AsOmitted`] -- the tool declines to choose a
+    ///   packing for the operator, and `--as` waives it -- and
+    ///   [`Row::MixedNetwork`], a network contradiction inside the file
+    ///   (test 3; decision 1's HARD mismatch).
+    /// - INVALID (2): every other row. Each is a fact about the wallet or the
+    ///   file -- unparseable, inadmissible, or not representable on the path
+    ///   asked for -- and no flag waives the rule behind it.
+    pub fn class(self) -> mnemonic_io_lib::exit::Bits {
+        use mnemonic_io_lib::exit::Bits;
+        match self {
+            Row::AsOmitted | Row::MixedNetwork => Bits::REFUSED,
+            Row::Unparseable
+            | Row::EmptyFile
+            | Row::WhitespaceOnly
+            | Row::JsonInnerMalformed
+            | Row::BlueWalletNoName
+            | Row::BlueWalletNoFormat
+            | Row::BlueWalletZeroCosigners
+            | Row::BlueWalletPolicyCount
+            | Row::BlueWalletNoOrigin
+            | Row::BlueWalletBadFingerprint
+            | Row::MultiUnderDescriptor
+            | Row::Miniscript
+            | Row::Md1FixedIndex
+            | Row::ThresholdExceedsKeys
+            | Row::ThresholdBelowOne
+            | Row::KeyCountExceeded
+            | Row::KeyIdentity
+            | Row::KeyIdentityDuplicate
+            | Row::UnsupportedKeyVersion
+            | Row::TaprootMultisig
+            | Row::PromotionPathNotInferable
+            | Row::PromotionAccountNotZero
+            | Row::PromotionFingerprintNoPath
+            | Row::PromotionMultisigCosignerKey
+            | Row::PromotionTestnetKey
+            | Row::BitcoinAddress
+            | Row::MultiInSingleKeyScript
+            | Row::KeyInScriptSlot
+            | Row::UseSiteHardened
+            | Row::UseSiteNonConsecutive
+            | Row::UseSiteOutOfSet
+            | Row::Md1NoWildcard
+            | Row::MultiRecordDescriptor => Bits::INVALID,
+        }
+    }
+}
+
+impl Row {
     pub const ALL: &'static [Row] = &[
         Row::Unparseable,
         Row::EmptyFile,
@@ -1155,5 +1208,67 @@ pub fn form_of(d: &Parsed) -> String {
     match (d.script, d.multi) {
         (s, None) => s.descriptor_form().to_string(),
         (s, Some(m)) => format!("{}({}(…))", s.descriptor_form(), m.spelling()),
+    }
+}
+
+#[cfg(test)]
+mod exit_class_tests {
+    use super::Row;
+
+    /// R13's table test: every §6 row, each with its expected code as a
+    /// literal (not a restated predicate). It must cover [`Row::ALL`] exactly.
+    #[test]
+    fn every_row_maps_to_its_exit_class() {
+        let table: &[(Row, u8)] = &[
+            (Row::Unparseable, 2),
+            (Row::EmptyFile, 2),
+            (Row::WhitespaceOnly, 2),
+            (Row::AsOmitted, 8),
+            (Row::JsonInnerMalformed, 2),
+            (Row::BlueWalletNoName, 2),
+            (Row::BlueWalletNoFormat, 2),
+            (Row::BlueWalletZeroCosigners, 2),
+            (Row::BlueWalletPolicyCount, 2),
+            (Row::BlueWalletNoOrigin, 2),
+            (Row::BlueWalletBadFingerprint, 2),
+            (Row::MultiUnderDescriptor, 2),
+            (Row::Miniscript, 2),
+            (Row::Md1FixedIndex, 2),
+            (Row::ThresholdExceedsKeys, 2),
+            (Row::ThresholdBelowOne, 2),
+            (Row::KeyCountExceeded, 2),
+            (Row::KeyIdentity, 2),
+            (Row::KeyIdentityDuplicate, 2),
+            (Row::MixedNetwork, 8),
+            (Row::UnsupportedKeyVersion, 2),
+            (Row::TaprootMultisig, 2),
+            (Row::PromotionPathNotInferable, 2),
+            (Row::PromotionAccountNotZero, 2),
+            (Row::PromotionFingerprintNoPath, 2),
+            (Row::PromotionMultisigCosignerKey, 2),
+            (Row::PromotionTestnetKey, 2),
+            (Row::BitcoinAddress, 2),
+            (Row::MultiInSingleKeyScript, 2),
+            (Row::KeyInScriptSlot, 2),
+            (Row::UseSiteHardened, 2),
+            (Row::UseSiteNonConsecutive, 2),
+            (Row::UseSiteOutOfSet, 2),
+            (Row::Md1NoWildcard, 2),
+            (Row::MultiRecordDescriptor, 2),
+        ];
+        assert_eq!(table.len(), Row::ALL.len(), "the table must list every row");
+        for &row in Row::ALL {
+            assert!(
+                table.iter().any(|(r, _)| *r == row),
+                "{row:?} is not in the table"
+            );
+        }
+        for &(row, want) in table {
+            assert_eq!(
+                Some(row.class()),
+                mnemonic_io_lib::exit::Bits::from_code(want),
+                "{row:?}"
+            );
+        }
     }
 }

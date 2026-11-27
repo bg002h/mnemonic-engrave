@@ -234,7 +234,7 @@
       "address_0": "1G7ZM6uRVewv4NRf28yYVmsS6fZpErh7pz",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "formats-happy",
         "promotion-near-miss",
@@ -254,7 +254,7 @@
       "address_0": "bc1q5hrky4qgk2yqdg334z0g0r4348jvuj8khremkg",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "promotion-near-miss",
         "gate"
@@ -271,7 +271,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-multisig-cosigner-key",
       "covers": [
         "promotion-near-miss",
@@ -289,7 +289,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-multisig-cosigner-key",
       "covers": [
         "promotion-near-miss",
@@ -309,7 +309,7 @@
       "address_0": "1G7ZM6uRVewv4NRf28yYVmsS6fZpErh7pz",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "promotion-near-miss",
         "gate"
@@ -328,7 +328,7 @@
       "address_0": "3QAMb8VVvDudrvXuUTjjBvyfHXPGtDyGJ4",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "promotion-near-miss",
         "gate"
@@ -347,7 +347,7 @@
       "address_0": "bc1q5hrky4qgk2yqdg334z0g0r4348jvuj8khremkg",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "promotion-near-miss",
         "gate"
@@ -364,7 +364,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-path-not-inferable",
       "covers": [
         "promotion-near-miss",
@@ -382,7 +382,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-path-not-inferable",
       "covers": [
         "promotion-near-miss",
@@ -400,7 +400,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-account-not-zero",
       "covers": [
         "promotion-near-miss",
@@ -418,7 +418,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-path-not-inferable",
       "covers": [
         "promotion-near-miss",
@@ -436,7 +436,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-fingerprint-no-path",
       "covers": [
         "promotion-near-miss",
@@ -456,7 +456,7 @@
       "address_0": "1G7ZM6uRVewv4NRf28yYVmsS6fZpErh7pz",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "promotion-near-miss",
         "gate"
@@ -475,7 +475,7 @@
       "address_0": "1G7ZM6uRVewv4NRf28yYVmsS6fZpErh7pz",
       "gate_open": true,
       "outcome": "as-decides",
-      "exit_code": 2,
+      "exit_code": 8,
       "covers": [
         "promotion-near-miss",
         "whitespace",
@@ -493,7 +493,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "promotion-testnet-key",
       "covers": [
         "promotion-near-miss",
@@ -951,7 +951,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -967,7 +967,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -983,7 +983,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -999,7 +999,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1015,7 +1015,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1031,7 +1031,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1047,7 +1047,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1063,7 +1063,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "bluewallet-no-name",
       "covers": [
         "gate"
@@ -1080,7 +1080,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1096,7 +1096,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1112,7 +1112,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1128,7 +1128,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1144,7 +1144,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "multi-record",
-      "exit_code": 4,
+      "exit_code": 2,
       "refusal_row": "multi-record-descriptor",
       "covers": [
         "gate"
@@ -1161,7 +1161,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "unparseable",
       "covers": [
         "gate"
@@ -1178,7 +1178,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "unparseable",
       "covers": [
         "gate"
@@ -1195,7 +1195,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "unparseable",
       "covers": [
         "gate"
@@ -1212,7 +1212,7 @@
       "format": "none",
       "gate_open": false,
       "outcome": "record-refusal",
-      "exit_code": 4,
+      "exit_code": 2,
       "covers": [
         "gate"
       ],
@@ -1228,7 +1228,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "unparseable",
       "covers": [
         "gate"
@@ -1245,7 +1245,7 @@
       "format": "none",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "unparseable",
       "covers": [
         "gate"
@@ -1262,7 +1262,7 @@
       "format": "bip380",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "key-identity",
       "covers": [
         "gate"
@@ -1279,7 +1279,7 @@
       "format": "bip380",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "key-identity-duplicate",
       "covers": [
         "gate"
@@ -1296,7 +1296,7 @@
       "format": "bip380",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "key-identity-duplicate",
       "covers": [
         "gate"
@@ -1313,7 +1313,7 @@
       "format": "bip380",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "key-identity-duplicate",
       "covers": [
         "gate"
@@ -1330,7 +1330,7 @@
       "format": "bip380",
       "gate_open": true,
       "outcome": "descriptor-refusal",
-      "exit_code": 3,
+      "exit_code": 2,
       "refusal_row": "key-identity",
       "covers": [
         "gate"

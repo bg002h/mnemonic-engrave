@@ -40,7 +40,9 @@ inw() { python3 -I -c 'import sys; c=lambda t: " ".join(t.split()); sys.exit(0 i
 hasw() { inw "$1" "$2" && echo "ok   $1 has: ${2:0:60}" || bad "$1 lacks: $2"; }
 lacksw() { inw "$1" "$2" && bad "$1 still has: $2" || echo "ok   $1 lacks: ${2:0:60}"; }
 
-SHA=71bba6f24a4b3613d9d7ac7fafa7fc43ff35d1b557ec5b9189b3a3fc6ad5b227
+# Re-pinned by the constellation exit-code change (the file's exit_code values moved;
+# design/FIX_sec_canonical_keeps_xpub_depth.md records the earlier 71bba6f2 pin).
+SHA=ec4b6e216bb9e064319ec5c66fcdac47f64055ce4089e2058ed211f911bb5ade
 J=crates/me-cli/testdata/descriptor_seam_vectors.json
 SPEC=design/SPEC_descriptor_input.md
 

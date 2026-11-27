@@ -78,7 +78,10 @@ pub enum SealError {
         source: record::RecordError,
     },
     Container(container::ContainerError),
+    /// v1: the passphrase `seal` GENERATED is not a valid mnemonic -- a bug.
+    /// A caller-typed v2 passphrase that fails is [`SealError::Password`].
     Passphrase(String),
+    /// An AEAD failure while sealing -- a bug.
     Crypto(CryptoError),
     Iterations(u32),
     SecretInPublic(usize),
@@ -86,12 +89,42 @@ pub enum SealError {
     TooLarge(usize),
     /// v2 (S1b §14.4): the titles record or its agreement with the seed records.
     Titles(titles::TitlesError),
-    /// v2 (S1b §14.5): the n-word password's word count or a word off the list.
+    /// v2 (S1b §14.5): the n-word password's word count or a word off the
+    /// list, or a `pw_form` 0 passphrase without a BIP-39 checksum: the
+    /// caller's words, so invalid input.
     Password(String),
     /// v2: `pw_form` is neither 0 nor 6 to 12.
     PwForm(u8),
     /// v2: `pw_form` 6 to 12 with fewer than 600,000 iterations.
     PwFormIterations(u32),
+}
+
+impl SealError {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3). Exhaustive on
+    /// purpose (R13).
+    ///
+    /// - USAGE (64): the settings -- `--iterations` and the v2 password form.
+    /// - INTERNAL (101): what `seal` cannot reach with a passphrase it
+    ///   generated itself (an invalid generated passphrase, an AEAD failure).
+    /// - INVALID (2): the records -- an input wrong for `seal` whatever the
+    ///   flags.
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
+        match self {
+            SealError::Iterations(_) | SealError::PwForm(_) | SealError::PwFormIterations(_) => {
+                exit::USAGE
+            }
+            SealError::Passphrase(_) | SealError::Crypto(_) => exit::INTERNAL,
+            SealError::Record(_)
+            | SealError::RecordAt { .. }
+            | SealError::Container(_)
+            | SealError::SecretInPublic(_)
+            | SealError::Empty
+            | SealError::TooLarge(_)
+            | SealError::Titles(_)
+            | SealError::Password(_) => exit::INVALID,
+        }
+    }
 }
 
 impl std::fmt::Display for SealError {
@@ -352,6 +385,35 @@ pub enum OpenError {
     Titles(titles::TitlesError),
 }
 
+impl OpenError {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3) of an OPEN with a
+    /// password the user typed. Exhaustive on purpose (R13).
+    ///
+    /// - NO (1): [`OpenError::Authentication`] -- the typed password was
+    ///   compared with the container and came out no (test 4). AEAD cannot
+    ///   tell a wrong password from an altered payload (ciphertext, tag or
+    ///   authenticated header), so BOTH are 1, and the message names both
+    ///   ("wrong password, or this payload has been altered"). An altered
+    ///   payload is 2 only where it is caught before the tag: a malformed
+    ///   header, section or record.
+    /// - INVALID (2): everything else -- a malformed header, section or record,
+    ///   or a password that is malformed before any comparison.
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
+        match self {
+            OpenError::Authentication => exit::NO,
+            OpenError::Wire(_)
+            | OpenError::Public(_)
+            | OpenError::PasswordWordCount { .. }
+            | OpenError::PasswordWord(_)
+            | OpenError::Passphrase
+            | OpenError::Container(_)
+            | OpenError::Record { .. }
+            | OpenError::Titles(_) => exit::INVALID,
+        }
+    }
+}
+
 impl std::fmt::Display for OpenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -570,7 +632,10 @@ pub(crate) fn seal_v2_deterministic(
         }
     } else {
         if !passphrase::is_valid(words) {
-            return Err(SealError::Passphrase(
+            // `Password`, not `Passphrase`: these words were TYPED by the
+            // caller, so a bad checksum is invalid input (2). `Passphrase` is
+            // kept for the v1 path, where `seal` generated the words itself.
+            return Err(SealError::Password(
                 "passphrase is not a checksum-valid BIP-39 mnemonic".into(),
             ));
         }
@@ -714,6 +779,103 @@ mod v2_tests;
 mod tests {
     use super::*;
     use std::fmt::Write as _;
+
+    /// The variant's name. No wildcard: a new variant does not compile until
+    /// it is named here, and the table test then fails until it is listed.
+    fn seal_variant(e: &SealError) -> &'static str {
+        match e {
+            SealError::Record(_) => "Record",
+            SealError::RecordAt { .. } => "RecordAt",
+            SealError::Container(_) => "Container",
+            SealError::Passphrase(_) => "Passphrase",
+            SealError::Crypto(_) => "Crypto",
+            SealError::Iterations(_) => "Iterations",
+            SealError::SecretInPublic(_) => "SecretInPublic",
+            SealError::Empty => "Empty",
+            SealError::TooLarge(_) => "TooLarge",
+            SealError::Titles(_) => "Titles",
+            SealError::Password(_) => "Password",
+            SealError::PwForm(_) => "PwForm",
+            SealError::PwFormIterations(_) => "PwFormIterations",
+        }
+    }
+
+    /// R13's table test: EVERY SealError variant, each with its expected
+    /// code written as a literal.
+    #[test]
+    fn every_seal_error_maps_to_its_exit_code() {
+        let table: Vec<(SealError, u8)> = vec![
+            (SealError::Record(record::RecordError::NotLowercase(0)), 2),
+            (
+                SealError::RecordAt {
+                    section: "secret",
+                    index: 0,
+                    source: record::RecordError::NotLowercase(0),
+                },
+                2,
+            ),
+            (SealError::Container(container::ContainerError::NotUtf8), 2),
+            (SealError::Passphrase("x".into()), 101),
+            (SealError::Crypto(CryptoError::TooShort), 101),
+            (SealError::Iterations(1), 64),
+            (SealError::SecretInPublic(0), 2),
+            (SealError::Empty, 2),
+            (SealError::TooLarge(1), 2),
+            (SealError::Titles(titles::TitlesError::Duplicate), 2),
+            (SealError::Password("x".into()), 2),
+            (SealError::PwForm(9), 64),
+            (SealError::PwFormIterations(1), 64),
+        ];
+        let names: std::collections::BTreeSet<_> =
+            table.iter().map(|(e, _)| seal_variant(e)).collect();
+        assert_eq!(names.len(), table.len(), "a variant is listed twice");
+        assert_eq!(names.len(), 13, "the table must list every variant");
+        for (e, want) in table {
+            assert_eq!(e.exit_code(), want, "{e}");
+        }
+    }
+
+    /// R13's table test for the OPEN side (M1): a wrong password on a
+    /// well-formed container is NO (1), never INTERNAL; every other open
+    /// failure is INVALID (2). Every variant, with a literal.
+    #[test]
+    fn every_open_error_maps_to_its_exit_code() {
+        fn name(e: &OpenError) -> &'static str {
+            match e {
+                OpenError::Wire(_) => "Wire",
+                OpenError::Public(_) => "Public",
+                OpenError::PasswordWordCount { .. } => "PasswordWordCount",
+                OpenError::PasswordWord(_) => "PasswordWord",
+                OpenError::Passphrase => "Passphrase",
+                OpenError::Authentication => "Authentication",
+                OpenError::Container(_) => "Container",
+                OpenError::Record { .. } => "Record",
+                OpenError::Titles(_) => "Titles",
+            }
+        }
+        let table: Vec<(OpenError, u8)> = vec![
+            (OpenError::Wire(wire::WireError::TooShort(1)), 2),
+            (OpenError::Public(SealError::Empty), 2),
+            (OpenError::PasswordWordCount { got: 5, want: 6 }, 2),
+            (OpenError::PasswordWord(1), 2),
+            (OpenError::Passphrase, 2),
+            (OpenError::Authentication, 1),
+            (OpenError::Container(container::ContainerError::NotUtf8), 2),
+            (
+                OpenError::Record {
+                    index: 0,
+                    source: record::RecordError::NotLowercase(0),
+                },
+                2,
+            ),
+            (OpenError::Titles(titles::TitlesError::Duplicate), 2),
+        ];
+        let names: std::collections::BTreeSet<_> = table.iter().map(|(e, _)| name(e)).collect();
+        assert_eq!(names.len(), 9, "the table must list every variant");
+        for (e, want) in table {
+            assert_eq!(e.exit_code(), want, "{e}");
+        }
+    }
 
     const PASS: &str = "beef beef beef beef beef beef beef beef beef beef beef beef";
 

@@ -30,10 +30,10 @@
 //!
 //! ## What this crate therefore does NOT hold
 //!
-//! - **No exit-code integer, and no binary→code mapping.** The binaries agree
-//!   on almost nothing: on the same invalid artifact `md` 1, `mk` 2, `ms` 1,
-//!   `mnemonic` 2; on a clap usage error `md` 2, `mk` 64, `ms` 64, `mt` 2,
-//!   `me` 2. See [`exit`].
+//! - **No binary→code mapping.** The exit-code NUMBERS are here
+//!   (`SPEC_constellation_exit_codes.md` §3, its decision 4), with the bit-set
+//!   that sums them; which of a binary's failures is which class is that
+//!   binary's own classification. See [`exit`].
 //! - **No disqualifying permission mask.** Not `0o044`, not `0o077`.
 //!   See [`fd`].
 //! - **No record classification.** Deciding what a string IS belongs to each
@@ -59,7 +59,8 @@
 
 /// `--in` / `--out` / `-`, and where a container's bytes are going.
 pub mod channel;
-/// Refusal decisions, their wording, and the ordering rule. No integers.
+/// The constellation exit codes (constants and the [`exit::Bits`] set), and
+/// the refusal decisions with their ordering rule.
 pub mod exit;
 /// The fd mechanism: the mode that was measured, and nothing about what it
 /// means.

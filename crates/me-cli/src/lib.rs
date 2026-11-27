@@ -42,6 +42,23 @@ pub enum ConvertError {
     Ndef(ndef::NdefError),
 }
 
+impl ConvertError {
+    /// The exit code (`SPEC_constellation_exit_codes.md` §3). Every arm is an
+    /// INVALID input: an ms1 is an input the converter has no flag to take (the
+    /// spec's worked table places "an ms1 to `me --hex`" at 2). The match is
+    /// exhaustive on purpose (R13): a new variant does not compile until it is
+    /// classified.
+    pub fn exit_code(&self) -> u8 {
+        use mnemonic_io_lib::exit;
+        match self {
+            ConvertError::Classify(_)
+            | ConvertError::RefusedSecret
+            | ConvertError::Validate(_)
+            | ConvertError::Ndef(_) => exit::INVALID,
+        }
+    }
+}
+
 impl std::fmt::Display for ConvertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -84,6 +101,32 @@ pub fn convert(input: &str) -> Result<Vec<u8>, ConvertError> {
 
 #[cfg(test)]
 mod tests {
+
+    /// R13's table test: EVERY ConvertError variant is INVALID (2), each
+    /// listed with a literal. An ms1 to the converter is the spec's worked
+    /// example. The `match` has no wildcard, so a new variant fails to
+    /// compile here until it is listed.
+    #[test]
+    fn every_convert_error_maps_to_its_exit_code() {
+        use super::{classify, ndef, validate, ConvertError as C};
+        let table: Vec<(C, u8)> = vec![
+            (C::Classify(classify::ClassifyError::NoSeparator), 2),
+            (C::RefusedSecret, 2),
+            (C::Validate(validate::ValidateError::Mt), 2),
+            (C::Ndef(ndef::NdefError::TooLong(1)), 2),
+        ];
+        let mut seen = [false; 4];
+        for (e, want) in &table {
+            seen[match e {
+                C::Classify(_) => 0,
+                C::RefusedSecret => 1,
+                C::Validate(_) => 2,
+                C::Ndef(_) => 3,
+            }] = true;
+            assert_eq!(e.exit_code(), *want, "{e}");
+        }
+        assert!(seen.iter().all(|&x| x), "the table must list every variant");
+    }
     use super::*;
 
     const MD1_VALID: &str = "md1yqpqqxqq8xtwhw4xwn4qh";
